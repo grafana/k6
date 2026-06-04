@@ -385,7 +385,9 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		c.globalState.Logger.Debug("Logger format: JSON")
 	default:
 		c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
-			ForceColors: loggerForceColors, DisableColors: c.globalState.Flags.NoColor,
+			ForceColors:     loggerForceColors,
+			DisableColors:   c.globalState.Flags.NoColor,
+			TimestampFormat: time.RFC3339Nano,
 		})
 		c.globalState.Logger.Debug("Logger format: TEXT")
 	}
