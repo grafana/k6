@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -205,7 +206,20 @@ func (c *Capturer) process(req captureReq) {
 	if err := c.opts.Persister.Persist(req.ctx, path, bytes.NewReader(buf)); err != nil {
 		c.opts.Logger.Warnf("autoscreenshot",
 			"persist failed (path=%s): %v", path, err)
+		return
 	}
+
+	// Emit a structured marker per persisted capture so external
+	// tooling (a wrapper script, the SM agent, a future plugin) can
+	// discover screenshots without scanning the filesystem. We write
+	// to stderr directly rather than through opts.Logger because
+	// callers commonly wire a NullLogger (to suppress the existing
+	// capture/persist warnings) and the marker must be visible
+	// regardless of that choice. The `auto-screenshot:` prefix is
+	// the stable contract; downstream parsers anchor on it.
+	fmt.Fprintf(os.Stderr,
+		"auto-screenshot: reason=%s seq=%d unix_ms=%d path=%s\n",
+		req.reason, seq, started.UnixMilli(), path)
 }
 
 // buildPath produces the storage path for one captured frame.
