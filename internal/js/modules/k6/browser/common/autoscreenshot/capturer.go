@@ -64,6 +64,17 @@ type CapturerOptions struct {
 	// Registry. Defaults to true at the Registry layer; tests that
 	// construct Capturers directly should set it explicitly.
 	DedupEnabled bool
+	// PersistEnabled controls whether process() writes captured frames
+	// (and their dedup sidecars) to the Persister. When false the
+	// Persister is never invoked: the bytes only flow through any
+	// onPersisted closure attached to each capture request. Useful
+	// for consumers that prefer to ship bytes elsewhere (e.g. a
+	// page.on('auto-screenshot') handler pushing to Loki) and do not
+	// want the local-disk write.
+	//
+	// Wired from K6_BROWSER_AUTO_SCREENSHOT_PERSIST via the Registry.
+	// Defaults to true at the Registry layer.
+	PersistEnabled bool
 }
 
 // Capturer dispatches screenshot capture requests to a worker goroutine with
@@ -252,24 +263,32 @@ func (c *Capturer) process(req captureReq) {
 
 	c.mu.Lock()
 	if c.opts.DedupEnabled && !req.forced && c.seq > 0 && hash == c.lastHash {
-		// Dedup path. Record the elided event against the previous
-		// persisted frame so downstream tooling can show the full
-		// sequence of API calls that mapped to a single screenshot.
-		c.lastDedups = append(c.lastDedups, dedupEntry{
-			API:    apiForLog,
-			UnixMs: started.UnixMilli(),
-			Reason: req.reason,
-		})
+		// Dedup path. The frame is byte-identical to the most
+		// recently persisted one; do not invoke the onPersisted
+		// callback and do not fire any auto-screenshot event.
 		dupeOfSeq := c.seq
 		dupeOfPath := c.lastPath
-		dedupsSnapshot := append([]dedupEntry(nil), c.lastDedups...)
+		var dedupsSnapshot []dedupEntry
+		if c.opts.PersistEnabled {
+			// Only maintain the dedup-sidecar bucket when we are
+			// also persisting screenshots; the bucket points back
+			// to a path on disk, which won't exist in event-only mode.
+			c.lastDedups = append(c.lastDedups, dedupEntry{
+				API:    apiForLog,
+				UnixMs: started.UnixMilli(),
+				Reason: req.reason,
+			})
+			dedupsSnapshot = append([]dedupEntry(nil), c.lastDedups...)
+		}
 		c.mu.Unlock()
 
 		fmt.Fprintf(os.Stderr,
 			"auto-screenshot: dedup api=%s reason=%s unix_ms=%d of_seq=%d of_path=%s\n",
 			apiForLog, req.reason, started.UnixMilli(), dupeOfSeq, dupeOfPath)
 
-		c.writeSidecar(req.ctx, dupeOfPath, dedupsSnapshot)
+		if c.opts.PersistEnabled {
+			c.writeSidecar(req.ctx, dupeOfPath, dedupsSnapshot)
+		}
 		return
 	}
 	c.lastHash = hash
@@ -279,18 +298,23 @@ func (c *Capturer) process(req captureReq) {
 	c.lastDedups = nil
 	c.mu.Unlock()
 
-	path := buildPath(c.opts.TestName, c.opts.VU, c.opts.Iter, seq, req.reason, req.apiName, started)
-	if err := c.opts.Persister.Persist(req.ctx, path, bytes.NewReader(buf)); err != nil {
-		c.opts.Logger.Warnf("autoscreenshot",
-			"persist failed (path=%s): %v", path, err)
-		return
+	// Persist branch — gated on PersistEnabled. If a persist fails we
+	// still fire the onPersisted callback below so a JS handler doing
+	// its own off-box upload (e.g. Loki) can salvage the frame.
+	var path string
+	if c.opts.PersistEnabled {
+		path = buildPath(c.opts.TestName, c.opts.VU, c.opts.Iter, seq, req.reason, req.apiName, started)
+		if err := c.opts.Persister.Persist(req.ctx, path, bytes.NewReader(buf)); err != nil {
+			c.opts.Logger.Warnf("autoscreenshot",
+				"persist failed (path=%s): %v", path, err)
+		} else {
+			// Commit lastPath only after a successful persist so any
+			// later dedups associate with a frame that really exists.
+			c.mu.Lock()
+			c.lastPath = path
+			c.mu.Unlock()
+		}
 	}
-
-	// Commit lastPath only after a successful persist so any later
-	// dedups associate with a frame that really exists on disk.
-	c.mu.Lock()
-	c.lastPath = path
-	c.mu.Unlock()
 
 	// Emit a structured marker per persisted capture so external
 	// tooling (a wrapper script, the SM agent, a future plugin) can

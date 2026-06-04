@@ -51,11 +51,12 @@ func ParseMode(s string) Mode {
 // when constructed with ModeOff, so callers in disabled mode get
 // no-op behaviour without nil checks.
 type Registry struct {
-	persister    Persister
-	testName     string
-	logger       *log.Logger
-	mode         Mode
-	dedupEnabled bool
+	persister      Persister
+	testName       string
+	logger         *log.Logger
+	mode           Mode
+	dedupEnabled   bool
+	persistEnabled bool
 
 	mu sync.Mutex
 	m  map[capturerKey]*Capturer
@@ -71,20 +72,22 @@ type capturerKey struct {
 // entirely.
 //
 // dedupEnabled controls whether the Capturers it produces apply CRC32
-// dedup. The caller is expected to have parsed the
-// K6_BROWSER_AUTO_SCREENSHOT_DEDUP env var (default true) before
-// constructing the Registry.
-func NewRegistry(mode Mode, persister Persister, testName string, logger *log.Logger, dedupEnabled bool) *Registry {
+// dedup; persistEnabled controls whether they write captured frames to
+// the Persister. Both default to true at the env-var parsing layer
+// (module.go); tests that construct the Registry directly pass these
+// explicitly.
+func NewRegistry(mode Mode, persister Persister, testName string, logger *log.Logger, dedupEnabled, persistEnabled bool) *Registry {
 	if mode == ModeOff {
 		return nil
 	}
 	return &Registry{
-		persister:    persister,
-		testName:     testName,
-		logger:       logger,
-		mode:         mode,
-		dedupEnabled: dedupEnabled,
-		m:            make(map[capturerKey]*Capturer),
+		persister:      persister,
+		testName:       testName,
+		logger:         logger,
+		mode:           mode,
+		dedupEnabled:   dedupEnabled,
+		persistEnabled: persistEnabled,
+		m:              make(map[capturerKey]*Capturer),
 	}
 }
 
@@ -112,13 +115,14 @@ func (r *Registry) OnIterStart(vu uint64, iter int64) *Capturer {
 		return c
 	}
 	c := NewCapturer(CapturerOptions{
-		Persister:    r.persister,
-		Logger:       r.logger,
-		TestName:     r.testName,
-		VU:           vu,
-		Iter:         iter,
-		BufferSize:   defaultBufferSize,
-		DedupEnabled: r.dedupEnabled,
+		Persister:      r.persister,
+		Logger:         r.logger,
+		TestName:       r.testName,
+		VU:             vu,
+		Iter:           iter,
+		BufferSize:     defaultBufferSize,
+		DedupEnabled:   r.dedupEnabled,
+		PersistEnabled: r.persistEnabled,
 	})
 	r.m[k] = c
 	return c

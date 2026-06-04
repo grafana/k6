@@ -33,14 +33,15 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		PidRegistry         *pidRegistry
-		remoteRegistry      *remoteRegistry
-		initOnce            *sync.Once
-		tracesMetadata      map[string]string
-		filePersister       filePersister
-		testRunID           string
-		autoScreenshotMode  autoscreenshot.Mode
-		autoScreenshotDedup bool
+		PidRegistry           *pidRegistry
+		remoteRegistry        *remoteRegistry
+		initOnce              *sync.Once
+		tracesMetadata        map[string]string
+		filePersister         filePersister
+		testRunID             string
+		autoScreenshotMode    autoscreenshot.Mode
+		autoScreenshotDedup   bool
+		autoScreenshotPersist bool
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -87,6 +88,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 		resolveTestName(vu),
 		log.NewNullLogger(),
 		m.autoScreenshotDedup,
+		m.autoScreenshotPersist,
 	)
 
 	return &ModuleInstance{
@@ -170,6 +172,17 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if v, ok := initEnv.LookupEnv(env.AutoScreenshotDedup); ok {
 		if b, perr := strconv.ParseBool(v); perr == nil {
 			m.autoScreenshotDedup = b
+		}
+	}
+
+	// Persist defaults to enabled (matches existing on-disk / S3
+	// behaviour). Set K6_BROWSER_AUTO_SCREENSHOT_PERSIST=false to opt
+	// into event-only mode (e.g. when a page.on('auto-screenshot')
+	// handler ships the bytes elsewhere).
+	m.autoScreenshotPersist = true
+	if v, ok := initEnv.LookupEnv(env.AutoScreenshotPersist); ok {
+		if b, perr := strconv.ParseBool(v); perr == nil {
+			m.autoScreenshotPersist = b
 		}
 	}
 }

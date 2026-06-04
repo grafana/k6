@@ -111,6 +111,7 @@ func TestCapturer(t *testing.T) {
 		Iter:       0,
 		BufferSize: 10,
 		DedupEnabled: true,
+		PersistEnabled: true,
 	})
 
 	wantBytes := []byte{0xde, 0xad, 0xbe, 0xef}
@@ -145,6 +146,7 @@ func TestCapturer_DedupsIdenticalFrames(t *testing.T) {
 		Iter:       0,
 		BufferSize: 10,
 		DedupEnabled: true,
+		PersistEnabled: true,
 	})
 
 	same := []byte{1, 2, 3, 4, 5}
@@ -179,6 +181,7 @@ func TestCapturer_DedupDisabled_PersistsEveryFrame(t *testing.T) {
 		Iter:         0,
 		BufferSize:   10,
 		DedupEnabled: false,
+		PersistEnabled: true,
 	})
 
 	same := []byte{1, 2, 3, 4, 5}
@@ -213,6 +216,7 @@ func TestCapturer_DropsOldestOnBackpressure(t *testing.T) {
 		Iter:       0,
 		BufferSize: 3,
 		DedupEnabled: true,
+		PersistEnabled: true,
 	})
 
 	// First capture is pulled by the worker and blocks in the persister.
@@ -263,6 +267,7 @@ func TestCapturer_CloseDrainsPending(t *testing.T) {
 		Iter:       0,
 		BufferSize: 100,
 		DedupEnabled: true,
+		PersistEnabled: true,
 	})
 
 	const n = 5
@@ -303,6 +308,7 @@ func TestCapturer_CaptureForced_BypassesDedup(t *testing.T) {
 		Iter:       0,
 		BufferSize: 10,
 		DedupEnabled: true,
+		PersistEnabled: true,
 	})
 
 	// All four calls return byte-identical screenshots so the dedup
