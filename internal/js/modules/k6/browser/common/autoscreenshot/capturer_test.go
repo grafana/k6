@@ -110,6 +110,7 @@ func TestCapturer(t *testing.T) {
 		VU:         1,
 		Iter:       0,
 		BufferSize: 10,
+		DedupEnabled: true,
 	})
 
 	wantBytes := []byte{0xde, 0xad, 0xbe, 0xef}
@@ -143,6 +144,7 @@ func TestCapturer_DedupsIdenticalFrames(t *testing.T) {
 		VU:         1,
 		Iter:       0,
 		BufferSize: 10,
+		DedupEnabled: true,
 	})
 
 	same := []byte{1, 2, 3, 4, 5}
@@ -161,6 +163,44 @@ func TestCapturer_DedupsIdenticalFrames(t *testing.T) {
 	assert.Equal(t, uint64(0), c.Dropped(), "dedup is not a drop")
 }
 
+// When DedupEnabled is false, byte-identical consecutive frames must
+// all persist. Mirrors K6_BROWSER_AUTO_SCREENSHOT_DEDUP=false at the
+// Capturer layer. Sidecar JSONs MUST NOT be written in this mode
+// because the dedup bucket is never populated.
+func TestCapturer_DedupDisabled_PersistsEveryFrame(t *testing.T) {
+	t.Parallel()
+
+	p := newRecordingPersister()
+	c := NewCapturer(CapturerOptions{
+		Persister:    p,
+		Logger:       log.NewNullLogger(),
+		TestName:     "demo",
+		VU:           1,
+		Iter:         0,
+		BufferSize:   10,
+		DedupEnabled: false,
+	})
+
+	same := []byte{1, 2, 3, 4, 5}
+	fn := func(_ context.Context) ([]byte, error) { return same, nil }
+
+	c.Capture(context.Background(), "action", "Test.action", fn)
+	c.Capture(context.Background(), "action", "Test.action", fn)
+	c.Capture(context.Background(), "action", "Test.action", fn)
+
+	c.Close()
+
+	pngs := filterPNGs(p.snapshot())
+	assert.Len(t, pngs, 3, "every triggered frame must persist when dedup is off")
+
+	for _, f := range p.snapshot() {
+		assert.False(t, strings.HasSuffix(f.path, ".json"),
+			"no sidecars should be written when dedup is disabled, got %q", f.path)
+	}
+
+	assert.Equal(t, uint64(0), c.Dropped())
+}
+
 func TestCapturer_DropsOldestOnBackpressure(t *testing.T) {
 	t.Parallel()
 
@@ -172,6 +212,7 @@ func TestCapturer_DropsOldestOnBackpressure(t *testing.T) {
 		VU:         1,
 		Iter:       0,
 		BufferSize: 3,
+		DedupEnabled: true,
 	})
 
 	// First capture is pulled by the worker and blocks in the persister.
@@ -221,6 +262,7 @@ func TestCapturer_CloseDrainsPending(t *testing.T) {
 		VU:         1,
 		Iter:       0,
 		BufferSize: 100,
+		DedupEnabled: true,
 	})
 
 	const n = 5
@@ -260,6 +302,7 @@ func TestCapturer_CaptureForced_BypassesDedup(t *testing.T) {
 		VU:         1,
 		Iter:       0,
 		BufferSize: 10,
+		DedupEnabled: true,
 	})
 
 	// All four calls return byte-identical screenshots so the dedup

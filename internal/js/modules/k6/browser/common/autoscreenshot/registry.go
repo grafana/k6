@@ -51,10 +51,11 @@ func ParseMode(s string) Mode {
 // when constructed with ModeOff, so callers in disabled mode get
 // no-op behaviour without nil checks.
 type Registry struct {
-	persister Persister
-	testName  string
-	logger    *log.Logger
-	mode      Mode
+	persister    Persister
+	testName     string
+	logger       *log.Logger
+	mode         Mode
+	dedupEnabled bool
 
 	mu sync.Mutex
 	m  map[capturerKey]*Capturer
@@ -68,16 +69,22 @@ type capturerKey struct {
 // NewRegistry constructs a Registry. Returns nil if mode is ModeOff so that
 // downstream code can rely on nil-safety to disable auto-screenshot work
 // entirely.
-func NewRegistry(mode Mode, persister Persister, testName string, logger *log.Logger) *Registry {
+//
+// dedupEnabled controls whether the Capturers it produces apply CRC32
+// dedup. The caller is expected to have parsed the
+// K6_BROWSER_AUTO_SCREENSHOT_DEDUP env var (default true) before
+// constructing the Registry.
+func NewRegistry(mode Mode, persister Persister, testName string, logger *log.Logger, dedupEnabled bool) *Registry {
 	if mode == ModeOff {
 		return nil
 	}
 	return &Registry{
-		persister: persister,
-		testName:  testName,
-		logger:    logger,
-		mode:      mode,
-		m:         make(map[capturerKey]*Capturer),
+		persister:    persister,
+		testName:     testName,
+		logger:       logger,
+		mode:         mode,
+		dedupEnabled: dedupEnabled,
+		m:            make(map[capturerKey]*Capturer),
 	}
 }
 
@@ -105,12 +112,13 @@ func (r *Registry) OnIterStart(vu uint64, iter int64) *Capturer {
 		return c
 	}
 	c := NewCapturer(CapturerOptions{
-		Persister:  r.persister,
-		Logger:     r.logger,
-		TestName:   r.testName,
-		VU:         vu,
-		Iter:       iter,
-		BufferSize: defaultBufferSize,
+		Persister:    r.persister,
+		Logger:       r.logger,
+		TestName:     r.testName,
+		VU:           vu,
+		Iter:         iter,
+		BufferSize:   defaultBufferSize,
+		DedupEnabled: r.dedupEnabled,
 	})
 	r.m[k] = c
 	return c
