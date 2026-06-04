@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsontext
 
 import (
@@ -9,6 +11,8 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/go-json-experiment/json/internal/jsonflags"
+	"github.com/go-json-experiment/json/internal/jsonopts"
 	"github.com/go-json-experiment/json/internal/jsonwire"
 )
 
@@ -26,6 +30,19 @@ func (e *ioError) Unwrap() error {
 	return e.err
 }
 
+type numError struct {
+	accessor string // either "Int", "Uint", or "Float"
+	value    string // e.g., "1e1000"
+	err      error  // either [strconv.ErrSyntax] or [strconv.ErrRange]
+}
+
+func (e *numError) Error() string {
+	return "jsontext.Token(" + e.value + ")." + e.accessor + " error: " + e.err.Error()
+}
+func (e *numError) Unwrap() error {
+	return e.err
+}
+
 // SyntacticError is a description of a syntactic error that occurred when
 // encoding or decoding JSON according to the grammar.
 //
@@ -34,7 +51,7 @@ type SyntacticError struct {
 	requireKeyedLiterals
 	nonComparable
 
-	// ByteOffset indicates that an error occurred after this byte offset.
+	// ByteOffset indicates that an error occurred at or after this byte offset.
 	ByteOffset int64
 	// JSONPointer indicates that an error occurred within this JSON value
 	// as indicated using the JSON Pointer notation (see RFC 6901).
@@ -55,6 +72,7 @@ type SyntacticError struct {
 // If the underlying error is a [pointerSuffixError],
 // then the suffix is appended to the derived pointer.
 func wrapSyntacticError(state interface {
+	options() *jsonopts.Struct
 	offsetAt(pos int) int64
 	AppendStackPointer(b []byte, where int) []byte
 }, err error, pos, where int) error {
@@ -80,6 +98,21 @@ func wrapSyntacticError(state interface {
 			}
 		}
 		err = jsonwire.NewInvalidCharacterError(d.buf[pos:], where)
+	}
+	if state.options().Flags.Get(jsonflags.ReportErrorsWithLegacySemantics) && err != io.ErrUnexpectedEOF {
+		// The v1 error offset more consistently reported
+		// the number of bytes read that lead to the error.
+		// This implies that the offset is after the invalid text.
+		if werr, ok := err.(*jsonwire.InvalidTextError); ok && werr != nil {
+			offset += int64(len(werr.What))
+		} else {
+			// This implies a structural error (e.g., parsing a JSON number
+			// when the grammar is expecting a JSON string for the object name).
+			// In such a case, simply increment by one, since the first byte
+			// is usually sufficient to indicate that the incoming token
+			// cannot possibly be correct.
+			offset++
+		}
 	}
 	return &SyntacticError{ByteOffset: offset, JSONPointer: Pointer(ptr), Err: err}
 }
