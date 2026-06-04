@@ -9,6 +9,7 @@ package browser
 import (
 	"context"
 	"io"
+	"strconv"
 	"sync"
 
 	"github.com/grafana/sobek"
@@ -32,13 +33,14 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		PidRegistry        *pidRegistry
-		remoteRegistry     *remoteRegistry
-		initOnce           *sync.Once
-		tracesMetadata     map[string]string
-		filePersister      filePersister
-		testRunID          string
-		autoScreenshotMode autoscreenshot.Mode
+		PidRegistry         *pidRegistry
+		remoteRegistry      *remoteRegistry
+		initOnce            *sync.Once
+		tracesMetadata      map[string]string
+		filePersister       filePersister
+		testRunID           string
+		autoScreenshotMode  autoscreenshot.Mode
+		autoScreenshotDedup bool
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -84,6 +86,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 		m.filePersister,
 		resolveTestName(vu),
 		log.NewNullLogger(),
+		m.autoScreenshotDedup,
 	)
 
 	return &ModuleInstance{
@@ -156,5 +159,17 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	}
 	if v, ok := initEnv.LookupEnv(env.AutoScreenshot); ok {
 		m.autoScreenshotMode = autoscreenshot.ParseMode(v)
+	}
+
+	// CRC32 dedup defaults to enabled (current behaviour). Customers
+	// can opt out by setting K6_BROWSER_AUTO_SCREENSHOT_DEDUP=false
+	// (or 0/off) when the downstream consumer wants every triggered
+	// frame regardless of pixel equality. Unparseable values are
+	// silently treated as the default.
+	m.autoScreenshotDedup = true
+	if v, ok := initEnv.LookupEnv(env.AutoScreenshotDedup); ok {
+		if b, perr := strconv.ParseBool(v); perr == nil {
+			m.autoScreenshotDedup = b
+		}
 	}
 }

@@ -13,7 +13,7 @@ func TestRegistry(t *testing.T) {
 	t.Parallel()
 
 	p := newRecordingPersister()
-	r := NewRegistry(ModeActions, p, "demo", log.NewNullLogger())
+	r := NewRegistry(ModeActions, p, "demo", log.NewNullLogger(), true)
 	require.NotNil(t, r)
 	assert.Equal(t, ModeActions, r.Mode())
 
@@ -43,7 +43,7 @@ func TestRegistry_DisabledWhenModeOff(t *testing.T) {
 	t.Parallel()
 
 	p := newRecordingPersister()
-	r := NewRegistry(ModeOff, p, "demo", log.NewNullLogger())
+	r := NewRegistry(ModeOff, p, "demo", log.NewNullLogger(), true)
 	assert.Nil(t, r, "ModeOff yields a nil registry so callers can rely on nil-safety")
 
 	// All methods must be nil-safe.

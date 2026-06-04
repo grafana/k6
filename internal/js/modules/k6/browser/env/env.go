@@ -77,6 +77,18 @@ const (
 	// after every browser API call). Unset or unknown values disable
 	// the feature.
 	AutoScreenshot = "K6_BROWSER_AUTO_SCREENSHOT"
+
+	// AutoScreenshotDedup controls whether the auto-screenshot capturer
+	// elides byte-identical consecutive frames via CRC32. Defaults to
+	// enabled (current behaviour). Accepted values follow strconv.ParseBool;
+	// set to "false"/"0"/"off" to disable, in which case every triggered
+	// frame persists regardless of whether it matches the preceding one.
+	//
+	// Disabling is useful for downstream consumers that want to see every
+	// capture attempt independent of pixel equality — typically when the
+	// consumer handles its own dedup or correlates by API-call seq rather
+	// than image bytes.
+	AutoScreenshotDedup = "K6_BROWSER_AUTO_SCREENSHOT_DEDUP"
 )
 
 // Infrastructural.

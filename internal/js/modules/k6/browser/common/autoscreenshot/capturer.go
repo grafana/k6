@@ -54,6 +54,16 @@ type CapturerOptions struct {
 	VU         uint64
 	Iter       int64
 	BufferSize int
+	// DedupEnabled controls whether process() compares each frame's
+	// CRC32 against the most recently persisted frame and elides it
+	// on match. When false, every triggered frame persists; the dedup
+	// sidecar mechanism is also disabled in that mode (no .json files
+	// next to the PNGs) since the bucket is always empty.
+	//
+	// Wired from the K6_BROWSER_AUTO_SCREENSHOT_DEDUP env var via the
+	// Registry. Defaults to true at the Registry layer; tests that
+	// construct Capturers directly should set it explicitly.
+	DedupEnabled bool
 }
 
 // Capturer dispatches screenshot capture requests to a worker goroutine with
@@ -223,7 +233,7 @@ func (c *Capturer) process(req captureReq) {
 	}
 
 	c.mu.Lock()
-	if !req.forced && c.seq > 0 && hash == c.lastHash {
+	if c.opts.DedupEnabled && !req.forced && c.seq > 0 && hash == c.lastHash {
 		// Dedup path. Record the elided event against the previous
 		// persisted frame so downstream tooling can show the full
 		// sequence of API calls that mapped to a single screenshot.
