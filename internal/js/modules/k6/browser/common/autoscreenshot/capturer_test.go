@@ -22,6 +22,20 @@ type persistedFrame struct {
 	at    time.Time
 }
 
+// filterPNGs returns only the frames whose path ends in ".png". Tests
+// that exercise the dedup path get JSON sidecar writes interleaved
+// with screenshot writes; use this helper when only the screenshots
+// matter for the assertion.
+func filterPNGs(frames []persistedFrame) []persistedFrame {
+	out := make([]persistedFrame, 0, len(frames))
+	for _, f := range frames {
+		if strings.HasSuffix(f.path, ".png") {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // recordingPersister captures every Persist call. When startCh is non-nil,
 // the first Persist call closes it to signal that the worker has reached
 // the persister. When block is non-nil, Persist blocks on it until closed.
@@ -140,8 +154,10 @@ func TestCapturer_DedupsIdenticalFrames(t *testing.T) {
 
 	c.Close()
 
-	frames := p.snapshot()
-	assert.Len(t, frames, 1)
+	// Filter out the dedup sidecar (.json) writes; we're asserting on
+	// persisted screenshots only.
+	pngs := filterPNGs(p.snapshot())
+	assert.Len(t, pngs, 1)
 	assert.Equal(t, uint64(0), c.Dropped(), "dedup is not a drop")
 }
 
@@ -261,7 +277,9 @@ func TestCapturer_CaptureForced_BypassesDedup(t *testing.T) {
 
 	c.Close()
 
-	frames := p.snapshot()
+	// Filter out the dedup sidecar (.json) writes; we're asserting on
+	// persisted screenshots only.
+	frames := filterPNGs(p.snapshot())
 	require.Len(t, frames, 2)
 	assert.Contains(t, frames[0].path, "action")
 	assert.Contains(t, frames[1].path, "failure")
