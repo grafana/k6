@@ -688,6 +688,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return mapRequestEvent(vu, pe), nil
 				case common.PageEventMetric:
 					// intentionally left blank
+				case common.PageEventAutoScreenshot:
+					// intentionally left blank — auto-screenshot
+					// events are fire-and-forget; awaiting them via
+					// waitForEvent is not supported in this version.
 				}
 				return nil, fmt.Errorf("waitForEvent does not support mapping for event: %q", event)
 			}
@@ -786,6 +790,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			common.PageEventResponse:        {mapp: mapResponseEvent},
 			common.PageEventRequestFinished: {mapp: mapRequestEvent},
 			common.PageEventRequestFailed:   {mapp: mapRequestEvent},
+			// auto-screenshot is fire-and-forget: a Loki push or
+			// other slow handler must not delay the next browser
+			// action. The Go side enqueues the handler task and
+			// returns immediately.
+			common.PageEventAutoScreenshot: {mapp: mapAutoScreenshotEvent},
 		}
 		pageEvent, ok := pageEvents[eventName]
 		if !ok {

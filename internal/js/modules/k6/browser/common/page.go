@@ -55,6 +55,15 @@ const (
 
 	// PageEventRequestFailed represents the page requestfailed event.
 	PageEventRequestFailed PageEventName = "requestfailed"
+
+	// PageEventAutoScreenshot is fired after the auto-screenshot
+	// capturer persists a frame for this page. Handlers receive the
+	// raw PNG bytes alongside the API name that triggered the capture
+	// and bookkeeping fields. Fire-and-forget — the Go-side dispatch
+	// does not wait for the JS handler to settle, so a slow handler
+	// (e.g. one that POSTs the bytes to a remote store) does not
+	// delay the script.
+	PageEventAutoScreenshot PageEventName = "auto-screenshot"
 )
 
 // PageEventHandler is a function type that handles a page on event.
@@ -509,6 +518,25 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", tag, matched)
 
 	return tag, matched
+}
+
+// OnAutoScreenshot calls [PageEventAutoScreenshot] handlers when the
+// auto-screenshot capturer has just persisted (or processed in
+// event-only mode) a frame for this page. Exported because it is
+// invoked from the browser/modulevu.go side, which lives in a
+// different Go package; the lowercase emit helpers in this file are
+// only called by code internal to common.
+//
+// Errors from JS handlers are logged at warn level and abort
+// iteration over the remaining handlers, matching the convention of
+// onRequest / onResponse.
+func (p *Page) OnAutoScreenshot(event *AutoScreenshotEvent) {
+	for handle := range p.eventHandlersByName(PageEventAutoScreenshot) {
+		if err := handle(PageEvent{AutoScreenshot: event}); err != nil {
+			p.logger.Warnf("OnAutoScreenshot", "handler returned an error: %v", err)
+			return
+		}
+	}
 }
 
 // onRequest calls [PageEventRequest] handlers after each request is made.
@@ -1432,6 +1460,46 @@ type PageEvent struct {
 
 	// Response is the read only response that was received from the WuT.
 	Response *Response
+
+	// AutoScreenshot is fired after the auto-screenshot capturer
+	// persists a frame for the page.
+	AutoScreenshot *AutoScreenshotEvent
+}
+
+// AutoScreenshotEvent is the payload delivered to handlers registered via
+// `page.on('auto-screenshot', ...)`. It carries the raw PNG bytes along
+// with the metadata describing which browser-API invocation triggered the
+// capture and where it sits in the per-iteration sequence.
+//
+// The event is fire-and-forget from the Go side. Handlers must not assume
+// any ordering relative to the JS API call that produced the screenshot;
+// for that, look at Seq / UnixMs to reconstruct the order.
+type AutoScreenshotEvent struct {
+	// Bytes is the captured PNG payload. Exposed to JS as an
+	// ArrayBuffer (zero-copy via sobek's NewArrayBuffer).
+	Bytes []byte
+
+	// API is the JS-visible browser API method name that triggered
+	// the capture (for example "Page.click", "Locator.waitFor"). The
+	// empty string is replaced with "unknown" by downstream consumers.
+	API string
+
+	// Reason is the trigger tag — currently "action" for successful
+	// API completions in Mode A, or "failure" for promise rejections.
+	Reason string
+
+	// Seq is the 1-based sequence number of the persisted frame
+	// within the current (VU, iteration) pair. Increments only when
+	// a frame survives dedup.
+	Seq uint64
+
+	// UnixMs is the millisecond timestamp at which the capture began.
+	UnixMs int64
+
+	// PageURL is the URL the page was on at capture time. Best-effort:
+	// empty when the page URL cannot be read (e.g. the page has been
+	// closed by the time the handler is dispatched).
+	PageURL string
 }
 
 // On subscribes to a page event for which the given handler will be executed

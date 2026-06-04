@@ -104,6 +104,18 @@ type dedupEntry struct {
 	Reason string `json:"reason"`
 }
 
+// OnPersistedFunc is the callback invoked after a frame survives dedup
+// (i.e. when it would persist). It receives the raw PNG bytes plus the
+// post-dedup seq and the unix-ms timestamp at which the capture began.
+//
+// Called on the Capturer's worker goroutine; implementations must not
+// block for long. The autoscreenshot package does not interpret what
+// the closure does — typical implementations dispatch a page-scoped
+// auto-screenshot event into the JS runtime.
+//
+// nil is fine; a nil closure is simply not invoked.
+type OnPersistedFunc func(bytes []byte, seq uint64, unixMs int64)
+
 // captureReq is the unit of work passed from Capture callers to the worker.
 type captureReq struct {
 	ctx context.Context
@@ -120,6 +132,10 @@ type captureReq struct {
 	// failure-debugging path where the user needs the state at the
 	// moment of failure regardless of whether it has visibly changed.
 	forced bool
+	// onPersisted is invoked after a frame survives dedup. The caller
+	// uses this closure to deliver the bytes to a page-scoped event
+	// handler (e.g. page.on('auto-screenshot')). Nil-safe.
+	onPersisted OnPersistedFunc
 }
 
 // NewCapturer constructs a Capturer and starts its worker goroutine. The
@@ -153,11 +169,12 @@ func NewCapturer(opts CapturerOptions) *Capturer {
 // consecutive frames are deduplicated via CRC32; if a caller needs the
 // frame persisted even when its bytes match the previous frame, use
 // CaptureForced instead.
-func (c *Capturer) Capture(ctx context.Context, reason, apiName string, fn CaptureFunc) {
+func (c *Capturer) Capture(ctx context.Context, reason, apiName string, fn CaptureFunc, onPersisted OnPersistedFunc) {
 	if c == nil {
 		return
 	}
-	if c.buf.push(captureReq{ctx: ctx, reason: reason, apiName: apiName, fn: fn}) {
+	req := captureReq{ctx: ctx, reason: reason, apiName: apiName, fn: fn, onPersisted: onPersisted}
+	if c.buf.push(req) {
 		c.mu.Lock()
 		c.dropped++
 		c.mu.Unlock()
@@ -170,11 +187,12 @@ func (c *Capturer) Capture(ctx context.Context, reason, apiName string, fn Captu
 // failure-debugging captures where the user needs the state at the
 // moment of failure even when it visually matches the last successful
 // action. Backpressure (drop-oldest) behaves the same as Capture.
-func (c *Capturer) CaptureForced(ctx context.Context, reason, apiName string, fn CaptureFunc) {
+func (c *Capturer) CaptureForced(ctx context.Context, reason, apiName string, fn CaptureFunc, onPersisted OnPersistedFunc) {
 	if c == nil {
 		return
 	}
-	if c.buf.push(captureReq{ctx: ctx, reason: reason, apiName: apiName, fn: fn, forced: true}) {
+	req := captureReq{ctx: ctx, reason: reason, apiName: apiName, fn: fn, forced: true, onPersisted: onPersisted}
+	if c.buf.push(req) {
 		c.mu.Lock()
 		c.dropped++
 		c.mu.Unlock()
@@ -288,6 +306,15 @@ func (c *Capturer) process(req captureReq) {
 	fmt.Fprintf(os.Stderr,
 		"auto-screenshot: reason=%s api=%s seq=%d unix_ms=%d path=%s\n",
 		req.reason, apiForLog, seq, started.UnixMilli(), path)
+
+	// Fire-and-forget event dispatch to whoever registered. The
+	// closure is invoked on the worker goroutine; it must not block
+	// for long. Typical implementation: enqueue a task on the page's
+	// task queue and return. nil is fine — older callers that haven't
+	// adopted the API simply don't get events.
+	if req.onPersisted != nil {
+		req.onPersisted(buf, seq, started.UnixMilli())
+	}
 }
 
 // writeSidecar persists the current dedup bucket for screenshotPath as

@@ -148,13 +148,38 @@ func (vu moduleVU) captureOpenPages(reason, apiName string, force bool) {
 		Quality: 100,
 	}
 	for _, page := range pages {
+		page := page // shadow so each iteration's closures capture
+		// the right Page; without this every closure would see the
+		// final value of the loop variable in Go versions older than
+		// 1.22's loopvar semantics.
 		fn := func(_ context.Context) ([]byte, error) {
 			return page.Screenshot(opts, noopScreenshotPersister{})
 		}
+
+		// onPersisted is invoked on the autoscreenshot worker goroutine
+		// once the capturer has decided the frame survives dedup. We
+		// translate the raw outputs into a typed AutoScreenshotEvent
+		// and hand it to the Page's event dispatcher, which queues
+		// any registered page.on('auto-screenshot') handler onto the
+		// VU's JS event loop. Fire-and-forget: Page.OnAutoScreenshot
+		// itself does not block (the queueTask underneath returns
+		// immediately for fire-and-forget event types).
+		onPersisted := func(buf []byte, seq uint64, unixMs int64) {
+			pageURL, _ := page.URL()
+			page.OnAutoScreenshot(&common.AutoScreenshotEvent{
+				Bytes:   buf,
+				API:     apiName,
+				Reason:  reason,
+				Seq:     seq,
+				UnixMs:  unixMs,
+				PageURL: pageURL,
+			})
+		}
+
 		if force {
-			c.CaptureForced(ctx, reason, apiName, fn)
+			c.CaptureForced(ctx, reason, apiName, fn, onPersisted)
 		} else {
-			c.Capture(ctx, reason, apiName, fn)
+			c.Capture(ctx, reason, apiName, fn, onPersisted)
 		}
 	}
 }
