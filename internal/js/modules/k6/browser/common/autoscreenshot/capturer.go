@@ -15,6 +15,7 @@ package autoscreenshot
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/crc32"
 	"io"
@@ -72,7 +73,25 @@ type Capturer struct {
 	mu       sync.Mutex
 	seq      uint64
 	lastHash uint32
-	dropped  uint64
+	// lastPath is the relative storage path of the most recently
+	// persisted frame. Used to associate subsequent dedup-elided
+	// frames with the screenshot they collapsed into.
+	lastPath string
+	// lastDedups accumulates the API-call events that have been
+	// dedup-elided against the most recently persisted frame. It
+	// is reset every time a new (non-dedup) frame persists and
+	// flushed to a JSON sidecar next to lastPath on each append.
+	lastDedups []dedupEntry
+	dropped    uint64
+}
+
+// dedupEntry records one API call whose frame was elided because its
+// bytes matched the previous persisted frame. Serialised as the
+// `deduped[]` array in the per-screenshot JSON sidecar.
+type dedupEntry struct {
+	API    string `json:"api"`
+	UnixMs int64  `json:"unix_ms"`
+	Reason string `json:"reason"`
 }
 
 // captureReq is the unit of work passed from Capture callers to the worker.
@@ -198,20 +217,39 @@ func (c *Capturer) process(req captureReq) {
 
 	hash := crc32.ChecksumIEEE(buf)
 
+	apiForLog := req.apiName
+	if apiForLog == "" {
+		apiForLog = "unknown"
+	}
+
 	c.mu.Lock()
 	if !req.forced && c.seq > 0 && hash == c.lastHash {
+		// Dedup path. Record the elided event against the previous
+		// persisted frame so downstream tooling can show the full
+		// sequence of API calls that mapped to a single screenshot.
+		c.lastDedups = append(c.lastDedups, dedupEntry{
+			API:    apiForLog,
+			UnixMs: started.UnixMilli(),
+			Reason: req.reason,
+		})
+		dupeOfSeq := c.seq
+		dupeOfPath := c.lastPath
+		dedupsSnapshot := append([]dedupEntry(nil), c.lastDedups...)
 		c.mu.Unlock()
+
+		fmt.Fprintf(os.Stderr,
+			"auto-screenshot: dedup api=%s reason=%s unix_ms=%d of_seq=%d of_path=%s\n",
+			apiForLog, req.reason, started.UnixMilli(), dupeOfSeq, dupeOfPath)
+
+		c.writeSidecar(req.ctx, dupeOfPath, dedupsSnapshot)
 		return
 	}
 	c.lastHash = hash
 	c.seq++
 	seq := c.seq
+	// New persisted frame opens a fresh dedup bucket.
+	c.lastDedups = nil
 	c.mu.Unlock()
-
-	apiForLog := req.apiName
-	if apiForLog == "" {
-		apiForLog = "unknown"
-	}
 
 	path := buildPath(c.opts.TestName, c.opts.VU, c.opts.Iter, seq, req.reason, req.apiName, started)
 	if err := c.opts.Persister.Persist(req.ctx, path, bytes.NewReader(buf)); err != nil {
@@ -219,6 +257,12 @@ func (c *Capturer) process(req captureReq) {
 			"persist failed (path=%s): %v", path, err)
 		return
 	}
+
+	// Commit lastPath only after a successful persist so any later
+	// dedups associate with a frame that really exists on disk.
+	c.mu.Lock()
+	c.lastPath = path
+	c.mu.Unlock()
 
 	// Emit a structured marker per persisted capture so external
 	// tooling (a wrapper script, the SM agent, a future plugin) can
@@ -234,6 +278,36 @@ func (c *Capturer) process(req captureReq) {
 	fmt.Fprintf(os.Stderr,
 		"auto-screenshot: reason=%s api=%s seq=%d unix_ms=%d path=%s\n",
 		req.reason, apiForLog, seq, started.UnixMilli(), path)
+}
+
+// writeSidecar persists the current dedup bucket for screenshotPath as
+// a JSON file at the same name with the ".json" extension. Overwrites
+// each time a new dedup event is appended; idempotent for a given
+// (screenshotPath, dedups) input.
+//
+// Errors are intentionally swallowed at warn level: the sidecar is a
+// dev-loop convenience and must not fail captures.
+func (c *Capturer) writeSidecar(ctx context.Context, screenshotPath string, dedups []dedupEntry) {
+	if screenshotPath == "" {
+		return
+	}
+	sidecarPath := strings.TrimSuffix(screenshotPath, ".png") + ".json"
+
+	payload := struct {
+		Deduped []dedupEntry `json:"deduped"`
+	}{Deduped: dedups}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		c.opts.Logger.Warnf("autoscreenshot",
+			"marshal dedup sidecar (path=%s): %v", sidecarPath, err)
+		return
+	}
+
+	if err := c.opts.Persister.Persist(ctx, sidecarPath, bytes.NewReader(data)); err != nil {
+		c.opts.Logger.Warnf("autoscreenshot",
+			"persist dedup sidecar (path=%s): %v", sidecarPath, err)
+	}
 }
 
 // buildPath produces the storage path for one captured frame.
