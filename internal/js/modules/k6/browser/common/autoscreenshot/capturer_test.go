@@ -117,7 +117,7 @@ func TestCapturer(t *testing.T) {
 	start := time.Now()
 	c.Capture(context.Background(), "action", "Test.action", func(_ context.Context) ([]byte, error) {
 		return wantBytes, nil
-	})
+	}, nil)
 
 	c.Close()
 
@@ -150,9 +150,9 @@ func TestCapturer_DedupsIdenticalFrames(t *testing.T) {
 	same := []byte{1, 2, 3, 4, 5}
 	fn := func(_ context.Context) ([]byte, error) { return same, nil }
 
-	c.Capture(context.Background(), "action", "Test.action", fn)
-	c.Capture(context.Background(), "action", "Test.action", fn)
-	c.Capture(context.Background(), "action", "Test.action", fn)
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)
 
 	c.Close()
 
@@ -184,9 +184,9 @@ func TestCapturer_DedupDisabled_PersistsEveryFrame(t *testing.T) {
 	same := []byte{1, 2, 3, 4, 5}
 	fn := func(_ context.Context) ([]byte, error) { return same, nil }
 
-	c.Capture(context.Background(), "action", "Test.action", fn)
-	c.Capture(context.Background(), "action", "Test.action", fn)
-	c.Capture(context.Background(), "action", "Test.action", fn)
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)
 
 	c.Close()
 
@@ -226,13 +226,13 @@ func TestCapturer_DropsOldestOnBackpressure(t *testing.T) {
 		}
 	}
 
-	c.Capture(context.Background(), "action", "Test.action", makeFn())
+	c.Capture(context.Background(), "action", "Test.action", makeFn(), nil)
 	p.waitStart(t)
 
 	// The worker is now blocked in Persist. The buffer can hold up to 3.
 	// Push 6 more: 3 fit, 3 must drop the oldest.
 	for range 6 {
-		c.Capture(context.Background(), "action", "Test.action", makeFn())
+		c.Capture(context.Background(), "action", "Test.action", makeFn(), nil)
 	}
 
 	// Give the buffer a moment to settle. All push operations are
@@ -269,7 +269,7 @@ func TestCapturer_CloseDrainsPending(t *testing.T) {
 	for i := range n {
 		c.Capture(context.Background(), "action", "Test.action", func(_ context.Context) ([]byte, error) {
 			return []byte{byte(i), 0xff}, nil
-		})
+		}, nil)
 	}
 
 	c.Close()
@@ -283,10 +283,10 @@ func TestCapturer_NilSafe(t *testing.T) {
 	var c *Capturer
 	c.Capture(context.Background(), "action", "Test.action", func(_ context.Context) ([]byte, error) {
 		return nil, nil
-	})
+	}, nil)
 	c.CaptureForced(context.Background(), "failure", "Test.failure", func(_ context.Context) ([]byte, error) {
 		return nil, nil
-	})
+	}, nil)
 	c.Close()
 	assert.Equal(t, uint64(0), c.Dropped())
 }
@@ -313,10 +313,10 @@ func TestCapturer_CaptureForced_BypassesDedup(t *testing.T) {
 	same := []byte{0xaa, 0xbb, 0xcc}
 	fn := func(_ context.Context) ([]byte, error) { return same, nil }
 
-	c.Capture(context.Background(), "action", "Test.action", fn)        // persist
-	c.Capture(context.Background(), "action", "Test.action", fn)        // dedup
-	c.CaptureForced(context.Background(), "failure", "Test.failure", fn) // persist (forced)
-	c.Capture(context.Background(), "action", "Test.action", fn)        // dedup
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)        // persist
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)        // dedup
+	c.CaptureForced(context.Background(), "failure", "Test.failure", fn, nil) // persist (forced)
+	c.Capture(context.Background(), "action", "Test.action", fn, nil)        // dedup
 
 	c.Close()
 
