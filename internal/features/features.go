@@ -41,6 +41,23 @@ type Flags struct {
 	activated []string
 }
 
+// Activated returns a copy of the sorted canonical names of active features.
+func (f *Flags) Activated() []string {
+	out := make([]string, len(f.activated))
+	copy(out, f.activated)
+	return out
+}
+
+// Tags returns per-flag metric tags (k6_feature_<snake>="true") for active features.
+func (f *Flags) Tags() map[string]string {
+	tags := make(map[string]string, len(f.activated))
+	for _, name := range f.activated {
+		snake := strings.ReplaceAll(name, "-", "_")
+		tags["k6_feature_"+snake] = "true"
+	}
+	return tags
+}
+
 // Flag is a single feature flag's metadata.
 type Flag struct {
 	Name        string
