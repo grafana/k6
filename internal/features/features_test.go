@@ -17,6 +17,8 @@ type testFlags struct {
 	Delta bool `lifecycle:"deprecated" help:"d"`
 }
 
+const aliasEnv = "K6_TEST_ALIAS"
+
 func TestFeatureDefinitionNames(t *testing.T) {
 	t.Parallel()
 
@@ -226,6 +228,70 @@ func TestResolveLogsUnknownNames(t *testing.T) {
 	assert.Equal(t, "cli", entry.Data["source"])
 }
 
+func TestInitIntoResolvesAliases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		cli        Source
+		env        map[string]string
+		aliases    []alias
+		wantActive []string
+		wantFlags  testFlags
+	}{
+		{
+			name:       "honored alias activates when env wins",
+			env:        map[string]string{aliasEnv: "true"},
+			aliases:    []alias{{EnvVar: aliasEnv, Canonical: "alpha", Phase: honored}},
+			wantActive: []string{"alpha"},
+			wantFlags:  testFlags{Alpha: true, Gamma: true},
+		},
+		{
+			name:       "cli wins over alias env",
+			cli:        supplied("beta"),
+			env:        map[string]string{aliasEnv: "true"},
+			aliases:    []alias{{EnvVar: aliasEnv, Canonical: "alpha", Phase: honored}},
+			wantActive: []string{"beta"},
+			wantFlags:  testFlags{Beta: true, Gamma: true},
+		},
+		{
+			name:       "dangling alias canonical stays inactive",
+			env:        map[string]string{aliasEnv: "true"},
+			aliases:    []alias{{EnvVar: aliasEnv, Canonical: "gone-feature", Phase: honored}},
+			wantActive: []string{},
+			wantFlags:  testFlags{Gamma: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			flags, active := runTestInit(t, tt.cli, Source{}, tt.env, tt.aliases)
+
+			assert.Equal(t, tt.wantActive, active)
+			assert.Equal(t, tt.wantFlags, *flags)
+		})
+	}
+}
+
+func TestInitIntoLogsAliases(t *testing.T) {
+	t.Parallel()
+
+	hook := runTestInitForLogs(t, Source{}, map[string]string{aliasEnv: "true"},
+		[]alias{{EnvVar: aliasEnv, Canonical: "alpha", Phase: honored}})
+
+	warn := entryByLevel(t, hook, logrus.WarnLevel)
+	assert.Equal(t, "alpha", warn.Data["feature"])
+	assert.Equal(t, "env_legacy_alias", warn.Data["source"])
+	assert.Equal(t, "deprecated_alias", warn.Data["lifecycle"])
+	assert.Equal(t, aliasEnv, warn.Data["env"])
+
+	info := entryByLevel(t, hook, logrus.InfoLevel)
+	assert.Equal(t, "alpha", info.Data["feature"])
+	assert.Equal(t, "experimental", info.Data["lifecycle"])
+}
+
 func supplied(v ...string) Source {
 	return Source{Values: v, Supplied: true}
 }
@@ -242,6 +308,30 @@ func resolveTestFlags(t *testing.T, cli, env, json Source) (*testFlags, []string
 	require.NoError(t, err)
 
 	return flags, activated
+}
+
+func runTestInit(
+	t *testing.T, cli, json Source, env map[string]string, aliases []alias,
+) (*testFlags, []string) {
+	t.Helper()
+
+	flags := &testFlags{}
+	logger, _ := logtest.NewNullLogger()
+	active, err := initInto(reflect.ValueOf(flags).Elem(), logger, cli, json, env, aliases)
+	require.NoError(t, err)
+
+	return flags, active
+}
+
+func runTestInitForLogs(t *testing.T, cli Source, env map[string]string, aliases []alias) *logtest.Hook {
+	t.Helper()
+
+	flags := &testFlags{}
+	logger, hook := logtest.NewNullLogger()
+	_, err := initInto(reflect.ValueOf(flags).Elem(), logger, cli, Source{}, env, aliases)
+	require.NoError(t, err)
+
+	return hook
 }
 
 func resolveTestLogs(t *testing.T, cli, env, json Source) *logtest.Hook {
@@ -268,4 +358,18 @@ func assertSingleLog(t *testing.T, hook *logtest.Hook, level logrus.Level) *logr
 	assert.Equal(t, level, entry.Level)
 
 	return entry
+}
+
+func entryByLevel(t *testing.T, hook *logtest.Hook, level logrus.Level) *logrus.Entry {
+	t.Helper()
+
+	var found *logrus.Entry
+	for _, e := range hook.AllEntries() {
+		if e.Level == level {
+			require.Nil(t, found, "more than one %s entry", level)
+			found = e
+		}
+	}
+	require.NotNil(t, found, "no %s entry found", level)
+	return found
 }
