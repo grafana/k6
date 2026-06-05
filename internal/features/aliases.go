@@ -56,6 +56,15 @@ func resolveEnvAliases(defs *definitions,
 			names = append(names, a.Canonical)
 			aliasOf[a.Canonical] = a.EnvVar
 			supplied = true
+
+		case tombstoned:
+			logger.WithFields(logrus.Fields{
+				"env":     a.EnvVar,
+				"source":  "env_tombstoned_alias",
+				"outcome": "unknown",
+			}).Error("Legacy env var is no longer supported, use --features or K6_FEATURES instead")
+
+		case removed:
 		}
 	}
 
