@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Lifecycle represents the maturity stage of a feature flag.
@@ -72,12 +74,44 @@ func All() ([]Flag, error) {
 	return allOf(reflect.TypeFor[Flags]())
 }
 
+// Init resolves the surfaces and returns the typed flags.
+func Init(
+	logger logrus.FieldLogger, cli, json Source, runtimeEnv map[string]string,
+) (*Flags, error) {
+	flags := &Flags{}
+	active, err := initInto(reflect.ValueOf(flags).Elem(), logger, cli, json, runtimeEnv, defaultAliases())
+	if err != nil {
+		return nil, err
+	}
+
+	flags.activated = active
+	return flags, nil
+}
+
 func allOf(t reflect.Type) ([]Flag, error) {
 	defs, err := parseDefinitions(t)
 	if err != nil {
 		return nil, err
 	}
 	return allDefinitions(defs), nil
+}
+
+func initInto(
+	target reflect.Value, logger logrus.FieldLogger, cli, json Source,
+	runtimeEnv map[string]string, aliases []alias,
+) ([]string, error) {
+	defs, err := parseDefinitions(target.Type())
+	if err != nil {
+		return nil, err
+	}
+
+	for _, a := range aliases {
+		if err := registerAlias(defs, a); err != nil {
+			return nil, err
+		}
+	}
+
+	return resolveInto(defs, target, cli, resolveEnvSurface(defs, runtimeEnv, logger), json, logger)
 }
 
 // definition holds the parsed metadata and field index for one flag field.
@@ -91,6 +125,7 @@ type definitions struct {
 	typ         reflect.Type
 	definitions []definition
 	byName      map[string]int
+	aliases     []alias
 }
 
 var kebabRe = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
