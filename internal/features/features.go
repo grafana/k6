@@ -2,9 +2,11 @@
 package features
 
 import (
+	"cmp"
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -63,6 +65,19 @@ type Flag struct {
 	Name        string
 	Lifecycle   Lifecycle
 	Description string
+}
+
+// All returns flags sorted for display: Experimental, Deprecated, GA, then by name.
+func All() ([]Flag, error) {
+	return allOf(reflect.TypeFor[Flags]())
+}
+
+func allOf(t reflect.Type) ([]Flag, error) {
+	defs, err := parseDefinitions(t)
+	if err != nil {
+		return nil, err
+	}
+	return allDefinitions(defs), nil
 }
 
 // definition holds the parsed metadata and field index for one flag field.
@@ -163,6 +178,33 @@ func parseDefinitions(t reflect.Type) (*definitions, error) {
 	}
 
 	return ds, nil
+}
+
+func lifecycleOrder(l Lifecycle) int {
+	switch l {
+	case Experimental:
+		return 0
+	case Deprecated:
+		return 1
+	case GA:
+		return 2
+	default:
+		return 3
+	}
+}
+
+func allDefinitions(defs *definitions) []Flag {
+	out := make([]Flag, len(defs.definitions))
+	for i, def := range defs.definitions {
+		out[i] = def.flag
+	}
+	slices.SortFunc(out, func(a, b Flag) int {
+		if c := cmp.Compare(lifecycleOrder(a.Lifecycle), lifecycleOrder(b.Lifecycle)); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Name, b.Name)
+	})
+	return out
 }
 
 // noCopy prevents Flags from being copied by value.
