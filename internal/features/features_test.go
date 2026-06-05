@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -111,4 +112,70 @@ func TestFeatureDefinitionsRejectInvalidStructs(t *testing.T) {
 			assert.Error(t, err)
 		})
 	}
+}
+
+func TestResolveFeatures(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		cli        Source
+		env        Source
+		json       Source
+		wantActive []string
+		wantFlags  testFlags
+	}{
+		{
+			name:       "cli wins over env and json",
+			cli:        supplied("alpha"),
+			env:        supplied("beta"),
+			json:       supplied("delta"),
+			wantActive: []string{"alpha"},
+			wantFlags:  testFlags{Alpha: true},
+		},
+		{
+			name:       "env wins over json and splits values",
+			env:        supplied(" alpha, beta,, "),
+			json:       supplied("delta"),
+			wantActive: []string{"alpha", "beta"},
+			wantFlags:  testFlags{Alpha: true, Beta: true},
+		},
+		{
+			name:       "empty supplied cli clears lower surfaces",
+			cli:        Source{Supplied: true},
+			env:        supplied("alpha"),
+			json:       supplied("beta"),
+			wantActive: []string{},
+			wantFlags:  testFlags{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			flags, active := resolveTestFlags(t, tt.cli, tt.env, tt.json)
+
+			assert.Equal(t, tt.wantActive, active)
+			assert.Equal(t, tt.wantFlags, *flags)
+		})
+	}
+}
+
+func supplied(v ...string) Source {
+	return Source{Values: v, Supplied: true}
+}
+
+func resolveTestFlags(t *testing.T, cli, env, json Source) (*testFlags, []string) {
+	t.Helper()
+
+	defs, err := parseDefinitions(reflect.TypeFor[testFlags]())
+	require.NoError(t, err)
+
+	flags := &testFlags{}
+	logger, _ := logtest.NewNullLogger()
+	activated, err := resolveInto(defs, reflect.ValueOf(flags).Elem(), cli, env, json, logger)
+	require.NoError(t, err)
+
+	return flags, activated
 }
