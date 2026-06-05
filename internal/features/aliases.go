@@ -22,7 +22,13 @@ type alias struct {
 }
 
 func defaultAliases() []alias {
-	return nil
+	return []alias{
+		{
+			EnvVar:    "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM",
+			Canonical: "native-histograms",
+			Phase:     honored,
+		},
+	}
 }
 
 func registerAlias(defs *definitions, a alias) error {

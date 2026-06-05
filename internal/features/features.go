@@ -41,8 +41,9 @@ func (l Lifecycle) String() string {
 
 // Flags declares every feature flag as a tagged bool field.
 type Flags struct {
-	_         noCopy
-	activated []string
+	NativeHistograms bool `lifecycle:"experimental" help:"Use native histograms for trend metrics"`
+	_                noCopy
+	activated        []string
 }
 
 // Activated returns a copy of the sorted canonical names of active features.
