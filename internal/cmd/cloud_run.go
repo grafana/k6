@@ -192,6 +192,7 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		c.noCloudSecrets,
 		"only when using the local-execution mode, don't automatically configure the cloud secret source",
 	)
+	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 
 	return flags
 }
