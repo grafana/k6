@@ -154,6 +154,12 @@ func TestResolveFeatures(t *testing.T) {
 			wantActive: []string{},
 			wantFlags:  testFlags{Gamma: true},
 		},
+		{
+			name:       "unknown names stay inactive",
+			cli:        supplied("not-a-flag"),
+			wantActive: []string{},
+			wantFlags:  testFlags{Gamma: true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -193,6 +199,17 @@ func TestResolveLogs(t *testing.T) {
 			assert.Equal(t, tt.lifecycle, entry.Data["lifecycle"])
 		})
 	}
+}
+
+func TestResolveLogsUnknownNames(t *testing.T) {
+	t.Parallel()
+
+	hook := resolveTestLogs(t, supplied("not-a-flag"), Source{}, Source{})
+
+	entry := assertSingleLog(t, hook, logrus.ErrorLevel)
+	assert.Equal(t, "not-a-flag", entry.Data["feature"])
+	assert.Equal(t, "unknown", entry.Data["outcome"])
+	assert.Equal(t, "cli", entry.Data["source"])
 }
 
 func supplied(v ...string) Source {
