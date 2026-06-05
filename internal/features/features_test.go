@@ -131,14 +131,14 @@ func TestResolveFeatures(t *testing.T) {
 			env:        supplied("beta"),
 			json:       supplied("delta"),
 			wantActive: []string{"alpha"},
-			wantFlags:  testFlags{Alpha: true},
+			wantFlags:  testFlags{Alpha: true, Gamma: true},
 		},
 		{
 			name:       "env wins over json and splits values",
 			env:        supplied(" alpha, beta,, "),
 			json:       supplied("delta"),
 			wantActive: []string{"alpha", "beta"},
-			wantFlags:  testFlags{Alpha: true, Beta: true},
+			wantFlags:  testFlags{Alpha: true, Beta: true, Gamma: true},
 		},
 		{
 			name:       "empty supplied cli clears lower surfaces",
@@ -146,7 +146,7 @@ func TestResolveFeatures(t *testing.T) {
 			env:        supplied("alpha"),
 			json:       supplied("beta"),
 			wantActive: []string{},
-			wantFlags:  testFlags{},
+			wantFlags:  testFlags{Gamma: true},
 		},
 	}
 

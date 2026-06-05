@@ -46,6 +46,7 @@ func resolveInto(defs *definitions,
 	case json.Supplied:
 		winner = json
 	default:
+		forceGA(defs, target)
 		return []string{}, nil
 	}
 
@@ -58,14 +59,18 @@ func resolveInto(defs *definitions,
 		}
 		seen[name] = struct{}{}
 
-		if _, known := defs.byName[name]; !known {
+		idx, known := defs.byName[name]
+		if !known {
 			continue
 		}
 
 		activated[name] = struct{}{}
+
+		logActivation(logger, name, defs.definitions[idx].flag.Lifecycle)
 	}
 
 	setFields(defs, target, activated)
+	forceGA(defs, target)
 
 	return sortedKeys(activated), nil
 }
@@ -78,9 +83,31 @@ func parseValues(vals []string) []string {
 	return out
 }
 
+func logActivation(logger logrus.FieldLogger, name string, lc Lifecycle) {
+	switch lc {
+	case Experimental:
+		logger.WithFields(logrus.Fields{"feature": name, "lifecycle": "experimental"}).
+			Info("Experimental feature enabled")
+	case GA:
+		logger.WithFields(logrus.Fields{"feature": name, "lifecycle": "ga"}).
+			Info("Feature is now available by default, please remove this flag")
+	case Deprecated:
+		logger.WithFields(logrus.Fields{"feature": name, "lifecycle": "deprecated"}).
+			Warn("Deprecated feature enabled")
+	}
+}
+
 func setFields(defs *definitions, target reflect.Value, names map[string]struct{}) {
 	for name := range names {
 		target.FieldByIndex(defs.definitions[defs.byName[name]].index).SetBool(true)
+	}
+}
+
+func forceGA(defs *definitions, target reflect.Value) {
+	for _, def := range defs.definitions {
+		if def.flag.Lifecycle == GA {
+			target.FieldByIndex(def.index).SetBool(true)
+		}
 	}
 }
 
