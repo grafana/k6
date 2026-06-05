@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -13,6 +14,50 @@ import (
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/lib"
 )
+
+type featuresCmd struct {
+	gs *state.GlobalState
+}
+
+func getCmdFeatures(gs *state.GlobalState) *cobra.Command {
+	c := &featuresCmd{gs: gs}
+
+	cmd := &cobra.Command{
+		Use:   "features",
+		Short: "List available feature flags",
+		Long:  `List all available feature flags with their lifecycle status and description.`,
+		Args:  cobra.NoArgs,
+		RunE:  c.run,
+	}
+
+	return cmd
+}
+
+func (c *featuresCmd) run(_ *cobra.Command, _ []string) error {
+	all, err := features.All()
+	if err != nil {
+		return fmt.Errorf("loading feature definitions: %w", err)
+	}
+
+	return c.printTable(all)
+}
+
+func (c *featuresCmd) printTable(flags []features.Flag) error {
+	if len(flags) == 0 {
+		return nil
+	}
+
+	w := tabwriter.NewWriter(c.gs.Stdout, 0, 0, 3, ' ', 0)
+	if _, err := fmt.Fprintln(w, "FEATURE\tLIFECYCLE\tDESCRIPTION"); err != nil {
+		return err
+	}
+	for _, f := range flags {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", f.Name, f.Lifecycle.String(), f.Description); err != nil {
+			return err
+		}
+	}
+	return w.Flush()
+}
 
 func resolveFeatureFlags(gs *state.GlobalState, cmd *cobra.Command, piState *lib.TestPreInitState) error {
 	var cli features.Source
