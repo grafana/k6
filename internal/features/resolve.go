@@ -37,14 +37,15 @@ func resolveInto(defs *definitions,
 	}
 
 	var winner Source
+	var source string
 
 	switch {
 	case cli.Supplied:
-		winner = cli
+		winner, source = cli, "cli"
 	case env.Supplied:
-		winner = env
+		winner, source = env, "env"
 	case json.Supplied:
-		winner = json
+		winner, source = json, "json"
 	default:
 		forceGA(defs, target)
 		return []string{}, nil
@@ -61,6 +62,11 @@ func resolveInto(defs *definitions,
 
 		idx, known := defs.byName[name]
 		if !known {
+			logger.WithFields(logrus.Fields{
+				"feature": name,
+				"outcome": "unknown",
+				"source":  source,
+			}).Error("Unknown feature flag")
 			continue
 		}
 
