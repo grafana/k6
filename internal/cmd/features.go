@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"strings"
@@ -16,7 +17,8 @@ import (
 )
 
 type featuresCmd struct {
-	gs *state.GlobalState
+	gs     *state.GlobalState
+	isJSON bool
 }
 
 func getCmdFeatures(gs *state.GlobalState) *cobra.Command {
@@ -30,6 +32,8 @@ func getCmdFeatures(gs *state.GlobalState) *cobra.Command {
 		RunE:  c.run,
 	}
 
+	cmd.Flags().BoolVar(&c.isJSON, "json", false, "output in JSON format")
+
 	return cmd
 }
 
@@ -39,6 +43,9 @@ func (c *featuresCmd) run(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("loading feature definitions: %w", err)
 	}
 
+	if c.isJSON {
+		return c.printJSON(all)
+	}
 	return c.printTable(all)
 }
 
@@ -57,6 +64,27 @@ func (c *featuresCmd) printTable(flags []features.Flag) error {
 		}
 	}
 	return w.Flush()
+}
+
+func (c *featuresCmd) printJSON(flags []features.Flag) error {
+	type jsonFlag struct {
+		Feature     string `json:"feature"`
+		Lifecycle   string `json:"lifecycle"`
+		Description string `json:"description"`
+	}
+
+	out := make([]jsonFlag, len(flags))
+	for i, f := range flags {
+		out[i] = jsonFlag{
+			Feature:     f.Name,
+			Lifecycle:   f.Lifecycle.String(),
+			Description: f.Description,
+		}
+	}
+
+	enc := json.NewEncoder(c.gs.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
 }
 
 func resolveFeatureFlags(gs *state.GlobalState, cmd *cobra.Command, piState *lib.TestPreInitState) error {
