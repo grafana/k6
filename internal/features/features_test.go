@@ -261,6 +261,20 @@ func TestInitIntoResolvesAliases(t *testing.T) {
 			wantActive: []string{},
 			wantFlags:  testFlags{Gamma: true},
 		},
+		{
+			name:       "tombstoned alias does not activate",
+			env:        map[string]string{aliasEnv: "true"},
+			aliases:    []alias{{EnvVar: aliasEnv, Canonical: "alpha", Phase: tombstoned}},
+			wantActive: []string{},
+			wantFlags:  testFlags{Gamma: true},
+		},
+		{
+			name:       "removed alias is ignored",
+			env:        map[string]string{aliasEnv: "true"},
+			aliases:    []alias{{EnvVar: aliasEnv, Canonical: "alpha", Phase: removed}},
+			wantActive: []string{},
+			wantFlags:  testFlags{Gamma: true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -290,6 +304,41 @@ func TestInitIntoLogsAliases(t *testing.T) {
 	info := entryByLevel(t, hook, logrus.InfoLevel)
 	assert.Equal(t, "alpha", info.Data["feature"])
 	assert.Equal(t, "experimental", info.Data["lifecycle"])
+}
+
+func TestInitIntoLogsRetiredAliases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("tombstoned", func(t *testing.T) {
+		t.Parallel()
+
+		hook := runTestInitForLogs(t, Source{}, map[string]string{aliasEnv: "true"},
+			[]alias{{EnvVar: aliasEnv, Canonical: "alpha", Phase: tombstoned}})
+
+		entry := assertSingleLog(t, hook, logrus.ErrorLevel)
+		assert.Equal(t, aliasEnv, entry.Data["env"])
+		assert.Equal(t, "env_tombstoned_alias", entry.Data["source"])
+		assert.Equal(t, "unknown", entry.Data["outcome"])
+	})
+
+	t.Run("dangling", func(t *testing.T) {
+		t.Parallel()
+
+		hook := runTestInitForLogs(t, Source{}, map[string]string{aliasEnv: "true"},
+			[]alias{{EnvVar: aliasEnv, Canonical: "gone-feature", Phase: honored}})
+
+		warn := entryByLevel(t, hook, logrus.WarnLevel)
+		assert.Equal(t, "gone-feature", warn.Data["feature"])
+		assert.Equal(t, "env_legacy_alias", warn.Data["source"])
+		assert.Equal(t, "deprecated_alias", warn.Data["lifecycle"])
+		assert.Equal(t, aliasEnv, warn.Data["env"])
+
+		errEntry := entryByLevel(t, hook, logrus.ErrorLevel)
+		assert.Equal(t, "gone-feature", errEntry.Data["feature"])
+		assert.Equal(t, "unknown", errEntry.Data["outcome"])
+		assert.Equal(t, "env_legacy_alias", errEntry.Data["source"])
+		assert.Equal(t, aliasEnv, errEntry.Data["env"])
+	})
 }
 
 func supplied(v ...string) Source {
