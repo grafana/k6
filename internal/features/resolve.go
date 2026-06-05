@@ -14,6 +14,7 @@ import (
 type Source struct {
 	Values   []string
 	Supplied bool
+	aliasOf  map[string]string
 }
 
 func parseInput(raw string) []string {
@@ -60,13 +61,30 @@ func resolveInto(defs *definitions,
 		}
 		seen[name] = struct{}{}
 
+		// alias WARN fires here, not at parse time: only now has env won
+		nameSource := source
+		envVar, viaAlias := winner.aliasOf[name]
+		if viaAlias {
+			nameSource = "env_legacy_alias"
+			logger.WithFields(logrus.Fields{
+				"feature":   name,
+				"env":       envVar,
+				"source":    "env_legacy_alias",
+				"lifecycle": "deprecated_alias",
+			}).Warn("Legacy env var detected, use --features or K6_FEATURES instead")
+		}
+
 		idx, known := defs.byName[name]
 		if !known {
-			logger.WithFields(logrus.Fields{
+			fields := logrus.Fields{
 				"feature": name,
 				"outcome": "unknown",
-				"source":  source,
-			}).Error("Unknown feature flag")
+				"source":  nameSource,
+			}
+			if viaAlias {
+				fields["env"] = envVar
+			}
+			logger.WithFields(fields).Error("Unknown feature flag")
 			continue
 		}
 
