@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"golang.org/x/net/http2"
@@ -90,6 +91,63 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 		return 0
 	}
 	return 1 + errCode(code)
+}
+
+// http2ErrCodeByName maps the textual form produced by http2.ErrCode.String()
+// (e.g. "PROTOCOL_ERROR") back to its code. Only the spec-defined codes are
+// recognized; anything else returns false.
+func http2ErrCodeByName(name string) (http2.ErrCode, bool) {
+	for code := http2.ErrCodeNo; code <= http2.ErrCodeHTTP11Required; code++ {
+		if code.String() == name {
+			return code, true
+		}
+	}
+	return 0, false
+}
+
+// errorCodeForHTTP2Message classifies an HTTP/2 connection or GOAWAY error by
+// the text of its Error() method, as a fallback to the type switch in
+// errorCodeForError.
+//
+// Since Go 1.27, golang.org/x/net/http2 compiles a "wrapping implementation"
+// (build tag `go1.27 && !http2legacy`) that delegates to net/http. HTTP/2
+// errors then surface as values of the unexported net/http/internal/http2
+// connection- and GOAWAY-error types, which the http2.{ConnectionError,
+// GoAwayError} cases in errorCodeForError cannot match and which - unlike
+// http2.StreamError - have no errors.As bridge to the x/net types. Their
+// Error() text is identical to x/net's, so we match on that instead. Only
+// spec-defined error codes are recognized; an unknown code falls through.
+func errorCodeForHTTP2Message(msg string) (errCode, string, bool) {
+	switch {
+	case strings.HasPrefix(msg, "connection error: "):
+		name := strings.TrimPrefix(msg, "connection error: ")
+		if code, ok := http2ErrCodeByName(name); ok {
+			return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(code),
+				fmt.Sprintf(http2ConnectionErrorCodeMsg, code), true
+		}
+	case strings.HasPrefix(msg, "http2: server sent GOAWAY"):
+		if name, ok := stringBetween(msg, "ErrCode=", ","); ok {
+			if code, ok := http2ErrCodeByName(name); ok {
+				return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(code),
+					fmt.Sprintf(http2GoAwayErrorCodeMsg, code), true
+			}
+		}
+	}
+	return 0, "", false
+}
+
+// stringBetween returns the substring of s found between the first occurrence
+// of prefix and the next occurrence of sep that follows it.
+func stringBetween(s, prefix, sep string) (string, bool) {
+	_, after, found := strings.Cut(s, prefix)
+	if !found {
+		return "", false
+	}
+	mid, _, found := strings.Cut(after, sep)
+	if !found {
+		return "", false
+	}
+	return mid, true
 }
 
 //nolint:errorlint
@@ -193,6 +251,20 @@ func errorCodeForError(err error) (errCode, string) {
 	case *url.Error:
 		return errorCodeForError(e.Err)
 	default:
+		// Go 1.27+ fallback: x/net/http2's wrapping implementation surfaces HTTP/2
+		// errors as unexported net/http/internal/http2 values that don't match the
+		// http2.* cases above. StreamError can still be recovered via errors.As (the
+		// standard-library type implements an As bridge to x/net's StreamError);
+		// ConnectionError and GoAwayError have no such bridge and are matched by
+		// their (implementation-independent) Error() text instead.
+		var streamErr http2.StreamError
+		if errors.As(err, &streamErr) {
+			return unknownHTTP2StreamErrorCode + http2ErrCodeOffset(streamErr.Code),
+				fmt.Sprintf(http2StreamErrorCodeMsg, streamErr.Code)
+		}
+		if code, msg, ok := errorCodeForHTTP2Message(err.Error()); ok {
+			return code, msg
+		}
 		if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
 			return errorCodeForError(wrappedErr)
 		}

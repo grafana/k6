@@ -338,6 +338,62 @@ func TestHTTP2GoAwayError(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity), msg)
 }
 
+// TestHTTP2MessageFallback covers the message-based classification of HTTP/2
+// connection and GOAWAY errors. Since Go 1.27, golang.org/x/net/http2's wrapping
+// implementation surfaces these as unexported net/http/internal/http2 types that
+// errorCodeForError cannot match by type and that, unlike StreamError, have no
+// errors.As bridge. The error strings below are exactly what those types' Error()
+// methods produce (identical to x/net's), so the fallback must classify them.
+// This feeds the messages directly, so it runs on every Go version.
+func TestHTTP2MessageFallback(t *testing.T) {
+	t.Parallel()
+
+	connErr := errors.New("connection error: " + http2.ErrCodeProtocol.String())
+	goAwayErr := fmt.Errorf(
+		"http2: server sent GOAWAY and closed the connection; LastStreamID=4, ErrCode=%v, debug=%q",
+		http2.ErrCodeInadequateSecurity, "whatever")
+
+	testCases := []struct {
+		name     string
+		err      error
+		wantCode errCode
+		wantMsg  string
+	}{
+		{
+			"connection error",
+			connErr,
+			unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCodeProtocol),
+			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCodeProtocol),
+		},
+		{
+			"connection error wrapped in url.Error",
+			&url.Error{Op: "Get", URL: "https://example.com", Err: connErr},
+			unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCodeProtocol),
+			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCodeProtocol),
+		},
+		{
+			"goaway error",
+			goAwayErr,
+			unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(http2.ErrCodeInadequateSecurity),
+			fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity),
+		},
+		{
+			"goaway error wrapped",
+			fmt.Errorf("read tcp: %w", goAwayErr),
+			unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(http2.ErrCodeInadequateSecurity),
+			fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			code, msg := errorCodeForError(tc.err)
+			assert.Equal(t, tc.wantCode, code)
+			assert.Equal(t, tc.wantMsg, msg)
+		})
+	}
+}
+
 type connKeyT int32
 
 const connKey connKeyT = 2
