@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,6 +149,11 @@ func TestResolveFeatures(t *testing.T) {
 			wantActive: []string{},
 			wantFlags:  testFlags{Gamma: true},
 		},
+		{
+			name:       "no surface activates only ga fields",
+			wantActive: []string{},
+			wantFlags:  testFlags{Gamma: true},
+		},
 	}
 
 	for _, tt := range tests {
@@ -158,6 +164,33 @@ func TestResolveFeatures(t *testing.T) {
 
 			assert.Equal(t, tt.wantActive, active)
 			assert.Equal(t, tt.wantFlags, *flags)
+		})
+	}
+}
+
+func TestResolveLogs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		feature   string
+		wantLevel logrus.Level
+		lifecycle string
+	}{
+		{name: "experimental", feature: "alpha", wantLevel: logrus.InfoLevel, lifecycle: "experimental"},
+		{name: "ga", feature: "gamma", wantLevel: logrus.InfoLevel, lifecycle: "ga"},
+		{name: "deprecated", feature: "delta", wantLevel: logrus.WarnLevel, lifecycle: "deprecated"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			hook := resolveTestLogs(t, supplied(tt.feature), Source{}, Source{})
+
+			entry := assertSingleLog(t, hook, tt.wantLevel)
+			assert.Equal(t, tt.feature, entry.Data["feature"])
+			assert.Equal(t, tt.lifecycle, entry.Data["lifecycle"])
 		})
 	}
 }
@@ -178,4 +211,30 @@ func resolveTestFlags(t *testing.T, cli, env, json Source) (*testFlags, []string
 	require.NoError(t, err)
 
 	return flags, activated
+}
+
+func resolveTestLogs(t *testing.T, cli, env, json Source) *logtest.Hook {
+	t.Helper()
+
+	defs, err := parseDefinitions(reflect.TypeFor[testFlags]())
+	require.NoError(t, err)
+
+	flags := &testFlags{}
+	logger, hook := logtest.NewNullLogger()
+	_, err = resolveInto(defs, reflect.ValueOf(flags).Elem(), cli, env, json, logger)
+	require.NoError(t, err)
+
+	return hook
+}
+
+func assertSingleLog(t *testing.T, hook *logtest.Hook, level logrus.Level) *logrus.Entry {
+	t.Helper()
+
+	entries := hook.AllEntries()
+	require.Len(t, entries, 1)
+
+	entry := entries[0]
+	assert.Equal(t, level, entry.Level)
+
+	return entry
 }
