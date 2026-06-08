@@ -385,7 +385,7 @@ The system MUST provide a `k6 features` subcommand that prints a table of all cu
 ```
 $ k6 features
 
-FEATURE              LIFECYCLE      DESCRIPTION
+NAME                 LIFECYCLE      DESCRIPTION
 native-histograms    Experimental   Enables high-resolution HDR histograms.
 new-summary          Experimental   Machine-readable end-of-test summary.
 old-statsd-output    Deprecated     Legacy StatsD implementation.
