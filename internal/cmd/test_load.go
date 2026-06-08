@@ -133,6 +133,8 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		return nil, fmt.Errorf("could not initialize '%s': %w", test.sourceRootPath, err)
 	}
 
+	warnOnScriptOptionsFeatures(gs.Logger, test.initRunner.GetOptions())
+
 	return test, nil
 }
 

@@ -46,7 +46,6 @@ type Config struct {
 	Out    []string  `json:"out" envconfig:"K6_OUT"`
 	Linger null.Bool `json:"linger" envconfig:"K6_LINGER"`
 
-	Features      []string  `json:"features"`
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
