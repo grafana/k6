@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/v2/cmd/state"
@@ -127,6 +128,14 @@ func resolveFeatureFlags(gs *state.GlobalState, cmd *cobra.Command, piState *lib
 
 	propagateFeatureEnv(piState.RuntimeOptions.Env, flags.Activated())
 	return nil
+}
+
+func warnOnScriptOptionsFeatures(logger logrus.FieldLogger, opts lib.Options) {
+	if len(opts.Features) == 0 {
+		return
+	}
+	logger.WithField("source", "options").
+		Warn("Feature flags in script options are not supported; use --features, K6_FEATURES, or the JSON config")
 }
 
 // applyFeatureRunTags rewrites RunTags via a fresh map (consolidated shares the original, must not mutate).

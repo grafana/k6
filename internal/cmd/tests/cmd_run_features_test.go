@@ -136,3 +136,31 @@ func TestRunActivatesFeatureFromJSONConfig(t *testing.T) {
 	tagged := runAndNativeHistTagged(t, ts)
 	assert.NotEmpty(t, tagged, "JSON config features must activate the flag")
 }
+
+func TestRunWarnsOnScriptOptionsFeatures(t *testing.T) {
+	t.Parallel()
+
+	const script = `
+		export const options = {
+			features: ['native-histograms'],
+			scenarios: {
+				s: { executor: 'per-vu-iterations', vus: 1, iterations: 1 },
+			},
+		};
+		export default function () {}
+	`
+	ts := getSingleFileTestState(t, script,
+		[]string{"--out", "json=results.json", "--no-usage-report"}, 0)
+
+	tagged := runAndNativeHistTagged(t, ts)
+	assert.Empty(t, tagged, "options.features must not activate the flag")
+	assert.Nil(t, ts.Usage.Map()["features"], "options.features must not contribute to telemetry")
+
+	var sawOptionsWarn bool
+	for _, e := range ts.LoggerHook.Drain() {
+		if e.Level == logrus.WarnLevel && e.Data["source"] == "options" {
+			sawOptionsWarn = true
+		}
+	}
+	assert.True(t, sawOptionsWarn, "expected WARN naming the supported surfaces with source=options")
+}
