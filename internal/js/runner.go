@@ -208,6 +208,11 @@ func (r *Runner) newVU(
 	if r.forceHTTP1() {
 		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
 	} else {
+		// Go 1.27+: golang.org/x/net/http2.ConfigureTransport is a no-op (its wrapping
+		// implementation defers to net/http), and net/http does not negotiate HTTP/2
+		// over a Transport that has a custom DialContext/TLSClientConfig unless
+		// ForceAttemptHTTP2 is set. Without this, VUs would silently drop to HTTP/1.1.
+		transport.ForceAttemptHTTP2 = true
 		_ = http2.ConfigureTransport(transport) // send over h2 protocol
 	}
 
