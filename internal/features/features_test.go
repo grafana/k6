@@ -115,6 +115,20 @@ func TestFeatureDefinitionsRejectInvalidStructs(t *testing.T) {
 	}
 }
 
+func TestFeatureDefinitions(t *testing.T) {
+	t.Parallel()
+
+	flags, err := allOf(reflect.TypeFor[testFlags]())
+	require.NoError(t, err)
+
+	assert.Equal(t, []Flag{
+		{Name: "alpha", Lifecycle: Experimental, Description: "a"},
+		{Name: "beta", Lifecycle: Experimental, Description: "b"},
+		{Name: "delta", Lifecycle: Deprecated, Description: "d"},
+		{Name: "gamma", Lifecycle: GA, Description: "g"},
+	}, flags)
+}
+
 func TestResolveFeatures(t *testing.T) {
 	t.Parallel()
 
