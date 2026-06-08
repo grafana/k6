@@ -359,10 +359,18 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	})
 	require.NoError(t, err)
 
-	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
+	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support).
+	//
+	// Advertise both h2 and http/1.1 so the client can reach both the HTTP/2 server and the
+	// http/1.1-only HTTPS server: the h2 server setup above left tlsConfig.NextProtos as ["h2"],
+	// and since Go 1.27 http2.ConfigureTransport no longer appends "http/1.1". ForceAttemptHTTP2
+	// is also required on Go 1.27+, where ConfigureTransport is a no-op and net/http won't
+	// negotiate HTTP/2 over a Transport with a custom dialer/TLS config without it.
+	tlsConfig.NextProtos = []string{http2.NextProtoTLS, "http/1.1"}
 	transport := &http.Transport{
-		DialContext:     dialer.DialContext,
-		TLSClientConfig: tlsConfig,
+		DialContext:       dialer.DialContext,
+		TLSClientConfig:   tlsConfig,
+		ForceAttemptHTTP2: true,
 	}
 	require.NoError(t, http2.ConfigureTransport(transport))
 

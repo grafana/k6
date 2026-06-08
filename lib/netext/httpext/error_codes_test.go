@@ -192,18 +192,9 @@ func TestHTTP2StreamError(t *testing.T) {
 		time.Sleep(time.Millisecond * 2)
 		panic("expected internal error")
 	})
-	// ForceAttemptHTTP2 is required on Go 1.27+: there http2.ConfigureTransport is a
-	// no-op and the standard library won't negotiate HTTP/2 over a Transport that has a
-	// custom dialer/TLS config unless explicitly asked to.
-	transport := &http.Transport{
-		DialContext:       tb.Dialer.DialContext,
-		TLSClientConfig:   tb.TLSClientConfig,
-		ForceAttemptHTTP2: true,
-	}
-	require.NoError(t, http2.ConfigureTransport(transport))
 	client := http.Client{
 		Timeout:   time.Second * 3,
-		Transport: transport,
+		Transport: tb.HTTPTransport,
 	}
 
 	res, err := client.Get(tb.Replacer.Replace("HTTP2BIN_URL/tsr")) //nolint:noctx
@@ -222,18 +213,9 @@ func TestX509HostnameError(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	// On Go 1.27+ the shared client TLS config advertises only "h2" (ConfigureTransport
-	// no longer appends "http/1.1"), so a request to the http/1.1-only HTTPSBIN server
-	// fails ALPN with "no application protocol" before the x509 check can run. Offer
-	// http/1.1 explicitly so the handshake proceeds to certificate verification.
-	tlsCfg := tb.TLSClientConfig.Clone()
-	tlsCfg.NextProtos = []string{"http/1.1"}
 	client := http.Client{
-		Timeout: time.Second * 3,
-		Transport: &http.Transport{
-			DialContext:     tb.Dialer.DialContext,
-			TLSClientConfig: tlsCfg,
-		},
+		Timeout:   time.Second * 3,
+		Transport: tb.HTTPTransport,
 	}
 	var err error
 	badHostname := "somewhere.else"
