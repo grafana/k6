@@ -131,7 +131,7 @@
       "description": "Override and enable only security updates for v1"
     },
     {
-      "description": "Dockerfiles packaging tool",
+      "description": "v1.x Dockerfile",
       "matchBaseBranches": ["v1.x"],
       "matchManagers": [
         "docker"
