@@ -19,7 +19,6 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/v2/errext"
@@ -206,14 +205,11 @@ func (r *Runner) newVU(
 	}
 
 	if r.forceHTTP1() {
-		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
+		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 	} else {
-		// Go 1.27+: golang.org/x/net/http2.ConfigureTransport is a no-op (its wrapping
-		// implementation defers to net/http), and net/http does not negotiate HTTP/2
-		// over a Transport that has a custom DialContext/TLSClientConfig unless
-		// ForceAttemptHTTP2 is set. Without this, VUs would silently drop to HTTP/1.1.
+		// net/http negotiates HTTP/2 over a Transport with a custom DialContext or
+		// TLSClientConfig only when ForceAttemptHTTP2 is set (see Go issue #14275).
 		transport.ForceAttemptHTTP2 = true
-		_ = http2.ConfigureTransport(transport) // send over h2 protocol
 	}
 
 	cookieJar, err := cookiejar.New(nil)
