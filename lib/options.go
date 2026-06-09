@@ -363,6 +363,16 @@ func (o Options) Apply(opts Options) Options {
 		o.VUs = opts.VUs
 	}
 
+	// A bare VUs value from a higher-priority config tier overrides lower-tier
+	// scenarios, but should still combine with lower duration, iterations or stages.
+	if opts.VUs.Valid && !opts.Duration.Valid && !opts.Iterations.Valid &&
+		opts.Stages == nil && opts.Scenarios == nil {
+		o.Scenarios = nil
+		if len(o.Stages) == 0 {
+			o.Stages = nil
+		}
+	}
+
 	// Specifying duration, iterations, stages, or execution in a "higher" config tier
 	// will overwrite all of the previous execution settings (if any) from any
 	// "lower" config tiers

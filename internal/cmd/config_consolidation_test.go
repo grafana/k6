@@ -136,6 +136,12 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		return getFS([]file{{defaultFlags.ConfigFilePath, jsonConfig}})
 	}
 	I := null.IntFrom // shortcut for "Valid" (i.e. user-specified) ints
+	constantVUsScenario := func(name string, vus int64, duration time.Duration) executor.ConstantVUsConfig {
+		c := executor.NewConstantVUsConfig(name)
+		c.VUs = I(vus)
+		c.Duration = types.NullDurationFrom(duration)
+		return c
+	}
 	// This is a function, because some of these test cases actually need for the init() functions
 	// to be executed, since they depend on defaultConfigFilePath
 	return []configConsolidationTestCase{
@@ -284,6 +290,40 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				logWarning: true,
 			},
 			verifySharedIters(I(12), I(25)),
+		},
+		{
+			opts{
+				fs: defaultConfig(`{"vus": 3}`),
+				runner: &lib.Options{Scenarios: lib.ScenarioConfigs{
+					"api": constantVUsScenario("api", 7, time.Minute),
+				}},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				exec := c.Scenarios["api"]
+				require.NotEmpty(t, exec)
+				require.IsType(t, executor.ConstantVUsConfig{}, exec)
+				clvc, ok := exec.(executor.ConstantVUsConfig)
+				require.True(t, ok)
+				assert.Equal(t, I(7), clvc.VUs)
+				assert.Equal(t, types.NullDurationFrom(time.Minute), clvc.Duration)
+				assert.NotContains(t, c.Scenarios, lib.DefaultScenarioName)
+			},
+		},
+		{
+			opts{runner: &lib.Options{
+				VUs: I(3),
+				Scenarios: lib.ScenarioConfigs{
+					"api": constantVUsScenario("api", 7, time.Minute),
+				},
+			}},
+			exp{},
+			func(t *testing.T, c Config) {
+				exec := c.Scenarios["api"]
+				require.NotEmpty(t, exec)
+				require.IsType(t, executor.ConstantVUsConfig{}, exec)
+				assert.NotContains(t, c.Scenarios, lib.DefaultScenarioName)
+			},
 		},
 		{
 			opts{
@@ -481,7 +521,15 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			exp{},
 			verifySharedIters(I(8), I(8)),
 		},
-		// --vus with script-defined scenarios should return a derivation error
+		{
+			opts{
+				cli: []string{"--vus", "8"},
+				fs:  defaultConfig(`{"stages": []}`),
+			},
+			exp{},
+			verifySharedIters(I(8), I(8)),
+		},
+		// --vus from the CLI should override script-defined scenarios.
 		{
 			opts{
 				cli: []string{"--vus", "8"},
