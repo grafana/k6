@@ -37,6 +37,9 @@ type Config struct {
 
 	// ExporterProtocol sets the protocol of OpenTelemetry Exporter to use
 	ExporterProtocol null.String `json:"exporterProtocol" envconfig:"K6_OTEL_EXPORTER_PROTOCOL"`
+	// ExporterType is intentionally unsupported and only kept to fail fast when
+	// deprecated config is still used.
+	ExporterType null.String `json:"exporterType" envconfig:"K6_OTEL_EXPORTER_TYPE"`
 	// ExportInterval configures the intervening time between metrics exports
 	ExportInterval types.NullDuration `json:"exportInterval" envconfig:"K6_OTEL_EXPORT_INTERVAL"`
 
@@ -143,6 +146,10 @@ func (cfg Config) Apply(v Config) Config {
 		cfg.ExporterProtocol = v.ExporterProtocol
 	}
 
+	if v.ExporterType.Valid {
+		cfg.ExporterType = v.ExporterType
+	}
+
 	if v.ExportInterval.Valid {
 		cfg.ExportInterval = v.ExportInterval
 	}
@@ -202,6 +209,9 @@ func (cfg Config) Validate() error {
 	}
 	if err := cfg.validateExporterProtocol(); err != nil {
 		return err
+	}
+	if cfg.ExporterType.Valid {
+		return errors.New("exporter type is no longer supported, use exporter protocol")
 	}
 	return nil
 }
