@@ -21,6 +21,7 @@ type Dialer struct {
 	Resolver         Resolver
 	Blacklist        []*lib.IPNet
 	BlockedHostnames *types.HostnameTrie
+	AllowedHostnames *types.HostnameTrie
 	Hosts            *types.Hosts
 
 	BytesRead    int64
@@ -53,6 +54,15 @@ type BlockedHostError struct {
 
 func (b BlockedHostError) Error() string {
 	return fmt.Sprintf("hostname (%s) is in a blocked pattern (%s)", b.hostname, b.match)
+}
+
+// NotAllowedHostError is returned when a given hostname is not in the allowlist
+type NotAllowedHostError struct {
+	hostname string
+}
+
+func (b NotAllowedHostError) Error() string {
+	return fmt.Sprintf("hostname (%s) is not in the allowed hostnames list", b.hostname)
 }
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
@@ -141,6 +151,13 @@ func (d *Dialer) findRemote(addr string) (*types.Host, error) {
 	if d.BlockedHostnames != nil && ip == nil {
 		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
 			return nil, BlockedHostError{hostname: host, match: match}
+		}
+	}
+
+	// Check if hostname is in allowlist (if allowlist is configured)
+	if d.AllowedHostnames != nil && ip == nil {
+		if _, allowed := d.AllowedHostnames.Contains(host); !allowed {
+			return nil, NotAllowedHostError{hostname: host}
 		}
 	}
 
