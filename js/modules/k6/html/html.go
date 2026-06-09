@@ -173,7 +173,11 @@ func (s Selection) Find(arg any) Selection {
 }
 
 func (s Selection) Single(selector string) Selection {
-	return Selection{s.rt, s.sel.FindMatcher(goquery.Single(selector)), s.URL}
+	sel := s.sel.FindMatcher(goquery.Single(selector))
+	if len(sel.Nodes) > 1 {
+		sel.Nodes = sel.Nodes[:1]
+	}
+	return Selection{s.rt, sel, s.URL}
 }
 
 func (s Selection) Closest(arg any) Selection {
