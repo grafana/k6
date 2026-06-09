@@ -96,7 +96,7 @@ See the [Glossary](#glossary) at the end of this document for one-line definitio
 > *Eve has just upgraded k6 and wants to know what experimental capabilities are available.*
 
 1. Eve runs `k6 features` in her terminal.
-2. The CLI prints a table of every defined feature, grouped by lifecycle stage (`Experimental` → `Deprecated` → `GA` — most-actionable first) and alphabetical within each group, with name, lifecycle stage, and description.
+2. The CLI prints a table of every defined feature, grouped by lifecycle stage (`Experimental` → `Deprecated` → `GA` — most-actionable first) and alphabetical within each group, with feature, lifecycle stage, and description.
 
 **Acceptance:**
 - **GIVEN** the registry contains a mix of `GA`, `Experimental`, and `Deprecated` flags
@@ -214,8 +214,8 @@ See the [Glossary](#glossary) at the end of this document for one-line definitio
 - **GIVEN** Eve runs `k6 features --json`
 - **WHEN** the command executes
 - **THEN** the output is a valid JSON array of feature objects
-- **AND** each object contains exactly the keys `name`, `lifecycle`, `description`
-- **AND** `name` is a kebab-case canonical name, `lifecycle` is Title Case (`Experimental` / `GA` / `Deprecated`), `description` is a human-readable string
+- **AND** each object contains exactly the keys `feature`, `lifecycle`, `description`
+- **AND** `feature` is a kebab-case canonical name, `lifecycle` is Title Case (`Experimental` / `GA` / `Deprecated`), `description` is a human-readable string
 - **AND** the array is sorted by lifecycle stage (`Experimental` → `Deprecated` → `GA`) then alphabetically by name within each group
 - **AND** if the registry is empty, the output is the empty JSON array `[]`
 
@@ -397,14 +397,14 @@ Required behavior:
 - **Default sort:** grouped by lifecycle stage in the order `Experimental` → `Deprecated` → `GA`, and alphabetical by feature name within each group. There are no flags to alter sort order; the example output above shows the canonical layout. The canonical display form for the lifecycle column uses Title Case (`Experimental`, `GA`, `Deprecated`). **Rationale:** the order surfaces the most-actionable, most-interesting flags first. `Experimental` flags are what users typically come to discover (new capabilities to try). `Deprecated` flags require user action (migrate before removal). `GA` flags are informational only — users keep them in configs to avoid hard-break on upgrade, but they are no-ops for behavior — so they sort last.
 - The command is **self-documenting**: it MUST NOT require any other documentation source to convey what flags exist and what they do. Note that `k6 features` is a static registry printout only and does not reflect run-specific activation states.
 - The command MUST list flags that are currently in the registry. Flags removed from the registry (post-grace-period) MUST NOT appear.
-- **`--json` flag:** the command MUST support a `--json` flag that emits the same content as the default table, encoded as a JSON array of objects with the keys `name`, `lifecycle`, and `description`. Example:
+- **`--json` flag:** the command MUST support a `--json` flag that emits the same content as the default table, encoded as a JSON array of objects with the keys `feature`, `lifecycle`, and `description`. Example:
 
   ```json
   [
-    {"name": "native-histograms", "lifecycle": "Experimental", "description": "Enables high-resolution HDR histograms."},
-    {"name": "new-summary", "lifecycle": "Experimental", "description": "Machine-readable end-of-test summary."},
-    {"name": "old-statsd-output", "lifecycle": "Deprecated", "description": "Legacy StatsD implementation."},
-    {"name": "js-modules-v2", "lifecycle": "GA", "description": "Core ESM loader improvements."}
+    {"feature": "native-histograms", "lifecycle": "Experimental", "description": "Enables high-resolution HDR histograms."},
+    {"feature": "new-summary", "lifecycle": "Experimental", "description": "Machine-readable end-of-test summary."},
+    {"feature": "old-statsd-output", "lifecycle": "Deprecated", "description": "Legacy StatsD implementation."},
+    {"feature": "js-modules-v2", "lifecycle": "GA", "description": "Core ESM loader improvements."}
   ]
   ```
 
