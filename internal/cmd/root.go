@@ -499,8 +499,8 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 		gs.CloudSecretSource = cs
 	}
 
-	// When  K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT are injected, create and configure the cloud source
-	// directly from env vars without a /v1/tests round-trip. Set it as the default source if none was chosen.
+	// When K6_CLOUD_SECRETS_TOKEN + K6_CLOUD_SECRETS_ENDPOINT are injected, create and configure
+	// the cloud source directly from env vars without a /v1/tests round-trip.
 	if token := gs.Env["K6_CLOUD_SECRETS_TOKEN"]; token != "" {
 		if gs.CloudSecretSource == nil {
 			cloudSource, err := cloudsecrets.New(baseParams)
@@ -515,7 +515,21 @@ func createSecretSources(gs *state.GlobalState) (map[string]secretsource.Source,
 			Endpoint:     gs.Env["K6_CLOUD_SECRETS_ENDPOINT"],
 			ResponsePath: gs.Env["K6_CLOUD_SECRETS_RESPONSE_PATH"],
 		})
-		if _, ok := result["default"]; !ok {
+	}
+
+	if _, ok := result["default"]; !ok {
+		var singleSource secretsource.Source
+		nonCloudSources := 0
+		for name, source := range result {
+			if name == "cloud" {
+				continue
+			}
+			nonCloudSources++
+			singleSource = source
+		}
+		if nonCloudSources == 1 {
+			result["default"] = singleSource
+		} else if gs.CloudSecretSource != nil {
 			result["default"] = gs.CloudSecretSource
 		}
 	}
