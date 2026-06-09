@@ -91,6 +91,13 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 		cfg = cfg.Apply(envConf)
 	}
 
+	if err := validateRemovedExporterTypeOption(jsonRawConf, env); err != nil {
+		return cfg, errext.WithExitCodeIfNone(
+			fmt.Errorf("error validating OpenTelemetry output config: %w", err),
+			exitcodes.InvalidConfig,
+		)
+	}
+
 	if err := cfg.Validate(); err != nil {
 		// TODO: check why k6's still exiting with 255
 		return cfg, errext.WithExitCodeIfNone(
@@ -100,6 +107,23 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 	}
 
 	return cfg, nil
+}
+
+func validateRemovedExporterTypeOption(jsonRawConf json.RawMessage, env map[string]string) error {
+	if jsonRawConf != nil {
+		raw := map[string]json.RawMessage{}
+		if err := json.Unmarshal(jsonRawConf, &raw); err == nil {
+			if _, ok := raw["exporterType"]; ok {
+				return errors.New(`"exporterType" has been removed, use "exporterProtocol"`)
+			}
+		}
+	}
+
+	if _, ok := env["K6_OTEL_EXPORTER_TYPE"]; ok {
+		return errors.New(`"K6_OTEL_EXPORTER_TYPE" has been removed, use "K6_OTEL_EXPORTER_PROTOCOL"`)
+	}
+
+	return nil
 }
 
 // newDefaultConfig creates a new default config with default values
