@@ -338,16 +338,16 @@ func TestHTTP2GoAwayError(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity), msg)
 }
 
-// TestHTTP2MessageFallback covers the message-based classification of HTTP/2
-// connection and GOAWAY errors. Since Go 1.27, golang.org/x/net/http2's wrapping
-// implementation surfaces these as unexported net/http/internal/http2 types that
-// errorCodeForError cannot match by type and that, unlike StreamError, have no
-// errors.As bridge. The error strings below are exactly what those types' Error()
-// methods produce (identical to x/net's), so the fallback must classify them.
-// This feeds the messages directly, so it runs on every Go version.
+// TestHTTP2MessageFallback covers message-based classification of HTTP/2 errors.
+// Both golang.org/x/net/http2 and Go's stdlib net/http/internal/http2 produce
+// identical Error() strings, so a single message-based path handles every Go
+// version uniformly. This feeds exact error strings directly, so it runs on
+// every Go version without a live server.
 func TestHTTP2MessageFallback(t *testing.T) {
 	t.Parallel()
 
+	streamErr := fmt.Errorf("stream error: stream ID 1; %v; EOF", http2.ErrCodeInternal)
+	streamErrNoCause := fmt.Errorf("stream error: stream ID 1; %v", http2.ErrCodeInternal)
 	connErr := errors.New("connection error: " + http2.ErrCodeProtocol.String())
 	goAwayErr := fmt.Errorf(
 		"http2: server sent GOAWAY and closed the connection; LastStreamID=4, ErrCode=%v, debug=%q",
@@ -359,6 +359,24 @@ func TestHTTP2MessageFallback(t *testing.T) {
 		wantCode errCode
 		wantMsg  string
 	}{
+		{
+			"stream error",
+			streamErr,
+			unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			"stream error wrapped",
+			fmt.Errorf("read: %w", streamErr),
+			unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			"stream error no cause",
+			streamErrNoCause,
+			unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
 		{
 			"connection error",
 			connErr,
@@ -430,9 +448,8 @@ func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBi
 	transport := &http.Transport{
 		DialContext:       dialer.DialContext,
 		TLSClientConfig:   tlsConfig,
-		ForceAttemptHTTP2: true, // required on Go 1.27+, where ConfigureTransport no longer forces h2 over a custom dialer
+		ForceAttemptHTTP2: true,
 	}
-	require.NoError(t, http2.ConfigureTransport(transport))
 	return &httpmultibin.HTTPMultiBin{
 		Mux:         mux,
 		ServerHTTP2: http2Srv,
