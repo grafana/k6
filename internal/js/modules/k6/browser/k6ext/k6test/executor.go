@@ -3,8 +3,8 @@ package k6test
 import (
 	"github.com/sirupsen/logrus"
 
-	k6lib "go.k6.io/k6/lib"
-	k6executor "go.k6.io/k6/lib/executor"
+	k6lib "go.k6.io/k6/v2/lib"
+	k6executor "go.k6.io/k6/v2/lib/executor"
 )
 
 // TestExecutor is a k6lib.ExecutorConfig implementation

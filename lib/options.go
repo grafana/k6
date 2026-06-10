@@ -13,8 +13,8 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // DefaultScenarioName is used as the default key/ID of the scenario config entries
@@ -344,6 +344,10 @@ type Options struct {
 
 	// Specify client IP ranges and/or CIDR from which VUs will make requests
 	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
+
+	// Features decodes the "features" key from the JSON config file (a resolution
+	// surface) and from the script's exported options (unsupported, warned about).
+	Features []string `json:"features" ignored:"true"`
 }
 
 // Apply returns the result of overwriting any fields with any that are set on the argument.

@@ -10,9 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
 )
 
 type depsCmd struct {
@@ -55,7 +54,11 @@ func (c *depsCmd) run(cmd *cobra.Command, args []string) error {
 	imports := test.Imports()
 	slices.Sort(imports)
 
-	customBuildRequired := isCustomBuildRequired(deps, build.Version, ext.GetAll())
+	checkErr := checkBuiltinDependencies(deps, runtimeK6Version(), ext.GetAll())
+	if checkErr != nil {
+		c.gs.Logger.WithError(checkErr).Debug("Current binary does not satisfy all dependencies, custom build required")
+	}
+	customBuildRequired := checkErr != nil
 
 	if c.isJSON {
 		return c.outputJSON(depsMap, imports, customBuildRequired)

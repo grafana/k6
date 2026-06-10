@@ -2,18 +2,17 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/internal/execution"
-	"go.k6.io/k6/internal/ui/pb"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/execution"
+	"go.k6.io/k6/v2/internal/ui/pb"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {
@@ -96,13 +95,9 @@ func getIterationRunner(
 					return false
 				}
 
-				var exception errext.Exception
-				if errors.As(err, &exception) {
-					// TODO don't count this as a full iteration?
-					logger.WithField("source", "stacktrace").Error(exception.StackTrace())
-				} else {
-					logger.Error(err.Error())
-				}
+				// TODO don't count this as a full iteration?
+				errText, fields := errext.Format(err)
+				logger.WithFields(logrus.Fields(fields)).Error(errText)
 				// TODO: investigate context cancelled errors
 			}
 

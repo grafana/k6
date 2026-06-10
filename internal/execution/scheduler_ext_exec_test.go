@@ -11,12 +11,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/js"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/js"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // TODO: rewrite and/or move these as integration tests to reduce boilerplate
@@ -347,9 +347,6 @@ func TestExecutionInfoAll(t *testing.T) {
 			vus: 1,
 			duration: "1s",
 			gracefulStop: "0s",`,
-		"externally-controlled": `
-			vus: 1,
-			duration: "1s",`,
 		"per-vu-iterations": `
 			vus: 1,
 			iterations: 1,

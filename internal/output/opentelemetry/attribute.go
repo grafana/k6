@@ -2,7 +2,7 @@ package opentelemetry
 
 import (
 	"github.com/mstoykov/atlas"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/metrics"
 	"go.opentelemetry.io/otel/attribute"
 )
 

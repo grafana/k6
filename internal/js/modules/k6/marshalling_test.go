@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/js"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/js"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func TestSetupDataMarshalling(t *testing.T) {

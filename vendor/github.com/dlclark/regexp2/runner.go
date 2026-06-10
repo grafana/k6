@@ -313,12 +313,9 @@ func (r *runner) execute() error {
 					}
 				} else {
 					// The inner expression found an empty match, so we'll go directly to 'back2' if we
-					// backtrack.  In this case, we need to push something on the stack, since back2 pops.
-					// However, in the case of ()+? or similar, this empty match may be legitimate, so push the text
-					// position associated with that empty match.
-					r.stackPush(oldMarkPos)
-
-					r.trackPushNeg1(r.stackPeek()) // Save old mark
+					// backtrack. Don't touch the grouping stack here; instead, record the old mark and
+					// a flag indicating that backtracking doesn't need to pop a grouping stack frame.
+					r.trackPushNeg2(oldMarkPos, 0)
 				}
 				r.advance(1)
 				continue
@@ -334,18 +331,22 @@ func (r *runner) execute() error {
 
 			r.trackPopN(2)
 			pos := r.trackPeekN(1)
-			r.trackPushNeg1(r.trackPeek()) // Save old mark
-			r.stackPush(pos)               // Make new mark
-			r.textto(pos)                  // Recall position
-			r.goTo(r.operand(0))           // Loop
+			r.trackPushNeg2(r.trackPeek(), 1) // Save old mark, note that we pushed a new mark
+			r.stackPush(pos)                  // Make new mark
+			r.textto(pos)                     // Recall position
+			r.goTo(r.operand(0))              // Loop
 			continue
 
 		case syntax.Lazybranchmark | syntax.Back2:
 			// The lazy loop has failed.  We'll do a true backtrack and
 			// start over before the lazy loop.
-			r.stackPop()
-			r.trackPop()
-			r.stackPush(r.trackPeek()) // Recall old mark
+			r.trackPopN(2)
+			oldMark := r.trackPeek()
+			needsPop := r.trackPeekN(1)
+			if needsPop != 0 {
+				r.stackPop()
+			}
+			r.stackPush(oldMark) // Recall old mark
 			break
 
 		case syntax.Setcount:

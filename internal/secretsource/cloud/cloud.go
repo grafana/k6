@@ -10,8 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"go.k6.io/k6/internal/secretsource/url"
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/internal/secretsource/url"
+	"go.k6.io/k6/v2/secretsource"
 )
 
 // Config holds the configuration for accessing cloud secrets.
@@ -44,11 +44,9 @@ func init() {
 }
 
 // SecretSource wraps the URL secret source for cloud-based secrets.
-// It must be explicitly requested via --secret-source=cloud (or K6_SECRET_SOURCE=cloud),
-// and is only valid for 'k6 cloud run --local-execution'. It is also auto-configured for
-// the PLZ operator path when K6_CLOUD_SECRETS_TOKEN is set. Configuration arrives via
-// SetConfig — either from the CreateTestRun API response (createCloudTest) or directly
-// from env vars — before the first Get() call.
+// It is automatically registered for 'k6 cloud run --local-execution' (unless
+// --no-cloud-secrets is passed). Configuration arrives via SetConfig from the
+// CreateTestRun API response (createCloudTest) before the first Get() call.
 //
 // The URL source is rebuilt whenever configPtr changes (i.e. a new test run starts with
 // different credentials). This supports sequential test runs in the same process — each run

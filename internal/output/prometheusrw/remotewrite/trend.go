@@ -9,7 +9,7 @@ import (
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // TrendStatsResolver is a map of trend stats name and their relative resolver function

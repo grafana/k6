@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"time"
 
-	"go.k6.io/k6/internal/build"
-	machinereadable "go.k6.io/k6/internal/lib/summary/machinereadable"
-	"go.k6.io/k6/internal/lib/summary/machinereadable/cog"
+	"go.k6.io/k6/v2/internal/build"
+	machinereadable "go.k6.io/k6/v2/internal/lib/summary/machinereadable"
+	"go.k6.io/k6/v2/internal/lib/summary/machinereadable/cog"
 )
 
 var (
