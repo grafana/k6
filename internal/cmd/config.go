@@ -35,6 +35,7 @@ func configFlagSet() *pflag.FlagSet {
 		false,
 		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
+	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 	return flags
 }
 
@@ -42,8 +43,9 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	Out    []string  `json:"out" envconfig:"K6_OUT"`
+	Linger null.Bool `json:"linger" envconfig:"K6_LINGER"`
+
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
