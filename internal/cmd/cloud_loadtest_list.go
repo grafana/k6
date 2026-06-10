@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -15,10 +14,6 @@ import (
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
 	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
-)
-
-var errNoProjectConfigured = errors.New(
-	"no project specified. Use --project-id, set K6_CLOUD_PROJECT_ID, or run `k6 cloud login` to set a default project",
 )
 
 type cmdCloudTestList struct {

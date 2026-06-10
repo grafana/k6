@@ -38,6 +38,13 @@ var (
 	)
 	errMissingToken   = errors.New("access token not configured")
 	errMissingStackID = errors.New("stack ID not configured")
+
+	// errNoProjectConfigured is returned by cloud sub-commands that require a
+	// concrete project to operate on when none can be resolved from the flags,
+	// the environment, or the logged-in configuration.
+	errNoProjectConfigured = errors.New(
+		"no project specified. Use --project-id, set K6_CLOUD_PROJECT_ID, or run `k6 cloud login` to set a default project",
+	)
 )
 
 // checkCloudLogin verifies that both a token and a stack are configured.
