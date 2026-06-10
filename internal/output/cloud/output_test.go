@@ -278,6 +278,33 @@ func TestOutputStopWithTestError(t *testing.T) {
 	})
 }
 
+// Locks in the symmetric-gating property: the stop-time decision must read
+// out.provisioningMode (set by lazyInitProvisioning), never the Config fields
+// directly. Otherwise a future divergence (Config fields populated without
+// lazyInit running) would nil-deref out.provisioningNotifier.
+func TestOutputStopWithTestError_ConfigFieldsAloneDoNotInferProvisioningMode(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		mock := &cloudClientMock{}
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "1234",
+			client:    mock,
+			// Config fields populated; lazyInit did not run; deps nil.
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://ingest.example/metrics/abc"),
+				TestRunToken:   null.StringFrom("scoped-token"),
+			},
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		require.True(t, mock.testFinishedCalled,
+			"legacy TestFinished must be called when provisioningMode is false")
+	})
+}
+
 // cloudClientMock implements cloudClient for tests without starting a real HTTP server.
 type cloudClientMock struct {
 	createTestRunFn func(*cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error)
@@ -531,6 +558,7 @@ func TestOutputStopWithTestError_ProvisioningMode_NoError(t *testing.T) {
 			},
 			client:               clientMock,
 			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
 		}
 
 		out.versionedOutput = versionedOutputMock{
@@ -571,6 +599,7 @@ func TestOutputStopWithTestError_ProvisioningMode_WithTestError(t *testing.T) {
 			},
 			client:               clientMock,
 			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
 		}
 
 		out.versionedOutput = versionedOutputMock{
