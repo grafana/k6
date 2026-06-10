@@ -9,6 +9,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/cmd/state"
@@ -114,25 +115,25 @@ func (c *cmdCloudTestList) run(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// resolveProjectID returns the project ID to list tests for, resolved in order:
-// --project-id flag, K6_CLOUD_PROJECT_ID/config ProjectID, then the stack's default project.
+// resolveProjectID returns the project ID to list tests for. An explicit
+// --project-id flag outranks every configuration layer, so it is applied on top
+// of the already-consolidated config before resolution is delegated to the
+// shared resolveDefaultProjectID helper (config projectID, then the stack's
+// default project). Unlike `k6 cloud run`, listing needs a concrete project, so
+// a zero result is treated as an error.
 func (c *cmdCloudTestList) resolveProjectID(cloudConfig cloudapi.Config, projectIDSet bool) (int32, error) {
-	var id int64
-
-	switch {
-	case projectIDSet:
+	if projectIDSet {
 		if c.projectID <= 0 {
 			return 0, errNoProjectConfigured
 		}
-		id = c.projectID
+		cloudConfig.ProjectID = null.IntFrom(c.projectID)
+	}
 
-	case cloudConfig.ProjectID.Valid && cloudConfig.ProjectID.Int64 > 0:
-		id = cloudConfig.ProjectID.Int64
-
-	case cloudConfig.DefaultProjectID.Valid && cloudConfig.DefaultProjectID.Int64 > 0:
-		id = cloudConfig.DefaultProjectID.Int64
-
-	default:
+	id, err := resolveDefaultProjectID(c.globalState, &cloudConfig)
+	if err != nil {
+		return 0, err
+	}
+	if id == 0 {
 		return 0, errNoProjectConfigured
 	}
 

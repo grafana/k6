@@ -62,7 +62,7 @@ func TestCloudTestList(t *testing.T) {
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stderr := ts.Stderr.String()
-		assert.Contains(t, stderr, "no project specified")
+		assert.Contains(t, stderr, "default stack configured but the default project ID is not available")
 	})
 
 	t.Run("missing auth uses list-specific wording", func(t *testing.T) {
