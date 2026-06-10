@@ -28,7 +28,7 @@ require (
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.18.0
 	github.com/klauspost/compress v1.18.5
-	github.com/mattn/go-colorable v0.1.14
+	github.com/mattn/go-colorable v0.1.15
 	github.com/mattn/go-isatty v0.0.22
 	github.com/mccutchen/go-httpbin/v2 v2.20.0
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
