@@ -107,6 +107,11 @@ type Output struct {
 	metricsPusher        metricsPusher
 	provisioningNotifier provisioningNotifier
 
+	// provisioningMode gates the provisioning-mode runtime path. Set in
+	// lazyInitProvisioning after both deps are constructed; read by
+	// startVersionedOutput and testFinished.
+	provisioningMode bool
+
 	usage *usage.Usage
 }
 
@@ -335,8 +340,9 @@ func (out *Output) testFinished(testErr error) error {
 		return nil
 	}
 
-	// Provisioning mode: notify instead of the legacy TestFinished call.
-	if out.config.MetricsPushURL.Valid && out.config.TestRunToken.Valid {
+	// Provisioning mode: notify instead of legacy TestFinished. Gate on
+	// the explicit flag set by lazyInitProvisioning, not on Config fields.
+	if out.provisioningMode {
 		// The provisioning API test-run IDs are int64; parse the full range.
 		testRunIDInt, err := strconv.ParseInt(out.testRunID, 10, 64)
 		if err != nil {
@@ -450,7 +456,7 @@ func (out *Output) startVersionedOutput() error {
 		}
 
 		// Inject provisioning overrides if in provisioning mode.
-		if out.metricsPusher != nil && out.config.MetricsPushURL.Valid {
+		if out.provisioningMode {
 			if v, ok := out.versionedOutput.(*cloudv2.Output); ok {
 				v.SetMetricsHTTPClient(out.metricsPusher)
 				v.SetMetricsURL(out.config.MetricsPushURL.String)
@@ -520,6 +526,9 @@ func (out *Output) lazyInitProvisioning() error {
 		}
 		out.provisioningNotifier = c
 	}
+
+	// Both deps constructed; arm the gate.
+	out.provisioningMode = true
 
 	return nil
 }
