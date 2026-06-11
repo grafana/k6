@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TBD: created by archiving change add-feature-flags. Update Purpose after archive.
+Define a unified feature-flag system for k6: a single typed registry of flags with lifecycle stages (Experimental/GA/Deprecated), deterministic resolution across the `--features` CLI flag, `K6_FEATURES` env var, and JSON `features` config (winner-takes-all precedence), structured lifecycle logging, a `k6 features` discovery command, observability via metric tags and usage telemetry, legacy env-var alias migration, and propagation to distributed workers — while keeping gated engine branches as zero-overhead direct field reads.
 
 ## Requirements
 

@@ -26,7 +26,7 @@
 ## 4. `k6 features` discovery command
 
 - [x] 4.1 Add `features` subcommand printing a name/lifecycle/description table grouped `Experimental`→`Deprecated`→`GA`, alphabetical within group, Title Case lifecycle column
-- [x] 4.2 Add `--json` flag emitting array of `{ name, lifecycle, description }` in default sort order; `[]` for empty registry
+- [x] 4.2 Add `--json` flag emitting array of `{ feature, lifecycle, description }` in default sort order; `[]` for empty registry
 - [x] 4.3 Follow read-only subcommand exit-code conventions (cf. `k6 inspect`)
 - [x] 4.4 Integration-test table output, JSON output, and that removed flags do not appear
 
