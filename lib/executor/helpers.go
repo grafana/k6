@@ -2,7 +2,6 @@ package executor
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -96,13 +95,9 @@ func getIterationRunner(
 					return false
 				}
 
-				var exception errext.Exception
-				if errors.As(err, &exception) {
-					// TODO don't count this as a full iteration?
-					logger.WithField("source", "stacktrace").Error(exception.StackTrace())
-				} else {
-					logger.Error(err.Error())
-				}
+				// TODO don't count this as a full iteration?
+				errText, fields := errext.Format(err)
+				logger.WithFields(logrus.Fields(fields)).Error(errText)
 				// TODO: investigate context cancelled errors
 			}
 

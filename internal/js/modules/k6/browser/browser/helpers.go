@@ -93,7 +93,7 @@ func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 	go func() {
 		v, err := fn()
 		if err != nil {
-			reject(err)
+			reject(k6ext.BrowserError(err))
 			return
 		}
 		resolve(v)

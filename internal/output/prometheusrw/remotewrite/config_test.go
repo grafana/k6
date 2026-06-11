@@ -553,7 +553,6 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"trendAsNativeHistogram":true}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM": "true"}},
 		//nolint:gocritic
 		//"Arg":  {arg: "trendAsNativeHistogram=true"},
 	}

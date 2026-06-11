@@ -15,6 +15,7 @@ import (
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/guregu/null.v3"
 )
 
 var _ output.Output = new(Output)
@@ -41,6 +42,12 @@ func New(params output.Params) (*Output, error) {
 	config, err := GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
 	if err != nil {
 		return nil, err
+	}
+
+	// The native-histograms feature flag maps Trend metrics to Prometheus native
+	// histograms by driving the output's existing config switch.
+	if params.Features.NativeHistograms {
+		config.TrendAsNativeHistogram = null.BoolFrom(true)
 	}
 
 	clientConfig, err := config.RemoteConfig()

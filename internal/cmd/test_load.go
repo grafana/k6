@@ -24,6 +24,7 @@ import (
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/js"
 	"go.k6.io/k6/v2/internal/loader"
 	"go.k6.io/k6/v2/js/modules"
@@ -99,6 +100,7 @@ func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args 
 		Usage:          gs.Usage,
 		SecretsManager: gs.SecretsManager,
 		TestStatus:     gs.TestStatus,
+		FeatureFlags:   &features.Flags{},
 	}
 
 	test := &loadedTest{
@@ -123,9 +125,15 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		return nil, err
 	}
 
+	if err := resolveFeatureFlags(gs, cmd, test.preInitState); err != nil {
+		return nil, err
+	}
+
 	if err := test.continueInitialization(gs); err != nil {
 		return nil, fmt.Errorf("could not initialize '%s': %w", test.sourceRootPath, err)
 	}
+
+	warnOnScriptOptionsFeatures(gs.Logger, test.initRunner.GetOptions())
 
 	return test, nil
 }
@@ -195,6 +203,13 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 			return fmt.Errorf("could not load test archive bundle '%s': %w", testPath, err)
 		}
 		logger.Debugf("Loaded test as an archive bundle with type '%s'!", arc.Type)
+
+		env := maps.Clone(arc.Env)
+		if env == nil {
+			env = make(map[string]string, len(lt.preInitState.RuntimeOptions.Env))
+		}
+		maps.Copy(env, lt.preInitState.RuntimeOptions.Env)
+		lt.preInitState.RuntimeOptions.Env = env
 
 		switch arc.Type {
 		case testTypeJS:
@@ -556,6 +571,9 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	if err != nil {
 		return nil, err
 	}
+
+	// tag only derived options; consolidated stays clean so cloud/archive don't serialize feature tags
+	applyFeatureRunTags(&derivedConfig.Options, lt.preInitState.FeatureFlags.Tags())
 
 	return &loadedAndConfiguredTest{
 		loadedTest:         lt,

@@ -13,12 +13,12 @@ func Format(err error) (string, map[string]any) {
 	}
 
 	errText := err.Error()
+	fields := FieldsFromErr(err)
 	var xerr Exception
 	if errors.As(err, &xerr) {
 		errText = xerr.StackTrace()
+		fields["source"] = "stacktrace"
 	}
-
-	fields := make(map[string]any)
 	var herr HasHint
 	if errors.As(err, &herr) {
 		fields["hint"] = herr.Hint()

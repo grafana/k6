@@ -9,12 +9,21 @@ const (
 	binaryContentType = "application/octet-stream"
 	htmlContentType   = "text/html; charset=utf-8"
 	jsonContentType   = "application/json; charset=utf-8"
+	jsonlContentType  = "application/x-ndjson; charset=utf-8"
 	sseContentType    = "text/event-stream; charset=utf-8"
 	textContentType   = "text/plain; charset=utf-8"
 )
 
 type envResponse struct {
 	Env map[string]string `json:"env"`
+}
+
+type versionResponse struct {
+	Service   string `json:"service"`
+	Version   string `json:"version,omitempty"`
+	Commit    string `json:"commit,omitempty"`
+	BuildDate string `json:"build_date,omitempty"`
+	GoVersion string `json:"go_version,omitempty"`
 }
 
 type headersResponse struct {
@@ -42,6 +51,13 @@ type noBodyResponse struct {
 	Gzipped  bool `json:"gzipped,omitempty"`
 }
 
+// A response for incoming request where body data is discarded, like `/upload`
+// (POST, PUT, PATCH).
+type discardedBodyResponse struct {
+	noBodyResponse
+	BytesReceived int64 `json:"bytes_received"`
+}
+
 // A generic response for any incoming request that might contain a body (POST,
 // PUT, PATCH, etc).
 type bodyResponse struct {
@@ -57,11 +73,16 @@ type bodyResponse struct {
 	JSON  any        `json:"json"`
 }
 
-type cookiesResponse map[string]string
+type cookiesResponse struct {
+	Cookies map[string]string `json:"cookies"`
+}
 
 type authResponse struct {
-	Authorized bool   `json:"authorized"`
-	User       string `json:"user"`
+	Authenticated bool   `json:"authenticated"`
+	User          string `json:"user"`
+
+	// kept for backwards-compatibility with go-httpbin versions <= 2.20
+	Authorized bool `json:"authorized"`
 }
 
 // An actual stream response body will be made up of one or more of these

@@ -3,6 +3,7 @@ package browser
 import (
 	"testing"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -180,6 +181,63 @@ func TestParsePageEmulateMediaOptions(t *testing.T) {
 			require.NoError(t, err)
 
 			opts, err := parsePageEmulateMediaOptions(vu.Runtime(), v, newDefaults())
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, opts)
+		})
+	}
+}
+
+func TestParsePageScreenshotOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		input string
+		want  *common.PageScreenshotOptions
+	}{
+		{
+			name:  "defaults_on_null",
+			input: `null`,
+			want:  common.NewPageScreenshotOptions(),
+		},
+		{
+			name:  "partial_options",
+			input: `({fullPage: true, quality: 100, type: "png"})`,
+			want: &common.PageScreenshotOptions{
+				FullPage: true,
+				Quality:  100,
+				Format:   common.ImageFormatPNG,
+			},
+		},
+		{
+			name:  "all_options",
+			input: `({clip: {x: 32.5, y: 16, width: 200, height: 100}, fullPage: false, omitBackground: true, quality: 100, type: "jpg", path: "image.jpg"})`,
+			want: &common.PageScreenshotOptions{
+				Clip: &page.Viewport{
+					X:      32.5,
+					Y:      16,
+					Width:  200,
+					Height: 100,
+					Scale:  1,
+				},
+				FullPage:       false,
+				OmitBackground: true,
+				Quality:        100,
+				Format:         common.ImageFormatJPEG,
+				Path:           "image.jpg",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			vu := k6test.NewVU(t)
+			v, err := vu.Runtime().RunString(tt.input)
+			require.NoError(t, err)
+
+			opts, err := parsePageScreenshotOptions(vu.Runtime(), v)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, opts)
 		})

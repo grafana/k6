@@ -39,4 +39,15 @@ runs:
             unset args[2]
           fi
         fi
+        if [[ ${USE_GOTIP} == 'true' ]]; then
+          # Under Go 1.27+, golang.org/x/net/http2 switches to a "wrapping
+          # implementation" that delegates to net/http. With it, ConfigureTransport
+          # no longer forces HTTP/2 over custom dialers, and HTTP/2 errors surface as
+          # unexported net/http/internal/http2 types that lib/netext/httpext can no
+          # longer classify (only StreamError has an upstream errors.As bridge;
+          # ConnectionError and GoAwayError do not). Force the legacy x/net
+          # implementation until k6 adapts. See Dependencies.md / the http2 error
+          # handling in lib/netext/httpext/error_codes.go.
+          args+=("-tags" "http2legacy")
+        fi
         go test "${args[@]}" -timeout 1600s `go list ./... | grep -v browser/tests`

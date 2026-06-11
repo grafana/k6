@@ -32,7 +32,7 @@ func Abortf(ctx context.Context, format string, a ...any) {
 // TODO: test.
 func Panicf(ctx context.Context, format string, a ...any) {
 	failFunc := func(rt *sobek.Runtime, a ...any) {
-		k6common.Throw(rt, fmt.Errorf(format, a...))
+		k6common.Throw(rt, BrowserError(fmt.Errorf(format, a...)))
 	}
 	sharedPanic(ctx, failFunc, a...)
 }
@@ -99,4 +99,9 @@ func (e *UserFriendlyError) Error() string {
 	case errors.Is(e.Err, context.Canceled):
 		return "canceled"
 	}
+}
+
+// BrowserError tags err as originating from the browser module.
+func BrowserError(err error) error {
+	return errext.WithFields(err, map[string]any{"module": "browser"})
 }

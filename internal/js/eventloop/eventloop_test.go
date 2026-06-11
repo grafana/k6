@@ -199,6 +199,23 @@ func TestEventLoopRejectSyntaxError(t *testing.T) {
 	require.EqualError(t, err, "Uncaught (in promise) ReferenceError: some is not defined\n\tat <eval>:1:30(1)\n")
 }
 
+func TestEventLoopRejectPreservesErrorChain(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
+	loop := eventloop.New(vu)
+	rt := vu.Runtime()
+	original := fmt.Errorf("connection refused")
+	require.NoError(t, rt.Set("reason", rt.ToValue(original)))
+	err := loop.Start(func() error {
+		_, err := rt.RunString("Promise.reject(reason)")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.ErrorContains(t, err, "Uncaught (in promise)")
+	require.ErrorContains(t, err, "connection refused")
+	require.ErrorIs(t, err, original)
+}
+
 func TestEventLoopRejectGoError(t *testing.T) {
 	t.Parallel()
 	vu := &modulestest.VU{RuntimeField: sobek.New()}

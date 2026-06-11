@@ -115,5 +115,8 @@ func parseBrowserContextOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Br
 	if err := mergeWith(rt, b, opts); err != nil {
 		return nil, err
 	}
+	if err := b.Proxy.Validate(); err != nil {
+		return nil, err
+	}
 	return b, nil
 }

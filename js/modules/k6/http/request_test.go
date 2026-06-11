@@ -649,8 +649,8 @@ func TestRequest(t *testing.T) {
 				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
 				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" } });
-				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
-				if (res.json().key2 != "value2") { throw new Error("wrong cookie value: " + res.json().key2); }
+				if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
+				if (res.json().cookies.key2 != "value2") { throw new Error("wrong cookie value: " + res.json().cookies.key2); }
 				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key[0] != "value") { throw new Error("wrong cookie value in jar"); }
 				if (jarCookies.key2 != undefined) { throw new Error("unexpected cookie in jar"); }
@@ -665,7 +665,7 @@ func TestRequest(t *testing.T) {
 				state.CookieJar = cookieJar
 				_, err = rt.RunString(sr(`
 				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key: "value" } });
-				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
+				if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
 				var jar = http.cookieJar();
 				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key != undefined) { throw new Error("unexpected cookie in jar"); }
@@ -682,7 +682,7 @@ func TestRequest(t *testing.T) {
 				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
 				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key: { value: "replaced", replace: true } } });
-				if (res.json().key != "replaced") { throw new Error("wrong cookie value: " + res.json().key); }
+				if (res.json().cookies.key != "replaced") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
 				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key[0] != "value") { throw new Error("wrong cookie value in jar"); }
 				`))
@@ -810,15 +810,15 @@ func TestRequest(t *testing.T) {
 				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value", { domain: "HTTPBIN_DOMAIN" });
 				var res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key != "value") {
-					throw new Error("wrong cookie value 1: " + res.json().key);
+				if (res.json().cookies.key != "value") {
+					throw new Error("wrong cookie value 1: " + res.json().cookies.key);
 				}
 				jar.set("HTTPBIN_URL/cookies", "key2", "value2", { domain: "example.com" });
 				res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key != "value") {
-					throw new Error("wrong cookie value 2: " + res.json().key);
+				if (res.json().cookies.key != "value") {
+					throw new Error("wrong cookie value 2: " + res.json().cookies.key);
 				}
-				if (res.json().key2 != undefined) {
+				if (res.json().cookies.key2 != undefined) {
 					throw new Error("cookie 'key2' unexpectedly found");
 				}
 				`))
@@ -834,15 +834,15 @@ func TestRequest(t *testing.T) {
 				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value", { path: "/cookies" });
 				var res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key != "value") {
-					throw new Error("wrong cookie value: " + res.json().key);
+				if (res.json().cookies.key != "value") {
+					throw new Error("wrong cookie value: " + res.json().cookies.key);
 				}
 				jar.set("HTTPBIN_URL/cookies", "key2", "value2", { path: "/some-other-path" });
 				res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key != "value") {
-					throw new Error("wrong cookie value: " + res.json().key);
+				if (res.json().cookies.key != "value") {
+					throw new Error("wrong cookie value: " + res.json().cookies.key);
 				}
-				if (res.json().key2 != undefined) {
+				if (res.json().cookies.key2 != undefined) {
 					throw new Error("cookie 'key2' unexpectedly found");
 				}
 				`))
@@ -858,12 +858,12 @@ func TestRequest(t *testing.T) {
 				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value", { expires: "Sun, 24 Jul 1983 17:01:02 GMT" });
 				var res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key != undefined) {
+				if (res.json().cookies.key != undefined) {
 					throw new Error("cookie 'key' unexpectedly found");
 				}
 				jar.set("HTTPBIN_URL/cookies", "key", "value", { expires: "Sat, 24 Jul 2083 17:01:02 GMT" });
 				res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key != "value") {
+				if (res.json().cookies.key != "value") {
 					throw new Error("cookie 'key' not found");
 				}
 				`))
@@ -879,8 +879,8 @@ func TestRequest(t *testing.T) {
 				var jar = http.cookieJar();
 				jar.set("HTTPSBIN_IP_URL/cookies", "key", "value", { secure: true });
 				var res = http.request("GET", "HTTPSBIN_IP_URL/cookies");
-				if (res.json().key != "value") {
-					throw new Error("wrong cookie value: " + res.json().key);
+				if (res.json().cookies.key != "value") {
+					throw new Error("wrong cookie value: " + res.json().cookies.key);
 				}
 				`))
 				assert.NoError(t, err)
@@ -895,8 +895,8 @@ func TestRequest(t *testing.T) {
 				var jar = new http.CookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
 				var res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" }, jar: jar });
-				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
-				if (res.json().key2 != "value2") { throw new Error("wrong cookie value: " + res.json().key2); }
+				if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
+				if (res.json().cookies.key2 != "value2") { throw new Error("wrong cookie value: " + res.json().cookies.key2); }
 				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/cookies");
 				if (jarCookies.key[0] != "value") { throw new Error("wrong cookie value in jar: " + jarCookies.key[0]); }
 				if (jarCookies.key2 != undefined) { throw new Error("unexpected cookie in jar"); }
@@ -913,10 +913,10 @@ func TestRequest(t *testing.T) {
 				var jar = http.cookieJar();
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
 				var res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key != "value") { throw new Error("cookie 'key' unexpectedly don't found"); }
+				if (res.json().cookies.key != "value") { throw new Error("cookie 'key' unexpectedly don't found"); }
 				jar.clear('HTTPBIN_URL/cookies');
 				res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key == "value") { throw new Error("wrong clean: unexpected cookie in jar"); }
+				if (res.json().cookies.key == "value") { throw new Error("wrong clean: unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
@@ -931,10 +931,10 @@ func TestRequest(t *testing.T) {
 				jar.set("HTTPBIN_URL/cookies", "key1", "value1");
 				jar.set("HTTPBIN_URL/cookies", "key2", "value2");
 				var res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key1 != "value1" || res.json().key2 != "value2") { throw new Error("cookie 'keys' unexpectedly don't found"); }
+				if (res.json().cookies.key1 != "value1" || res.json().cookies.key2 != "value2") { throw new Error("cookie 'keys' unexpectedly don't found"); }
 				jar.delete('HTTPBIN_URL/cookies', "key1");
 				res = http.request("GET", "HTTPBIN_URL/cookies");
-				if (res.json().key1 == "value1" || res.json().key2 != "value2"  ) { throw new Error("wrong clean: unexpected cookie in jar"); }
+				if (res.json().cookies.key1 == "value1" || res.json().cookies.key2 != "value2"  ) { throw new Error("wrong clean: unexpected cookie in jar"); }
 				`))
 				assert.NoError(t, err)
 				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
@@ -1290,7 +1290,7 @@ func TestRequest(t *testing.T) {
 				jar.set("HTTPBIN_URL/cookies", "key", "value");
 				res = http.request("GET", "HTTPBIN_URL/cookies", null, { cookies: { key2: "value2" }, jar: jar });
 
-				if (res.json().key != "value") { throw new Error("wrong cookie value: " + res.json().key); }
+				if (res.json().cookies.key != "value") { throw new Error("wrong cookie value: " + res.json().cookies.key); }
 
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.request["method"] !== "GET") { throw new Error("http request method was not \"GET\": " + JSON.stringify(res.request)) }

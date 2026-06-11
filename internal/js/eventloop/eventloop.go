@@ -2,7 +2,7 @@
 package eventloop
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 
 	"github.com/grafana/sobek"
@@ -194,11 +194,33 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 					}
 				}
 			}
-			// this is the de facto wording in both firefox and deno at least
-			return fmt.Errorf("Uncaught (in promise) %s", value) //nolint:staticcheck
+			return newRejectionError(promise.Result(), value)
 		}
 	}
 }
+
+func newRejectionError(res, v sobek.Value) error {
+	var s string
+	if v != nil {
+		s = v.String()
+	}
+	// this is the de facto wording in both firefox and deno at least
+	msg := "Uncaught (in promise) " + s
+	if !common.IsNullish(res) {
+		if cause, ok := res.Export().(error); ok {
+			return &rejectionError{msg: msg, cause: cause}
+		}
+	}
+	return errors.New(msg)
+}
+
+type rejectionError struct {
+	msg   string
+	cause error
+}
+
+func (e *rejectionError) Error() string { return e.msg }
+func (e *rejectionError) Unwrap() error { return e.cause }
 
 // WaitOnRegistered waits on all registered callbacks so we know nothing is still doing work.
 // This does call back the callbacks and more can be queued over time.

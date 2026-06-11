@@ -119,7 +119,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect, getCmdDeps,
-		getCmdRun, getCmdStats, getCmdVersion, getX,
+		getCmdRun, getCmdStats, getCmdVersion, getCmdFeatures, getX,
 	}
 
 	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()

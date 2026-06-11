@@ -1,6 +1,9 @@
 package common
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // BrowserContextOptions stores browser context options.
 type BrowserContextOptions struct {
@@ -19,6 +22,7 @@ type BrowserContextOptions struct {
 	Locale            string            `js:"locale"`
 	Offline           bool              `js:"offline"`
 	Permissions       []string          `js:"permissions"`
+	Proxy             *ProxyOptions     `js:"proxy"`
 	ReducedMotion     ReducedMotion     `js:"reducedMotion"`
 	Screen            Screen            `js:"screen"`
 	TimezoneID        string            `js:"timezoneID"`
@@ -47,6 +51,23 @@ type Geolocation struct {
 	Latitude  float64 `js:"latitude"`
 	Longitude float64 `js:"longitude"`
 	Accuracy  float64 `js:"accuracy"`
+}
+
+// ProxyOptions represents proxy configuration for a browser context.
+type ProxyOptions struct {
+	Server string `js:"server"`
+	Bypass string `js:"bypass"`
+}
+
+// Validate validates the [ProxyOptions].
+func (p *ProxyOptions) Validate() error {
+	if p == nil {
+		return nil
+	}
+	if strings.TrimSpace(p.Server) == "" {
+		return fmt.Errorf("proxy.server must be set")
+	}
+	return nil
 }
 
 // Validate validates the [Geolocation].
