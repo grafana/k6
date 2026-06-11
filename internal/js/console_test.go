@@ -432,6 +432,21 @@ func TestConsoleLogWithGoValues(t *testing.T) { //nolint:tparallel // actually f
 	}
 }
 
+func TestConsoleEscapesControlCharacters(t *testing.T) {
+	t.Parallel()
+
+	logger, hook := testutils.NewLoggerWithHook(t)
+	c := newConsole(logger)
+	rt := sobek.New()
+
+	c.Log(rt.ToValue("first\rsecond\x1b[31m\nthird\tfourth\x00"))
+
+	entry := hook.LastEntry()
+	require.NotNil(t, entry, "nothing logged")
+	assert.Equal(t, "first\\rsecond\\x1b[31m\nthird\tfourth\\x00", entry.Message)
+	assert.Equal(t, logrus.Fields{"source": "console"}, entry.Data)
+}
+
 func TestConsoleLevels(t *testing.T) {
 	t.Parallel()
 	levels := map[string]logrus.Level{
