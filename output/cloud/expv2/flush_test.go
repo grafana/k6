@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // TODO: additional case

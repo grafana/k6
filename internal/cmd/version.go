@@ -9,16 +9,92 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/build"
 )
 
 const (
 	commitKey      = "commit"
 	commitDirtyKey = "commit_dirty"
-	mainK6Path     = "go.k6.io/k6"
+	mainK6Path     = "go.k6.io/k6/v2"
 )
+
+// k6VersionInfo holds the version and VCS metadata for the running k6 binary,
+// as read from Go build info.
+type k6VersionInfo struct {
+	version string // effective version string, always with "v" prefix
+	commit  string // short VCS hash, "devel" for plain go-build, "" if unknown
+	dirty   bool   // true when the working tree was modified at build time
+}
+
+// readK6VersionInfo reads Go build info once and returns everything needed by
+// both the version display and the dependency constraint check. This is the
+// single source of truth so that what k6 prints and what it compares against
+// are always the same string.
+func readK6VersionInfo() k6VersionInfo {
+	v := build.Version
+	if !strings.HasPrefix(v, "v") {
+		v = "v" + v
+	}
+
+	bi, ok := debug.ReadBuildInfo()
+	if !ok {
+		return k6VersionInfo{version: v}
+	}
+
+	if bi.Main.Path == mainK6Path {
+		return readMainK6VersionInfo(bi, v)
+	}
+	return readLibK6VersionInfo(bi, v)
+}
+
+func readMainK6VersionInfo(bi *debug.BuildInfo, fallback string) k6VersionInfo {
+	var info k6VersionInfo
+	if bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		info.version = bi.Main.Version
+	} else {
+		info.version = fallback
+		if bi.Main.Version == "(devel)" {
+			info.commit = "devel"
+		}
+	}
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			commitLen := min(len(s.Value), 10)
+			info.commit = s.Value[:commitLen]
+		case "vcs.modified":
+			info.dirty = s.Value == "true"
+		}
+	}
+	return info
+}
+
+// readLibK6VersionInfo handles the case where k6 is used as a library inside another binary.
+func readLibK6VersionInfo(bi *debug.BuildInfo, fallback string) k6VersionInfo {
+	var info k6VersionInfo
+	for _, dep := range bi.Deps {
+		if dep.Path == mainK6Path {
+			if dep.Replace != nil {
+				info.version = dep.Replace.Version
+			} else {
+				info.version = dep.Version
+			}
+			break
+		}
+	}
+	if info.version == "" {
+		info.version = fallback
+	}
+	return info
+}
+
+// runtimeK6Version returns the effective k6 version for dependency constraint
+// checking. It is guaranteed to match details["version"] from versionDetails().
+func runtimeK6Version() string {
+	return readK6VersionInfo().version
+}
 
 // fullVersion returns the maximally full version and build information for
 // the currently running k6 executable.
@@ -47,48 +123,20 @@ func fullVersion() string {
 
 // versionDetails returns the structured details about version
 func versionDetails() map[string]any {
-	v := build.Version
-	if !strings.HasPrefix(v, "v") {
-		v = "v" + v
-	}
+	info := readK6VersionInfo()
 
 	details := map[string]any{
-		"version":    v,
+		"version":    info.version,
 		"go_version": runtime.Version(),
 		"go_os":      runtime.GOOS,
 		"go_arch":    runtime.GOARCH,
 	}
 
-	buildInfo, ok := debug.ReadBuildInfo()
-	if !ok {
-		return details
+	if info.commit != "" {
+		details[commitKey] = info.commit
 	}
-
-	if buildInfo.Main.Path == mainK6Path {
-		details["version"] = buildInfo.Main.Version
-		if buildInfo.Main.Version == "(devel)" {
-			details["version"] = v
-			details[commitKey] = "devel"
-		}
-		for _, s := range buildInfo.Settings {
-			switch s.Key {
-			case "vcs.revision":
-				commitLen := min(len(s.Value), 10)
-				details[commitKey] = s.Value[:commitLen]
-			case "vcs.modified":
-				if s.Value == "true" {
-					details[commitDirtyKey] = true
-				}
-			default:
-			}
-		}
-	} else {
-		for _, dep := range buildInfo.Deps {
-			if dep.Path == mainK6Path {
-				details["version"] = dep.Version
-				break
-			}
-		}
+	if info.dirty {
+		details[commitDirtyKey] = true
 	}
 
 	return details

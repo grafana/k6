@@ -15,12 +15,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/env"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
-	"go.k6.io/k6/internal/js/modules/k6/browser/storage"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/browser"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/storage"
 )
 
 func TestBrowserNewPage(t *testing.T) {
@@ -200,7 +200,7 @@ func TestBrowserVersion(t *testing.T) {
 
 // This only works for Chrome!
 // TODO: Improve this test, see:
-// https://go.k6.io/k6/js/modules/k6/browser/pull/51#discussion_r742696736
+// https://go.k6.io/k6/v2/js/modules/k6/browser/pull/51#discussion_r742696736
 func TestBrowserUserAgent(t *testing.T) {
 	t.Parallel()
 

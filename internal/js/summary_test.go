@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 const (
@@ -697,5 +697,5 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	errMsg, err := logErrors[0].String()
 	require.NoError(t, err)
 	assert.Contains(t, errMsg, "\"Error: intentional error\\n\\tat file:///script.js:4:11(3)\\n")
-	assert.Equal(t, logrus.Fields{"hint": "script exception"}, logErrors[0].Data)
+	assert.Equal(t, logrus.Fields{"hint": "script exception", "source": "stacktrace"}, logErrors[0].Data)
 }

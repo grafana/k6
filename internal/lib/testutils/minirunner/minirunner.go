@@ -6,9 +6,9 @@ import (
 	"context"
 	"io"
 
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // Ensure mock implementations conform to the interfaces.
@@ -211,7 +211,7 @@ func (vu *ActiveVU) RunOnce() error {
 
 	select {
 	case <-vu.RunContext.Done():
-		return vu.RunContext.Err() // we are done, return
+		return lib.ContextErr(vu.RunContext) // we are done, return
 	case vu.busy <- struct{}{}:
 		// nothing else can run now, and the VU cannot be deactivated
 	}

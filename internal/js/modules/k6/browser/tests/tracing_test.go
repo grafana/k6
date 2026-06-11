@@ -15,11 +15,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/browser"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
-	browsertrace "go.k6.io/k6/internal/js/modules/k6/browser/trace"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/browser"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
 
-	k6lib "go.k6.io/k6/lib"
+	k6lib "go.k6.io/k6/v2/lib"
 )
 
 const html = `

@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/modules"
 )
 
 // Crypto represents the Crypto interface of the Web Crypto API.

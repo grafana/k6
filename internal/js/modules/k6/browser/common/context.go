@@ -94,7 +94,7 @@ func ContextErr(ctx context.Context) error {
 	}
 
 	cause := context.Cause(ctx)
-	if cause == nil || errors.Is(cause, err) {
+	if cause == nil || errors.Is(err, cause) {
 		return err
 	}
 

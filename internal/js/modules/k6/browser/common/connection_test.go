@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"testing"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
-	"go.k6.io/k6/internal/js/modules/k6/browser/tests/ws"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/tests/ws"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"

@@ -2,6 +2,7 @@ package cloudapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,13 +23,10 @@ const (
 type Client struct {
 	apiClient *k6cloud.APIClient
 	token     string
-	stackID   int64
+	stackID   int32
 	baseURL   string
 
 	logger logrus.FieldLogger
-
-	retries       int
-	retryInterval time.Duration
 }
 
 // NewClient return a new client for the cloud API
@@ -47,22 +45,25 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 			},
 		},
 		OperationServers: map[string]k6cloud.ServerConfigurations{},
-		HTTPClient:       &http.Client{Timeout: timeout},
+		HTTPClient: &http.Client{
+			Timeout:   timeout,
+			Transport: &bodyResetTransport{base: http.DefaultTransport},
+		},
+		MaxRetries:    MaxRetries,
+		RetryInterval: RetryInterval,
 	}
 
 	c := &Client{
-		apiClient:     k6cloud.NewAPIClient(cfg),
-		token:         token,
-		baseURL:       fmt.Sprintf("%s/cloud/v6", host),
-		retries:       MaxRetries,
-		retryInterval: RetryInterval,
-		logger:        logger,
+		apiClient: k6cloud.NewAPIClient(cfg),
+		token:     token,
+		baseURL:   fmt.Sprintf("%s/cloud/v6", host),
+		logger:    logger,
 	}
 	return c, nil
 }
 
 // SetStackID sets the stack ID for the client.
-func (c *Client) SetStackID(stackID int64) {
+func (c *Client) SetStackID(stackID int32) {
 	c.stackID = stackID
 }
 
@@ -71,10 +72,35 @@ func (c *Client) BaseURL() string {
 	return c.baseURL
 }
 
+// bodyResetTransport resets req.Body from GetBody before each round trip.
+// The vendored SDK retries 5xx/429 by re-calling Do on the same request
+// without resetting its Body. After Connection: close the drained body
+// causes "ContentLength=N with Body length 0".
+type bodyResetTransport struct{ base http.RoundTripper }
+
+func (rt *bodyResetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.GetBody == nil {
+		return rt.base.RoundTrip(req)
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, err
+	}
+	req.Body = body
+	return rt.base.RoundTrip(req)
+}
+
 // CheckResponse checks the parsed response.
 // It returns nil if the code is in the successful range,
 // otherwise it tries to parse the body and return a parsed error.
-func CheckResponse(r *http.Response) error {
+func CheckResponse(r *http.Response, err error) error {
+	if err != nil {
+		var aerr *k6cloud.GenericOpenAPIError
+		if !errors.As(err, &aerr) {
+			return err
+		}
+	}
+
 	if r == nil {
 		return errUnknown
 	}

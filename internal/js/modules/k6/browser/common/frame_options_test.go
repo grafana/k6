@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

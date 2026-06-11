@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/internal/lib/testutils/grpcservice"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/testutils/grpcservice"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
+	"go.k6.io/k6/v2/metrics"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/grafana/sobek"

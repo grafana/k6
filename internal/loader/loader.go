@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 // SourceData wraps a source file; data and filename.

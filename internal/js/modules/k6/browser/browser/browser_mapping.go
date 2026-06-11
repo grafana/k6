@@ -5,7 +5,7 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 )
 
 // mapBrowser to the JS module.
@@ -113,6 +113,9 @@ func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
 func parseBrowserContextOptions(rt *sobek.Runtime, opts sobek.Value) (*common.BrowserContextOptions, error) {
 	b := common.DefaultBrowserContextOptions()
 	if err := mergeWith(rt, b, opts); err != nil {
+		return nil, err
+	}
+	if err := b.Proxy.Validate(); err != nil {
 		return nil, err
 	}
 	return b, nil

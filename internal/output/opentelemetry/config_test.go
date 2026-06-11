@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -33,7 +33,6 @@ func TestConfig(t *testing.T) {
 				GRPCExporterEndpoint: null.NewString("localhost:4317", false),
 				ExportInterval:       types.NewNullDuration(10*time.Second, false),
 				FlushInterval:        types.NewNullDuration(1*time.Second, false),
-				SingleCounterForRate: null.NewBool(true, false),
 			},
 		},
 
@@ -50,7 +49,6 @@ func TestConfig(t *testing.T) {
 				GRPCExporterEndpoint: null.NewString("else", true),
 				ExportInterval:       types.NewNullDuration(4*time.Millisecond, true),
 				FlushInterval:        types.NewNullDuration(1*time.Second, false),
-				SingleCounterForRate: null.NewBool(true, false),
 			},
 		},
 
@@ -71,7 +69,6 @@ func TestConfig(t *testing.T) {
 				"K6_OTEL_TLS_CLIENT_CERTIFICATE":   "client_cert_path",
 				"K6_OTEL_TLS_CLIENT_KEY":           "client_key_path",
 				"K6_OTEL_HEADERS":                  "key1=value1,key2=value2",
-				"K6_OTEL_SINGLE_COUNTER_FOR_RATE":  "false",
 			},
 			expectedConfig: Config{
 				ServiceName:           null.NewString("foo", true),
@@ -89,7 +86,6 @@ func TestConfig(t *testing.T) {
 				TLSClientCertificate:  null.NewString("client_cert_path", true),
 				TLSClientKey:          null.NewString("client_key_path", true),
 				Headers:               null.NewString("key1=value1,key2=value2", true),
-				SingleCounterForRate:  null.NewBool(false, true),
 			},
 		},
 
@@ -108,7 +104,6 @@ func TestConfig(t *testing.T) {
 				GRPCExporterEndpoint: null.NewString("localhost:4317", false),
 				ExportInterval:       types.NewNullDuration(10*time.Second, false),
 				FlushInterval:        types.NewNullDuration(1*time.Second, false),
-				SingleCounterForRate: null.NewBool(true, false),
 			},
 		},
 
@@ -129,8 +124,7 @@ func TestConfig(t *testing.T) {
 					`"tlsCertificate":"cert_path",` +
 					`"tlsClientCertificate":"client_cert_path",` +
 					`"tlsClientKey":"client_key_path",` +
-					`"headers":"key1=value1,key2=value2",` +
-					`"singleCounterForRate":false` +
+					`"headers":"key1=value1,key2=value2"` +
 					`}`,
 			),
 			expectedConfig: Config{
@@ -149,7 +143,6 @@ func TestConfig(t *testing.T) {
 				TLSClientCertificate:  null.NewString("client_cert_path", true),
 				TLSClientKey:          null.NewString("client_key_path", true),
 				Headers:               null.NewString("key1=value1,key2=value2", true),
-				SingleCounterForRate:  null.NewBool(false, true),
 			},
 		},
 
@@ -166,7 +159,6 @@ func TestConfig(t *testing.T) {
 				GRPCExporterEndpoint: null.NewString("localhost:4317", false), // default
 				ExportInterval:       types.NewNullDuration(15*time.Millisecond, true),
 				FlushInterval:        types.NewNullDuration(1*time.Second, false),
-				SingleCounterForRate: null.NewBool(true, false),
 			},
 		},
 		"no scheme in http exporter protocol": {

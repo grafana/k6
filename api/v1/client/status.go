@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	v1 "go.k6.io/k6/api/v1"
+	v1 "go.k6.io/k6/v2/api/v1"
 )
 
 // Status returns the current k6 status.

@@ -14,14 +14,14 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -35,6 +35,7 @@ func configFlagSet() *pflag.FlagSet {
 		false,
 		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
+	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 	return flags
 }
 
@@ -42,8 +43,9 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	Out    []string  `json:"out" envconfig:"K6_OUT"`
+	Linger null.Bool `json:"linger" envconfig:"K6_LINGER"`
+
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
