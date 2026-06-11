@@ -96,3 +96,57 @@ func TestPrintConfigTokenOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeStackURL(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "slug",
+			input:    "my-team",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "slug with grafana net suffix",
+			input:    "my-team.grafana.net",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "slug with grafana net suffix and trailing slash",
+			input:    "my-team.grafana.net/",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "full https URL",
+			input:    "https://my-team.grafana.net",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "full https URL with trailing slash",
+			input:    "https://my-team.grafana.net/",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "full https URL with multiple trailing slashes",
+			input:    "https://my-team.grafana.net///",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "full http URL with trailing slash",
+			input:    "http://my-team.grafana.net/",
+			expected: "http://my-team.grafana.net",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.expected, normalizeStackURL(tc.input))
+		})
+	}
+}

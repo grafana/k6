@@ -282,7 +282,8 @@ func authenticateUserToken(
 
 // validateTokenV6 validates a token and a stack URL/slug and returns the normalized URL, stack ID,
 // and default project ID.
-// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
+// The stackInput can be either a full URL (e.g., https://my-team.grafana.net)
+// or just a slug (e.g., my-team).
 func validateTokenV6(
 	gs *state.GlobalState,
 	config cloudapi.Config,
@@ -309,14 +310,18 @@ func validateTokenV6(
 	return normalizedURL, int64(authResp.StackId), int64(authResp.DefaultProjectId), nil
 }
 
-// normalizeStackURL converts a stack slug to a full URL if needed.
-// The stackInput can be either a full URL (e.g., https://my-team.grafana.net) or just a slug (e.g., my-team).
+// normalizeStackURL converts a stack slug to a full URL if needed and removes trailing slashes.
+// The stackInput can be either a full URL (e.g., https://my-team.grafana.net)
+// or just a slug (e.g., my-team).
 func normalizeStackURL(stackInput string) string {
-	// If it's already a full URL, return it as is
+	stackInput = strings.TrimRight(stackInput, "/")
+
+	// If it's already a full URL, return it as is.
 	if strings.HasPrefix(stackInput, "http://") || strings.HasPrefix(stackInput, "https://") {
 		return stackInput
 	}
-	// Otherwise, treat it as a slug and construct the URL
+
+	// Otherwise, treat it as a slug and construct the URL.
 	slug := stripGrafanaNetSuffix(stackInput)
 	return fmt.Sprintf("https://%s.grafana.net", slug)
 }
