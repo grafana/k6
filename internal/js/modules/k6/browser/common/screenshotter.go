@@ -45,6 +45,11 @@ var imageFormatToID = map[string]ImageFormat{ //nolint:gochecknoglobals
 	"png":  ImageFormatPNG,
 }
 
+func ImageIDFromString(format string) (ImageFormat, bool) {
+	id, exists := imageFormatToID[format]
+	return id, exists
+}
+
 // MarshalJSON marshals the enum as a quoted JSON string.
 func (f ImageFormat) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)

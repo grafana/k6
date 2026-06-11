@@ -129,6 +129,19 @@
       "enabled": true,
       "dependencyDashboardApproval": false,
       "description": "Override and enable only security updates for v1"
+    },
+    {
+      "description": "v1.x Dockerfile",
+      "matchBaseBranches": ["v1.x"],
+      "matchManagers": [
+        "docker"
+      ],
+      "matchFileNames": [
+        "Dockerfile"
+      ],
+      "extends": [
+        "schedule:weekly"
+      ]
     }
   ]
 }

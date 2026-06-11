@@ -5,13 +5,13 @@ package colorable
 
 import (
 	"bytes"
+	syscall "golang.org/x/sys/windows"
 	"io"
 	"math"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
-	syscall "golang.org/x/sys/windows"
 	"unsafe"
 
 	"github.com/mattn/go-isatty"
@@ -93,6 +93,7 @@ type writer struct {
 	handle    syscall.Handle
 	althandle syscall.Handle
 	oldattr   word
+	curattr   word
 	oldpos    coord
 	rest      bytes.Buffer
 	mutex     sync.Mutex
@@ -112,7 +113,7 @@ func NewColorable(file *os.File) io.Writer {
 		var csbi consoleScreenBufferInfo
 		handle := syscall.Handle(file.Fd())
 		procGetConsoleScreenBufferInfo.Call(uintptr(handle), uintptr(unsafe.Pointer(&csbi)))
-		return &writer{out: file, handle: handle, oldattr: csbi.attributes, oldpos: coord{0, 0}}
+		return &writer{out: file, handle: handle, oldattr: csbi.attributes, curattr: csbi.attributes, oldpos: coord{0, 0}}
 	}
 	return file
 }
@@ -438,7 +439,11 @@ func (w *writer) Write(data []byte) (n int, err error) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	var csbi consoleScreenBufferInfo
-	procGetConsoleScreenBufferInfo.Call(uintptr(w.handle), uintptr(unsafe.Pointer(&csbi)))
+
+	if w.rest.Len() == 0 && bytes.IndexByte(data, 0x1b) == -1 {
+		w.out.Write(data)
+		return len(data), nil
+	}
 
 	handle := w.handle
 
@@ -517,7 +522,7 @@ loop:
 				w.rest.Reset()
 				break
 			}
-			buf.Write([]byte(string(c)))
+			buf.WriteByte(c)
 		}
 		if m == 0 {
 			break loop
@@ -678,11 +683,11 @@ loop:
 			procFillConsoleOutputCharacter.Call(uintptr(handle), uintptr(' '), uintptr(n), *(*uintptr)(unsafe.Pointer(&cursor)), uintptr(unsafe.Pointer(&written)))
 			procFillConsoleOutputAttribute.Call(uintptr(handle), uintptr(csbi.attributes), uintptr(n), *(*uintptr)(unsafe.Pointer(&cursor)), uintptr(unsafe.Pointer(&written)))
 		case 'm':
-			procGetConsoleScreenBufferInfo.Call(uintptr(handle), uintptr(unsafe.Pointer(&csbi)))
-			attr := csbi.attributes
+			attr := w.curattr
 			cs := buf.String()
 			if cs == "" {
 				procSetConsoleTextAttribute.Call(uintptr(handle), uintptr(w.oldattr))
+				w.curattr = w.oldattr
 				continue
 			}
 			token := strings.Split(cs, ";")
@@ -814,8 +819,11 @@ loop:
 							attr |= backgroundBlue
 						}
 					}
-					procSetConsoleTextAttribute.Call(uintptr(handle), uintptr(attr))
 				}
+			}
+			if attr != w.curattr {
+				procSetConsoleTextAttribute.Call(uintptr(handle), uintptr(attr))
+				w.curattr = attr
 			}
 		case 'h':
 			var ci consoleCursorInfo
@@ -834,6 +842,8 @@ loop:
 					w.althandle = syscall.Handle(h)
 					if w.althandle != 0 {
 						handle = w.althandle
+						procGetConsoleScreenBufferInfo.Call(uintptr(handle), uintptr(unsafe.Pointer(&csbi)))
+						w.curattr = csbi.attributes
 					}
 				}
 			}
@@ -853,6 +863,8 @@ loop:
 					syscall.CloseHandle(w.althandle)
 					w.althandle = 0
 					handle = w.handle
+					procGetConsoleScreenBufferInfo.Call(uintptr(handle), uintptr(unsafe.Pointer(&csbi)))
+					w.curattr = csbi.attributes
 				}
 			}
 		case 's':
