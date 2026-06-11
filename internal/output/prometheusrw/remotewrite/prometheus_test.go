@@ -89,3 +89,12 @@ func findNameLabel(labels []*prompb.Label) string {
 	// This should never happen whenever we use this test helper.
 	panic("__name__ label must be present")
 }
+
+func findLabelValue(labels []*prompb.Label, name string) string {
+	for _, l := range labels {
+		if l.Name == name {
+			return l.Value
+		}
+	}
+	return ""
+}
