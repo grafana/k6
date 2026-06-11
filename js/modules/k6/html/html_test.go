@@ -128,6 +128,47 @@ func TestParseHTML(t *testing.T) {
 			assert.Equal(t, "Lorem ipsum", sel.Text())
 		}
 	})
+	t.Run("Single", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTML)
+
+		t.Run("returns first matching descendant", func(t *testing.T) {
+			v, err := rt.RunString(`doc.single("p")`)
+			if assert.NoError(t, err) && assert.IsType(t, Selection{}, v.Export()) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+				text := sel.Text()
+				require.GreaterOrEqual(t, len(text), 17)
+				assert.Equal(t, "Lorem ipsum dolor", text[:17])
+			}
+		})
+		t.Run("supports chaining from a selection", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("body").single("option").text()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "no", v.Export())
+			}
+		})
+		t.Run("returns one overall match for multiple receiver nodes", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("select").single("option")`)
+			if assert.NoError(t, err) && assert.IsType(t, Selection{}, v.Export()) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+				assert.Equal(t, "no", sel.Text())
+			}
+		})
+		t.Run("preserves end semantics", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("select").single("option").end().first().attr("id")`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, "select_one", v.Export())
+			}
+		})
+		t.Run("returns empty selection when no nodes match", func(t *testing.T) {
+			v, err := rt.RunString(`doc.single(".missing").size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(0), v.Export())
+			}
+		})
+	})
 	t.Run("Add", func(t *testing.T) {
 		t.Parallel()
 		rt := getTestRuntimeWithDoc(t, testHTML)

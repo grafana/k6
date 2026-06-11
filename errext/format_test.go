@@ -31,7 +31,7 @@ func TestFormat(t *testing.T) {
 		err := fakeExceptionError{error: errors.New("simple error"), stack: "stack trace"}
 		errorText, fields := errext.Format(err)
 		assert.Equal(t, "stack trace", errorText)
-		assert.Empty(t, fields)
+		assert.Equal(t, map[string]any{"source": "stacktrace"}, fields)
 	})
 
 	t.Run("Hint", func(t *testing.T) {
@@ -42,12 +42,20 @@ func TestFormat(t *testing.T) {
 		assert.Equal(t, map[string]any{"hint": "hint message"}, fields)
 	})
 
+	t.Run("Fields", func(t *testing.T) {
+		t.Parallel()
+		err := errext.WithFields(errors.New("browser error"), map[string]any{"module": "browser"})
+		errorText, fields := errext.Format(err)
+		assert.Equal(t, "browser error", errorText)
+		assert.Equal(t, map[string]any{"module": "browser"}, fields)
+	})
+
 	t.Run("ExceptionWithHint", func(t *testing.T) {
 		t.Parallel()
 		err := fakeExceptionError{error: errext.WithHint(errors.New("error with hint"), "hint message"), stack: "stack trace"}
 		errorText, fields := errext.Format(err)
 		assert.Equal(t, "stack trace", errorText)
-		assert.Equal(t, map[string]any{"hint": "hint message"}, fields)
+		assert.Equal(t, map[string]any{"hint": "hint message", "source": "stacktrace"}, fields)
 	})
 }
 

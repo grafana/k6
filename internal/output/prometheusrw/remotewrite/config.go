@@ -67,7 +67,9 @@ type Config struct {
 
 	// TrendAsNativeHistogram defines if the mapping for metrics defined as Trend type
 	// should map to a Prometheus' Native Histogram.
-	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram" envconfig:"K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"`
+	// The K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM env var is owned by the native-histograms
+	// feature flag (a lifecycle-managed alias), so it is intentionally not bound here.
+	TrendAsNativeHistogram null.Bool `json:"trendAsNativeHistogram"`
 
 	// TrendStats defines the stats to flush for Trend metrics.
 	//
