@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/v2/internal/lib/strvals"
@@ -18,6 +19,8 @@ import (
 
 // fileHookBufferSize is a default size for the fileHook's loglines channel.
 const fileHookBufferSize = 100
+
+const fileHookFlushInterval = time.Second
 
 // fileHook is a hook to handle writing to local files.
 type fileHook struct {
@@ -109,11 +112,18 @@ func (h *fileHook) openFile(getCwd func() (string, error)) error {
 
 // Listen waits for log lines to flush.
 func (h *fileHook) Listen(ctx context.Context) {
+	ticker := time.NewTicker(fileHookFlushInterval)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case entry := <-h.loglines:
 			if _, err := h.bw.Write(entry); err != nil {
 				h.fallbackLogger.Errorf("failed to write a log message to a logfile: %w", err)
+			}
+		case <-ticker.C:
+			if err := h.bw.Flush(); err != nil {
+				h.fallbackLogger.Errorf("failed to flush logfile buffer: %w", err)
 			}
 		case <-ctx.Done():
 			// This context is cancelled after the command finishes executing, so it is guaranteed that no more lines
