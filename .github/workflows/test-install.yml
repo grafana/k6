@@ -1,0 +1,140 @@
+name: Test k6 Installation
+on:
+  # Run after a new release is published
+  release:
+    types: [published]
+  # Run weekly to verify packages remain installable
+  schedule:
+    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
+  # Allow manual triggering for debugging
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  install-linux-deb:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - debian:bookworm
+          - debian:trixie
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y gnupg2 curl ca-certificates
+      - name: Add k6 APT repository
+        run: |
+          gpg -k
+          gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | tee /etc/apt/sources.list.d/k6.list
+          apt-get update
+      - name: Install k6
+        run: apt-get install -y k6
+      - name: Verify k6
+        run: |
+          k6 version
+          k6 --help > /dev/null
+
+  install-linux-rpm:
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - fedora:40
+          - fedora:41
+          - rockylinux:9
+          - amazonlinux:2023
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Add k6 RPM repository and install
+        run: |
+          dnf install -y https://dl.k6.io/rpm/repo.rpm
+          dnf install -y k6
+      - name: Verify k6
+        run: |
+          k6 version
+          k6 --help > /dev/null
+
+  install-macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install k6 via Homebrew
+        run: brew install k6
+      - name: Verify k6
+        run: |
+          k6 version
+          k6 --help > /dev/null
+
+  install-windows-choco:
+    runs-on: windows-latest
+    steps:
+      - name: Install k6 via Chocolatey
+        shell: pwsh
+        run: choco install k6 -y
+      - name: Verify k6
+        shell: pwsh
+        run: |
+          k6 version
+          k6 --help | Out-Null
+
+  install-windows-msi:
+    runs-on: windows-latest
+    steps:
+      - name: Download and install k6 MSI
+        shell: pwsh
+        run: |
+          $msiUrl = "https://dl.k6.io/msi/k6-latest-amd64.msi"
+          $msiPath = "$env:RUNNER_TEMP\k6-latest-amd64.msi"
+          Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath
+          Start-Process msiexec.exe -ArgumentList "/i", $msiPath, "/quiet", "/norestart" -Wait -NoNewWindow
+      - name: Verify k6
+        shell: pwsh
+        run: |
+          # MSI installs to Program Files by default
+          $env:PATH = "C:\Program Files\k6;$env:PATH"
+          k6 version
+          k6 --help | Out-Null
+
+  install-windows-winget:
+    runs-on: windows-latest
+    steps:
+      - name: Install k6 via winget
+        shell: pwsh
+        run: winget install k6 --source winget --accept-source-agreements --accept-package-agreements
+      - name: Verify k6
+        shell: pwsh
+        run: |
+          k6 version
+          k6 --help | Out-Null
+
+  install-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull k6 Docker image
+        run: docker pull grafana/k6:latest
+      - name: Verify k6 in Docker
+        run: |
+          docker run --rm grafana/k6:latest version
+          docker run --rm grafana/k6:latest --help > /dev/null
+      - name: Pull k6 browser image
+        run: docker pull grafana/k6:latest-with-browser
+      - name: Verify k6 browser image
+        run: docker run --rm grafana/k6:latest-with-browser version
