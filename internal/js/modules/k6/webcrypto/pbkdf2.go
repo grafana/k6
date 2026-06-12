@@ -131,7 +131,7 @@ func (keyParams PBKDF2Params) DeriveBits(
 	}
 
 	if length%8 != 0 {
-		return nil, NewError(InvalidAccessError, "provided length of key must be a multiple of 8")
+		return nil, NewError(OperationError, "provided length of key must be a multiple of 8")
 	}
 
 	dk, err := pbkdf2.Key(hashFn, string(pk), keyParams.Salt, keyParams.Iterations, length/8)
