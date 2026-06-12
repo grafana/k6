@@ -405,13 +405,22 @@ func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavas
 	// dismiss beforeunload dialog boxes at the moment as
 	// it seems to pause the exec of any other action on
 	// the page. I believe this is an issue in Chromium.
-	action := cdppage.HandleJavaScriptDialog(false)
 	if event.Type == cdppage.DialogTypeBeforeunload {
-		action = cdppage.HandleJavaScriptDialog(true)
+		if err := cdppage.HandleJavaScriptDialog(true).Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening",
+				"failed to accept beforeunload dialog: %v", err)
+		}
+		return
 	}
 
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening", "failed to dismiss dialog box: %v", err)
+	dialog := newDialog(fs.ctx, fs.session, event)
+	fs.page.onDialog(dialog)
+
+	if !dialog.handled {
+		if err := cdppage.HandleJavaScriptDialog(false).Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening",
+				"failed to dismiss dialog box: %v", err)
+		}
 	}
 }
 
