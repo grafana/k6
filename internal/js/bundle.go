@@ -406,11 +406,21 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
-	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
-	err := rt.Set("__ENV", env)
+	envObj := rt.NewObject()
+	for k, v := range b.preInitState.RuntimeOptions.Env {
+		if err := envObj.DefineDataProperty(
+			k, rt.ToValue(v), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE,
+		); err != nil {
+			return fmt.Errorf("setting __ENV property %s: %w", k, err)
+		}
+	}
+	err := rt.Set("__ENV", envObj)
 	if err != nil {
-		return err
+		return fmt.Errorf("setting __ENV: %w", err)
+	}
+	// Freeze the object so JS code cannot modify __ENV.
+	if _, err := rt.RunString("Object.freeze(__ENV)"); err != nil {
+		return fmt.Errorf("freezing __ENV: %w", err)
 	}
 	err = rt.Set("__VU", vuID)
 	if err != nil {
