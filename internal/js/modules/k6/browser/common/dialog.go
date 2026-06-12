@@ -31,25 +31,22 @@ func (d *Dialog) Message() string      { return d.message }
 func (d *Dialog) DefaultValue() string { return d.defaultValue }
 
 func (d *Dialog) Accept(promptText ...string) error {
+	return d.handle(true, promptText)
+}
+
+func (d *Dialog) Dismiss() error {
+	return d.handle(false, nil)
+}
+
+func (d *Dialog) handle(accept bool, promptText []string) error {
 	if d.handled {
 		return nil
 	}
-	action := cdppage.HandleJavaScriptDialog(true)
+	action := cdppage.HandleJavaScriptDialog(accept)
 	if len(promptText) > 0 {
 		action = action.WithPromptText(promptText[0])
 	}
 	err := action.Do(cdp.WithExecutor(d.ctx, d.session))
-	if err == nil {
-		d.handled = true
-	}
-	return err
-}
-
-func (d *Dialog) Dismiss() error {
-	if d.handled {
-		return nil
-	}
-	err := cdppage.HandleJavaScriptDialog(false).Do(cdp.WithExecutor(d.ctx, d.session))
 	if err == nil {
 		d.handled = true
 	}
