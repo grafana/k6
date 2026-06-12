@@ -44,13 +44,57 @@ func (m *mockSession) ID() target.SessionID  { return "mock-session-id" }
 func (m *mockSession) TargetID() target.ID   { return "mock-target-id" }
 func (m *mockSession) Done() <-chan struct{} { return m.doneCh }
 
+func newTestDialog(ctx context.Context, ms *mockSession, opts ...func(*cdppage.EventJavascriptDialogOpening)) *Dialog {
+	event := &cdppage.EventJavascriptDialogOpening{
+		Type:          cdppage.DialogTypeAlert,
+		Message:       "test message",
+		DefaultPrompt: "default",
+	}
+	for _, o := range opts {
+		o(event)
+	}
+	return newDialog(cdp.WithExecutor(ctx, ms), ms, event)
+}
+
+func TestDialogType(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	d := newTestDialog(ctx, ms, func(e *cdppage.EventJavascriptDialogOpening) {
+		e.Type = cdppage.DialogTypeConfirm
+	})
+	assert.Equal(t, "confirm", d.Type())
+}
+
+func TestDialogMessage(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	d := newTestDialog(ctx, ms, func(e *cdppage.EventJavascriptDialogOpening) {
+		e.Message = "are you sure?"
+	})
+	assert.Equal(t, "are you sure?", d.Message())
+}
+
+func TestDialogDefaultValue(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	d := newTestDialog(ctx, ms, func(e *cdppage.EventJavascriptDialogOpening) {
+		e.DefaultPrompt = "hello"
+	})
+	assert.Equal(t, "hello", d.DefaultValue())
+}
+
 func TestDialogAccept(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
 	ms := newMockSession(ctx)
-
-	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+	d := newTestDialog(ctx, ms)
 	require.NotNil(t, d)
 	assert.False(t, d.handled)
 
@@ -60,8 +104,25 @@ func TestDialogAccept(t *testing.T) {
 	assert.True(t, d.handled)
 	assert.Equal(t, "Page.handleJavaScriptDialog", ms.lastMethod)
 	params, ok := ms.lastParams.(*cdppage.HandleJavaScriptDialogParams)
-	require.True(t, ok, "expected *cdppage.HandleJavaScriptDialogParams")
-	assert.True(t, params.Accept, "expected accept=true for Accept()")
+	require.True(t, ok)
+	assert.True(t, params.Accept)
+	assert.Empty(t, params.PromptText)
+}
+
+func TestDialogAcceptWithPromptText(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	d := newTestDialog(ctx, ms)
+
+	err := d.Accept("my answer")
+	require.NoError(t, err)
+
+	params, ok := ms.lastParams.(*cdppage.HandleJavaScriptDialogParams)
+	require.True(t, ok)
+	assert.True(t, params.Accept)
+	assert.Equal(t, "my answer", params.PromptText)
 }
 
 func TestDialogDismiss(t *testing.T) {
@@ -69,8 +130,7 @@ func TestDialogDismiss(t *testing.T) {
 
 	ctx := context.Background()
 	ms := newMockSession(ctx)
-
-	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+	d := newTestDialog(ctx, ms)
 	require.NotNil(t, d)
 	assert.False(t, d.handled)
 
@@ -80,8 +140,8 @@ func TestDialogDismiss(t *testing.T) {
 	assert.True(t, d.handled)
 	assert.Equal(t, "Page.handleJavaScriptDialog", ms.lastMethod)
 	params, ok := ms.lastParams.(*cdppage.HandleJavaScriptDialogParams)
-	require.True(t, ok, "expected *cdppage.HandleJavaScriptDialogParams")
-	assert.False(t, params.Accept, "expected accept=false for Dismiss()")
+	require.True(t, ok)
+	assert.False(t, params.Accept)
 }
 
 func TestDialogAcceptIdempotent(t *testing.T) {
@@ -89,16 +149,12 @@ func TestDialogAcceptIdempotent(t *testing.T) {
 
 	ctx := context.Background()
 	ms := newMockSession(ctx)
-
-	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+	d := newTestDialog(ctx, ms)
 
 	require.NoError(t, d.Accept())
-	assert.True(t, d.handled)
-
-	// Second call must be a no-op (no second CDP command sent).
 	ms.lastMethod = ""
 	require.NoError(t, d.Accept())
-	assert.Empty(t, ms.lastMethod, "second Accept() must not send a CDP command")
+	assert.Empty(t, ms.lastMethod)
 }
 
 func TestDialogDismissIdempotent(t *testing.T) {
@@ -106,15 +162,12 @@ func TestDialogDismissIdempotent(t *testing.T) {
 
 	ctx := context.Background()
 	ms := newMockSession(ctx)
-
-	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+	d := newTestDialog(ctx, ms)
 
 	require.NoError(t, d.Dismiss())
-	assert.True(t, d.handled)
-
 	ms.lastMethod = ""
 	require.NoError(t, d.Dismiss())
-	assert.Empty(t, ms.lastMethod, "second Dismiss() must not send a CDP command")
+	assert.Empty(t, ms.lastMethod)
 }
 
 func TestDialogAcceptPropagatesError(t *testing.T) {
@@ -124,7 +177,7 @@ func TestDialogAcceptPropagatesError(t *testing.T) {
 	ms := newMockSession(ctx)
 	ms.err = errors.New("cdp error")
 
-	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+	d := newTestDialog(ctx, ms)
 	err := d.Accept()
 
 	require.Error(t, err)
@@ -139,7 +192,7 @@ func TestDialogDismissPropagatesError(t *testing.T) {
 	ms := newMockSession(ctx)
 	ms.err = errors.New("cdp error")
 
-	d := newDialog(cdp.WithExecutor(ctx, ms), ms)
+	d := newTestDialog(ctx, ms)
 	err := d.Dismiss()
 
 	require.Error(t, err)
