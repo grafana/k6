@@ -344,6 +344,10 @@ type Options struct {
 
 	// Specify client IP ranges and/or CIDR from which VUs will make requests
 	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
+
+	// Features decodes the "features" key from the JSON config file (a resolution
+	// surface) and from the script's exported options (unsupported, warned about).
+	Features []string `json:"features" ignored:"true"`
 }
 
 // Apply returns the result of overwriting any fields with any that are set on the argument.
