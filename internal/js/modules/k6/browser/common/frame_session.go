@@ -413,7 +413,7 @@ func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavas
 		return
 	}
 
-	dialog := newDialog(fs.ctx, fs.session)
+	dialog := newDialog(fs.ctx, fs.session, event)
 	fs.page.onDialog(dialog)
 
 	if !dialog.handled {
