@@ -26,15 +26,15 @@ func (e ResponseError) Error() string {
 	err := e.APIError
 	msg := err.Message
 
-	if err.Target.IsSet() {
-		msg += " (target: '" + *err.Target.Get() + "')"
+	if target, ok := err.GetTargetOk(); ok && target != nil {
+		msg += " (target: '" + *target + "')"
 	}
 
 	details := make([]string, len(err.Details))
 	for i, v := range err.Details {
 		details[i] = v.Message
-		if v.Target.IsSet() {
-			details[i] += " (target: '" + *v.Target.Get() + "')"
+		if target, ok := v.GetTargetOk(); ok && target != nil {
+			details[i] += " (target: '" + *target + "')"
 		}
 	}
 
