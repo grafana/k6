@@ -648,8 +648,10 @@ type workerAPI interface {
 	URL() string
 }
 
-// dialogAPI is the interface of a JavaScript dialog.
 type dialogAPI interface {
-	Accept() error
+	Accept(promptText ...string) error
 	Dismiss() error
+	Type() string
+	Message() string
+	DefaultValue() string
 }
