@@ -92,6 +92,39 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 	return ctx
 }
 
+// ConnectOverCDP attaches k6 browser to an existing browser instance
+// using CDP directly, without requiring scenario browser options.
+// This is for user-managed browsers where the script controls the
+// connection lifecycle (e.g. connecting to external browser farms).
+//
+// The user is responsible for calling Close() before the iteration
+// ends. Unlike the registry-managed Connect path (which uses a
+// background context so the event system can close the connection
+// after iteration cancel), here nobody calls Close() post-cancel,
+// so ctx controls both the connection and the browser lifetime.
+func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*common.Browser, error) {
+	ctx = b.initContext(ctx)
+
+	logger, err := makeLogger(ctx, b.envLookupper)
+	if err != nil {
+		return nil, fmt.Errorf("setting up logger: %w", err)
+	}
+
+	opts := common.NewRemoteBrowserOptions()
+	ctx = common.WithBrowserOptions(ctx, opts)
+
+	bp, err := b.connect(ctx, ctx, wsEndpoint, opts, logger)
+	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: opts.Timeout,
+		}
+		return nil, fmt.Errorf("%w", err)
+	}
+
+	return bp, nil
+}
+
 // Connect attaches k6 browser to an existing browser instance.
 //
 // vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
