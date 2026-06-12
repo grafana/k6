@@ -1,0 +1,287 @@
+package provisioning
+
+import (
+	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"time"
+
+	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
+
+	v6 "go.k6.io/k6/v2/internal/cloudapi/v6"
+)
+
+// defaultWaitPollInterval is the default interval between status polls
+// when waiting for a test run to become ready.
+const defaultWaitPollInterval = 2 * time.Second
+
+// StartLocalExecutionRequest contains the parameters for starting a local
+// execution test run via the provisioning API.
+type StartLocalExecutionRequest struct {
+	// Options is the pre-marshalled lib.Options JSON produced by cmd.
+	// Kept as json.RawMessage to preserve typed precision (custom
+	// marshallers on lib.Options work correctly).
+	Options json.RawMessage
+
+	// MaxVUs is the maximum number of virtual users during the test.
+	MaxVUs int64
+
+	// TotalDuration is the total test duration in seconds.
+	TotalDuration int64
+
+	// ArchiveSize is the archive file size in bytes, or nil when
+	// --no-archive-upload is set (sent as explicit JSON null).
+	ArchiveSize *int64
+}
+
+// StartLocalExecutionResponse holds the fields returned by the
+// start_local_execution endpoint that downstream consumers need.
+type StartLocalExecutionResponse struct {
+	TestRunID             int32
+	ArchiveUploadURL      *string // nil when no archive upload expected
+	RuntimeConfig         RuntimeConfig
+	TestRunDetailsPageURL string
+}
+
+// RuntimeConfig carries the runtime configuration returned by the
+// provisioning API for a local-execution test run.
+type RuntimeConfig struct {
+	Metrics      MetricsConfig
+	TestRunToken string
+	Secrets      SecretsConfig
+}
+
+// MetricsConfig holds the metrics push configuration from the
+// provisioning API's runtime_config.metrics object.
+type MetricsConfig struct {
+	PushURL               string
+	PushInterval          *string
+	PushConcurrency       *int32
+	AggregationPeriod     *string
+	AggregationWaitPeriod *string
+	AggregationMinSamples *int32
+	MaxSamplesPerPackage  *int32
+}
+
+// SecretsConfig holds the secrets configuration from the
+// provisioning API's runtime_config.secrets object.
+type SecretsConfig struct {
+	Endpoint     string
+	ResponsePath string
+}
+
+// UploadArchive PUTs pre-serialised archive bytes to the given
+// presigned S3 URL. The URL carries auth in query params, so no
+// Authorization header is set. Retries on 5xx and transport errors.
+func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("creating upload request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-tar")
+	req.ContentLength = int64(len(body))
+
+	resp, err := c.doWithRetry(req)
+	if err != nil {
+		return fmt.Errorf("uploading archive: %w", err)
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		respBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil || len(respBody) == 0 {
+			return fmt.Errorf("archive upload failed: %d %s",
+				resp.StatusCode, http.StatusText(resp.StatusCode))
+		}
+		return fmt.Errorf("archive upload failed: %d %s: %s",
+			resp.StatusCode, http.StatusText(resp.StatusCode), respBody)
+	}
+
+	return nil
+}
+
+// WaitForTestRunReady polls GET /cloud/v6/test_runs/{id} until the
+// backend status becomes "initializing" (signalling that k6 can begin
+// local execution). Returns an error if the test run reaches "aborted"
+// or "completed" first. Cancellable via context. Logs status transitions
+// at Info level once per change.
+//
+// If pollInterval is <= 0 the defaultWaitPollInterval is used.
+func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int32, pollInterval time.Duration) error {
+	if pollInterval <= 0 {
+		pollInterval = defaultWaitPollInterval
+		c.logger.WithField("interval", pollInterval).Info("using default poll interval")
+	}
+
+	var lastStatus string
+
+	for {
+		progress, err := c.v6Client.FetchTest(ctx, testRunID)
+		if err != nil {
+			return fmt.Errorf("fetching test status: %w", err)
+		}
+
+		status := progress.Status.String()
+
+		switch v6.Status(status) {
+		case v6.StatusInitializing:
+			return nil
+
+		case v6.StatusAborted:
+			var abortMsg string
+			for _, e := range progress.StatusHistory {
+				if e.Status == v6.StatusAborted && e.Message != "" {
+					abortMsg = e.Message
+					break
+				}
+			}
+			if abortMsg != "" {
+				return fmt.Errorf("test run aborted before starting: %s", abortMsg)
+			}
+			return fmt.Errorf("test run aborted before starting")
+
+		case v6.StatusCompleted:
+			return fmt.Errorf("test run completed before k6 could start")
+
+		default:
+			// created, queued, or any unrecognised state — keep polling.
+			if status != lastStatus {
+				c.logger.WithField("status", progress.FormatStatus()).Info("test status")
+				lastStatus = status
+			}
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(pollInterval):
+			// continue polling
+		}
+	}
+}
+
+// StartLocalExecution starts a local-execution test run via the
+// provisioning API. It generates a K6-Idempotency-Key header for
+// safe retries. The caller provides options as pre-marshalled JSON.
+func (c *Client) StartLocalExecution(
+	ctx context.Context, loadTestID int32, req StartLocalExecutionRequest,
+) (*StartLocalExecutionResponse, error) {
+	// Generate idempotency key: 8 random bytes hex-encoded (16 chars).
+	var key [8]byte
+	if _, err := rand.Read(key[:]); err != nil {
+		return nil, fmt.Errorf("generating idempotency key: %w", err)
+	}
+
+	// SDK adapter: unmarshal json.RawMessage → map[string]any.
+	var opts map[string]any
+	if err := json.Unmarshal(req.Options, &opts); err != nil {
+		return nil, fmt.Errorf("unmarshalling options for SDK: %w", err)
+	}
+
+	maxVUs, err := toInt32(req.MaxVUs)
+	if err != nil {
+		return nil, fmt.Errorf("max_vus: %w", err)
+	}
+	totalDuration, err := toInt32(req.TotalDuration)
+	if err != nil {
+		return nil, fmt.Errorf("total_duration: %w", err)
+	}
+
+	sdkReq := k6cloud.NewStartLocalExecutionTestRequest(opts, maxVUs, totalDuration)
+
+	if req.ArchiveSize != nil {
+		v, err := toInt32(*req.ArchiveSize)
+		if err != nil {
+			return nil, fmt.Errorf("archive_size: %w", err)
+		}
+		sdkReq.SetArchiveSize(v)
+	} else {
+		sdkReq.SetArchiveSizeNil()
+	}
+
+	res, hr, err := c.apiClient.ProvisioningAPI.
+		StartLocalExecutionTest(c.authCtx(ctx), loadTestID).
+		K6IdempotencyKey(hex.EncodeToString(key[:])).
+		StartLocalExecutionTestRequest(sdkReq).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if hr != nil {
+		if respErr := CheckResponse(hr); respErr != nil {
+			return nil, respErr
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return mapStartLocalExecutionResponse(res), nil
+}
+
+// mapStartLocalExecutionResponse converts the SDK response type into
+// the package's domain type.
+func mapStartLocalExecutionResponse(res *k6cloud.StartLocalExecutionTestResponse) *StartLocalExecutionResponse {
+	rc := res.GetRuntimeConfig()
+	m := rc.GetMetrics()
+	s := rc.GetSecrets()
+
+	resp := &StartLocalExecutionResponse{
+		TestRunID:             res.GetTestRunId(),
+		TestRunDetailsPageURL: res.GetTestRunDetailsPageUrl(),
+		RuntimeConfig: RuntimeConfig{
+			TestRunToken: rc.GetTestRunToken(),
+			Metrics: MetricsConfig{
+				PushURL:               m.GetPushUrl(),
+				PushInterval:          m.PushInterval.Get(),
+				PushConcurrency:       m.PushConcurrency.Get(),
+				AggregationPeriod:     m.AggregationPeriod.Get(),
+				AggregationWaitPeriod: m.AggregationWaitPeriod.Get(),
+				AggregationMinSamples: m.AggregationMinSamples.Get(),
+				MaxSamplesPerPackage:  m.MaxSamplesPerPackage.Get(),
+			},
+			Secrets: SecretsConfig{
+				Endpoint:     s.GetEndpoint(),
+				ResponsePath: s.GetResponsePath(),
+			},
+		},
+	}
+
+	if url := res.ArchiveUploadUrl.Get(); url != nil {
+		resp.ArchiveUploadURL = url
+	}
+
+	return resp
+}
+
+// toInt32 safely converts an int64 to int32, returning an error if
+// the value overflows.
+func toInt32(v int64) (int32, error) {
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		return 0, fmt.Errorf("value %d overflows int32", v)
+	}
+	return int32(v), nil
+}
+
+// closeResponse drains and closes an HTTP response body. It mirrors
+// the v6 package's closeResponse helper.
+func closeResponse(res *http.Response, rerr *error) {
+	if res == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	if err := res.Body.Close(); err != nil && *rerr == nil {
+		*rerr = err
+	}
+}

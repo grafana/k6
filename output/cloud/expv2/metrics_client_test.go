@@ -51,7 +51,7 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 
 	// Use a mock that returns immediately without HTTP - no server, no retries.
-	mock := &mockMetricsHTTPClient{
+	mock := &mockMetricsHTTPClientWithBaseURL{
 		doErr: errors.New("500 Internal Server Error"),
 	}
 	mc, err := newMetricsClient(mock, "test-ref-id")
@@ -61,8 +61,23 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	assert.ErrorContains(t, err, "500 Internal Server Error")
 }
 
-// mockMetricsHTTPClient implements metricsHTTPClient for tests.
+// mockMetricsHTTPClientWithBaseURL implements metricsHTTPClientWithBaseURL for tests.
 // It returns immediately without making HTTP requests.
+type mockMetricsHTTPClientWithBaseURL struct {
+	doErr error
+}
+
+func (m *mockMetricsHTTPClientWithBaseURL) Do(_ *http.Request, _ any) error {
+	return m.doErr
+}
+
+func (m *mockMetricsHTTPClientWithBaseURL) BaseURL() string {
+	return "http://test/v1"
+}
+
+// mockMetricsHTTPClient implements only the smaller metricsHTTPClient
+// interface (Do-only, no BaseURL). Used to verify that the explicit-URL
+// constructor does not require the extended interface.
 type mockMetricsHTTPClient struct {
 	doErr error
 }
@@ -71,6 +86,21 @@ func (m *mockMetricsHTTPClient) Do(_ *http.Request, _ any) error {
 	return m.doErr
 }
 
-func (m *mockMetricsHTTPClient) BaseURL() string {
-	return "http://test/v1"
+func TestNewMetricsClientWithURL(t *testing.T) {
+	t.Parallel()
+
+	stub := &mockMetricsHTTPClient{}
+	mc, err := newMetricsClientWithURL(stub, "https://ingest.example/metrics/abc")
+	require.NoError(t, err)
+	assert.Equal(t, "https://ingest.example/metrics/abc", mc.url)
+	assert.Equal(t, stub, mc.httpClient)
+}
+
+func TestNewMetricsClientWithURL_EmptyURLReturnsError(t *testing.T) {
+	t.Parallel()
+
+	stub := &mockMetricsHTTPClient{}
+	_, err := newMetricsClientWithURL(stub, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "metrics push URL is required")
 }

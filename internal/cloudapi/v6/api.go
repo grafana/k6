@@ -135,6 +135,35 @@ func (c *Client) ValidateOptions(ctx context.Context, projectID int32, opts lib.
 	return nil
 }
 
+// CreateOrFindLoadTest creates a load test by name in the given project without
+// uploading a script. If the API returns 409 (conflict), it falls back to
+// looking up the existing test by name and returns its ID.
+func (c *Client) CreateOrFindLoadTest(ctx context.Context, projectID int32, name string) (_ int32, err error) {
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ProjectsLoadTestsCreate(c.authCtx(ctx), projectID).
+		XStackId(c.stackID).
+		Name(name).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		var rerr ResponseError
+		if errors.As(err, &rerr) && rerr.Response != nil && rerr.Response.StatusCode == http.StatusConflict {
+			lt, err := c.findTestByName(ctx, projectID, name)
+			if err != nil {
+				return 0, err
+			}
+			return lt.GetId(), nil
+		}
+		return 0, err
+	}
+	if res == nil {
+		return 0, errUnknown
+	}
+
+	return res.GetId(), nil
+}
+
 // UploadTest creates or updates a cloud load test's script.
 func (c *Client) UploadTest(
 	ctx context.Context, name string, projectID int32, arc *lib.Archive,
