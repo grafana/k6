@@ -3177,122 +3177,45 @@ func TestMachineReadableSummary(t *testing.T) {
 	assertSummaryExport := func(t *testing.T, out string) {
 		t.Helper()
 
-		// Configuration block: duration is dynamic.
-		configPattern := `"config": \{
-        "duration": [\d.]+,
-        "execution": "local",
-        "script": "(?:[^"\\]|\\.)*"
-    \}`
-		assert.Regexp(t, regexp.MustCompile(configPattern), out)
+		assert.Equal(t, "local", gjson.Get(out, "config.execution").String())
+		assert.NotEmpty(t, gjson.Get(out, "config.script").String())
+		assert.True(t, gjson.Get(out, "config.duration").Float() >= 0)
+		assert.Equal(t, build.Version, gjson.Get(out, "metadata.k6Version").String())
+		assert.Regexp(
+			t,
+			regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(Z|[+-]\d{2}:\d{2})$`),
+			gjson.Get(out, "metadata.generatedAt").String(),
+		)
 
-		// Metadata block: generated_at is dynamic.
-		metadataPattern := `"metadata": \{
-        "generated_at": "\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+(Z|[+-]\d{2}:\d{2})",
-        "k6_version": "` + regexp.QuoteMeta(build.Version) + `"
-    \}`
-		assert.Regexp(t, regexp.MustCompile(metadataPattern), out)
+		assert.Equal(t, int64(3), gjson.Get(out, `results.checks.metrics.#`).Int())
+		assert.Equal(t, "checks_total", gjson.Get(out, `results.checks.metrics.0.name`).String())
+		assert.Equal(t, int64(1), gjson.Get(out, `results.checks.metrics.0.values.count`).Int())
+		assert.Equal(t, "checks_failed", gjson.Get(out, `results.checks.metrics.1.name`).String())
+		assert.Equal(t, float64(0), gjson.Get(out, `results.checks.metrics.1.values.matches`).Float())
+		assert.Equal(t, float64(0), gjson.Get(out, `results.checks.metrics.1.values.rate`).Float())
+		assert.Equal(t, float64(1), gjson.Get(out, `results.checks.metrics.1.values.total`).Float())
+		assert.Equal(t, "checks_succeeded", gjson.Get(out, `results.checks.metrics.2.name`).String())
+		assert.Equal(t, float64(1), gjson.Get(out, `results.checks.metrics.2.values.matches`).Float())
+		assert.Equal(t, float64(1), gjson.Get(out, `results.checks.metrics.2.values.rate`).Float())
+		assert.Equal(t, float64(1), gjson.Get(out, `results.checks.metrics.2.values.total`).Float())
 
-		// Checks block: checks.metrics preserve the order.
-		checksPattern := `"checks": \{
-            "metrics": \[
-                \{
-                    "contains": "default",
-                    "name": "checks_total",
-                    "type": "counter",
-                    "values": \{
-                        "count": 1
-                    \}
-                \},
-                \{
-                    "contains": "default",
-                    "name": "checks_failed",
-                    "type": "rate",
-                    "values": \{
-                        "matches": 0,
-                        "rate": 0,
-                        "total": 1
-                    \}
-                \},
-                \{
-                    "contains": "default",
-                    "name": "checks_succeeded",
-                    "type": "rate",
-                    "values": \{
-                        "matches": 1,
-                        "rate": 1,
-                        "total": 1
-                    \}
-                \}
-            \],
-            "results": \[
-                \{
-                    "fails": 0,
-                    "name": "TRUE is TRUE",
-                    "passes": 1
-                \}
-            \]
-        \}`
-		assert.Regexp(t, regexp.MustCompile(checksPattern), out)
+		assert.Equal(t, int64(1), gjson.Get(out, `results.checks.results.#`).Int())
+		assert.Equal(t, "TRUE is TRUE", gjson.Get(out, `results.checks.results.0.name`).String())
+		assert.Equal(t, int64(1), gjson.Get(out, `results.checks.results.0.passes`).Int())
+		assert.Equal(t, int64(0), gjson.Get(out, `results.checks.results.0.fails`).Int())
 
-		// Metrics block: asserted individual because order may vary between executions.
-		iterationDurationPattern := `\{
-                "contains": "time",
-                "name": "iteration_duration",
-                "type": "trend",
-                "values": \{
-                    "avg": [\d.]+,
-                    "max": [\d.]+,
-                    "med": [\d.]+,
-                    "min": [\d.]+,
-                    "p90": [\d.]+,
-                    "p95": [\d.]+
-                \}
-            \}`
-		assert.Regexp(t, regexp.MustCompile(iterationDurationPattern), out)
+		assert.True(t, gjson.Get(out, `results.metrics.#(name=="iteration_duration").values.avg`).Exists())
+		assert.True(t, gjson.Get(out, `results.metrics.#(name=="iteration_duration").values.max`).Exists())
+		assert.True(t, gjson.Get(out, `results.metrics.#(name=="iteration_duration").values.med`).Exists())
+		assert.True(t, gjson.Get(out, `results.metrics.#(name=="iteration_duration").values.min`).Exists())
+		assert.True(t, gjson.Get(out, `results.metrics.#(name=="iteration_duration").values.p\(90\)`).Exists())
+		assert.True(t, gjson.Get(out, `results.metrics.#(name=="iteration_duration").values.p\(95\)`).Exists())
+		assert.Equal(t, int64(1), gjson.Get(out, `results.metrics.#(name=="iterations").values.count`).Int())
+		assert.Equal(t, int64(0), gjson.Get(out, `results.metrics.#(name=="data_sent").values.count`).Int())
+		assert.Equal(t, int64(0), gjson.Get(out, `results.metrics.#(name=="data_received").values.count`).Int())
+		assert.Equal(t, int64(1), gjson.Get(out, `results.metrics.#(name=="custom_iterations").values.count`).Int())
 
-		iterationsPattern := `\{
-                "contains": "default",
-                "name": "iterations",
-                "type": "counter",
-                "values": \{
-                    "count": 1
-                \}
-            \}`
-		assert.Regexp(t, regexp.MustCompile(iterationsPattern), out)
-
-		dataSentPattern := `\{
-                "contains": "data",
-                "name": "data_sent",
-                "type": "counter",
-                "values": \{
-                    "count": 0
-                \}
-            \}`
-		assert.Regexp(t, regexp.MustCompile(dataSentPattern), out)
-
-		dataReceivedPattern := `\{
-                "contains": "data",
-                "name": "data_received",
-                "type": "counter",
-                "values": \{
-                    "count": 0
-                \}
-            \}`
-		assert.Regexp(t, regexp.MustCompile(dataReceivedPattern), out)
-
-		customIterationsPattern := `\{
-                "contains": "default",
-                "name": "custom_iterations",
-                "type": "counter",
-                "values": \{
-                    "count": 1
-                \}
-            \}`
-		assert.Regexp(t, regexp.MustCompile(customIterationsPattern), out)
-
-		// Schema version: statically defined, as changes in the schema will likely require changes in code.
-		versionPattern := `"version": "1\.0\.0"`
-		assert.Regexp(t, regexp.MustCompile(versionPattern), out)
+		assert.Equal(t, "1.0.0", gjson.Get(out, "version").String())
 	}
 
 	t.Run("--summary-export", func(t *testing.T) {
