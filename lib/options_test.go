@@ -550,6 +550,18 @@ func TestOptions(t *testing.T) {
 		opts := Options{}.Apply(Options{RunTags: tags})
 		assert.Equal(t, tags, opts.RunTags)
 	})
+	t.Run("RunTagsMerge", func(t *testing.T) {
+		t.Parallel()
+		base := Options{RunTags: map[string]string{"env": "staging", "team": "backend"}}
+		// higher-priority layer adds a new key and overrides an existing one
+		override := Options{RunTags: map[string]string{"env": "prod", "region": "us-east"}}
+		opts := base.Apply(override)
+		assert.Equal(t, map[string]string{
+			"env":    "prod",    // higher-priority layer wins on collision
+			"team":   "backend", // lower-priority key preserved
+			"region": "us-east", // higher-priority new key added
+		}, opts.RunTags)
+	})
 	t.Run("DiscardResponseBodies", func(t *testing.T) {
 		t.Parallel()
 		opts := Options{}.Apply(Options{DiscardResponseBodies: null.BoolFrom(true)})
