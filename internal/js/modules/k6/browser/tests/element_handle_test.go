@@ -123,6 +123,90 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 	require.EqualValues(t, bbox, rect)
 }
 
+func TestElementHandleIsInViewport(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+
+	err := p.SetViewportSize(&common.Size{Width: 300, Height: 200})
+	require.NoError(t, err)
+
+	err = p.SetContent(`
+		<style>
+			body { margin: 0; }
+			div { width: 20px; height: 20px; }
+			#below { position: absolute; top: 260px; }
+			#partial { position: absolute; top: 190px; }
+			#hidden { display: none; }
+		</style>
+		<div id="visible"></div>
+		<div id="below"></div>
+		<div id="partial"></div>
+		<div id="hidden"></div>
+	`, nil)
+	require.NoError(t, err)
+
+	visible, err := p.Query("#visible")
+	require.NoError(t, err)
+	got, err := visible.IsInViewport()
+	require.NoError(t, err)
+	require.True(t, got)
+
+	below, err := p.Query("#below")
+	require.NoError(t, err)
+	got, err = below.IsInViewport()
+	require.NoError(t, err)
+	require.False(t, got)
+
+	partial, err := p.Query("#partial")
+	require.NoError(t, err)
+	got, err = partial.IsInViewport()
+	require.NoError(t, err)
+	require.False(t, got)
+
+	hidden, err := p.Query("#hidden")
+	require.NoError(t, err)
+	got, err = hidden.IsInViewport()
+	require.NoError(t, err)
+	require.False(t, got)
+
+	_, err = p.Evaluate(`() => document.querySelector("#below").scrollIntoView()`)
+	require.NoError(t, err)
+	got, err = below.IsInViewport()
+	require.NoError(t, err)
+	require.True(t, got)
+}
+
+func TestElementHandleIsInViewportWithMapper(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const p = await browser.newPage();
+		await p.setViewportSize({ width: 300, height: 200 });
+		await p.setContent('<style>body{margin:0}div{width:20px;height:20px}#below{position:absolute;top:260px}</style><div id="visible"></div><div id="below"></div>');
+
+		const visible = await p.$('#visible');
+		const below = await p.$('#below');
+		const visibleInViewport = await visible.isInViewport();
+		const belowInViewport = await below.isInViewport();
+		await p.evaluate(() => document.querySelector("#below").scrollIntoView());
+		const belowAfterScroll = await below.isInViewport();
+		await p.close();
+
+		if (!visibleInViewport || belowInViewport || !belowAfterScroll) {
+			throw new Error("unexpected isInViewport result");
+		}
+		return true;
+	`)
+	assert.Equal(t, tb.vu.ToSobekValue(true), got.Result())
+}
+
 func TestElementHandleClick(t *testing.T) {
 	t.Parallel()
 

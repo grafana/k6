@@ -488,6 +488,7 @@ type elementHandleAPI interface { //nolint:interfacebloat
 	IsEditable() (bool, error)
 	IsEnabled() (bool, error)
 	IsHidden() (bool, error)
+	IsInViewport() (bool, error)
 	IsVisible() (bool, error)
 	OwnerFrame() (*common.Frame, error)
 	Press(key string, opts sobek.Value) error

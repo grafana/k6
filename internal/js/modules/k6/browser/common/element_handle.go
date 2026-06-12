@@ -1080,6 +1080,41 @@ func (h *ElementHandle) IsHidden() (bool, error) {
 	return ok, nil
 }
 
+// IsInViewport checks if the element is fully visible within the viewport.
+func (h *ElementHandle) IsInViewport() (bool, error) {
+	fn := `
+		(node) => {
+			if (!node.isConnected) {
+				return false;
+			}
+			const rect = node.getBoundingClientRect();
+			const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+			const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+			return rect.width > 0 && rect.height > 0 &&
+				rect.top >= 0 &&
+				rect.left >= 0 &&
+				rect.bottom <= viewportHeight &&
+				rect.right <= viewportWidth;
+		}
+	`
+	opts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := h.eval(h.ctx, opts, fn)
+	if err != nil {
+		return false, fmt.Errorf("checking element is in viewport: %w", err)
+	}
+
+	inViewport, ok := result.(bool)
+	if !ok {
+		return false, fmt.Errorf("checking element is in viewport: unexpected type %T", result)
+	}
+
+	return inViewport, nil
+}
+
 // IsVisible checks if the element is visible.
 func (h *ElementHandle) IsVisible() (bool, error) {
 	ok, err := h.isVisible(h.ctx)
