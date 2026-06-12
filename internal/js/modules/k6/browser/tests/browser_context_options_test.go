@@ -16,7 +16,7 @@ func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 	t.Parallel()
 
 	opts := common.DefaultBrowserContextOptions()
-	assert.False(t, opts.AcceptDownloads)
+	assert.True(t, opts.AcceptDownloads)
 	assert.Empty(t, opts.DownloadsPath)
 	assert.False(t, opts.BypassCSP)
 	assert.Equal(t, common.ColorSchemeLight, opts.ColorScheme)
