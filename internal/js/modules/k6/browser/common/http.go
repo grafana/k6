@@ -70,16 +70,18 @@ type RequestFailure struct {
 
 // Request represents a browser HTTP request.
 type Request struct {
-	ctx           context.Context
-	frame         *Frame
-	responseMu    sync.RWMutex
-	response      *Response
-	redirectChain []*Request
-	requestID     network.RequestID
-	documentID    string
-	url           *url.URL
-	method        string
-	headers       map[string][]string
+	ctx            context.Context
+	frame          *Frame
+	responseMu     sync.RWMutex
+	response       *Response
+	redirectChain  []*Request
+	requestID      network.RequestID
+	documentID     string
+	url            *url.URL
+	method         string
+	headers        map[string][]string
+	extraHeaders   map[string][]string
+	extraHeadersMu sync.RWMutex
 	// For now we're only going to work with the 0th entry of postDataEntries.
 	// We've not been able to reproduce a situation where more than one entry
 	// occupies the slice. Once we have a better idea of when more than one
@@ -214,6 +216,12 @@ func validateResourceType(logger *log.Logger, t string) string {
 	return t
 }
 
+func (r *Request) addExtraHeaders(extra map[string][]string) {
+	r.extraHeadersMu.Lock()
+	defer r.extraHeadersMu.Unlock()
+	r.extraHeaders = extra
+}
+
 func (r *Request) getFrame() *Frame {
 	return r.frame
 }
@@ -231,9 +239,21 @@ func (r *Request) headersSize() int64 {
 	size += len(r.method)
 	size += len(r.url.Path)
 	size += 8 // httpVersion
-	for n, v := range r.headers {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	r.extraHeadersMu.RLock()
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
+	} else {
+		for name, values := range r.headers {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return int64(size)
 }
 
@@ -255,11 +275,18 @@ func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
 
 // AllHeaders returns all the request headers.
 func (r *Request) AllHeaders() map[string]string {
-	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
-	for n, v := range r.headers {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
+	r.extraHeadersMu.RLock()
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
+	} else {
+		for name, values := range r.headers {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -287,11 +314,17 @@ func (r *Request) Headers() map[string]string {
 // HeadersArray returns the request headers as an array of objects.
 func (r *Request) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	for n, vals := range r.headers {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
+	r.extraHeadersMu.RLock()
+	source := r.headers
+	if len(r.extraHeaders) != 0 {
+		source = r.extraHeaders
+	}
+	for name, values := range source {
+		for _, v := range values {
+			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -428,6 +461,8 @@ type Response struct {
 	bodyMu            sync.RWMutex
 	body              []byte
 	headers           map[string][]string
+	extraHeaders      map[string][]string
+	extraHeadersMu    sync.RWMutex
 	fromDiskCache     bool
 	fromServiceWorker bool
 	fromPrefetchCache bool
@@ -490,6 +525,12 @@ func NewHTTPResponse(
 	return &r
 }
 
+func (r *Response) addExtraHeaders(extra map[string][]string) {
+	r.extraHeadersMu.Lock()
+	defer r.extraHeadersMu.Unlock()
+	r.extraHeaders = extra
+}
+
 func (r *Response) fetchBody() error {
 	cached := func() bool {
 		r.bodyMu.RLock()
@@ -537,20 +578,39 @@ func (r *Response) headersSize() int64 {
 	size += 8 // httpVersion
 	size += 3 // statusCode
 	size += len(r.statusText)
-	for n, v := range r.headers {
-		size += len(n) + len(strings.Join(v, "")) + 4 // 4 = ': ' + '\r\n'
+	r.extraHeadersMu.RLock()
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
+	} else {
+		for name, values := range r.headers {
+			for _, value := range values {
+				size += len(name) + len(value) + 4 // 4 = ': ' + '\r\n'
+			}
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	size += 2 // '\r\n'
 	return int64(size)
 }
 
 // AllHeaders returns all the response headers.
 func (r *Response) AllHeaders() map[string]string {
-	// TODO: fix this data to include "ExtraInfo" header data
 	headers := make(map[string]string)
-	for n, v := range r.headers {
-		headers[strings.ToLower(n)] = strings.Join(v, ",")
+	r.extraHeadersMu.RLock()
+	if len(r.extraHeaders) != 0 {
+		for name, values := range r.extraHeaders {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
+	} else {
+		for name, values := range r.headers {
+			headers[strings.ToLower(name)] = strings.Join(values, "\n")
+		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
@@ -633,11 +693,17 @@ func (r *Response) Headers() map[string]string {
 // HeadersArray returns the response headers as an array of objects.
 func (r *Response) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	for n, vals := range r.headers {
-		for _, v := range vals {
-			headers = append(headers, HTTPHeader{Name: n, Value: v})
+	r.extraHeadersMu.RLock()
+	source := r.headers
+	if len(r.extraHeaders) != 0 {
+		source = r.extraHeaders
+	}
+	for name, values := range source {
+		for _, v := range values {
+			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
+	r.extraHeadersMu.RUnlock()
 	return headers
 }
 
