@@ -116,6 +116,10 @@ func TestMappings(t *testing.T) {
 		}
 		// detect redundant mappings.
 		for m := range mapped {
+			// ignore keys starting by __ (internal keys)
+			if strings.HasPrefix(m, "__") {
+				continue
+			}
 			if !tested[m] {
 				t.Errorf("method %q is redundant", m)
 			}
@@ -600,6 +604,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	Last() *common.Locator
 	Nth(nth int) *common.Locator
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
+	Or(locator *common.Locator) (*common.Locator, error)
 	Press(key string, opts sobek.Value) error
 	PressSequentially(text string, opts sobek.Value) error
 	Type(text string, opts sobek.Value) error
