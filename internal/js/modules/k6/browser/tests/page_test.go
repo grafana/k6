@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 	k6metrics "go.k6.io/k6/v2/metrics"
@@ -297,6 +298,24 @@ func TestPageEvaluateMappingError(t *testing.T) { //nolint:tparallel
 			assert.ErrorContains(t, err, tt.wantErr)
 		})
 	}
+}
+
+func TestPageEvaluateErrorHasBrowserModule(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	_, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		await page.evaluate("() => { throw new Error('expected'); }");
+	`)
+	require.ErrorContains(t, err, "evaluating JS: Error: expected")
+
+	_, fields := errext.Format(err)
+	assert.Equal(t, "browser", fields["module"])
 }
 
 func TestPageGoto(t *testing.T) {
@@ -683,6 +702,12 @@ func TestPageScreenshotFullpage(t *testing.T) {
 
 		document.body.appendChild(div);
 	}`)
+	require.NoError(t, err)
+
+	// Wait for the browser to commit a frame so the gradient div is painted
+	// before the screenshot is captured. Without this, on slow CI runners the
+	// screenshot can race the first paint and capture the still-white background.
+	_, err = p.Evaluate(`() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
 	require.NoError(t, err)
 
 	opts := common.NewPageScreenshotOptions()

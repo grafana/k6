@@ -25,7 +25,7 @@ permissions:
 
 env:
   APP_NAME: "k6"
-  DOCKER_IMAGE_ID: "grafana/k6"
+  DOCKER_IMAGE_ID: "us-docker.pkg.dev/grafanalabs-global/dockerhub-k6-prod-mirror/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
   DEFAULT_GO_VERSION: "1.26.x"
 
@@ -240,9 +240,11 @@ jobs:
           docker run $DOCKER_IMAGE_ID help
           docker run $DOCKER_IMAGE_ID run --help
           docker run $DOCKER_IMAGE_ID inspect --help
-      - name: Login to DockerHub
+      - name: Login to GAR (Docker Hub mirror)
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        uses: grafana/shared-workflows/actions/dockerhub-login@081a366728379fd0426b9cfef190e9a21c2d5418 # dockerhub-login/v1.0.3
+        uses: grafana/shared-workflows/actions/login-to-gar@c7ad5f57693ac858c698d95783685a9cbfd91223 # login-to-gar/v1.0.1
+        with:
+          registry: us-docker.pkg.dev
       - name: Login to GitHub Container Registry
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         env:
