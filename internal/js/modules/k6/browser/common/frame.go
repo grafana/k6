@@ -1573,6 +1573,30 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 	return v, nil
 }
 
+func (f *Frame) isInViewport(selector string, opts *FrameIsInViewportOptions) (bool, error) {
+	isInViewport := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		v, err := handle.isInViewport(apiCtx, opts.Ratio)
+		if errors.Is(err, ErrTimedOut) { // We don't care about timeout errors here!
+			return v, nil
+		}
+		return v, err
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, isInViewport, []string{}, false, withRetry, true, opts.Timeout,
+	)
+	v, err := call(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return false, errorFromDOMError(err)
+	}
+
+	bv, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("checking is %q in viewport: unexpected type %T", selector, v)
+	}
+
+	return bv, nil
+}
+
 // ID returns the frame id.
 func (f *Frame) ID() string {
 	f.propertiesMu.RLock()

@@ -35,6 +35,15 @@ const (
 	// Subcommand extensions can read it to know which k6 version launched them.
 	ProvisionHostVersion = "K6_PROVISION_HOST_VERSION"
 
+	// ProvisionCatalogTTL overrides how long the on-disk k6 extension
+	// registry catalog is considered fresh before `k6 x` refetches it.
+	ProvisionCatalogTTL = "K6_PROVISION_CATALOG_TTL"
+
+	// ProvisionCatalogURL overrides the k6 extension registry catalog endpoint
+	// fetched by `k6 x`. Tests point this at httptest or an unreachable address
+	// to keep the command tree construction off the real network.
+	ProvisionCatalogURL = "K6_PROVISION_CATALOG_URL"
+
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
 
