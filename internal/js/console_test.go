@@ -439,11 +439,11 @@ func TestConsoleEscapesControlCharacters(t *testing.T) {
 	c := newConsole(logger)
 	rt := sobek.New()
 
-	c.Log(rt.ToValue("first\rsecond\x1b[31m\nthird\tfourth\x00"))
+	c.Log(rt.ToValue("first\rsecond\x1b[31m\nthird\tfourth\x00fifth\u0085"))
 
 	entry := hook.LastEntry()
 	require.NotNil(t, entry, "nothing logged")
-	assert.Equal(t, "first\\rsecond\\x1b[31m\nthird\tfourth\\x00", entry.Message)
+	assert.Equal(t, "first\\rsecond\\x1b[31m\nthird\tfourth\\x00fifth\\x85", entry.Message)
 	assert.Equal(t, logrus.Fields{"source": "console"}, entry.Data)
 }
 
