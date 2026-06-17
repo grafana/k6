@@ -258,6 +258,21 @@ func (l *Locator) IsDisabled(opts *FrameIsDisabledOptions) (bool, error) {
 	return disabled, nil
 }
 
+// IsInViewport returns true if the element matches the locator's selector and
+// intersects the viewport by at least the requested ratio. Otherwise, returns
+// false.
+func (l *Locator) IsInViewport(opts *FrameIsInViewportOptions) (bool, error) {
+	l.log.Debugf("Locator:IsInViewport", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	opts.Strict = true
+	inViewport, err := l.frame.isInViewport(l.selector, opts)
+	if err != nil {
+		return false, fmt.Errorf("checking is %q in viewport: %w", l.selector, err)
+	}
+
+	return inViewport, nil
+}
+
 // IsVisible returns true if the element matches the locator's
 // selector and is visible. Otherwise, returns false.
 func (l *Locator) IsVisible() (bool, error) {
