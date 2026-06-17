@@ -44,6 +44,9 @@ type Output struct {
 	requestMetadatasCollector insightsOutput.RequestMetadatasCollector
 	requestMetadatasFlusher   insightsOutput.RequestMetadatasFlusher
 
+	metricsHTTPClient metricsHTTPClient // optional override
+	metricsURL        string            // optional override
+
 	// wg tracks background goroutines
 	wg sync.WaitGroup
 
@@ -78,6 +81,19 @@ func (o *Output) SetTestRunID(id string) {
 	o.testRunID = id
 }
 
+// SetMetricsHTTPClient injects a metricsHTTPClient for metric pushes.
+// Used by the provisioning-mode flow to provide a Bearer-authenticated
+// HTTP layer.
+func (o *Output) SetMetricsHTTPClient(c metricsHTTPClient) {
+	o.metricsHTTPClient = c
+}
+
+// SetMetricsURL injects an explicit metrics push URL. Used by the
+// provisioning-mode flow where the URL comes from the API.
+func (o *Output) SetMetricsURL(url string) {
+	o.metricsURL = url
+}
+
 // SetTestRunStopCallback receives the function that
 // that stops the engine when it is called.
 // It should be called on critical errors.
@@ -99,7 +115,12 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.testRunID)
+	var mc *metricsClient
+	if o.metricsHTTPClient != nil && o.metricsURL != "" {
+		mc, err = newMetricsClientWithURL(o.metricsHTTPClient, o.metricsURL)
+	} else {
+		mc, err = newMetricsClient(o.cloudClient, o.testRunID)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}

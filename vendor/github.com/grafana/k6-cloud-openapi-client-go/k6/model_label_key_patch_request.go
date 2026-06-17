@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.9.3
 Contact: info@grafana.com
 */
 
@@ -23,8 +23,11 @@ type LabelKeyPatchRequest struct {
 	// New label key name.
 	Key NullableString `json:"key,omitempty" validate:"regexp=^[^\\\\s'\\\\\\";\\\\\\\\%]+$"`
 	// New label key description.
-	Description NullableString `json:"description,omitempty"`
+	Description          NullableString `json:"description,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _LabelKeyPatchRequest LabelKeyPatchRequest
 
 // NewLabelKeyPatchRequest instantiates a new LabelKeyPatchRequest object
 // This constructor will assign default values to properties that have it defined,
@@ -145,7 +148,34 @@ func (o LabelKeyPatchRequest) ToMap() (map[string]interface{}, error) {
 	if o.Description.IsSet() {
 		toSerialize["description"] = o.Description.Get()
 	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *LabelKeyPatchRequest) UnmarshalJSON(data []byte) (err error) {
+	varLabelKeyPatchRequest := _LabelKeyPatchRequest{}
+
+	err = json.Unmarshal(data, &varLabelKeyPatchRequest)
+
+	if err != nil {
+		return err
+	}
+
+	*o = LabelKeyPatchRequest(varLabelKeyPatchRequest)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "key")
+		delete(additionalProperties, "description")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullableLabelKeyPatchRequest struct {

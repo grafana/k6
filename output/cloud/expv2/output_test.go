@@ -520,6 +520,36 @@ func (ff flusherFunc) flush() error {
 	return nil
 }
 
+func TestOutputSetters_OverrideMetricsClientAndURL(t *testing.T) {
+	t.Parallel()
+
+	conf := cloudapi.Config{
+		Host:                  null.StringFrom("host-not-used-for-override"),
+		Token:                 null.StringFrom("a-fake-token"),
+		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
+		AggregationPeriod:     types.NewNullDuration(1*time.Hour, true),
+		MetricPushInterval:    types.NewNullDuration(1*time.Hour, true),
+	}
+	logger := testutils.NewLogger(t)
+	o, err := New(logger, conf, nil)
+	require.NoError(t, err)
+
+	stub := &mockMetricsHTTPClient{}
+	o.SetMetricsHTTPClient(stub)
+	o.SetMetricsURL("https://override.example/m/123")
+	o.SetTestRunID("run-42")
+
+	require.NoError(t, o.Start())
+	defer func() { require.NoError(t, o.StopWithTestError(nil)) }()
+
+	mf, ok := o.flushing.(*metricsFlusher)
+	require.True(t, ok)
+	mc, ok := mf.client.(*metricsClient)
+	require.True(t, ok)
+	assert.Equal(t, "https://override.example/m/123", mc.url)
+	assert.Equal(t, stub, mc.httpClient)
+}
+
 func TestPrintableConfig(t *testing.T) {
 	t.Parallel()
 

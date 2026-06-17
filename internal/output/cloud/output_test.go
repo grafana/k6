@@ -1,11 +1,14 @@
 package cloud
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -275,8 +278,37 @@ func TestOutputStopWithTestError(t *testing.T) {
 	})
 }
 
+// Locks in the symmetric-gating property: the stop-time decision must read
+// out.provisioningMode (set by lazyInitProvisioning), never the Config fields
+// directly. Otherwise a future divergence (Config fields populated without
+// lazyInit running) would nil-deref out.provisioningNotifier.
+func TestOutputStopWithTestError_ConfigFieldsAloneDoNotInferProvisioningMode(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		mock := &cloudClientMock{}
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "1234",
+			client:    mock,
+			// Config fields populated; lazyInit did not run; deps nil.
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://ingest.example/metrics/abc"),
+				TestRunToken:   null.StringFrom("scoped-token"),
+			},
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		require.True(t, mock.testFinishedCalled,
+			"legacy TestFinished must be called when provisioningMode is false")
+	})
+}
+
 // cloudClientMock implements cloudClient for tests without starting a real HTTP server.
 type cloudClientMock struct {
+	createTestRunFn func(*cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error)
+
 	testFinishedCalled     bool
 	testFinishedRefID      string
 	testFinishedThresholds cloudapi.ThresholdResult
@@ -284,7 +316,10 @@ type cloudClientMock struct {
 	testFinishedRunStatus  cloudapi.RunStatus
 }
 
-func (m *cloudClientMock) CreateTestRun(_ *cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error) {
+func (m *cloudClientMock) CreateTestRun(tr *cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error) {
+	if m.createTestRunFn != nil {
+		return m.createTestRunFn(tr)
+	}
 	return &cloudapi.CreateTestRunResponse{}, nil
 }
 
@@ -363,4 +398,254 @@ func (o versionedOutputMock) SetTestRunID(_ string) {
 
 func (o versionedOutputMock) AddMetricSamples(_ []metrics.SampleContainer) {
 	o.callback("AddMetricSamples")
+}
+
+// metricsPusherMock implements metricsPusher for tests.
+type metricsPusherMock struct {
+	doCalls atomic.Int32
+}
+
+func (m *metricsPusherMock) Do(_ *http.Request, _ any) error {
+	m.doCalls.Add(1)
+	return nil
+}
+
+// provisioningNotifierMock implements provisioningNotifier for tests.
+type provisioningNotifierMock struct {
+	called    atomic.Bool
+	callCount atomic.Int32
+
+	// Captured arguments from the most recent call.
+	testRunID int32
+	token     string
+	testErr   error
+}
+
+func (m *provisioningNotifierMock) NotifyTestRunCompleted(_ context.Context, testRunID int32, token string, testErr error) error {
+	m.called.Store(true)
+	m.callCount.Add(1)
+	m.testRunID = testRunID
+	m.token = token
+	m.testErr = testErr
+	return nil
+}
+
+func TestOutputStart_ProvisioningMode(t *testing.T) {
+	t.Parallel()
+
+	// Build the JSON config containing MetricsPushURL and TestRunToken
+	// (the provisioning-mode fields on cloudapi.Config).
+	cfgJSON, err := json.Marshal(cloudapi.Config{
+		Host:                  null.StringFrom("https://fake-cloud"),
+		Token:                 null.StringFrom("fake-long-lived-token"),
+		MetricsPushURL:        null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+		TestRunToken:          null.StringFrom("scoped-test-run-token"),
+		APIVersion:            null.IntFrom(2),
+		AggregationPeriod:     types.NullDurationFrom(1 * time.Hour),
+		MetricPushInterval:    types.NullDurationFrom(1 * time.Hour),
+		AggregationWaitPeriod: types.NullDurationFrom(1 * time.Second),
+		MaxTimeSeriesInBatch:  null.IntFrom(1000),
+		MetricPushConcurrency: null.IntFrom(1),
+	})
+	require.NoError(t, err)
+
+	out, err := newOutput(output.Params{
+		Logger:     testutils.NewLogger(t),
+		JSONConfig: cfgJSON,
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+		RuntimeOptions: lib.RuntimeOptions{
+			Env: map[string]string{
+				"K6_CLOUDRUN_TEST_RUN_ID": "12345",
+			},
+		},
+		Usage: usage.New(),
+	})
+	require.NoError(t, err)
+
+	// Inject a cloudClient mock whose CreateTestRun would fail the test
+	// if called — regression assertion that the provisioning path never
+	// falls through to the CreateTestRun legacy branch.
+	out.client = &cloudClientMock{
+		createTestRunFn: func(_ *cloudapi.TestRun) (*cloudapi.CreateTestRunResponse, error) {
+			t.Fatal("CreateTestRun must not be called in provisioning mode")
+			return nil, errors.New("unreachable")
+		},
+	}
+
+	// Inject mocks for the provisioning-mode dependencies.
+	pusherMock := &metricsPusherMock{}
+	notifierMock := &provisioningNotifierMock{}
+	out.metricsPusher = pusherMock
+	out.provisioningNotifier = notifierMock
+
+	// Start should succeed.
+	require.NoError(t, out.Start())
+
+	// The versionedOutput must be an *expv2.Output (api version 2).
+	expv2Out, ok := out.versionedOutput.(*cloudv2.Output)
+	require.True(t, ok, "expected versionedOutput to be *cloudv2.Output")
+	assert.NotNil(t, expv2Out)
+
+	// Clean up: stop the output.
+	require.NoError(t, out.StopWithTestError(nil))
+}
+
+// TestOutputStart_PushRefIDStillTakesPrecedence locks in cloud-Output
+// behaviour even if cmd ever populated both PushRefID and MetricsPushURL.
+// In practice, cmd/outputs_cloud.go:96-100 short-circuits on PushRefID
+// before MetricsPushURL is ever set — so this combination shouldn't
+// occur. This test is defensive against future cmd-layer regressions.
+func TestOutputStart_PushRefIDStillTakesPrecedence(t *testing.T) {
+	t.Parallel()
+
+	cfgJSON, err := json.Marshal(cloudapi.Config{
+		Host:                  null.StringFrom("https://fake-cloud"),
+		Token:                 null.StringFrom("fake-token"),
+		PushRefID:             null.StringFrom("99999"),
+		MetricsPushURL:        null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+		TestRunToken:          null.StringFrom("scoped-test-run-token"),
+		APIVersion:            null.IntFrom(2),
+		AggregationPeriod:     types.NullDurationFrom(1 * time.Hour),
+		MetricPushInterval:    types.NullDurationFrom(1 * time.Hour),
+		AggregationWaitPeriod: types.NullDurationFrom(1 * time.Second),
+		MaxTimeSeriesInBatch:  null.IntFrom(1000),
+		MetricPushConcurrency: null.IntFrom(1),
+	})
+	require.NoError(t, err)
+
+	out, err := newOutput(output.Params{
+		Logger:     testutils.NewLogger(t),
+		JSONConfig: cfgJSON,
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, out.Start())
+
+	// PushRefID should win: testRunID should be set to the PushRefID value,
+	// not the testRunID from env.
+	assert.Equal(t, "99999", out.testRunID)
+
+	// The metricsPusher field should remain nil — provisioning mode was NOT
+	// entered because PushRefID took precedence.
+	assert.Nil(t, out.metricsPusher, "metricsPusher should be nil when PushRefID takes precedence")
+	assert.Nil(t, out.provisioningNotifier, "provisioningNotifier should be nil when PushRefID takes precedence")
+
+	require.NoError(t, out.StopWithTestError(nil))
+}
+
+func TestOutputStopWithTestError_ProvisioningMode_NoError(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+		}
+
+		out.versionedOutput = versionedOutputMock{
+			callback: func(_ string) {},
+		}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		// Notify was called exactly once with the right arguments.
+		assert.True(t, notifierMock.called.Load())
+		assert.Equal(t, int32(1), notifierMock.callCount.Load())
+		assert.Equal(t, int32(12345), notifierMock.testRunID)
+		assert.Equal(t, "scoped-test-run-token", notifierMock.token)
+		assert.Nil(t, notifierMock.testErr)
+
+		// TestFinished was NOT called (regression assertion).
+		assert.False(t, clientMock.testFinishedCalled)
+	})
+}
+
+func TestOutputStopWithTestError_ProvisioningMode_WithTestError(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		scriptErr := errext.WithAbortReasonIfNone(
+			errors.New("script error"),
+			errext.AbortedByScriptError,
+		)
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+		}
+
+		out.versionedOutput = versionedOutputMock{
+			callback: func(_ string) {},
+		}
+
+		require.NoError(t, out.StopWithTestError(scriptErr))
+
+		// Notify was called with the error verbatim (mapping to code 8035
+		// happens inside the real notifier, which is mocked here).
+		assert.True(t, notifierMock.called.Load())
+		assert.Equal(t, int32(12345), notifierMock.testRunID)
+		assert.Equal(t, "scoped-test-run-token", notifierMock.token)
+		assert.Equal(t, scriptErr, notifierMock.testErr)
+
+		// TestFinished was NOT called.
+		assert.False(t, clientMock.testFinishedCalled)
+	})
+}
+
+func TestOutputStopWithTestError_PushRefID_NoNotifyNoTestFinished(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				PushRefID:      null.StringFrom("99999"),
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+		}
+
+		out.versionedOutput = versionedOutputMock{
+			callback: func(_ string) {},
+		}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		// PushRefID short-circuits: NEITHER notify NOR TestFinished called.
+		assert.False(t, notifierMock.called.Load())
+		assert.False(t, clientMock.testFinishedCalled)
+	})
 }

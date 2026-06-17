@@ -15,10 +15,18 @@ import (
 	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
 )
 
-// metricsHTTPClient is the interface used by metricsClient to perform HTTP requests.
-// It allows tests to inject a mock that returns immediately without using real HTTP.
+// metricsHTTPClient is the minimal HTTP transport contract used by
+// metricsClient post-construction. The legacy URL-deriving constructor
+// requires the extended metricsHTTPClientWithBaseURL; the explicit-URL
+// constructor (added later) takes only this smaller interface.
 type metricsHTTPClient interface {
 	Do(req *http.Request, v any) error
+}
+
+// metricsHTTPClientWithBaseURL extends metricsHTTPClient with BaseURL,
+// used by newMetricsClient to derive the metrics push URL from the host.
+type metricsHTTPClientWithBaseURL interface {
+	metricsHTTPClient
 	BaseURL() string
 }
 
@@ -26,12 +34,12 @@ type metricsHTTPClient interface {
 // the collected metrics from the Cloud output
 // to the remote service.
 type metricsClient struct {
-	httpClient metricsHTTPClient
+	httpClient metricsHTTPClient // was: metricsHTTPClientWithBaseURL
 	url        string
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, error) {
+func newMetricsClient(c metricsHTTPClientWithBaseURL, testRunID string) (*metricsClient, error) {
 	// The cloudapi.Client works across different versions of the API, the test
 	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
 	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
@@ -49,6 +57,20 @@ func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, er
 	return &metricsClient{
 		httpClient: c,
 		url:        strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID,
+	}, nil
+}
+
+// newMetricsClientWithURL builds a metricsClient with an explicit push
+// URL and a smaller metricsHTTPClient (no BaseURL derivation). Used by
+// the provisioning-mode metrics push, where the URL is returned by the
+// API and not derived from a host.
+func newMetricsClientWithURL(c metricsHTTPClient, url string) (*metricsClient, error) {
+	if url == "" {
+		return nil, errors.New("metrics push URL is required")
+	}
+	return &metricsClient{
+		httpClient: c,
+		url:        url,
 	}, nil
 }
 
