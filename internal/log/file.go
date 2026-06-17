@@ -119,11 +119,11 @@ func (h *fileHook) Listen(ctx context.Context) {
 		select {
 		case entry := <-h.loglines:
 			if _, err := h.bw.Write(entry); err != nil {
-				h.fallbackLogger.Errorf("failed to write a log message to a logfile: %w", err)
+				h.fallbackLogger.WithError(err).Error("failed to write a log message to a logfile")
 			}
 		case <-ticker.C:
 			if err := h.bw.Flush(); err != nil {
-				h.fallbackLogger.Errorf("failed to flush logfile buffer: %w", err)
+				h.fallbackLogger.WithError(err).Error("failed to flush logfile buffer")
 			}
 		case <-ctx.Done():
 			// This context is cancelled after the command finishes executing, so it is guaranteed that no more lines
@@ -134,7 +134,7 @@ func (h *fileHook) Listen(ctx context.Context) {
 				select {
 				case entry := <-h.loglines:
 					if _, err := h.bw.Write(entry); err != nil {
-						h.fallbackLogger.Errorf("failed to write a log message to a logfile: %w", err)
+						h.fallbackLogger.WithError(err).Error("failed to write a log message to a logfile")
 					}
 				default:
 					break drainloop
@@ -142,11 +142,11 @@ func (h *fileHook) Listen(ctx context.Context) {
 			}
 
 			if err := h.bw.Flush(); err != nil {
-				h.fallbackLogger.Errorf("failed to flush buffer: %w", err)
+				h.fallbackLogger.WithError(err).Error("failed to flush buffer")
 			}
 
 			if err := h.w.Close(); err != nil {
-				h.fallbackLogger.Errorf("failed to close logfile: %w", err)
+				h.fallbackLogger.WithError(err).Error("failed to close logfile")
 			}
 
 			return

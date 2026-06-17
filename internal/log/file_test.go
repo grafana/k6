@@ -168,7 +168,7 @@ func TestFileHookPeriodicallyFlushes(t *testing.T) {
 	}
 
 	hook := &fileHook{
-		loglines: make(chan []byte),
+		loglines: make(chan []byte, fileHookBufferSize),
 		w:        nc,
 		bw:       bufio.NewWriter(nc),
 		levels:   logrus.AllLevels,
