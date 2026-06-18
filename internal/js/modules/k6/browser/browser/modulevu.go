@@ -61,6 +61,21 @@ var skipAfterActionAPIs = map[string]struct{}{
 	"BrowserContext.newPage": {},
 }
 
+// manualScreenshotAPIs lists the explicit, user-driven screenshot APIs.
+// Auto-screenshot never fires for these — on success or failure — because
+// the user is already capturing deliberately; an auto-capture would be a
+// redundant duplicate of the very frame the user just asked for. Skips are
+// logged at debug level so the suppression is traceable.
+//
+// Page.screenshot does not currently flow through the promise() helper (it
+// builds its own promise), so it never reaches afterAction/onFailure
+// regardless. It is listed here so the policy is explicit and survives a
+// future refactor onto promise().
+var manualScreenshotAPIs = map[string]struct{}{ //nolint:gochecknoglobals
+	"Page.screenshot":          {},
+	"ElementHandle.screenshot": {},
+}
+
 // afterAction schedules a screenshot capture for the current iteration's
 // open pages when auto-screenshot mode A (actions) is active. Called from
 // promise() after a successful JS-facing browser API call. apiName is the
@@ -69,7 +84,9 @@ var skipAfterActionAPIs = map[string]struct{}{
 // moduleVU whose auto-screenshot is disabled.
 //
 // APIs listed in skipAfterActionAPIs short-circuit here so blank
-// pre-state captures never reach the persister.
+// pre-state captures never reach the persister; APIs listed in
+// manualScreenshotAPIs short-circuit because the user is already
+// capturing deliberately.
 func (vu moduleVU) afterAction(apiName string) {
 	if vu.autoScreenshot.Mode() != autoscreenshot.ModeActions {
 		return
@@ -77,16 +94,22 @@ func (vu moduleVU) afterAction(apiName string) {
 	if _, skip := skipAfterActionAPIs[apiName]; skip {
 		return
 	}
+	if vu.manualScreenshotSkip(apiName) {
+		return
+	}
 	vu.captureOpenPages("action", apiName, false /* allow dedup */)
 }
 
 // onFailure schedules a failure-tagged screenshot capture for the current
 // iteration's open pages whenever a browser API call rejects its promise.
-// Fires for any non-Off auto-screenshot mode (both ModeActions and
-// ModeChanges); a failure capture is useful regardless of how the user
-// chose to drive successful-path captures. Safe to call from any
-// goroutine, during any VU lifecycle phase, and on a moduleVU whose
-// auto-screenshot is disabled.
+// Fires for any non-Off auto-screenshot mode; a failure capture is useful
+// regardless of how the user chose to drive successful-path captures. Safe
+// to call from any goroutine, during any VU lifecycle phase, and on a
+// moduleVU whose auto-screenshot is disabled.
+//
+// Explicit user-driven screenshot APIs (see manualScreenshotAPIs) are
+// excluded: a failed page.screenshot()/elementHandle.screenshot() is the
+// user's own capture call, not page state worth auto-capturing.
 //
 // Failure captures bypass the CRC32 dedup so that a frame is always
 // produced at the moment of failure, even when the page state matches
@@ -101,7 +124,27 @@ func (vu moduleVU) onFailure(apiName string) {
 	if vu.autoScreenshot.Mode() == autoscreenshot.ModeOff {
 		return
 	}
+	if vu.manualScreenshotSkip(apiName) {
+		return
+	}
 	vu.captureOpenPages("failure", apiName, true /* bypass dedup */)
+}
+
+// manualScreenshotSkip reports whether apiName is an explicit, user-driven
+// screenshot API for which auto-screenshot must not fire. When it returns
+// true it has already logged the skip at debug level. Safe to call during
+// the init phase when vu.State() is nil; the debug log is then omitted.
+func (vu moduleVU) manualScreenshotSkip(apiName string) bool {
+	if _, ok := manualScreenshotAPIs[apiName]; !ok {
+		return false
+	}
+	if state := vu.State(); state != nil {
+		state.Logger.Debugf(
+			"auto-screenshot: skipping capture for manual screenshot API %q",
+			apiName,
+		)
+	}
+	return true
 }
 
 // captureOpenPages enqueues a viewport capture for every currently-open

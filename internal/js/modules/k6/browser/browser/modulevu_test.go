@@ -77,3 +77,35 @@ func TestOnFailure_NoOpWhenDisabled(t *testing.T) {
 	var vu moduleVU
 	assert.NotPanics(t, func() { vu.onFailure("Test.onFailure") })
 }
+
+func TestManualScreenshotSkip(t *testing.T) {
+	t.Parallel()
+
+	// Activated VU so State() (and its Logger) is non-nil; manualScreenshotSkip
+	// logs the skip at debug level for the explicit user-driven screenshot APIs.
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+	mvu := moduleVU{VU: vu.VU}
+
+	// Explicit user-driven screenshot APIs are suppressed on both the
+	// success (afterAction) and failure (onFailure) paths.
+	assert.True(t, mvu.manualScreenshotSkip("ElementHandle.screenshot"))
+	assert.True(t, mvu.manualScreenshotSkip("Page.screenshot"))
+
+	// Ordinary browser actions still trigger auto-screenshot.
+	assert.False(t, mvu.manualScreenshotSkip("Page.click"))
+	assert.False(t, mvu.manualScreenshotSkip("Page.goto"))
+}
+
+func TestManualScreenshotSkip_NilStateNoPanic(t *testing.T) {
+	t.Parallel()
+
+	// Non-activated VU: vu.State() is nil (init phase). The helper must still
+	// classify the API and skip the debug log without panicking.
+	vu := k6test.NewVU(t)
+	mvu := moduleVU{VU: vu.VU}
+	assert.NotPanics(t, func() {
+		assert.True(t, mvu.manualScreenshotSkip("ElementHandle.screenshot"))
+		assert.False(t, mvu.manualScreenshotSkip("Page.click"))
+	})
+}
