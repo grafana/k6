@@ -73,9 +73,11 @@ const (
 	ScreenshotsOutput = "K6_BROWSER_SCREENSHOTS_OUTPUT"
 
 	// AutoScreenshot enables automatic screenshot capture in the
-	// browser module. The only recognised value is "actions" (capture
-	// after every browser API call). Unset or unknown values disable
-	// the feature.
+	// browser module. Recognised values:
+	//   "actions"  capture after every browser API call (on success) and
+	//              on failure.
+	//   "failures" capture only when a browser API call fails.
+	// Unset or unknown values disable the feature.
 	AutoScreenshot = "K6_BROWSER_AUTO_SCREENSHOT"
 
 	// AutoScreenshotDedup controls whether the auto-screenshot capturer

@@ -54,15 +54,28 @@ func TestRegistry_DisabledWhenModeOff(t *testing.T) {
 	assert.Equal(t, ModeOff, r.Mode())
 }
 
+func TestRegistry_EnabledWhenFailuresOnly(t *testing.T) {
+	t.Parallel()
+
+	// ModeFailuresOnly is a non-Off mode, so the registry is active and
+	// onFailure captures still run; only the success-path afterAction is
+	// suppressed (gated on ModeActions at the call site).
+	p := newRecordingPersister()
+	r := NewRegistry(ModeFailuresOnly, p, "demo", log.NewNullLogger(), true, true)
+	require.NotNil(t, r)
+	assert.Equal(t, ModeFailuresOnly, r.Mode())
+}
+
 func TestParseMode(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]Mode{
-		"actions": ModeActions,
-		"":        ModeOff,
-		"off":     ModeOff,
-		"changes": ModeOff, // historic value; no longer recognised.
-		"unknown": ModeOff,
+		"actions":  ModeActions,
+		"failures": ModeFailuresOnly,
+		"":         ModeOff,
+		"off":      ModeOff,
+		"changes":  ModeOff, // historic value; no longer recognised.
+		"unknown":  ModeOff,
 	}
 	for in, want := range cases {
 		assert.Equal(t, want, ParseMode(in), "ParseMode(%q)", in)
@@ -73,5 +86,6 @@ func TestMode_String(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, "actions", ModeActions.String())
+	assert.Equal(t, "failures", ModeFailuresOnly.String())
 	assert.Equal(t, "off", ModeOff.String())
 }
