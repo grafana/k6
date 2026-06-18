@@ -69,6 +69,8 @@ func TestConfig(t *testing.T) {
 				"K6_OTEL_TLS_CLIENT_CERTIFICATE":   "client_cert_path",
 				"K6_OTEL_TLS_CLIENT_KEY":           "client_key_path",
 				"K6_OTEL_HEADERS":                  "key1=value1,key2=value2",
+				"K6_OTEL_HTTP_EXPORTER_USERNAME":   "foo",
+				"K6_OTEL_HTTP_EXPORTER_PASSWORD":   "bar",
 			},
 			expectedConfig: Config{
 				ServiceName:           null.NewString("foo", true),
@@ -86,6 +88,8 @@ func TestConfig(t *testing.T) {
 				TLSClientCertificate:  null.NewString("client_cert_path", true),
 				TLSClientKey:          null.NewString("client_key_path", true),
 				Headers:               null.NewString("key1=value1,key2=value2", true),
+				HTTPUsername:          null.NewString("foo", true),
+				HTTPPassword:          null.NewString("bar", true),
 			},
 		},
 
@@ -124,7 +128,9 @@ func TestConfig(t *testing.T) {
 					`"tlsCertificate":"cert_path",` +
 					`"tlsClientCertificate":"client_cert_path",` +
 					`"tlsClientKey":"client_key_path",` +
-					`"headers":"key1=value1,key2=value2"` +
+					`"headers":"key1=value1,key2=value2",` +
+					`"username":"foo",` +
+					`"password":"bar"` +
 					`}`,
 			),
 			expectedConfig: Config{
@@ -143,6 +149,8 @@ func TestConfig(t *testing.T) {
 				TLSClientCertificate:  null.NewString("client_cert_path", true),
 				TLSClientKey:          null.NewString("client_key_path", true),
 				Headers:               null.NewString("key1=value1,key2=value2", true),
+				HTTPUsername:          null.NewString("foo", true),
+				HTTPPassword:          null.NewString("bar", true),
 			},
 		},
 
