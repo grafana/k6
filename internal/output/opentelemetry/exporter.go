@@ -3,6 +3,7 @@ package opentelemetry
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -36,6 +37,12 @@ func getExporter(cfg Config) (metric.Exporter, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse headers: %w", err)
 		}
+	}
+
+	// if at least valid user was configured, use basic auth
+	if cfg.HTTPUsername.Valid {
+		auth := []byte(cfg.HTTPUsername.String + ":" + cfg.HTTPPassword.String)
+		headers["Authorization"] = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(auth))
 	}
 
 	switch cfg.ExporterProtocol.String {
