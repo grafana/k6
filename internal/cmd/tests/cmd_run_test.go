@@ -2663,6 +2663,75 @@ func TestMultipleSecretSources(t *testing.T) {
 	assert.Contains(t, stderr, `level=info msg="trigger exception on wrong key" ***SECRET_REDACTED***=console`)
 }
 
+// TestInspectAndArchiveDefaultDummySecretSource verifies that 'k6 inspect' and
+// 'k6 archive' default to the 'dummy' secret source when none is provided, so a
+// script that accesses secrets during init no longer fails with
+// "no secret sources are configured". 'k6 run' keeps requiring a real source.
+func TestInspectAndArchiveDefaultDummySecretSource(t *testing.T) {
+	t.Parallel()
+
+	// The secret is read during the init context, which inspect and archive
+	// execute while reading the test's options.
+	script := `
+		import secrets from "k6/secrets";
+		const token = await secrets.get("x");
+		export const options = {};
+		export default function () {}
+	`
+
+	t.Run("inspect succeeds without a secret source", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+		ts.CmdArgs = []string{"k6", "inspect", "script.js"}
+		ts.ReparseFlags()
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.NotContains(t, ts.Stderr.String(), "no secret sources are configured")
+		assert.Contains(t, ts.Stdout.String(), "discardResponseBodies")
+	})
+
+	t.Run("archive succeeds without a secret source", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+		ts.CmdArgs = []string{"k6", "archive", "-O", "-", "script.js"}
+		ts.ReparseFlags()
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.NotContains(t, ts.Stderr.String(), "no secret sources are configured")
+		assert.NotEmpty(t, ts.Stdout.Bytes())
+	})
+
+	t.Run("explicit secret source is still honored by inspect", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+		ts.CmdArgs = []string{"k6", "inspect", "--secret-source=mock=x=real", "script.js"}
+		ts.ReparseFlags()
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.NotContains(t, ts.Stderr.String(), "no secret sources are configured")
+		assert.Contains(t, ts.Stdout.String(), "discardResponseBodies")
+	})
+
+	t.Run("run still requires a real secret source", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(script), 0o644))
+		ts.ExpectedExitCode = int(exitcodes.ScriptException)
+		ts.CmdArgs = []string{"k6", "run", "script.js"}
+		ts.ReparseFlags()
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Contains(t, ts.Stderr.String(), "no secret sources are configured")
+	})
+}
+
 // TestK6SecretSourceEnvVar covers the K6_SECRET_SOURCE environment variable, which is
 // treated as a single complete source spec equivalent to one --secret-source flag value.
 func TestK6SecretSourceEnvVar(t *testing.T) {
