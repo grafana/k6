@@ -127,6 +127,42 @@ func TestResponse(t *testing.T) {
 	})
 }
 
+func TestResponseHeaderValuesExtraInfo(t *testing.T) {
+	t.Parallel()
+
+	ts := cdp.MonotonicTime(time.Now())
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+	req := &Request{
+		offset: 0,
+	}
+	res := NewHTTPResponse(vu.Context(), req, &network.Response{
+		URL:     "https://test/post",
+		Headers: network.Headers(map[string]any{"content-type": "text/plain"}),
+	}, &ts)
+
+	// Simulate the raw wire headers arriving via responseReceivedExtraInfo,
+	// where a multi-valued header (Set-Cookie) is carried as separate values.
+	res.addExtraHeaders(map[string][]string{
+		"Set-Cookie": {"a=1; Path=/", "b=2; Path=/"},
+	})
+
+	t.Run("AllHeaders()_joins_multivalue_with_newline", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "a=1; Path=/\nb=2; Path=/", res.AllHeaders()["set-cookie"])
+	})
+
+	t.Run("HeaderValues()_splits_multivalue", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, []string{"a=1; Path=/", "b=2; Path=/"}, res.HeaderValues("set-cookie"))
+	})
+
+	t.Run("HeaderValues()_is_case_insensitive", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, []string{"a=1; Path=/", "b=2; Path=/"}, res.HeaderValues("Set-Cookie"))
+	})
+}
+
 func TestValidateResourceType(t *testing.T) {
 	t.Parallel()
 
