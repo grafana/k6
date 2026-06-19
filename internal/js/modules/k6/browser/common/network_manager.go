@@ -444,6 +444,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFailed(event.RequestID)
+	req.resolveRawHeaders()
 	m.frameManager.requestFailed(req, event.Canceled)
 }
 
@@ -457,6 +458,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFinished(event.RequestID)
+	req.resolveRawHeaders()
 	m.frameManager.requestFinished(req)
 	m.eventInterceptor.onRequestFinished(req)
 

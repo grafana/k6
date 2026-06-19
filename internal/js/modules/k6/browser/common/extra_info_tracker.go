@@ -94,6 +94,10 @@ func (t *extraInfoTracker) requestServedFromCache(reqID network.RequestID) {
 func (t *extraInfoTracker) processResponse(reqID network.RequestID, resp *Response, hasExtraInfo bool) {
 	info, ok := t.requests[reqID]
 	if !hasExtraInfo || (ok && info.servedFromCache) {
+		// No raw headers will arrive, so the provisional headers are final.
+		// Unblock any readers waiting for the raw headers.
+		resp.resolveRawHeaders()
+		resp.request.resolveRawHeaders()
 		return
 	}
 	if !ok {
@@ -136,6 +140,7 @@ func (t *extraInfoTracker) loadingFinished(reqID network.RequestID) {
 		return
 	}
 	info.loadingFinished = true
+	t.resolvePending(info)
 	t.checkFinished(reqID, info)
 }
 
@@ -147,7 +152,22 @@ func (t *extraInfoTracker) loadingFailed(reqID network.RequestID) {
 		return
 	}
 	info.loadingFailed = true
+	t.resolvePending(info)
 	t.checkFinished(reqID, info)
+}
+
+// resolvePending unblocks readers waiting on the raw headers of any tracked
+// response (and its request) whose ExtraInfo never arrived. It is a backstop
+// run on the terminal event so a reader never waits forever; the entry itself
+// is kept (see checkFinished) so a late ExtraInfo event can still be applied.
+func (t *extraInfoTracker) resolvePending(info *requestInfo) {
+	for _, resp := range info.responses {
+		if resp == nil {
+			continue
+		}
+		resp.resolveRawHeaders()
+		resp.request.resolveRawHeaders()
+	}
 }
 
 // checkFinished removes the tracking entry once loading has finished/failed and
