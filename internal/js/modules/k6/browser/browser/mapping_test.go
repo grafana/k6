@@ -566,6 +566,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
 	ContentFrame() *common.FrameLocator
+	Page() *common.Page
 	Count() (int, error)
 	Dblclick(opts sobek.Value) error
 	Evaluate(pageFunc sobek.Value, arg ...sobek.Value) (any, error)

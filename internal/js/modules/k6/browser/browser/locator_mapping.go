@@ -68,6 +68,9 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			ml := mapFrameLocator(vu, lo.ContentFrame())
 			return rt.ToValue(ml).ToObject(rt)
 		},
+		"page": func() mapping {
+			return mapPage(vu, lo.Page())
+		},
 		"count": func() *sobek.Promise {
 			return promise(vu, "Locator.count", func() (any, error) {
 				return lo.Count() //nolint:wrapcheck

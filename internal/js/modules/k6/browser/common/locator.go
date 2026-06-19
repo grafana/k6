@@ -56,6 +56,11 @@ func NewLocator(ctx context.Context, opts *LocatorOptions, selector string, f *F
 	}
 }
 
+// Page returns the page that owns the locator's frame.
+func (l *Locator) Page() *Page {
+	return l.frame.Page()
+}
+
 // BoundingBox will return the bounding box of the element.
 func (l *Locator) BoundingBox(opts *FrameBaseOptions) (*Rect, error) {
 	opts.Strict = true
