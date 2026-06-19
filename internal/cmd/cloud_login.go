@@ -323,7 +323,7 @@ func normalizeStackURL(stackInput string) string {
 	}
 
 	// Otherwise, treat it as a slug and construct the URL.
-	slug := stripGrafanaNetSuffix(strings.TrimRight(stackInput, "/"))
+	slug := stripGrafanaNetSuffix(stackInput)
 	return fmt.Sprintf("https://%s.grafana.net", slug)
 }
 
