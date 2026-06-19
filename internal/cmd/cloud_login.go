@@ -329,7 +329,6 @@ func normalizeStackURL(stackInput string) string {
 // stripGrafanaNetSuffix removes .grafana.net suffix if present.
 func stripGrafanaNetSuffix(s string) string {
 	const suffix = ".grafana.net"
-	s = strings.TrimRight(s, "/")
 	if len(s) > len(suffix) && s[len(s)-len(suffix):] == suffix {
 		return s[:len(s)-len(suffix)]
 	}

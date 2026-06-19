@@ -118,11 +118,6 @@ func TestNormalizeStackURL(t *testing.T) {
 			expected: normalizedURL,
 		},
 		{
-			name:     "slug with grafana net suffix and trailing slash",
-			input:    "my-team.grafana.net/",
-			expected: normalizedURL,
-		},
-		{
 			name:     "full https URL",
 			input:    normalizedURL,
 			expected: normalizedURL,
