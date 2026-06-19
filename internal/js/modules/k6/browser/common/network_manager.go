@@ -334,10 +334,10 @@ func handleURLTag(mi eventInterceptor, url string, method string, tags *k6metric
 }
 
 func (m *NetworkManager) handleRequestRedirect(
-	req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime,
+	req *Request, redirectResponse *network.Response, hasExtraInfo bool, timestamp *cdp.MonotonicTime,
 ) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
-	m.extraInfoTracker.processResponse(req.requestID, resp)
+	m.extraInfoTracker.processResponse(req.requestID, resp, hasExtraInfo)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
@@ -443,7 +443,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
-	m.extraInfoTracker.cleanup(event.RequestID)
+	m.extraInfoTracker.loadingFailed(event.RequestID)
 	m.frameManager.requestFailed(req, event.Canceled)
 }
 
@@ -456,7 +456,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
-	m.extraInfoTracker.cleanup(event.RequestID)
+	m.extraInfoTracker.loadingFinished(event.RequestID)
 	m.frameManager.requestFinished(req)
 	m.eventInterceptor.onRequestFinished(req)
 
@@ -532,7 +532,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	if event.RedirectResponse != nil {
 		req, ok := m.requestFromID(event.RequestID)
 		if ok {
-			m.handleRequestRedirect(req, event.RedirectResponse, event.Timestamp)
+			m.handleRequestRedirect(req, event.RedirectResponse, event.RedirectHasExtraInfo, event.Timestamp)
 			redirectChain = req.redirectChain
 		}
 	} else {
@@ -579,7 +579,6 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
 		return
 	}
-	m.extraInfoTracker.processRequest(event.RequestID, req)
 	// Skip data and blob URLs, since they're internal to the browser.
 	if isInternalURL(req.url) {
 		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
@@ -773,6 +772,7 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {
+	m.extraInfoTracker.requestServedFromCache(event.RequestID)
 	req, ok := m.requestFromID(event.RequestID)
 	if ok {
 		req.setLoadedFromCache(true)
@@ -786,7 +786,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 		return
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
-	m.extraInfoTracker.processResponse(event.RequestID, resp)
+	m.extraInfoTracker.processResponse(event.RequestID, resp, event.HasExtraInfo)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
