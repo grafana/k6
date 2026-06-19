@@ -315,14 +315,15 @@ func validateTokenV6(
 // The stackInput can be either a full URL (e.g., https://my-team.grafana.net)
 // or just a slug (e.g., my-team).
 func normalizeStackURL(stackInput string) string {
-	// If it's already a full URL and it looks okay lets just keep it
+	// If it's already a full URL, keep only the scheme and host, dropping any
+	// path (including trailing slashes).
 	if u, err := url.Parse(stackInput); err == nil && u.Host != "" &&
 		(u.Scheme == "http" || u.Scheme == "https") {
-		return u.String()
-}
+		return (&url.URL{Scheme: u.Scheme, Host: u.Host}).String()
+	}
 
 	// Otherwise, treat it as a slug and construct the URL.
-	slug := stripGrafanaNetSuffix(stackInput)
+	slug := stripGrafanaNetSuffix(strings.TrimRight(stackInput, "/"))
 	return fmt.Sprintf("https://%s.grafana.net", slug)
 }
 
