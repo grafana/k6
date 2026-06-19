@@ -174,13 +174,13 @@ func (r *Runtime) newDataView(args []Value, newTarget *Object) *Object {
 		byteOffset = r.toIndex(offsetArg)
 		buffer.ensureNotDetached(true)
 		if byteOffset > len(buffer.data) {
-			panic(r.newError(r.getRangeError(), "Start offset %s is outside the bounds of the buffer", offsetArg.String()))
+			panic(r.newErrorf(r.getRangeError(), "Start offset %s is outside the bounds of the buffer", offsetArg.String()))
 		}
 	}
 	if len(args) > 2 && args[2] != nil && args[2] != _undefined {
 		byteLen = r.toIndex(args[2])
 		if byteOffset+byteLen > len(buffer.data) {
-			panic(r.newError(r.getRangeError(), "Invalid DataView length %d", byteLen))
+			panic(r.newErrorf(r.getRangeError(), "Invalid DataView length %d", byteLen))
 		}
 	} else {
 		byteLen = len(buffer.data) - byteOffset
@@ -188,10 +188,10 @@ func (r *Runtime) newDataView(args []Value, newTarget *Object) *Object {
 	proto := r.getPrototypeFromCtor(newTarget, r.getDataView(), r.getDataViewPrototype())
 	buffer.ensureNotDetached(true)
 	if byteOffset > len(buffer.data) {
-		panic(r.newError(r.getRangeError(), "Start offset %d is outside the bounds of the buffer", byteOffset))
+		panic(r.newErrorf(r.getRangeError(), "Start offset %d is outside the bounds of the buffer", byteOffset))
 	}
 	if byteOffset+byteLen > len(buffer.data) {
-		panic(r.newError(r.getRangeError(), "Invalid DataView length %d", byteLen))
+		panic(r.newErrorf(r.getRangeError(), "Invalid DataView length %d", byteLen))
 	}
 	o := &Object{runtime: r}
 	b := &dataViewObject{
@@ -1241,7 +1241,7 @@ func (r *Runtime) typedArrayProto_with(call FunctionCall) Value {
 		} else {
 			fromValue = ta.typedArray.get(ta.offset + k)
 		}
-		a.typedArray.set(ta.offset+k, fromValue)
+		a.typedArray.set(k, fromValue)
 	}
 	return a.val
 }
@@ -1260,7 +1260,7 @@ func (r *Runtime) typedArrayProto_toReversed(call FunctionCall) Value {
 	for k := 0; k < length; k++ {
 		from := length - k - 1
 		fromValue := ta.typedArray.get(ta.offset + from)
-		a.typedArray.set(ta.offset+k, fromValue)
+		a.typedArray.set(k, fromValue)
 	}
 
 	return a.val
@@ -1445,7 +1445,7 @@ func (r *Runtime) _newTypedArrayFromArrayBuffer(ab *arrayBufferObject, args []Va
 	if len(args) > 1 && args[1] != nil && args[1] != _undefined {
 		byteOffset = r.toIndex(args[1])
 		if byteOffset%ta.elemSize != 0 {
-			panic(r.newError(r.getRangeError(), "Start offset of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
+			panic(r.newErrorf(r.getRangeError(), "Start offset of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
 		}
 	}
 	var length int
@@ -1453,16 +1453,16 @@ func (r *Runtime) _newTypedArrayFromArrayBuffer(ab *arrayBufferObject, args []Va
 		length = r.toIndex(args[2])
 		ab.ensureNotDetached(true)
 		if byteOffset+length*ta.elemSize > len(ab.data) {
-			panic(r.newError(r.getRangeError(), "Invalid typed array length: %d", length))
+			panic(r.newErrorf(r.getRangeError(), "Invalid typed array length: %d", length))
 		}
 	} else {
 		ab.ensureNotDetached(true)
 		if len(ab.data)%ta.elemSize != 0 {
-			panic(r.newError(r.getRangeError(), "Byte length of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
+			panic(r.newErrorf(r.getRangeError(), "Byte length of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
 		}
 		length = (len(ab.data) - byteOffset) / ta.elemSize
 		if length < 0 {
-			panic(r.newError(r.getRangeError(), "Start offset %d is outside the bounds of the buffer", byteOffset))
+			panic(r.newErrorf(r.getRangeError(), "Start offset %d is outside the bounds of the buffer", byteOffset))
 		}
 	}
 	ta.offset = byteOffset / ta.elemSize
