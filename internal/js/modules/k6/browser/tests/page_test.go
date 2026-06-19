@@ -2973,60 +2973,83 @@ func TestPageOnResponseAllHeadersRedirectChain(t *testing.T) {
 
 	tb := newTestBrowser(t, withHTTPServer())
 
-	// Set up a 3-step redirect chain, each response has a distinct X-Step header.
+	// A 3-step redirect chain where each hop sets a distinct Set-Cookie.
+	// Set-Cookie is delivered only via responseReceivedExtraInfo (Chrome
+	// strips it from the provisional responseReceived headers), so a hop's
+	// cookie can appear in allHeaders() only if the ExtraInfo events were
+	// paired with the correct response. This catches both mis-attribution (a
+	// later hop's cookie landing on an earlier response) and merging.
 	tb.withHandler("/redir-start", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Step", "1")
+		w.Header().Set("Set-Cookie", "step=1; Path=/")
 		http.Redirect(w, r, tb.url("/redir-mid"), http.StatusFound)
 	})
 	tb.withHandler("/redir-mid", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Step", "2")
+		w.Header().Set("Set-Cookie", "step=2; Path=/")
 		http.Redirect(w, r, tb.url("/redir-end"), http.StatusFound)
 	})
 	tb.withHandler("/redir-end", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Step", "3")
+		w.Header().Set("Set-Cookie", "step=3; Path=/")
 		w.Header().Set("Content-Type", "text/html")
 		_, err := fmt.Fprint(w, "<html><body>done</body></html>")
 		require.NoError(t, err)
 	})
 
-	p := tb.NewPage(nil)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
 
-	opts := &common.FrameGotoOptions{
-		WaitUntil: common.LifecycleEventNetworkIdle,
-		Timeout:   common.DefaultTimeout,
-	}
-	gotoPage := func() error {
-		_, err := p.Goto(tb.url("/redir-start"), opts)
-		return err
-	}
+	gv, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
 
-	// Wait for the final request to finish so we are guaranteed to
-	// have extra headers available on all responses in the chain.
-	var ev common.PageEvent
-	waitForRequestFinished := func() error {
-		var err error
-		ev, err = p.WaitForEvent(
-			common.PageEventRequestFinished,
-			&common.PageWaitForEventOptions{Timeout: p.Timeout()},
-			func(pe common.PageEvent) (bool, error) {
-				return strings.Contains(pe.Request.URL(), "/redir-end"), nil
-			},
-		)
-		return err
-	}
+		var responses = [];
+		page.on('response', async (response) => {
+			const headers = await response.allHeaders();
+			responses.push({
+				url: response.url(),
+				setCookie: headers['set-cookie'] || '',
+			});
+		});
 
-	err := tb.run(tb.context(), gotoPage, waitForRequestFinished)
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await page.close();
+
+		return JSON.stringify(responses);
+	`, tb.url("/redir-start"))
 	require.NoError(t, err)
-	require.NotNil(t, ev.Request)
 
-	finalResp := ev.Request.Response()
-	require.NotNil(t, finalResp)
+	got := k6test.ToPromise(t, gv)
 
-	// Verify the final (200) response has only its own X-Step header,
-	// not a merged set of values from all redirects.
-	finalHeaders := finalResp.AllHeaders()
-	assert.Equal(t, "3", finalHeaders["x-step"],
-		"final response should have x-step=3, not merged values from earlier redirects")
+	var responses []struct {
+		URL       string `json:"url"`
+		SetCookie string `json:"setCookie"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &responses))
+
+	setCookieByURL := make(map[string]string, len(responses))
+	for _, r := range responses {
+		setCookieByURL[r.URL] = r.SetCookie
+	}
+
+	// Each hop must carry only its own Set-Cookie.
+	steps := []string{"step=1", "step=2", "step=3"}
+	for _, tc := range []struct {
+		url  string
+		step string
+	}{
+		{tb.url("/redir-start"), "step=1"},
+		{tb.url("/redir-mid"), "step=2"},
+		{tb.url("/redir-end"), "step=3"},
+	} {
+		cookie, ok := setCookieByURL[tc.url]
+		require.True(t, ok, "no response captured for %s", tc.url)
+		assert.Contains(t, cookie, tc.step, "wrong Set-Cookie on %s", tc.url)
+		for _, other := range steps {
+			if other != tc.step {
+				assert.NotContains(t, cookie, other,
+					"%s leaked %s from another hop", tc.url, other)
+			}
+		}
+	}
 }
 
 // TestPageOnRequestFinished tests that the requestfinished event fires when requests complete successfully.
