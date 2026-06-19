@@ -161,6 +161,17 @@ func TestResponseHeaderValuesExtraInfo(t *testing.T) {
 		t.Parallel()
 		assert.Equal(t, []string{"a=1; Path=/", "b=2; Path=/"}, res.HeaderValues("Set-Cookie"))
 	})
+
+	t.Run("HeadersArray()_keeps_values_separate", func(t *testing.T) {
+		t.Parallel()
+		var cookies []string
+		for _, h := range res.HeadersArray() {
+			if strings.EqualFold(h.Name, "Set-Cookie") {
+				cookies = append(cookies, h.Value)
+			}
+		}
+		assert.ElementsMatch(t, []string{"a=1; Path=/", "b=2; Path=/"}, cookies)
+	})
 }
 
 func TestValidateResourceType(t *testing.T) {
