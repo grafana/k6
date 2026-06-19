@@ -166,3 +166,30 @@ func TestPageOn(t *testing.T) {
 		assert.Len(t, p.eventHandlers[("metric")], 1)
 	})
 }
+
+func TestPageOnAutoScreenshot(t *testing.T) {
+	t.Parallel()
+
+	p := &Page{
+		eventHandlers: make(map[PageEventName][]pageEventHandlerRecord),
+	}
+
+	var got *AutoScreenshotEvent
+	err := p.On(PageEventAutoScreenshot, func(e PageEvent) error {
+		got = e.AutoScreenshot
+		return nil
+	})
+	require.NoError(t, err)
+
+	want := &AutoScreenshotEvent{
+		Bytes:   []byte("pngbytes"),
+		API:     "Page.captureScreenshot",
+		Reason:  "manual",
+		UnixMs:  1234567890,
+		PageURL: "https://example.test/",
+	}
+	p.OnAutoScreenshot(want)
+
+	require.NotNil(t, got, "auto-screenshot handler was not invoked")
+	assert.Same(t, want, got)
+}

@@ -441,6 +441,48 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			return promise, nil
 		},
+		// captureScreenshot takes a screenshot of this page and delivers
+		// it to page.on('auto-screenshot') handlers, independent of the
+		// K6_BROWSER_AUTO_SCREENSHOT mode. Unlike screenshot(), it does
+		// not return the bytes or persist them to disk; the bytes flow
+		// only via the event, letting a handler ship them elsewhere
+		// (e.g. to Loki). reason is an optional label surfaced on the
+		// event (defaults to "manual").
+		"captureScreenshot": func(reason sobek.Value) (*sobek.Promise, error) {
+			label := "manual"
+			if reason != nil {
+				if s, ok := reason.Export().(string); ok && s != "" {
+					label = s
+				}
+			}
+
+			promise, res, rej := rt.NewPromise()
+			callback := vu.RegisterCallback()
+			go func() {
+				bb, err := p.Screenshot(common.NewPageScreenshotOptions(), noopScreenshotPersister{})
+				if err != nil {
+					callback(func() error {
+						return rej(err)
+					})
+					return
+				}
+
+				pageURL, _ := p.URL()
+				p.OnAutoScreenshot(&common.AutoScreenshotEvent{
+					Bytes:   bb,
+					API:     "Page.captureScreenshot",
+					Reason:  label,
+					UnixMs:  time.Now().UnixMilli(),
+					PageURL: pageURL,
+				})
+
+				callback(func() error {
+					return res(sobek.Undefined())
+				})
+			}()
+
+			return promise, nil
+		},
 		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameSelectOptionOptions(p.MainFrame().Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {

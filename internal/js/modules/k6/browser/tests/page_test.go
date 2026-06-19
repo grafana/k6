@@ -731,6 +731,43 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	assert.Truef(t, b > r*2, "want: the bottom pixel to be dominantly blue, got R: %d, B: %d", r, b)
 }
 
+func TestPageCaptureScreenshot(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	// captureScreenshot screenshots the page and delivers the frame to a
+	// page.on('auto-screenshot') handler, independent of the auto-screenshot
+	// mode. The handler resolves a promise the script awaits, so the
+	// assertions do not race the fire-and-forget event dispatch.
+	gv, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		try {
+			let resolveShot;
+			const shot = new Promise((r) => { resolveShot = r; });
+			page.on('auto-screenshot', (e) => {
+				resolveShot({ api: e.api, reason: e.reason, len: e.bytes.byteLength });
+			});
+			await page.captureScreenshot('integration');
+			return await shot;
+		} finally {
+			await page.close();
+		}
+	`)
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+
+	obj := got.Result().ToObject(tb.runtime())
+	assert.Equal(t, "Page.captureScreenshot", obj.Get("api").String())
+	assert.Equal(t, "integration", obj.Get("reason").String())
+	assert.Greater(t, obj.Get("len").ToInteger(), int64(0), "screenshot bytes should be non-empty")
+}
+
 func TestPageTitle(t *testing.T) {
 	t.Parallel()
 

@@ -358,6 +358,7 @@ type pageAPI interface { //nolint:interfacebloat
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts sobek.Value) *common.Response
 	Route(path string, handler sobek.Callable)
+	CaptureScreenshot(reason sobek.Value) error
 	Screenshot(opts sobek.Value) ([]byte, error)
 	SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error)
 	SetChecked(selector string, checked bool, opts sobek.Value) error
