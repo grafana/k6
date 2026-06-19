@@ -660,10 +660,13 @@ func (r *Response) HeaderValue(name string) (string, bool) {
 	return v, ok
 }
 
-// HeaderValues returns the values of the given header.
+// HeaderValues returns the values of the given header. The header name is
+// matched case-insensitively, and headers that carry multiple values (such as
+// Set-Cookie) are returned as separate entries. AllHeaders joins multiple
+// values with a newline, so we split on the same separator here.
 func (r *Response) HeaderValues(name string) []string {
 	headers := r.AllHeaders()
-	return strings.Split(headers[name], ",")
+	return strings.Split(headers[strings.ToLower(name)], "\n")
 }
 
 // FromCache returns whether this response was served from disk cache.
