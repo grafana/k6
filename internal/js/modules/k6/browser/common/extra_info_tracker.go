@@ -4,130 +4,161 @@ import (
 	"github.com/chromedp/cdproto/network"
 )
 
-// requestExtraInfo tracks the index-based pairing of extra info events
-// and requests/responses for a single requestId.
+// requestInfo aligns CDP ExtraInfo events with their Response objects for a
+// single requestId, modelled after Playwright's ResponseExtraInfoTracker.
 //
 // CDP dispatches events on two independent channels:
 //   - Channel A: requestWillBeSent, responseReceived, loadingFinished/loadingFailed
 //   - Channel B: requestWillBeSentExtraInfo, responseReceivedExtraInfo
 //
-// Events can arrive in any order between channels, but within each channel
-// they arrive in order for a given requestId. In a redirect chain, a single
-// requestId produces multiple request/response pairs. We pair them by index:
-// the i-th extraInfo event corresponds to the i-th request/response since the
-// ordering is guaranteed within each channel.
+// They are not synchronised, so events arrive in any order between the
+// channels, but within each channel they arrive in order for a given
+// requestId. A single requestId can produce multiple request/response pairs
+// (a redirect chain reuses the requestId), so we pair by index: the i-th
+// tracked response pairs with the i-th request/response ExtraInfo event.
 //
-// Example:
-// requestWillBeSentExtraInfo(123, hdrs) → pairs with Request_A at index 0
-// responseReceivedExtraInfo(123, hdrs) → pairs with Response_0 at index 0
-// requestWillBeSentExtraInfo(123, hdrs) → pairs with Request_B at index 1
-// responseReceivedExtraInfo(123, hdrs) → pairs with Response_1 at index 1
-// requestWillBeSentExtraInfo(123, hdrs) → pairs with Request_C at index 2
-// responseReceivedExtraInfo(123, hdrs) → pairs with Response_2 at index 2
-type requestExtraInfo struct {
-	// Indexed queues of parsed extra headers. Slots are set to nil after
-	// pairing to avoid applying headers twice.
+// Only responses that expect ExtraInfo are tracked (see processResponse).
+// Because the ExtraInfo events are likewise only emitted for those responses,
+// the indexes stay aligned even when some hops (e.g. cached redirects) carry no
+// ExtraInfo. The raw request headers are attached to the response's Request,
+// matching Playwright.
+type requestInfo struct {
+	// Indexed queues of parsed raw headers. Slots are set to nil after
+	// pairing to avoid applying the same headers twice.
 	requestExtraHeaders  []map[string][]string
 	responseExtraHeaders []map[string][]string
 
-	// Indexed queues of requests/responses awaiting extra headers. Slots
-	// are set to nil after pairing.
-	requests  []*Request
+	// Responses that expect ExtraInfo, in arrival order.
 	responses []*Response
+
+	loadingFinished bool
+	loadingFailed   bool
+	servedFromCache bool
 }
 
 // extraInfoTracker pairs requestWillBeSentExtraInfo / responseReceivedExtraInfo
-// events with their corresponding Request / Response objects using index-based
+// events with their corresponding Response (and its Request) using index-based
 // matching (modelled after Playwright's ResponseExtraInfoTracker).
 type extraInfoTracker struct {
-	requests map[network.RequestID]*requestExtraInfo
+	requests map[network.RequestID]*requestInfo
 }
 
 func newExtraInfoTracker() *extraInfoTracker {
 	return &extraInfoTracker{
-		requests: make(map[network.RequestID]*requestExtraInfo),
+		requests: make(map[network.RequestID]*requestInfo),
 	}
 }
 
-// getOrCreate returns the requestExtraInfo for the given requestId,
-// creating one if it doesn't exist yet.
-func (t *extraInfoTracker) getOrCreate(reqID network.RequestID) *requestExtraInfo {
+// getOrCreate returns the requestInfo for the given requestId, creating one if
+// it doesn't exist yet.
+func (t *extraInfoTracker) getOrCreate(reqID network.RequestID) *requestInfo {
 	info, ok := t.requests[reqID]
 	if !ok {
-		info = &requestExtraInfo{}
+		info = &requestInfo{}
 		t.requests[reqID] = info
 	}
 	return info
 }
 
-// requestWillBeSentExtraInfo records parsed request extra headers and
-// tries to pair them with an already-registered Request at the same index.
+// requestWillBeSentExtraInfo records parsed raw request headers and tries to
+// pair them with an already-registered response at the same index.
 func (t *extraInfoTracker) requestWillBeSentExtraInfo(reqID network.RequestID, headers map[string][]string) {
 	info := t.getOrCreate(reqID)
 	info.requestExtraHeaders = append(info.requestExtraHeaders, headers)
-	t.patchRequestHeaders(info, len(info.requestExtraHeaders)-1)
+	t.patchHeaders(info, len(info.requestExtraHeaders)-1)
+	t.checkFinished(reqID, info)
 }
 
-// responseReceivedExtraInfo records parsed response extra headers and
-// tries to pair them with an already-registered Response at the same index.
+// responseReceivedExtraInfo records parsed raw response headers and tries to
+// pair them with an already-registered response at the same index.
 func (t *extraInfoTracker) responseReceivedExtraInfo(reqID network.RequestID, headers map[string][]string) {
 	info := t.getOrCreate(reqID)
 	info.responseExtraHeaders = append(info.responseExtraHeaders, headers)
-	t.patchResponseHeaders(info, len(info.responseExtraHeaders)-1)
+	t.patchHeaders(info, len(info.responseExtraHeaders)-1)
+	t.checkFinished(reqID, info)
 }
 
-// processRequest registers a Request and tries to pair it with
-// already-received request extra headers at the same index.
-func (t *extraInfoTracker) processRequest(reqID network.RequestID, req *Request) {
+// requestServedFromCache marks the requestId as served from cache. Chrome can
+// report hasExtraInfo=true for cached responses but never emit the matching
+// ExtraInfo event (crbug.com/1340398), so such responses must not be tracked,
+// otherwise the index would slip and later headers would land on the wrong
+// response.
+func (t *extraInfoTracker) requestServedFromCache(reqID network.RequestID) {
 	info := t.getOrCreate(reqID)
-	info.requests = append(info.requests, req)
-	t.patchRequestHeaders(info, len(info.requests)-1)
+	info.servedFromCache = true
 }
 
-// processResponse registers a Response and tries to pair it with
-// already-received response extra headers at the same index.
-func (t *extraInfoTracker) processResponse(reqID network.RequestID, resp *Response) {
-	info := t.getOrCreate(reqID)
+// processResponse registers a Response that expects ExtraInfo. Responses that
+// do not expect it (hasExtraInfo=false, or served from cache) are not tracked,
+// so they keep their provisional headers as the raw ones.
+func (t *extraInfoTracker) processResponse(reqID network.RequestID, resp *Response, hasExtraInfo bool) {
+	info, ok := t.requests[reqID]
+	if !hasExtraInfo || (ok && info.servedFromCache) {
+		return
+	}
+	if !ok {
+		info = t.getOrCreate(reqID)
+	}
 	info.responses = append(info.responses, resp)
-	t.patchResponseHeaders(info, len(info.responses)-1)
+	t.patchHeaders(info, len(info.responses)-1)
 }
 
-// patchRequestHeaders applies request extra headers at the given index
-// if both the Request and the extra headers are available. After applying,
-// both slots are nilled out to avoid double-application.
-func (t *extraInfoTracker) patchRequestHeaders(info *requestExtraInfo, index int) {
-	if index >= len(info.requests) || index >= len(info.requestExtraHeaders) {
-		return
-	}
-	req := info.requests[index]
-	extra := info.requestExtraHeaders[index]
-	if req == nil || extra == nil {
-		return
-	}
-	req.addExtraHeaders(extra)
-	info.requests[index] = nil
-	info.requestExtraHeaders[index] = nil
-}
-
-// patchResponseHeaders applies response extra headers at the given index
-// if both the Response and the extra headers are available. After applying,
-// both slots are nilled out to avoid double-application.
-func (t *extraInfoTracker) patchResponseHeaders(info *requestExtraInfo, index int) {
-	if index >= len(info.responses) || index >= len(info.responseExtraHeaders) {
+// patchHeaders attaches the raw request and response headers at the given index
+// when both the response and the corresponding ExtraInfo event are available.
+// Consumed ExtraInfo slots are set to nil to avoid applying them twice.
+func (t *extraInfoTracker) patchHeaders(info *requestInfo, index int) {
+	if index < 0 || index >= len(info.responses) {
 		return
 	}
 	resp := info.responses[index]
-	extra := info.responseExtraHeaders[index]
-	if resp == nil || extra == nil {
+	if resp == nil {
 		return
 	}
-	resp.addExtraHeaders(extra)
-	info.responses[index] = nil
-	info.responseExtraHeaders[index] = nil
+	if index < len(info.requestExtraHeaders) {
+		if extra := info.requestExtraHeaders[index]; extra != nil {
+			resp.request.addExtraHeaders(extra)
+			info.requestExtraHeaders[index] = nil
+		}
+	}
+	if index < len(info.responseExtraHeaders) {
+		if extra := info.responseExtraHeaders[index]; extra != nil {
+			resp.addExtraHeaders(extra)
+			info.responseExtraHeaders[index] = nil
+		}
+	}
 }
 
-// cleanup removes the tracking entry for the given requestId. Should be
-// called when loading finishes or fails.
-func (t *extraInfoTracker) cleanup(reqID network.RequestID) {
-	delete(t.requests, reqID)
+// loadingFinished records that loading finished and stops tracking once every
+// tracked response has been paired with its ExtraInfo event.
+func (t *extraInfoTracker) loadingFinished(reqID network.RequestID) {
+	info, ok := t.requests[reqID]
+	if !ok {
+		return
+	}
+	info.loadingFinished = true
+	t.checkFinished(reqID, info)
+}
+
+// loadingFailed records that loading failed and stops tracking once every
+// tracked response has been paired with its ExtraInfo event.
+func (t *extraInfoTracker) loadingFailed(reqID network.RequestID) {
+	info, ok := t.requests[reqID]
+	if !ok {
+		return
+	}
+	info.loadingFailed = true
+	t.checkFinished(reqID, info)
+}
+
+// checkFinished removes the tracking entry once loading has finished/failed and
+// every tracked response has its response ExtraInfo. Deletion is deferred until
+// then so a late-arriving ExtraInfo event (CDP may emit it after
+// loadingFinished) can still be paired instead of being dropped.
+func (t *extraInfoTracker) checkFinished(reqID network.RequestID, info *requestInfo) {
+	if !info.loadingFinished && !info.loadingFailed {
+		return
+	}
+	if len(info.responses) <= len(info.responseExtraHeaders) {
+		delete(t.requests, reqID)
+	}
 }
