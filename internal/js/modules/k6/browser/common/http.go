@@ -82,6 +82,11 @@ type Request struct {
 	headers        map[string][]string
 	extraHeaders   map[string][]string
 	extraHeadersMu sync.RWMutex
+	// rawHeadersCh is closed once the raw (ExtraInfo) headers have been
+	// resolved: either applied, or known not to arrive. Readers that need the
+	// raw headers wait on it; see waitForRawHeaders.
+	rawHeadersCh   chan struct{}
+	rawHeadersOnce sync.Once
 	// For now we're only going to work with the 0th entry of postDataEntries.
 	// We've not been able to reproduce a situation where more than one entry
 	// occupies the slice. Once we have a better idea of when more than one
@@ -171,6 +176,7 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		documentID:          documentID.String(),
 		headers:             make(map[string][]string, len(ev.Request.Headers)),
 		ctx:                 ctx,
+		rawHeadersCh:        make(chan struct{}),
 	}
 	for n, v := range ev.Request.Headers {
 		if s, ok := v.(string); ok {
@@ -218,8 +224,25 @@ func validateResourceType(logger *log.Logger, t string) string {
 
 func (r *Request) addExtraHeaders(extra map[string][]string) {
 	r.extraHeadersMu.Lock()
-	defer r.extraHeadersMu.Unlock()
 	r.extraHeaders = extra
+	r.extraHeadersMu.Unlock()
+	r.resolveRawHeaders()
+}
+
+// resolveRawHeaders unblocks readers waiting for the raw (ExtraInfo) headers.
+// It is called once the raw headers have been applied, or once it is known
+// that none will arrive (so the provisional headers are the final ones).
+func (r *Request) resolveRawHeaders() {
+	r.rawHeadersOnce.Do(func() { close(r.rawHeadersCh) })
+}
+
+// WaitForRawHeaders blocks until the raw headers are resolved or the request
+// context is done, whichever comes first.
+func (r *Request) WaitForRawHeaders() {
+	select {
+	case <-r.rawHeadersCh:
+	case <-r.ctx.Done():
+	}
 }
 
 func (r *Request) getFrame() *Frame {
@@ -463,6 +486,8 @@ type Response struct {
 	headers           map[string][]string
 	extraHeaders      map[string][]string
 	extraHeadersMu    sync.RWMutex
+	rawHeadersCh      chan struct{}
+	rawHeadersOnce    sync.Once
 	fromDiskCache     bool
 	fromServiceWorker bool
 	fromPrefetchCache bool
@@ -494,6 +519,7 @@ func NewHTTPResponse(
 		statusText:        resp.StatusText,
 		body:              nil,
 		headers:           make(map[string][]string, len(resp.Headers)),
+		rawHeadersCh:      make(chan struct{}),
 		fromDiskCache:     resp.FromDiskCache,
 		fromServiceWorker: resp.FromServiceWorker,
 		fromPrefetchCache: resp.FromPrefetchCache,
@@ -527,8 +553,25 @@ func NewHTTPResponse(
 
 func (r *Response) addExtraHeaders(extra map[string][]string) {
 	r.extraHeadersMu.Lock()
-	defer r.extraHeadersMu.Unlock()
 	r.extraHeaders = extra
+	r.extraHeadersMu.Unlock()
+	r.resolveRawHeaders()
+}
+
+// resolveRawHeaders unblocks readers waiting for the raw (ExtraInfo) headers.
+// It is called once the raw headers have been applied, or once it is known
+// that none will arrive (so the provisional headers are the final ones).
+func (r *Response) resolveRawHeaders() {
+	r.rawHeadersOnce.Do(func() { close(r.rawHeadersCh) })
+}
+
+// WaitForRawHeaders blocks until the raw headers are resolved or the response
+// context is done, whichever comes first.
+func (r *Response) WaitForRawHeaders() {
+	select {
+	case <-r.rawHeadersCh:
+	case <-r.ctx.Done():
+	}
 }
 
 func (r *Response) fetchBody() error {
