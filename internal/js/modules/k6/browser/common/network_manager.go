@@ -343,7 +343,13 @@ func (m *NetworkManager) handleRequestRedirect(
 	req.responseMu.Unlock()
 	req.redirectChain = append(req.redirectChain, req)
 
-	m.emitResponseMetrics(resp, req)
+	// Emit the response metrics once the raw headers are resolved, off the
+	// event goroutine so the wait does not block the goroutine that resolves
+	// them (the redirect's ExtraInfo may still be in flight here).
+	m.wg.Go(func() {
+		resp.WaitForRawHeaders()
+		m.emitResponseMetrics(resp, req)
+	})
 	m.deleteRequestByID(req.requestID)
 
 	/*
@@ -466,26 +472,21 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	if isInternalURL(req.url) {
 		return
 	}
-	emitResponseMetrics := func() {
-		req.responseMu.RLock()
-		m.emitResponseMetrics(req.response, req)
-		req.responseMu.RUnlock()
-	}
-	if !req.allowInterception {
-		emitResponseMetrics()
-		return
-	}
-	// When request interception is enabled, we need to process requestPaused messages
-	// from CDP in order to get the response for the request. However, we can't process
-	// them until the request is unblocked. Since we're blocking the NetworkManager
-	// goroutine here, we need to spawn a new goroutine to allow the requestPaused
-	// messages to be processed by the NetworkManager.
-	//
-	// This happens when the main page request redirects before it finishes loading.
-	// So the new redirect request will be blocked until the main page finishes loading.
-	// The main page will wait forever since its subrequest is blocked.
+	// Emit the response metrics in a separate goroutine, once the raw headers
+	// are resolved, so the reported size is computed from a stable source.
+	// This must not run on the NetworkManager event goroutine: waiting for the
+	// raw headers there would block the goroutine that resolves them. Spawning
+	// a goroutine is also required for intercepted requests, so that CDP
+	// requestPaused messages can still be processed while a redirected main
+	// page request waits for its subrequest to finish loading.
 	m.wg.Go(func() {
-		emitResponseMetrics()
+		req.responseMu.RLock()
+		resp := req.response
+		req.responseMu.RUnlock()
+		if resp != nil {
+			resp.WaitForRawHeaders()
+		}
+		m.emitResponseMetrics(resp, req)
 	})
 }
 
@@ -589,7 +590,13 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
 	m.reqsMu.Unlock()
-	m.emitRequestMetrics(req)
+	// Emit the request metrics once the raw headers are resolved, off the
+	// event goroutine so the wait does not block the goroutine that resolves
+	// them. The metric uses req.wallTime, so the deferral does not skew it.
+	m.wg.Go(func() {
+		req.WaitForRawHeaders()
+		m.emitRequestMetrics(req)
+	})
 	m.frameManager.requestStarted(req)
 
 	m.eventInterceptor.onRequest(req)
