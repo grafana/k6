@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/data"
 	"go.k6.io/k6/v2/internal/js/modules/k6/encoding"
 	"go.k6.io/k6/v2/internal/js/modules/k6/execution"
+	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/ageval"
 	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/csv"
 	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/streams"
@@ -47,6 +48,7 @@ func getInternalJSModules() map[string]any {
 		"k6/ws":          ws.New(),
 
 		// Experimental modules
+		"k6/experimental/ageval":  ageval.New(),
 		"k6/experimental/csv":     csv.New(),
 		"k6/experimental/fs":      fs.New(),
 		"k6/experimental/streams": streams.New(),
