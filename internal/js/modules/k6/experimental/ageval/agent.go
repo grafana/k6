@@ -146,6 +146,7 @@ func (a *AgentSimulator) Run(opts sobek.Value) sobek.Value {
 		metrics:        a.mi.metrics,
 		tags:           tags,
 		stepReportTool: a.stepReportTool,
+		Input:          input,
 		ToolCalls:      []ToolCall{},
 	}
 

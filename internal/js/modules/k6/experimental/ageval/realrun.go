@@ -16,6 +16,7 @@ import (
 //
 //	input: {
 //	  output, toolCalls: [{ name, input, output }],   // the recorded trajectory
+//	  input?,                                          // the task/prompt the agent was given (used by judge)
 //	  model?, usage?: { inputTokens, outputTokens },  // optional, enables token/cost metrics
 //	  durationMs?, steps?, name?, stepReportTool?, tags?,
 //	}
@@ -54,6 +55,7 @@ func (mi *ModuleInstance) fromAgentRun(input sobek.Value) sobek.Value {
 		metrics:        mi.metrics,
 		tags:           tags,
 		stepReportTool: getString(o, "stepReportTool", defaultStepReportTool),
+		Input:          getString(o, "input", ""),
 		Output:         getString(o, "output", ""),
 		ToolCalls:      parseToolCalls(rt, o.Get("toolCalls")),
 	}

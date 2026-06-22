@@ -2,6 +2,9 @@ package ageval
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,6 +42,32 @@ func TestJudgeScoresAndEmitsMetrics(t *testing.T) {
 	samples := drainSamples(ts.samples)
 	assert.Equal(t, []float64{0.9}, samples["agent_quality_score"])
 	assert.Equal(t, []float64{1}, samples["agent_judge_pass"])
+}
+
+func TestJudgeIncludesRunInputInPrompt(t *testing.T) {
+	t.Parallel()
+	ts := newTestSetup(t)
+
+	var captured string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		captured = string(body)
+		w.Header().Set("content-type", "application/json")
+		_, _ = w.Write([]byte(judgeResponse))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := ts.rt.VU.Runtime().RunString(fmt.Sprintf(`
+		const r = fromAgentRun({
+			input: "Count the go files in the repo",
+			output: "There are 18 go files.",
+			toolCalls: [{ name: "Glob", input: { pattern: "*.go" }, output: "18 files" }],
+		});
+		// Note: no input passed to judge() -- it must fall back to the run's input.
+		judge(r, { model: "claude-sonnet-4-5", apiKey: "jt", baseURL: %q, rubric: "Reports a count." });
+	`, srv.URL))
+	require.NoError(t, err)
+	assert.Contains(t, captured, "Count the go files in the repo", "judge prompt should include the run's task/input")
 }
 
 func TestParseJudgeReply(t *testing.T) {

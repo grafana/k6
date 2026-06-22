@@ -56,7 +56,12 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	threshold := getFloat(o, "threshold", defaultJudgeThreshold)
 
 	rr := mi.exportRunResult(resultVal)
+	// The task/prompt the agent was given. Default to the run's own input so the
+	// judge always sees what the agent was asked to do, not just what it did.
 	input := getString(o, "input", "")
+	if input == "" && rr != nil {
+		input = rr.Input
+	}
 	actual := getString(o, "actualOutput", "")
 	if actual == "" && rr != nil {
 		actual = serializeTrajectory(rr)

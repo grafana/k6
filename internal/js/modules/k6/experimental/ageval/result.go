@@ -31,6 +31,7 @@ type RunResult struct {
 	tags           *metrics.TagSet
 	stepReportTool string
 
+	Input     string     `js:"input"`
 	Output    string     `js:"output"`
 	ToolCalls []ToolCall `js:"toolCalls"`
 	Usage     RunUsage   `js:"usage"`
