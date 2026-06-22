@@ -63,48 +63,48 @@ func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 	return nil
 }
 
-// cmdCloud handles the `k6 cloud` sub-command
-type cmdCloud struct {
-	gs *state.GlobalState
-
-	showCloudLogs bool
-	exitOnRunning bool
-	uploadOnly    bool
-}
-
-func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
-	// TODO: refactor (https://github.com/grafana/k6/issues/883)
-	//
-	// We deliberately parse the env variables, to validate for wrong
-	// values, even if we don't subsequently use them (if the respective
-	// CLI flag was specified, since it has a higher priority).
-	if showCloudLogsEnv, ok := c.gs.Env["K6_SHOW_CLOUD_LOGS"]; ok {
+// applyCloudEnvOverrides applies the K6_SHOW_CLOUD_LOGS and K6_EXIT_ON_RUNNING
+// environment variables onto the provided flag values, unless the corresponding
+// CLI flag was explicitly set (in which case it takes precedence).
+//
+// We deliberately parse the env variables, to validate for wrong values, even
+// if we don't subsequently use them.
+//
+// TODO: refactor (https://github.com/grafana/k6/issues/883)
+func applyCloudEnvOverrides(gs *state.GlobalState, cmd *cobra.Command, showCloudLogs, exitOnRunning *bool) error {
+	if showCloudLogsEnv, ok := gs.Env["K6_SHOW_CLOUD_LOGS"]; ok {
 		showCloudLogsValue, err := strconv.ParseBool(showCloudLogsEnv)
 		if err != nil {
 			return fmt.Errorf("parsing K6_SHOW_CLOUD_LOGS returned an error: %w", err)
 		}
 		if !cmd.Flags().Changed("show-logs") {
-			c.showCloudLogs = showCloudLogsValue
+			*showCloudLogs = showCloudLogsValue
 		}
 	}
 
-	if exitOnRunningEnv, ok := c.gs.Env["K6_EXIT_ON_RUNNING"]; ok {
+	if exitOnRunningEnv, ok := gs.Env["K6_EXIT_ON_RUNNING"]; ok {
 		exitOnRunningValue, err := strconv.ParseBool(exitOnRunningEnv)
 		if err != nil {
 			return fmt.Errorf("parsing K6_EXIT_ON_RUNNING returned an error: %w", err)
 		}
 		if !cmd.Flags().Changed("exit-on-running") {
-			c.exitOnRunning = exitOnRunningValue
+			*exitOnRunning = exitOnRunningValue
 		}
 	}
 	return nil
 }
 
+// runCloudTest builds the test archive, uploads it to Grafana Cloud, and (unless
+// uploadOnly is set) starts the run and tracks its progress until completion.
+//
 // TODO: split apart some more
 //
 //nolint:funlen,gocognit,cyclop
-func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
+func runCloudTest(
+	gs *state.GlobalState, cmd *cobra.Command, args []string,
+	showCloudLogs, exitOnRunning, uploadOnly bool,
+) error {
+	test, err := loadAndConfigureLocalTest(gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
 	}
@@ -121,15 +121,15 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// TODO: validate for usage of execution segment
 	// TODO: validate for externally controlled executor (i.e. executors that aren't distributable)
 	// TODO: move those validations to a separate function and reuse validateConfig()?
-	printBanner(c.gs)
+	printBanner(gs)
 
 	progressBar := pb.New(
 		pb.WithConstLeft("Init"),
 		pb.WithConstProgress(0, "Loading test script..."),
 	)
-	printBar(c.gs, progressBar)
+	printBar(gs, progressBar)
 
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
+	modifyAndPrintBar(gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
 	arc := test.makeArchive()
 
 	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
@@ -139,7 +139,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	// Cloud config
 	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud)
+		test.derivedConfig.Collectors["cloud"], gs.Env, "", arc.Options.Cloud)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	// Display config warning if needed
 	if warn != "" {
-		modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Warning: "+warn))
+		modifyAndPrintBar(gs, progressBar, pb.WithConstProgress(0, "Warning: "+warn))
 	}
 
 	if cloudConfig.Token.Valid {
@@ -178,31 +178,31 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		name = filepath.Base(test.sourceRootPath)
 	}
 
-	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
+	globalCtx, globalCancel := context.WithCancel(gs.Ctx)
 	defer globalCancel()
 
-	logger := c.gs.Logger
+	logger := gs.Logger
 
 	// Start cloud test run
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
+	modifyAndPrintBar(gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
 	client, err := cloudapiv6.NewClient(
 		logger, cloudConfig.Token.String, cloudConfig.Hostv6.String, build.Version, cloudConfig.Timeout.TimeDuration())
 	if err != nil {
 		return err
 	}
-	projectID, err := prepCloudTestRun(globalCtx, c.gs, client, &cloudConfig, tmpCloudConfig, arc)
+	projectID, err := prepCloudTestRun(globalCtx, gs, client, &cloudConfig, tmpCloudConfig, arc)
 	if err != nil {
 		return err
 	}
 
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+	modifyAndPrintBar(gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 
 	loadTest, err := client.UploadTest(globalCtx, name, projectID, arc)
 	if err != nil {
 		return fmt.Errorf("uploading test: %w", err)
 	}
 
-	if c.uploadOnly {
+	if uploadOnly {
 		et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 		if err != nil {
 			return err
@@ -210,10 +210,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 		testURL := fmt.Sprintf("%s/a/k6-app/tests/%d", strings.TrimSuffix(cloudConfig.StackURL.String, "/"), loadTest.GetId())
 		printExecutionDescription(
-			c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
+			gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 		)
-		modifyAndPrintBar(c.gs, progressBar, pb.WithConstLeft("Run "), pb.WithConstProgress(1.0, "Archived"))
-		c.printTestStatus("Archived")
+		modifyAndPrintBar(gs, progressBar, pb.WithConstLeft("Run "), pb.WithConstProgress(1.0, "Archived"))
+		printCloudTestStatus(gs, "Archived")
 		return nil
 	}
 
@@ -241,7 +241,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	onHardStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Error("Aborting k6 in response to signal, we won't wait for the test to end.")
 	}
-	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
+	stopSignalHandling := handleTestAbortSignals(gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
 	et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
@@ -251,11 +251,11 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	testURL := run.GetTestRunDetailsPageUrl()
 	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 	printExecutionDescription(
-		c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
+		gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 	)
 
 	modifyAndPrintBar(
-		c.gs, progressBar,
+		gs, progressBar,
 		pb.WithConstLeft("Run "), pb.WithConstProgress(0, "Initializing the cloud test"),
 	)
 
@@ -265,7 +265,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	defer progressBarWG.Wait()
 	defer progressCancel()
 	go func() {
-		showProgress(progressCtx, c.gs, []*pb.ProgressBar{progressBar}, logger)
+		showProgress(progressCtx, gs, []*pb.ProgressBar{progressBar}, logger)
 		progressBarWG.Done()
 	}()
 
@@ -290,7 +290,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	)
 
 	ticker := time.NewTicker(time.Millisecond * 2000)
-	if c.showCloudLogs {
+	if showCloudLogs {
 		refID := strconv.FormatInt(int64(testRunID), 10)
 		go func() {
 			logger.Debug("Connecting to cloud logs server...")
@@ -312,7 +312,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		testProgressLock.Unlock()
 
 		if newTestProgress.IsFinished() ||
-			(c.exitOnRunning && newTestProgress.IsRunning()) {
+			(exitOnRunning && newTestProgress.IsRunning()) {
 			globalCancel()
 			break
 		}
@@ -327,7 +327,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 	}
 
-	c.printTestStatus(testProgress.FormatStatus())
+	printCloudTestStatus(gs, testProgress.FormatStatus())
 
 	if testProgress.ThresholdsFailed() {
 		//nolint:staticcheck
@@ -341,27 +341,29 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func (c *cmdCloud) printTestStatus(status string) {
-	if !c.gs.Flags.Quiet {
-		valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
-		printToStdout(c.gs, fmt.Sprintf(
+func printCloudTestStatus(gs *state.GlobalState, status string) {
+	if !gs.Flags.Quiet {
+		valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
+		printToStdout(gs, fmt.Sprintf(
 			"     test status: %s\n", valueColor.Sprint(status),
 		))
 	} else {
-		c.gs.Logger.WithField("run_status", status).Debug("Test finished")
+		gs.Logger.WithField("run_status", status).Debug("Test finished")
 	}
 }
 
-func (c *cmdCloud) flagSet() *pflag.FlagSet {
+// cloudCmdFlagSet returns the flag set shared by the cloud run/upload commands,
+// binding the --exit-on-running and --show-logs flags to the provided values.
+func cloudCmdFlagSet(showCloudLogs, exitOnRunning *bool) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
 
 	// TODO: Figure out a better way to handle the CLI flags
-	flags.BoolVar(&c.exitOnRunning, "exit-on-running", c.exitOnRunning,
+	flags.BoolVar(exitOnRunning, "exit-on-running", *exitOnRunning,
 		"exits when test reaches the running status")
-	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
+	flags.BoolVar(showCloudLogs, "show-logs", *showCloudLogs,
 		"enable showing of logs when a test is executed in the cloud")
 	return flags
 }
@@ -387,12 +389,6 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 }
 
 func getCmdCloud(gs *state.GlobalState) *cobra.Command {
-	c := &cmdCloud{
-		gs:            gs,
-		showCloudLogs: true,
-		exitOnRunning: false,
-	}
-
 	exampleText := getExampleText(gs, `
   # Authenticate with Grafana Cloud
   $ {{.}} cloud login
@@ -420,7 +416,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	defaultUsageTemplate := (&cobra.Command{}).UsageTemplate()
 	defaultUsageTemplate = strings.ReplaceAll(defaultUsageTemplate, "FlagUsages", "FlagUsagesWrapped 120")
 
-	runCmd := getCmdCloudRun(c)
+	runCmd := getCmdCloudRun(gs)
 	runCmd.SetUsageTemplate(defaultUsageTemplate)
 	runCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(runCmd)
@@ -430,19 +426,23 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	loginCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(loginCmd)
 
-	uploadCmd := getCmdCloudUpload(c)
+	uploadCmd := getCmdCloudUpload(gs)
 	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
 	uploadCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(uploadCmd)
 
-	projectCmd := getCmdCloudProject(c)
+	projectCmd := getCmdCloudProject(gs)
 	cloudCmd.AddCommand(projectCmd)
 
-	testCmd := getCmdCloudTest(c)
+	testCmd := getCmdCloudTest(gs)
 	cloudCmd.AddCommand(testCmd)
 
+	// The parent `k6 cloud` command only prints help, but historically exposes
+	// these flags in its usage output; bind them to throwaway values so that
+	// output is preserved.
+	parentShowCloudLogs, parentExitOnRunning := true, false
 	cloudCmd.Flags().SortFlags = false
-	cloudCmd.Flags().AddFlagSet(c.flagSet())
+	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet(&parentShowCloudLogs, &parentExitOnRunning))
 
 	// Use custom template similar to root - hardcode flags to avoid showing global flags
 	cloudTemplate := getCloudUsageTemplate()
