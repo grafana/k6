@@ -150,7 +150,11 @@ func (p *anthropicProvider) createMessage(ctx context.Context, conv conversation
 	req.Header.Set("X-Api-Key", conv.apiKey)
 	req.Header.Set("Anthropic-Version", anthropicVersion)
 
-	resp, err := p.client.Do(req)
+	// The request URL is built from operator-supplied configuration (the model
+	// provider endpoint, defaulting to the official Anthropic API; baseURL is
+	// only overridable by the test author, who already controls the whole
+	// script), not from untrusted external input, so this is not an SSRF risk.
+	resp, err := p.client.Do(req) //nolint:gosec // G704: baseURL is operator config, not attacker-controlled
 	if err != nil {
 		return reply{}, err
 	}
