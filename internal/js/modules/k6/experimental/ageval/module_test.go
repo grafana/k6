@@ -17,7 +17,8 @@ func TestModuleExportsAndMetrics(t *testing.T) {
 	require.True(t, ok)
 
 	exports := mi.Exports().Named
-	assert.Contains(t, exports, "Agent")
+	assert.Contains(t, exports, "AgentSimulator")
+	assert.Contains(t, exports, "fromAgentRun")
 	assert.Contains(t, exports, "judge")
 
 	for _, name := range []string{

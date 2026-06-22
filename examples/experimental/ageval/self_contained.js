@@ -9,7 +9,7 @@
 // Run it with:
 //   ANTHROPIC_API_KEY=sk-...  ANTHROPIC_API_KEY_JUDGE=sk-...  k6 run self_contained.js
 import { check } from 'k6';
-import { Agent, judge } from 'k6/experimental/ageval';
+import { AgentSimulator, judge } from 'k6/experimental/ageval';
 
 export const options = {
   vus: 1,
@@ -45,7 +45,7 @@ const getInvoice = {
   mock: (input) => JSON.stringify({ invoice_id: input.invoice_id, status: 'paid', amount: 99, currency: 'USD' }),
 };
 
-const supportAgent = new Agent({
+const supportAgent = new AgentSimulator({
   provider: 'anthropic',
   model: 'claude-opus-4-8',
   apiKey: __ENV.ANTHROPIC_API_KEY,

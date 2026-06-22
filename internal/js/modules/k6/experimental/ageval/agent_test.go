@@ -15,7 +15,7 @@ func TestAgentRunRecordsTrajectoryAndMetrics(t *testing.T) {
 
 	_, err := ts.rt.VU.Runtime().RunString(fmt.Sprintf(`
 		globalThis.calledWith = null;
-		const agent = new Agent({
+		const agent = new AgentSimulator({
 			provider: "anthropic",
 			model: "claude-sonnet-4-5",
 			apiKey: "test",
@@ -65,7 +65,7 @@ func TestAgentExpectSequenceEmitsCorrectness(t *testing.T) {
 	srv := cannedServer(t, toolUseResponse, endTurnResponse)
 
 	v, err := ts.rt.VU.Runtime().RunString(fmt.Sprintf(`
-		const agent = new Agent({
+		const agent = new AgentSimulator({
 			model: "claude-sonnet-4-5", apiKey: "t", baseURL: %q,
 			tools: [{ name: "echo", description: "d", mock: () => "ok" }],
 		});
@@ -86,7 +86,7 @@ func TestAgentExpectSequenceEmitsCorrectness(t *testing.T) {
 func TestAgentRejectsUnsupportedModel(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)
-	_, err := ts.rt.VU.Runtime().RunString(`new Agent({ model: "gpt-4", apiKey: "t" });`)
+	_, err := ts.rt.VU.Runtime().RunString(`new AgentSimulator({ model: "gpt-4", apiKey: "t" });`)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported model")
 }
@@ -97,7 +97,7 @@ func TestAgentSkillMergesToolsAndInstructions(t *testing.T) {
 	srv := cannedServer(t, endTurnResponse)
 
 	_, err := ts.rt.VU.Runtime().RunString(fmt.Sprintf(`
-		const agent = new Agent({
+		const agent = new AgentSimulator({
 			model: "claude-sonnet-4-5", apiKey: "t", baseURL: %q,
 			systemPrompt: "base",
 			skills: [{ name: "s", instructions: "do the thing", tools: [{ name: "skilltool", description: "d", mock: () => "x" }] }],

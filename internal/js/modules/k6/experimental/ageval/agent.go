@@ -24,9 +24,9 @@ const (
 	defaultAgentName      = "agent"
 )
 
-// Agent is the JS-facing agent. It is created via `new Agent({...})` and exposes
+// AgentSimulator is the JS-facing agent. It is created via `new AgentSimulator({...})` and exposes
 // a single `run(opts)` method.
-type Agent struct {
+type AgentSimulator struct {
 	mi *ModuleInstance
 	rt *sobek.Runtime
 
@@ -44,11 +44,11 @@ type Agent struct {
 	registry       *toolRegistry
 }
 
-// newAgent is the `new Agent({...})` constructor.
-func (mi *ModuleInstance) newAgent(call sobek.ConstructorCall) *sobek.Object {
+// newAgentSimulator is the `new AgentSimulator({...})` constructor.
+func (mi *ModuleInstance) newAgentSimulator(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 	if len(call.Arguments) < 1 || common.IsNullish(call.Argument(0)) {
-		common.Throw(rt, errors.New("Agent constructor requires a config object"))
+		common.Throw(rt, errors.New("AgentSimulator constructor requires a config object"))
 	}
 	cfg := call.Argument(0).ToObject(rt)
 
@@ -67,7 +67,7 @@ func (mi *ModuleInstance) newAgent(call sobek.ConstructorCall) *sobek.Object {
 			modelName, providerName, strings.Join(supported, ", ")))
 	}
 
-	a := &Agent{
+	a := &AgentSimulator{
 		mi:             mi,
 		rt:             rt,
 		name:           getString(cfg, "name", defaultAgentName),
@@ -84,7 +84,7 @@ func (mi *ModuleInstance) newAgent(call sobek.ConstructorCall) *sobek.Object {
 		registry:       newToolRegistry(),
 	}
 	if a.apiKey == "" {
-		common.Throw(rt, errors.New("Agent config requires a non-empty apiKey"))
+		common.Throw(rt, errors.New("AgentSimulator config requires a non-empty apiKey"))
 	}
 
 	mi.parseTools(cfg.Get("tools"), a.registry)
@@ -96,7 +96,7 @@ func (mi *ModuleInstance) newAgent(call sobek.ConstructorCall) *sobek.Object {
 // applySkills merges each skill's instructions into the system prompt and
 // registers its tools. A skill is `{ name, instructions, tools }` — the
 // lightweight Claude-API tool-use notion of a skill (instructions + tools).
-func (a *Agent) applySkills(v sobek.Value) {
+func (a *AgentSimulator) applySkills(v sobek.Value) {
 	if v == nil || common.IsNullish(v) {
 		return
 	}
@@ -124,7 +124,7 @@ type runMocks map[string]sobek.Value
 // Run executes the agent loop synchronously and returns a RunResult. Blocking is
 // intentional and idiomatic (like http.request): we run on the VU goroutine and
 // hold the runtime, so JS mock handlers can be called directly.
-func (a *Agent) Run(opts sobek.Value) sobek.Value {
+func (a *AgentSimulator) Run(opts sobek.Value) sobek.Value {
 	state := a.mi.vu.State()
 	if state == nil {
 		common.Throw(a.rt, errInitContext)
@@ -168,7 +168,9 @@ func (a *Agent) Run(opts sobek.Value) sobek.Value {
 // converse runs the model/tool loop, filling result and returning total token
 // usage. It stops on end_turn, the configured terminalTool, maxSteps, or a turn
 // with no tool calls.
-func (a *Agent) converse(input string, mocks runMocks, tags *metrics.TagSet, result *RunResult) (int64, int64) {
+func (a *AgentSimulator) converse(
+	input string, mocks runMocks, tags *metrics.TagSet, result *RunResult,
+) (int64, int64) {
 	messages := []message{{role: roleUser, blocks: []block{{kind: blockText, text: input}}}}
 	var totalIn, totalOut int64
 
@@ -204,7 +206,7 @@ func (a *Agent) converse(input string, mocks runMocks, tags *metrics.TagSet, res
 // handleBlocks processes the model's reply blocks: records text/tool calls,
 // dispatches tools, emits the tool-call metric, and returns the tool-result
 // blocks plus whether the terminal tool was hit.
-func (a *Agent) handleBlocks(
+func (a *AgentSimulator) handleBlocks(
 	blocks []block, mocks runMocks, tags *metrics.TagSet, result *RunResult, asst *message,
 ) ([]block, bool) {
 	var toolResults []block
@@ -230,7 +232,7 @@ func (a *Agent) handleBlocks(
 
 // dispatch resolves a tool call to a result string. Order: per-run mock override
 // → the tool's own mock → a generic ack → an error for unknown tools.
-func (a *Agent) dispatch(name string, input map[string]any, mocks runMocks) string {
+func (a *AgentSimulator) dispatch(name string, input map[string]any, mocks runMocks) string {
 	if v, ok := mocks[name]; ok && v != nil && !sobek.IsUndefined(v) {
 		return a.resolveMock(v, input)
 	}
@@ -244,7 +246,7 @@ func (a *Agent) dispatch(name string, input map[string]any, mocks runMocks) stri
 }
 
 // resolveMock turns a mock value (callable or static) into a tool-result string.
-func (a *Agent) resolveMock(v sobek.Value, input map[string]any) string {
+func (a *AgentSimulator) resolveMock(v sobek.Value, input map[string]any) string {
 	if fn, ok := sobek.AssertFunction(v); ok {
 		res, err := fn(sobek.Undefined(), a.rt.ToValue(input))
 		if err != nil {
@@ -255,7 +257,7 @@ func (a *Agent) resolveMock(v sobek.Value, input map[string]any) string {
 	return toResultString(v)
 }
 
-func (a *Agent) parseRunMocks(v sobek.Value) runMocks {
+func (a *AgentSimulator) parseRunMocks(v sobek.Value) runMocks {
 	out := runMocks{}
 	if v == nil || common.IsNullish(v) {
 		return out
@@ -267,7 +269,7 @@ func (a *Agent) parseRunMocks(v sobek.Value) runMocks {
 	return out
 }
 
-func (a *Agent) baseTags(userTags sobek.Value) *metrics.TagSet {
+func (a *AgentSimulator) baseTags(userTags sobek.Value) *metrics.TagSet {
 	state := a.mi.vu.State()
 	tags := state.Tags.GetCurrentValues().Tags.With("agent", a.name).With("model", a.model)
 	if userTags != nil && !common.IsNullish(userTags) {

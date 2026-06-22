@@ -15,7 +15,7 @@ func TestJudgeScoresAndEmitsMetrics(t *testing.T) {
 	judgeSrv := cannedServer(t, judgeResponse)
 
 	v, err := ts.rt.VU.Runtime().RunString(fmt.Sprintf(`
-		const agent = new Agent({
+		const agent = new AgentSimulator({
 			model: "claude-sonnet-4-5", apiKey: "t", baseURL: %q,
 			tools: [{ name: "echo", description: "d", mock: () => "ok" }],
 		});
