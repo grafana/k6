@@ -14,11 +14,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
-	k6modules "go.k6.io/k6/js/modules"
-	k6metrics "go.k6.io/k6/metrics"
+	k6modules "go.k6.io/k6/v2/js/modules"
+	k6metrics "go.k6.io/k6/v2/metrics"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/browser"

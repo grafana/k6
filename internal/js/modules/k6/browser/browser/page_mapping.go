@@ -8,11 +8,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	k6common "go.k6.io/k6/js/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // mapPage to the JS module.
@@ -417,12 +418,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"route": mapPageRoute(vu, p),
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewPageScreenshotOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parsePageScreenshotOptions(rt, opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
 
-			rt := vu.Runtime()
 			promise, res, rej := rt.NewPromise()
 			callback := vu.RegisterCallback()
 			go func() {
@@ -1151,4 +1151,53 @@ func parsePageEmulateMediaOptions(
 	}
 
 	return defaults, nil
+}
+
+// parsePageScreenshotOptions parses the page screenshot options.
+func parsePageScreenshotOptions(rt *sobek.Runtime, opts sobek.Value) (*common.PageScreenshotOptions, error) {
+	popts := common.NewPageScreenshotOptions()
+	if k6common.IsNullish(opts) {
+		return popts, nil
+	}
+
+	formatSpecified := false
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "clip":
+			var c map[string]float64
+			if err := rt.ExportTo(obj.Get(k), &c); err != nil {
+				return popts, err
+			}
+			popts.Clip = &page.Viewport{
+				X:      c["x"],
+				Y:      c["y"],
+				Width:  c["width"],
+				Height: c["height"],
+				Scale:  1,
+			}
+		case "fullPage":
+			popts.FullPage = obj.Get(k).ToBoolean()
+		case "omitBackground":
+			popts.OmitBackground = obj.Get(k).ToBoolean()
+		case "path":
+			popts.Path = obj.Get(k).String()
+		case "quality":
+			popts.Quality = obj.Get(k).ToInteger()
+		case "type":
+			if f, ok := common.ImageIDFromString(obj.Get(k).String()); ok {
+				popts.Format = f
+				formatSpecified = true
+			}
+		}
+	}
+
+	// Infer file format by path if format not explicitly specified (default is PNG)
+	if popts.Path != "" && !formatSpecified {
+		if strings.HasSuffix(popts.Path, ".jpg") || strings.HasSuffix(popts.Path, ".jpeg") {
+			popts.Format = common.ImageFormatJPEG
+		}
+	}
+
+	return popts, nil
 }

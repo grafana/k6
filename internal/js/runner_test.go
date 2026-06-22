@@ -31,23 +31,23 @@ import (
 	"golang.org/x/time/rate"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/internal/execution"
-	"go.k6.io/k6/internal/execution/local"
-	"go.k6.io/k6/internal/js/modules/k6"
-	k6metrics "go.k6.io/k6/internal/js/modules/k6/metrics"
-	"go.k6.io/k6/internal/js/modules/k6/ws"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin/grpc_testing"
-	"go.k6.io/k6/internal/lib/testutils/mockoutput"
-	k6http "go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/lib"
-	_ "go.k6.io/k6/lib/executor" // TODO: figure out something better
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/execution"
+	"go.k6.io/k6/v2/internal/execution/local"
+	"go.k6.io/k6/v2/internal/js/modules/k6"
+	k6metrics "go.k6.io/k6/v2/internal/js/modules/k6/metrics"
+	"go.k6.io/k6/v2/internal/js/modules/k6/ws"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
+	"go.k6.io/k6/v2/internal/lib/testutils/mockoutput"
+	k6http "go.k6.io/k6/v2/js/modules/k6/http"
+	"go.k6.io/k6/v2/lib"
+	_ "go.k6.io/k6/v2/lib/executor" // TODO: figure out something better
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 )
 
 func TestRunnerNew(t *testing.T) {
@@ -1441,13 +1441,13 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 				var url = "HTTPBIN_URL";
 				var preRes = http.get(url + "/cookies");
 				if (preRes.status != 200) { throw new Error("wrong status (pre): " + preRes.status); }
-				if (preRes.json().k1 || preRes.json().k2) {
+				if (preRes.json().cookies.k1 || preRes.json().cookies.k2) {
 					throw new Error("cookies persisted: " + preRes.body);
 				}
 
 				var res = http.get(url + "/cookies/set?k2=v2&k1=v1");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-				if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+				if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
 					throw new Error("wrong cookies: " + res.body);
 				}
 			}
@@ -1486,7 +1486,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 				if (__ITER == 0) {
 					var res = http.get(url + "/cookies/set?k2=v2&k1=v1");
 					if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+					if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
 						throw new Error("wrong cookies: " + res.body);
 					}
 				}
@@ -1494,7 +1494,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 				if (__ITER == 1) {
 					var res = http.get(url + "/cookies");
 					if (res.status != 200) { throw new Error("wrong status (pre): " + res.status); }
-					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+					if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
 						throw new Error("wrong cookies: " + res.body);
 					}
 				}

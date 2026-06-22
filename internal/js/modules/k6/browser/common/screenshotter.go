@@ -13,7 +13,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 // ScreenshotPersister is the type that all file persisters must implement. It's job is
@@ -43,6 +43,11 @@ var imageFormatToString = map[ImageFormat]string{ //nolint:gochecknoglobals
 var imageFormatToID = map[string]ImageFormat{ //nolint:gochecknoglobals
 	"jpeg": ImageFormatJPEG,
 	"png":  ImageFormatPNG,
+}
+
+func ImageIDFromString(format string) (ImageFormat, bool) {
+	id, exists := imageFormatToID[format]
+	return id, exists
 }
 
 // MarshalJSON marshals the enum as a quoted JSON string.

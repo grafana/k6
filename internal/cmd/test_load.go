@@ -20,17 +20,17 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/js"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/ext"
+	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/internal/js"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/metrics"
 )
 
 const (
@@ -100,6 +100,7 @@ func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args 
 		Usage:          gs.Usage,
 		SecretsManager: gs.SecretsManager,
 		TestStatus:     gs.TestStatus,
+		FeatureFlags:   &features.Flags{},
 	}
 
 	test := &loadedTest{
@@ -124,9 +125,15 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		return nil, err
 	}
 
+	if err := resolveFeatureFlags(gs, cmd, test.preInitState); err != nil {
+		return nil, err
+	}
+
 	if err := test.continueInitialization(gs); err != nil {
 		return nil, fmt.Errorf("could not initialize '%s': %w", test.sourceRootPath, err)
 	}
+
+	warnOnScriptOptionsFeatures(gs.Logger, test.initRunner.GetOptions())
 
 	return test, nil
 }
@@ -196,6 +203,13 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 			return fmt.Errorf("could not load test archive bundle '%s': %w", testPath, err)
 		}
 		logger.Debugf("Loaded test as an archive bundle with type '%s'!", arc.Type)
+
+		env := maps.Clone(arc.Env)
+		if env == nil {
+			env = make(map[string]string, len(lt.preInitState.RuntimeOptions.Env))
+		}
+		maps.Copy(env, lt.preInitState.RuntimeOptions.Env)
+		lt.preInitState.RuntimeOptions.Env = env
 
 		switch arc.Type {
 		case testTypeJS:
@@ -277,7 +291,9 @@ func resolveModulesDependencies(
 		return deps, preDeps, originalError
 	}
 
-	if !isCustomBuildRequired(deps, build.Version, ext.GetAll()) {
+	if err := checkBuiltinDependencies(deps, runtimeK6Version(), ext.GetAll()); err != nil {
+		logger.WithError(err).Debug("Current binary does not satisfy all dependencies, custom build required")
+	} else {
 		logger.
 			Debug("The current k6 binary already satisfies all the required dependencies," +
 				" it isn't required to provision a new binary.")
@@ -555,6 +571,9 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	if err != nil {
 		return nil, err
 	}
+
+	// tag only derived options; consolidated stays clean so cloud/archive don't serialize feature tags
+	applyFeatureRunTags(&derivedConfig.Options, lt.preInitState.FeatureFlags.Tags())
 
 	return &loadedAndConfiguredTest{
 		loadedTest:         lt,

@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/cloudapi/insights"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/cloudapi/insights"
+	"go.k6.io/k6/v2/metrics"
 )
 
 type mockWorkingInsightsClient struct {
@@ -90,7 +90,7 @@ func Test_tracesFlusher_Flush_ReturnsNoErrorWithWorkingInsightsClientAndNonCance
 	flusher := NewFlusher(cli, col)
 
 	// When
-	err := flusher.Flush()
+	err := flusher.Flush(t.Context())
 
 	// Then
 	require.NoError(t, err)
@@ -109,7 +109,7 @@ func Test_tracesFlusher_Flush_ReturnsNoErrorWithWorkingInsightsClientAndNonCance
 	flusher := NewFlusher(cli, col)
 
 	// When
-	err := flusher.Flush()
+	err := flusher.Flush(t.Context())
 
 	// Then
 	require.NoError(t, err)
@@ -129,7 +129,7 @@ func Test_tracesFlusher_Flush_ReturnsErrorWithFailingInsightsClientAndNonCancell
 	flusher := NewFlusher(cli, col)
 
 	// When
-	err := flusher.Flush()
+	err := flusher.Flush(t.Context())
 
 	// Then
 	require.ErrorIs(t, err, testErr)

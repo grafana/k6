@@ -12,20 +12,26 @@ import (
 	"github.com/klauspost/compress/snappy"
 	"google.golang.org/protobuf/proto"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
+	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
 )
+
+// metricsHTTPClient is the interface used by metricsClient to perform HTTP requests.
+// It allows tests to inject a mock that returns immediately without using real HTTP.
+type metricsHTTPClient interface {
+	Do(req *http.Request, v any) error
+	BaseURL() string
+}
 
 // metricsClient is a Protobuf over HTTP client for sending
 // the collected metrics from the Cloud output
 // to the remote service.
 type metricsClient struct {
-	httpClient *cloudapi.Client
+	httpClient metricsHTTPClient
 	url        string
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, error) {
+func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, error) {
 	// The cloudapi.Client works across different versions of the API, the test
 	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
 	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
@@ -46,15 +52,16 @@ func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, err
 	}, nil
 }
 
-// Push the provided metrics for the given test run ID.
-func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
+// Push the provided metrics for the given test run ID. The context cancels the
+// underlying HTTP request so a stuck push cannot block k6 shutdown.
+func (mc *metricsClient) push(ctx context.Context, samples *pbcloud.MetricSet) error {
 	b, err := newRequestBody(samples)
 	if err != nil {
 		return err
 	}
 
 	req, err := http.NewRequestWithContext(
-		context.Background(), http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
+		ctx, http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
 	if err != nil {
 		return err
 	}

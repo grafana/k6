@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/v2/cmd/state"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -10,16 +10,22 @@ import (
 const cloudUploadCommandName = "upload"
 
 type cmdCloudUpload struct {
-	gs *state.GlobalState
+	globalState *state.GlobalState
+
+	// deprecatedCloudCmd holds an instance of the k6 cloud command that we store
+	// in order to be able to call its run method to support the cloud upload
+	// feature
+	deprecatedCloudCmd *cmdCloud
 }
 
-func getCmdCloudUpload(gs *state.GlobalState) *cobra.Command {
+func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
 	c := &cmdCloudUpload{
-		gs: gs,
+		globalState:        cloudCmd.gs,
+		deprecatedCloudCmd: cloudCmd,
 	}
 
 	// uploadCloudCommand represents the 'cloud upload' command
-	exampleText := getExampleText(gs, `
+	exampleText := getExampleText(cloudCmd.gs, `
   # Upload a test to Grafana Cloud without running it
   $ {{.}} cloud upload script.js`[1:])
 
@@ -29,6 +35,7 @@ func getCmdCloudUpload(gs *state.GlobalState) *cobra.Command {
 		Long:    "Upload a test to Grafana Cloud without running it. Requires authentication via \"k6 cloud login\".",
 		Example: exampleText,
 		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+		PreRunE: c.preRun,
 		RunE:    c.run,
 	}
 
@@ -37,25 +44,14 @@ func getCmdCloudUpload(gs *state.GlobalState) *cobra.Command {
 	return uploadCloudCommand
 }
 
+func (c *cmdCloudUpload) preRun(cmd *cobra.Command, args []string) error {
+	return c.deprecatedCloudCmd.preRun(cmd, args)
+}
+
 // run is the code that runs when the user executes `k6 cloud upload`
 func (c *cmdCloudUpload) run(cmd *cobra.Command, args []string) error {
-	setup, err := prepareCloudTest(c.gs, cmd, args)
-	if err != nil {
-		return err
-	}
-
-	cloudTestRun, err := setup.client.UploadTestOnly(setup.name, setup.cloudConfig.ProjectID.Int64, setup.arc)
-	if err != nil {
-		return err
-	}
-
-	refID := cloudTestRun.ReferenceID
-	cloudConfig := setup.cloudConfig
-	if cloudTestRun.ConfigOverride != nil {
-		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
-	}
-
-	return trackCloudTestProgress(c.gs, setup, refID, cloudConfig, false, false)
+	c.deprecatedCloudCmd.uploadOnly = true
+	return c.deprecatedCloudCmd.run(cmd, args)
 }
 
 func (c *cmdCloudUpload) flagSet() *pflag.FlagSet {

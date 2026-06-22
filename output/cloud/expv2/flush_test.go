@@ -1,19 +1,21 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/output/cloud/expv2/pbcloud"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // TODO: additional case
@@ -81,7 +83,7 @@ func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
 		require.Len(t, sinks, tc.series)
 
 		bq.Push([]timeBucket{{Time: 1, Sinks: sinks}})
-		err := mf.flush()
+		err := mf.flush(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, tc.expFlushCalls, pm.timesCalled())
 	}
@@ -131,7 +133,7 @@ func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 		}
 		require.Len(t, bq.buckets, tc.series)
 
-		err := mf.flush()
+		err := mf.flush(t.Context())
 		require.NoError(t, err)
 		assert.Equal(t, tc.expPushCalls, pm.timesCalled())
 	}
@@ -192,7 +194,7 @@ func TestFlushWithReservedLabels(t *testing.T) {
 		},
 	})
 
-	err := mf.flush()
+	err := mf.flush(t.Context())
 	require.NoError(t, err)
 
 	loglines := hook.Drain()
@@ -282,7 +284,7 @@ func TestFlushMaxSeriesInBatch(t *testing.T) {
 			},
 		},
 	})
-	err := mf.flush()
+	err := mf.flush(t.Context())
 	require.NoError(t, err)
 
 	require.Len(t, collected, 2)
@@ -327,7 +329,7 @@ func (pm *pusherMock) timesCalled() int {
 	return int(atomic.LoadInt64(&pm.pushCalled))
 }
 
-func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
+func (pm *pusherMock) push(_ context.Context, ms *pbcloud.MetricSet) error {
 	if pm.hook != nil {
 		pm.hook(ms)
 	}
@@ -339,6 +341,81 @@ func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
 	}
 
 	return nil
+}
+
+// TestMetricsFlusherFlushReturnsOnContextCancel ensures a flush returns promptly
+// when its context is cancelled, even while a metric push is blocked on an
+// unresponsive connection. Without this, the final flush at shutdown could keep
+// k6 from exiting.
+func TestMetricsFlusherFlushReturnsOnContextCancel(t *testing.T) {
+	t.Parallel()
+
+	r := metrics.NewRegistry()
+	m1 := r.MustNewMetric("metric1", metrics.Counter)
+
+	logger, _ := testutils.NewLoggerWithHook(t)
+
+	released := make(chan struct{})
+	defer close(released)
+	pm := &blockingPusher{released: released}
+
+	bq := &bucketQ{}
+	mf := metricsFlusher{
+		bq:                   bq,
+		client:               pm,
+		logger:               logger,
+		discardedLabels:      make(map[string]struct{}),
+		maxSeriesInBatch:     1,
+		batchPushConcurrency: 1,
+	}
+
+	for i := range 5 {
+		ts := metrics.TimeSeries{
+			Metric: m1,
+			Tags:   r.RootTagSet().With("key1", "val"+strconv.Itoa(i)),
+		}
+		bq.Push([]timeBucket{
+			{
+				Time: int64(i) + 1,
+				Sinks: map[metrics.TimeSeries]metricValue{
+					ts: &counter{Sum: 1},
+				},
+			},
+		})
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	done := make(chan error, 1)
+	go func() { done <- mf.flush(ctx) }()
+
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, context.Canceled)
+	case <-time.After(2 * time.Second):
+		t.Fatal("flush did not return after context was cancelled (production hang reproduced)")
+	}
+}
+
+// blockingPusher blocks push() until released is closed. It honours context
+// cancellation so flush can interrupt a stuck push.
+type blockingPusher struct {
+	released chan struct{}
+	called   atomic.Int64
+}
+
+func (bp *blockingPusher) push(ctx context.Context, _ *pbcloud.MetricSet) error {
+	bp.called.Add(1)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-bp.released:
+		return nil
+	}
 }
 
 func TestMetricsFlusherErrorCase(t *testing.T) {
@@ -383,7 +460,7 @@ func TestMetricsFlusherErrorCase(t *testing.T) {
 	}
 	require.Len(t, bq.buckets, series)
 
-	err := mf.flush()
+	err := mf.flush(t.Context())
 	require.Error(t, err)
 	// since the push happens concurrently the number of the calls could vary,
 	// but at least one call should happen and it should be less than the

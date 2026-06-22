@@ -1,6 +1,6 @@
 package executor
 
-import "go.k6.io/k6/metrics"
+import "go.k6.io/k6/v2/metrics"
 
 func sumMetricValues(samples chan metrics.SampleContainer, metricName string) (sum float64) { //nolint:unparam
 	for _, sc := range metrics.GetBufferedSamples(samples) {

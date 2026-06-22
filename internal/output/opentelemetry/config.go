@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/mstoykov/envconfig"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -62,17 +62,18 @@ type Config struct {
 	// HTTPExporterURLPath sets the target URL path the OpenTelemetry Exporter
 	HTTPExporterURLPath null.String `json:"httpExporterURLPath" envconfig:"K6_OTEL_HTTP_EXPORTER_URL_PATH"`
 
+	// Username is the User for Basic Auth.
+	HTTPUsername null.String `json:"username" envconfig:"K6_OTEL_HTTP_EXPORTER_USERNAME"`
+
+	// Password is the Password for the Basic Auth.
+	HTTPPassword null.String `json:"password" envconfig:"K6_OTEL_HTTP_EXPORTER_PASSWORD"`
+
 	// GRPCExporterEndpoint sets the target endpoint the OpenTelemetry Exporter
 	// will connect to.
 	GRPCExporterEndpoint null.String `json:"grpcExporterEndpoint" envconfig:"K6_OTEL_GRPC_EXPORTER_ENDPOINT"`
 	// GRPCExporterInsecure disables client transport security for the Exporter's gRPC
 	// connection.
 	GRPCExporterInsecure null.Bool `json:"grpcExporterInsecure" envconfig:"K6_OTEL_GRPC_EXPORTER_INSECURE"`
-
-	// SingleCounterForRate sets the feature flag defining how to export metrics defined as Rate type.
-	// When it is set to true, metrics are exported as a single counter, using an attribute as discriminator.
-	// When the opposite, the old method is used generating two different counters.
-	SingleCounterForRate null.Bool `json:"singleCounterForRate" envconfig:"K6_OTEL_SINGLE_COUNTER_FOR_RATE"`
 }
 
 // GetConsolidatedConfig combines the options' values from the different sources
@@ -123,8 +124,6 @@ func newDefaultConfig() Config {
 
 		ExportInterval: types.NewNullDuration(10*time.Second, false),
 		FlushInterval:  types.NewNullDuration(1*time.Second, false),
-
-		SingleCounterForRate: null.NewBool(true, false),
 	}
 }
 
@@ -194,8 +193,12 @@ func (cfg Config) Apply(v Config) Config {
 		cfg.Headers = v.Headers
 	}
 
-	if v.SingleCounterForRate.Valid {
-		cfg.SingleCounterForRate = v.SingleCounterForRate
+	if v.HTTPUsername.Valid {
+		cfg.HTTPUsername = v.HTTPUsername
+	}
+
+	if v.HTTPPassword.Valid {
+		cfg.HTTPPassword = v.HTTPPassword
 	}
 
 	return cfg

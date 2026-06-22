@@ -22,20 +22,20 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/event"
-	"go.k6.io/k6/internal/js/eventloop"
-	"go.k6.io/k6/internal/lib/consts"
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/js/eventloop"
+	"go.k6.io/k6/v2/internal/lib/consts"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/netext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // Ensure Runner implements the lib.Runner interface
@@ -822,7 +822,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 func (u *ActiveVU) RunOnce() error {
 	select {
 	case <-u.RunContext.Done():
-		return u.RunContext.Err() // we are done, return
+		return lib.ContextErr(u.RunContext) // we are done, return
 	case u.busy <- struct{}{}:
 		// nothing else can run now, and the VU cannot be deactivated
 	}

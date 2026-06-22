@@ -11,8 +11,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -286,12 +288,19 @@ func TestNewSeriesWithK6SinkMeasure(t *testing.T) {
 func TestNewSeriesWithNativeHistogramMeasure(t *testing.T) {
 	t.Parallel()
 
+	// the native-histograms feature flag drives the sink selection
+	o, err := New(output.Params{
+		Logger:   logrus.New(),
+		Features: &features.Flags{NativeHistograms: true},
+	})
+	require.NoError(t, err)
+
 	registry := metrics.NewRegistry()
 	s := metrics.TimeSeries{
 		Metric: registry.MustNewMetric("metric1", metrics.Trend),
 	}
 
-	swm := newSeriesWithMeasure(s, true, nil)
+	swm := newSeriesWithMeasure(s, o.config.TrendAsNativeHistogram.Bool, nil)
 	require.NotNil(t, swm)
 	assert.Equal(t, s, swm.TimeSeries)
 	require.NotNil(t, swm.Measure)

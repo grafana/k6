@@ -17,6 +17,7 @@ func TestCheckResponse(t *testing.T) {
 	tests := []struct {
 		name                string
 		response            *http.Response
+		inputError          error
 		expectResponseError bool
 		expectedError       string
 	}{
@@ -29,6 +30,12 @@ func TestCheckResponse(t *testing.T) {
 			name:          "successful response 200",
 			response:      &http.Response{StatusCode: http.StatusOK},
 			expectedError: "",
+		},
+		{
+			name:          "non-GenericOpenAPIError is returned directly",
+			response:      nil,
+			inputError:    errors.New("network failure"),
+			expectedError: "network failure",
 		},
 		{
 			name: "unauthorized 401 with invalid JSON",
@@ -75,7 +82,7 @@ func TestCheckResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := CheckResponse(tt.response)
+			err := CheckResponse(tt.response, tt.inputError)
 
 			if tt.expectedError == "" && !tt.expectResponseError {
 				assert.NoError(t, err)

@@ -14,9 +14,9 @@ import (
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/cdproto/target"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common/js"
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6error"
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6error"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 // waitForEventType represents the event types that can be used when working
