@@ -55,6 +55,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
 			"AgentSimulator": mi.newAgentSimulator,
+			"ExternalAgent":  mi.newExternalAgent,
 			"fromAgentRun":   mi.fromAgentRun,
 			"judge":          mi.judge,
 		},

@@ -6,13 +6,15 @@ import (
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
 )
 
 // fromAgentRun builds a RunResult from a real agent's recorded trajectory, with
-// no simulation and no model call for the agent. Use it to evaluate your
-// production agent's actual run: capture its final output and the tools it
-// called, pass them here, then assert with check()/expectSequence() and judge().
+// no simulation and no model call for the agent. Use it to evaluate an agent run
+// you already have — a logged production run, a dataset of captured runs, or a
+// transcript you parsed yourself. (To run the agent as part of the k6 test
+// instead, use ExternalAgent.)
 //
 //	input: {
 //	  output, toolCalls: [{ name, input, output }],   // the recorded trajectory
@@ -35,43 +37,85 @@ func (mi *ModuleInstance) fromAgentRun(input sobek.Value) sobek.Value {
 	}
 	o := input.ToObject(rt)
 
-	name := getString(o, "name", defaultAgentName)
 	modelName := getString(o, "model", "")
+	tags := mi.realRunTags(state, getString(o, "name", defaultAgentName), modelName, o.Get("tags"))
 
-	tags := state.Tags.GetCurrentValues().Tags.With("agent", name)
-	if modelName != "" {
-		tags = tags.With("model", modelName)
-	}
-	if ut := o.Get("tags"); ut != nil && !common.IsNullish(ut) {
-		uto := ut.ToObject(rt)
-		for _, k := range uto.Keys() {
-			tags = tags.With(k, uto.Get(k).String())
-		}
-	}
-
-	result := &RunResult{
-		vu:             mi.vu,
-		rt:             rt,
-		metrics:        mi.metrics,
-		tags:           tags,
-		stepReportTool: getString(o, "stepReportTool", defaultStepReportTool),
-		Input:          getString(o, "input", ""),
-		Output:         getString(o, "output", ""),
-		ToolCalls:      parseToolCalls(rt, o.Get("toolCalls")),
-	}
-	result.Steps = getInt(o, "steps", len(result.ToolCalls))
-	result.Duration = getFloat(o, "durationMs", 0)
-
+	toolCalls := parseToolCalls(rt, o.Get("toolCalls"))
 	var inTok, outTok int64
 	if uv := o.Get("usage"); uv != nil && !common.IsNullish(uv) {
 		uo := uv.ToObject(rt)
 		inTok = int64(getInt(uo, "inputTokens", 0))
 		outTok = int64(getInt(uo, "outputTokens", 0))
-		result.Usage = RunUsage{InputTokens: inTok, OutputTokens: outTok}
 	}
 
-	mi.emitRealRunMetrics(result, tags, modelName, inTok, outTok)
+	result := mi.newRealRunResult(rt, realRunData{
+		tags:           tags,
+		stepReportTool: getString(o, "stepReportTool", defaultStepReportTool),
+		input:          getString(o, "input", ""),
+		output:         getString(o, "output", ""),
+		model:          modelName,
+		toolCalls:      toolCalls,
+		inTok:          inTok,
+		outTok:         outTok,
+		durationMs:     getFloat(o, "durationMs", 0),
+		steps:          getInt(o, "steps", len(toolCalls)),
+	})
 	return rt.ToValue(result).ToObject(rt)
+}
+
+// realRunData is the provider-agnostic trajectory used to build a RunResult for
+// both fromAgentRun and ExternalAgent.
+type realRunData struct {
+	tags           *metrics.TagSet
+	stepReportTool string
+	input          string
+	output         string
+	model          string
+	toolCalls      []ToolCall
+	inTok          int64
+	outTok         int64
+	durationMs     float64
+	steps          int
+}
+
+// newRealRunResult builds a RunResult from a real (non-simulated) trajectory and
+// emits its metrics.
+func (mi *ModuleInstance) newRealRunResult(rt *sobek.Runtime, d realRunData) *RunResult {
+	if d.toolCalls == nil {
+		d.toolCalls = []ToolCall{}
+	}
+	result := &RunResult{
+		vu:             mi.vu,
+		rt:             rt,
+		metrics:        mi.metrics,
+		tags:           d.tags,
+		stepReportTool: d.stepReportTool,
+		Input:          d.input,
+		Output:         d.output,
+		ToolCalls:      d.toolCalls,
+		Usage:          RunUsage{InputTokens: d.inTok, OutputTokens: d.outTok},
+		Steps:          d.steps,
+		Duration:       d.durationMs,
+	}
+	mi.emitRealRunMetrics(result, d.tags, d.model, d.inTok, d.outTok)
+	return result
+}
+
+// realRunTags builds the base tag set (agent + model + user tags) for a real run.
+func (mi *ModuleInstance) realRunTags(
+	state *lib.State, name, model string, userTags sobek.Value,
+) *metrics.TagSet {
+	tags := state.Tags.GetCurrentValues().Tags.With("agent", name)
+	if model != "" {
+		tags = tags.With("model", model)
+	}
+	if userTags != nil && !common.IsNullish(userTags) {
+		obj := userTags.ToObject(mi.vu.Runtime())
+		for _, k := range obj.Keys() {
+			tags = tags.With(k, obj.Get(k).String())
+		}
+	}
+	return tags
 }
 
 // emitRealRunMetrics emits the metrics derivable from a provided trajectory.
