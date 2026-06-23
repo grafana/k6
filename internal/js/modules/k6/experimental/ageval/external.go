@@ -3,7 +3,6 @@ package ageval
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -102,20 +101,20 @@ func (a *ExternalAgent) Run(opts sobek.Value) sobek.Value {
 		common.Throw(a.rt, err)
 	}
 
-	output, toolCalls, inTok, outTok := a.parseOutput(stdout)
+	tr := a.parseOutput(stdout)
 	tags := a.mi.realRunTags(state, a.name, a.model, o.Get("tags"))
 
 	result := a.mi.newRealRunResult(a.rt, realRunData{
 		tags:           tags,
 		stepReportTool: a.stepReportTool,
 		input:          input,
-		output:         output,
+		output:         tr.output,
 		model:          a.model,
-		toolCalls:      toolCalls,
-		inTok:          inTok,
-		outTok:         outTok,
+		toolCalls:      tr.toolCalls,
+		inTok:          tr.inTok,
+		outTok:         tr.outTok,
 		durationMs:     float64(elapsed) / float64(time.Millisecond),
-		steps:          len(toolCalls),
+		steps:          len(tr.toolCalls),
 	})
 	return a.rt.ToValue(result).ToObject(a.rt)
 }
@@ -175,155 +174,41 @@ func (a *ExternalAgent) execCommand(input string) (string, time.Duration, error)
 }
 
 // parseOutput turns the command's stdout into a trajectory using the custom
-// parse callback, the built-in format, or (default) the raw text as the output.
-func (a *ExternalAgent) parseOutput(stdout string) (string, []ToolCall, int64, int64) {
+// parse callback, a built-in format adapter, or (default) the raw text as the
+// output.
+func (a *ExternalAgent) parseOutput(stdout string) trajectory {
 	if a.parse != nil {
 		res, err := a.parse(sobek.Undefined(), a.rt.ToValue(stdout))
 		if err != nil {
 			common.Throw(a.rt, fmt.Errorf("ExternalAgent parse callback threw: %w", err))
 		}
-		if res == nil || common.IsNullish(res) {
-			return "", nil, 0, 0
-		}
-		obj := res.ToObject(a.rt)
-		var inTok, outTok int64
-		if uv := obj.Get("usage"); uv != nil && !common.IsNullish(uv) {
-			uo := uv.ToObject(a.rt)
-			inTok = int64(getInt(uo, "inputTokens", 0))
-			outTok = int64(getInt(uo, "outputTokens", 0))
-		}
-		return getString(obj, "output", ""), parseToolCalls(a.rt, obj.Get("toolCalls")), inTok, outTok
+		return trajectoryFromJS(a.rt, res)
 	}
-	if a.format == "claude-code" {
-		return parseClaudeCodeTranscript(stdout)
+	if a.format != "" {
+		adapter, ok := lookupAdapter(a.format)
+		if !ok {
+			common.Throw(a.rt, fmt.Errorf("unknown format %q (supported: %s)",
+				a.format, strings.Join(adapterNames(), ", ")))
+		}
+		return adapter(stdout)
 	}
-	return strings.TrimSpace(stdout), nil, 0, 0
+	return trajectory{output: strings.TrimSpace(stdout)}
 }
 
-// --- Claude Code stream-json transcript parsing ---
-
-type ccBlock struct {
-	Type      string          `json:"type"`
-	Text      string          `json:"text"`
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Input     json.RawMessage `json:"input"`
-	ToolUseID string          `json:"tool_use_id"`
-	Content   json.RawMessage `json:"content"`
-}
-
-type ccEvent struct {
-	Type    string `json:"type"`
-	Message struct {
-		Content []ccBlock `json:"content"`
-	} `json:"message"`
-	Result *string `json:"result"`
-	Usage  *struct {
-		InputTokens   int64 `json:"input_tokens"`
-		OutputTokens  int64 `json:"output_tokens"`
-		CacheRead     int64 `json:"cache_read_input_tokens"`
-		CacheCreation int64 `json:"cache_creation_input_tokens"`
-	} `json:"usage"`
-}
-
-// parseClaudeCodeTranscript parses a Claude Code `--output-format stream-json`
-// transcript (JSONL) into a trajectory, normalizing mcp__<server>__<tool> names.
-func parseClaudeCodeTranscript(jsonl string) (string, []ToolCall, int64, int64) {
-	var (
-		output        string
-		toolCalls     = []ToolCall{}
-		byID          = map[string]int{}
-		inTok, outTok int64
-	)
-	for line := range strings.SplitSeq(jsonl, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		var e ccEvent
-		if json.Unmarshal([]byte(line), &e) != nil {
-			continue
-		}
-		switch e.Type {
-		case "assistant":
-			ccHandleAssistant(e.Message.Content, &toolCalls, byID, &output)
-		case "user":
-			ccHandleToolResults(e.Message.Content, toolCalls, byID)
-		case "result":
-			if e.Result != nil {
-				output = *e.Result
-			}
-			if e.Usage != nil {
-				inTok = e.Usage.InputTokens + e.Usage.CacheRead + e.Usage.CacheCreation
-				outTok = e.Usage.OutputTokens
-			}
-		}
+// trajectoryFromJS converts the object returned by a `parse` callback or passed
+// to fromAgentRun into a trajectory.
+func trajectoryFromJS(rt *sobek.Runtime, v sobek.Value) trajectory {
+	if v == nil || common.IsNullish(v) {
+		return trajectory{}
 	}
-	return output, toolCalls, inTok, outTok
-}
-
-// ccHandleAssistant records tool calls and the latest text from an assistant event.
-func ccHandleAssistant(content []ccBlock, toolCalls *[]ToolCall, byID map[string]int, output *string) {
-	for _, b := range content {
-		switch b.Type {
-		case blockToolUse:
-			input := map[string]any{}
-			if len(b.Input) > 0 {
-				_ = json.Unmarshal(b.Input, &input)
-			}
-			*toolCalls = append(*toolCalls, ToolCall{Name: normalizeMCPToolName(b.Name), Input: input})
-			byID[b.ID] = len(*toolCalls) - 1
-		case blockText:
-			if b.Text != "" {
-				*output = b.Text
-			}
-		}
+	obj := v.ToObject(rt)
+	t := trajectory{output: getString(obj, "output", ""), toolCalls: parseToolCalls(rt, obj.Get("toolCalls"))}
+	if uv := obj.Get("usage"); uv != nil && !common.IsNullish(uv) {
+		uo := uv.ToObject(rt)
+		t.inTok = int64(getInt(uo, "inputTokens", 0))
+		t.outTok = int64(getInt(uo, "outputTokens", 0))
 	}
-}
-
-// ccHandleToolResults attaches tool_result outputs to their matching tool calls.
-func ccHandleToolResults(content []ccBlock, toolCalls []ToolCall, byID map[string]int) {
-	for _, b := range content {
-		if b.Type != blockToolResult {
-			continue
-		}
-		if idx, ok := byID[b.ToolUseID]; ok {
-			toolCalls[idx].Output = stringifyJSONContent(b.Content)
-		}
-	}
-}
-
-// normalizeMCPToolName strips the "mcp__<server>__" prefix Claude Code adds to
-// MCP tool calls, so assertions use the server's own tool names.
-func normalizeMCPToolName(name string) string {
-	parts := strings.Split(name, "__")
-	if len(parts) >= 3 && parts[0] == "mcp" {
-		return strings.Join(parts[2:], "__")
-	}
-	return name
-}
-
-// stringifyJSONContent renders a tool_result `content` (string or array of
-// blocks) as a plain string.
-func stringifyJSONContent(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return ""
-	}
-	var s string
-	if json.Unmarshal(raw, &s) == nil {
-		return s
-	}
-	var blocks []struct {
-		Text string `json:"text"`
-	}
-	if json.Unmarshal(raw, &blocks) == nil {
-		parts := make([]string, 0, len(blocks))
-		for _, b := range blocks {
-			parts = append(parts, b.Text)
-		}
-		return strings.Join(parts, "\n")
-	}
-	return string(raw)
+	return t
 }
 
 func tail(s string, n int) string {

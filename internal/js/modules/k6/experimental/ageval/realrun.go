@@ -2,7 +2,9 @@ package ageval
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/v2/js/common"
@@ -39,28 +41,36 @@ func (mi *ModuleInstance) fromAgentRun(input sobek.Value) sobek.Value {
 
 	modelName := getString(o, "model", "")
 	tags := mi.realRunTags(state, getString(o, "name", defaultAgentName), modelName, o.Get("tags"))
-
-	toolCalls := parseToolCalls(rt, o.Get("toolCalls"))
-	var inTok, outTok int64
-	if uv := o.Get("usage"); uv != nil && !common.IsNullish(uv) {
-		uo := uv.ToObject(rt)
-		inTok = int64(getInt(uo, "inputTokens", 0))
-		outTok = int64(getInt(uo, "outputTokens", 0))
-	}
+	tr := mi.fromAgentRunTrajectory(rt, o)
 
 	result := mi.newRealRunResult(rt, realRunData{
 		tags:           tags,
 		stepReportTool: getString(o, "stepReportTool", defaultStepReportTool),
 		input:          getString(o, "input", ""),
-		output:         getString(o, "output", ""),
+		output:         tr.output,
 		model:          modelName,
-		toolCalls:      toolCalls,
-		inTok:          inTok,
-		outTok:         outTok,
+		toolCalls:      tr.toolCalls,
+		inTok:          tr.inTok,
+		outTok:         tr.outTok,
 		durationMs:     getFloat(o, "durationMs", 0),
-		steps:          getInt(o, "steps", len(toolCalls)),
+		steps:          getInt(o, "steps", len(tr.toolCalls)),
 	})
 	return rt.ToValue(result).ToObject(rt)
+}
+
+// fromAgentRunTrajectory builds the trajectory from either a `format` + `raw`
+// payload (run through the adapter registry) or the explicit
+// `output`/`toolCalls`/`usage` fields.
+func (mi *ModuleInstance) fromAgentRunTrajectory(rt *sobek.Runtime, o *sobek.Object) trajectory {
+	if format := getString(o, "format", ""); format != "" {
+		adapter, ok := lookupAdapter(format)
+		if !ok {
+			common.Throw(rt, fmt.Errorf("unknown format %q (supported: %s)",
+				format, strings.Join(adapterNames(), ", ")))
+		}
+		return adapter(getString(o, "raw", ""))
+	}
+	return trajectoryFromJS(rt, o)
 }
 
 // realRunData is the provider-agnostic trajectory used to build a RunResult for

@@ -32,22 +32,3 @@ func TestExternalAgentCommandFailureThrows(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed")
 }
-
-func TestParseClaudeCodeTranscript(t *testing.T) {
-	t.Parallel()
-	output, toolCalls, inTok, outTok := parseClaudeCodeTranscript(cannedTranscript)
-	assert.Equal(t, "The script is valid.", output)
-	require.Len(t, toolCalls, 1)
-	assert.Equal(t, "validate_script", toolCalls[0].Name)
-	assert.Equal(t, "valid", toolCalls[0].Output)
-	assert.Equal(t, "export default function(){}", toolCalls[0].Input["script"])
-	assert.Equal(t, int64(150), inTok)
-	assert.Equal(t, int64(20), outTok)
-}
-
-func TestNormalizeMCPToolName(t *testing.T) {
-	t.Parallel()
-	assert.Equal(t, "validate_script", normalizeMCPToolName("mcp__k6__validate_script"))
-	assert.Equal(t, "get_documentation", normalizeMCPToolName("mcp__k6__get_documentation"))
-	assert.Equal(t, "Read", normalizeMCPToolName("Read")) // non-MCP tools unchanged
-}
