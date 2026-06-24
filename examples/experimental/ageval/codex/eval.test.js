@@ -43,7 +43,11 @@ export const options = {
 };
 
 export default function () {
-  const res = codex.run({ input: TASK, tags: { case: 'count-go-files' } });
+  const res = codex.run({
+    input: TASK,
+    expectedTools: [{ name: 'shell' }], // graded by expectSequence() below
+    tags: { case: 'count-go-files' },
+  });
 
   check(res, {
     'ran a shell command': (r) => r.calledTool('shell'),
@@ -51,7 +55,7 @@ export default function () {
     'answer contains a number': (r) => /\d/.test(r.output),
   });
 
-  res.expectSequence([{ name: 'shell' }], { mode: 'in-order', allowOtherCalls: true });
+  res.expectSequence();
 
   judge(res, {
     provider: 'anthropic',

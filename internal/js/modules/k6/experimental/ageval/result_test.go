@@ -50,9 +50,9 @@ func TestArgsMatchNumberNormalization(t *testing.T) {
 	assert.True(t, argsMatch(got, nil))
 }
 
-func TestRunResultHelpers(t *testing.T) {
+func TestAgentTestCaseHelpers(t *testing.T) {
 	t.Parallel()
-	r := &RunResult{
+	r := &AgentTestCase{
 		stepReportTool: defaultStepReportTool,
 		ToolCalls: []ToolCall{
 			{Name: "html", Input: map[string]any{}},

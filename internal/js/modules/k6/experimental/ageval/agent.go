@@ -121,9 +121,14 @@ func (a *AgentSimulator) applySkills(v sobek.Value) {
 // runMocks holds per-run tool result overrides (string or JS callable).
 type runMocks map[string]sobek.Value
 
-// Run executes the agent loop synchronously and returns a RunResult. Blocking is
+// Run executes the agent loop synchronously and returns an AgentTestCase. Blocking is
 // intentional and idiomatic (like http.request): we run on the VU goroutine and
 // hold the runtime, so JS mock handlers can be called directly.
+//
+//	run({ input, mocks?, expectedTools?: [{ name, input? }], tags? })
+//
+// expectedTools is attached to the returned AgentTestCase so expectSequence() can
+// grade against it with no argument.
 func (a *AgentSimulator) Run(opts sobek.Value) sobek.Value {
 	state := a.mi.vu.State()
 	if state == nil {
@@ -140,7 +145,7 @@ func (a *AgentSimulator) Run(opts sobek.Value) sobek.Value {
 	mocks := a.parseRunMocks(o.Get("mocks"))
 	tags := a.baseTags(o.Get("tags"))
 
-	result := &RunResult{
+	result := &AgentTestCase{
 		vu:             a.mi.vu,
 		rt:             a.rt,
 		metrics:        a.mi.metrics,
@@ -148,6 +153,7 @@ func (a *AgentSimulator) Run(opts sobek.Value) sobek.Value {
 		stepReportTool: a.stepReportTool,
 		Input:          input,
 		ToolCalls:      []ToolCall{},
+		ExpectedTools:  parseToolCalls(a.rt, o.Get("expectedTools")),
 	}
 
 	start := time.Now()
@@ -170,7 +176,7 @@ func (a *AgentSimulator) Run(opts sobek.Value) sobek.Value {
 // usage. It stops on end_turn, the configured terminalTool, maxSteps, or a turn
 // with no tool calls.
 func (a *AgentSimulator) converse(
-	input string, mocks runMocks, tags *metrics.TagSet, result *RunResult,
+	input string, mocks runMocks, tags *metrics.TagSet, result *AgentTestCase,
 ) (int64, int64) {
 	messages := []message{{role: roleUser, blocks: []block{{kind: blockText, text: input}}}}
 	var totalIn, totalOut int64
@@ -208,7 +214,7 @@ func (a *AgentSimulator) converse(
 // dispatches tools, emits the tool-call metric, and returns the tool-result
 // blocks plus whether the terminal tool was hit.
 func (a *AgentSimulator) handleBlocks(
-	blocks []block, mocks runMocks, tags *metrics.TagSet, result *RunResult, asst *message,
+	blocks []block, mocks runMocks, tags *metrics.TagSet, result *AgentTestCase, asst *message,
 ) ([]block, bool) {
 	var toolResults []block
 	hitTerminal := false

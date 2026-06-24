@@ -1,17 +1,19 @@
 // Package ageval is an experimental k6 module for evaluating tool-using LLM
-// agents. It builds an "ageval test" from an agent's tool-call trajectory in one
-// of two ways:
+// agents. Its single data type is the AgentTestCase
+// LLMTestCase — holding an agent run's input, output, tool calls and usage. You
+// obtain an AgentTestCase in one of three ways:
 //
-//   - AgentSimulator — simulates an agent by running a model loop against a
-//     provider (Anthropic) with mocked tools, so you can exercise a prompt's
-//     behavior without a live backend; or
-//   - fromAgentRun — takes a real agent's recorded output + tool calls directly,
-//     with no simulation, so you can evaluate your production agent's actual run.
+//   - new AgentTestCase({...}) — wrap a recorded trajectory you already have (a logged
+//     production run, a captured dataset, a framework's output, or a raw payload
+//     parsed via a `format` adapter); no agent is run;
+//   - AgentSimulator.run() — an optional producer that simulates an agent by
+//     running a model loop against a provider (Anthropic) with mocked tools; or
+//   - ExternalAgent.run() — an optional producer that runs a real agent CLI as a
+//     subprocess (so the agent runs as part of the k6 test, even under load).
 //
-// Either way it produces a RunResult that scripts assert on with
-// check()/expectSequence() and an LLM-as-judge, and it emits standard k6 metrics
-// (Trend/Rate/Counter) so results visualize in k6 Cloud and Grafana with no extra
-// configuration.
+// All three yield an AgentTestCase that scripts assert on with check()/expectSequence()
+// and an LLM-as-judge, and it emits standard k6 metrics (Trend/Rate/Counter) so
+// results visualize in k6 Cloud and Grafana with no extra configuration.
 package ageval
 
 import (
@@ -54,9 +56,9 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
+			"AgentTestCase":  mi.newAgentTestCase,
 			"AgentSimulator": mi.newAgentSimulator,
 			"ExternalAgent":  mi.newExternalAgent,
-			"fromAgentRun":   mi.fromAgentRun,
 			"judge":          mi.judge,
 		},
 	}

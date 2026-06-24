@@ -97,13 +97,13 @@ func TestAdapterAnthropic(t *testing.T) {
 	assert.Equal(t, int64(9), tr.outTok)
 }
 
-func TestFromAgentRunWithFormatAdapter(t *testing.T) {
+func TestAgentTestCaseWithFormatAdapter(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)
-	// fromAgentRun({ format: 'a2a', raw: <sse> }) should parse via the adapter.
+	// new AgentTestCase({ format: 'a2a', raw: <sse> }) should parse via the adapter.
 	require.NoError(t, ts.rt.VU.Runtime().Set("a2aRaw", a2aFixture))
 	v, err := ts.rt.VU.Runtime().RunString(`
-		const r = fromAgentRun({ format: "a2a", raw: a2aRaw, input: "make a script", tags: { case: "fmt" } });
+		const r = new AgentTestCase({ format: "a2a", raw: a2aRaw, input: "make a script", tags: { case: "fmt" } });
 		[r.calledTool("get_documentation"), r.toolCalls.length, r.output, r.usage.inputTokens];
 	`)
 	require.NoError(t, err)
@@ -122,7 +122,7 @@ func TestFromAgentRunWithFormatAdapter(t *testing.T) {
 func TestUnknownFormatThrows(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)
-	_, err := ts.rt.VU.Runtime().RunString(`fromAgentRun({ format: "nope", raw: "x" });`)
+	_, err := ts.rt.VU.Runtime().RunString(`new AgentTestCase({ format: "nope", raw: "x" });`)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), fmt.Sprintf("unknown format %q", "nope"))
 }

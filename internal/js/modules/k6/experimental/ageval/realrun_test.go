@@ -7,12 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFromAgentRunBuildsResultAndMetrics(t *testing.T) {
+func TestAgentTestCaseBuildsResultAndMetrics(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)
 
 	v, err := ts.rt.VU.Runtime().RunString(`
-		const r = fromAgentRun({
+		const r = new AgentTestCase({
 			model: "claude-sonnet-4-5",
 			output: "Invoice INV-123 is paid.",
 			toolCalls: [
@@ -51,12 +51,12 @@ func TestFromAgentRunBuildsResultAndMetrics(t *testing.T) {
 	assert.InDelta(t, 1000.0/1e6*3+200.0/1e6*15, samples["agent_cost_usd"][0], 1e-12)
 }
 
-func TestFromAgentRunMinimalNoOptionalMetrics(t *testing.T) {
+func TestAgentTestCaseMinimalNoOptionalMetrics(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)
 
 	_, err := ts.rt.VU.Runtime().RunString(`
-		globalThis.r = fromAgentRun({
+		globalThis.r = new AgentTestCase({
 			output: "done",
 			toolCalls: [{ name: "search", input: {}, output: "ok" }],
 		});
@@ -71,17 +71,54 @@ func TestFromAgentRunMinimalNoOptionalMetrics(t *testing.T) {
 	assert.Empty(t, samples["agent_cost_usd"])
 }
 
-func TestFromAgentRunResultIsJudgeable(t *testing.T) {
+func TestAgentTestCaseExpectedToolsFallback(t *testing.T) {
+	t.Parallel()
+	ts := newTestSetup(t)
+
+	v, err := ts.rt.VU.Runtime().RunString(`
+		const expectedTools = [
+			{ name: "get_customer" },
+			{ name: "get_invoice", input: { invoice_id: "INV-123" } },
+		];
+		const good = new AgentTestCase({
+			output: "ok",
+			toolCalls: [
+				{ name: "get_customer", input: { email: "a@b.com" }, output: "{}" },
+				{ name: "get_invoice", input: { invoice_id: "INV-123" }, output: "paid" },
+			],
+			expectedTools,
+		});
+		const bad = new AgentTestCase({
+			output: "ok",
+			toolCalls: [{ name: "get_invoice", input: { invoice_id: "INV-999" }, output: "?" }],
+			expectedTools,
+		});
+		// expectSequence() with NO argument grades against the stored expectedTools.
+		[good.expectSequence(), bad.expectSequence()];
+	`)
+	require.NoError(t, err)
+
+	rt := ts.rt.VU.Runtime()
+	arr := v.ToObject(rt)
+	assert.True(t, arr.Get("0").ToBoolean(), "good run matches expectedTools")
+	assert.False(t, arr.Get("1").ToBoolean(), "bad run fails expectedTools (wrong invoice id)")
+
+	samples := drainSamples(ts.samples)
+	assert.Equal(t, []float64{1, 0}, samples["agent_tool_correctness"])
+}
+
+func TestAgentTestCaseIsJudgeable(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)
 	judgeSrv := cannedServer(t, judgeResponse)
 
 	v, err := ts.rt.VU.Runtime().RunString(`
-		const r = fromAgentRun({
+		const r = new AgentTestCase({
 			output: "Invoice INV-123 is paid.",
 			toolCalls: [{ name: "get_invoice", input: { invoice_id: "INV-123" }, output: "paid" }],
 			tags: { case: "real_judge" },
 		});
+		// Explicit expectSequence([...]) form with exact mode (still supported API).
 		const seqOK = r.expectSequence([{ name: "get_invoice" }], { mode: "exact" });
 		const verdict = judge(r, {
 			model: "claude-sonnet-4-5", apiKey: "jt", baseURL: ` + "`" + judgeSrv.URL + "`" + `,

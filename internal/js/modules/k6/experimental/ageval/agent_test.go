@@ -70,6 +70,9 @@ func TestAgentExpectSequenceEmitsCorrectness(t *testing.T) {
 			tools: [{ name: "echo", description: "d", mock: () => "ok" }],
 		});
 		const r = agent.run({ input: "go" });
+		// Explicit expectSequence([...]) form (still supported, also used by the ABT repo
+		// and the golden example): two different expected sequences on one run exercise
+		// both pass and fail. The no-arg expectedTools form is covered separately.
 		const good = r.expectSequence([{ name: "echo", args: { msg: "hi" } }], { mode: "in-order" });
 		const bad  = r.expectSequence([{ name: "missing" }], { mode: "in-order" });
 		[good, bad];

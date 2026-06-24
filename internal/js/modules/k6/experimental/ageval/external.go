@@ -22,7 +22,7 @@ const (
 )
 
 // ExternalAgent runs a real agent CLI as a subprocess, captures its output, and
-// turns it into a RunResult — so the agent runs as part of a single `k6 run`
+// turns it into an AgentTestCase — so the agent runs as part of a single `k6 run`
 // (no separate capture step). Output is parsed by a built-in `format` (currently
 // "claude-code") or a custom `parse(stdout)` JS callback.
 type ExternalAgent struct {
@@ -81,7 +81,12 @@ func (mi *ModuleInstance) newExternalAgent(call sobek.ConstructorCall) *sobek.Ob
 }
 
 // Run executes the agent command with the given input, parses its output, and
-// returns a RunResult. Blocking (like http.request) — runs on the VU goroutine.
+// returns an AgentTestCase. Blocking (like http.request) — runs on the VU goroutine.
+//
+//	run({ input, expectedTools?: [{ name, input? }], tags? })
+//
+// expectedTools is attached to the returned AgentTestCase so expectSequence() can
+// grade against it with no argument.
 func (a *ExternalAgent) Run(opts sobek.Value) sobek.Value {
 	state := a.mi.vu.State()
 	if state == nil {
@@ -104,7 +109,7 @@ func (a *ExternalAgent) Run(opts sobek.Value) sobek.Value {
 	tr := a.parseOutput(stdout)
 	tags := a.mi.realRunTags(state, a.name, a.model, o.Get("tags"))
 
-	result := a.mi.newRealRunResult(a.rt, realRunData{
+	result := a.mi.newRealAgentTestCase(a.rt, realRunData{
 		tags:           tags,
 		stepReportTool: a.stepReportTool,
 		input:          input,
@@ -116,6 +121,7 @@ func (a *ExternalAgent) Run(opts sobek.Value) sobek.Value {
 		durationMs:     float64(elapsed) / float64(time.Millisecond),
 		steps:          len(tr.toolCalls),
 	})
+	result.ExpectedTools = parseToolCalls(a.rt, o.Get("expectedTools"))
 	return a.rt.ToValue(result).ToObject(a.rt)
 }
 
@@ -196,7 +202,7 @@ func (a *ExternalAgent) parseOutput(stdout string) trajectory {
 }
 
 // trajectoryFromJS converts the object returned by a `parse` callback or passed
-// to fromAgentRun into a trajectory.
+// to new AgentTestCase({...}) into a trajectory.
 func trajectoryFromJS(rt *sobek.Runtime, v sobek.Value) trajectory {
 	if v == nil || common.IsNullish(v) {
 		return trajectory{}

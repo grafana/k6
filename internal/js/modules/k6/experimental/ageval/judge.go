@@ -20,7 +20,7 @@ type judgeResult struct {
 	Passed bool    `js:"passed"`
 }
 
-// judge runs an LLM-as-judge (GEval-style) over a RunResult: it scores the
+// judge runs an LLM-as-judge (GEval-style) over an AgentTestCase: it scores the
 // agent's behavior against a natural-language rubric on a 0..1 scale, emits the
 // agent_quality_score (Trend) and agent_judge_pass (Rate) metrics, and returns
 // `{ score, reason, passed }`.
@@ -55,7 +55,7 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	}
 	threshold := getFloat(o, "threshold", defaultJudgeThreshold)
 
-	rr := mi.exportRunResult(resultVal)
+	rr := mi.exportAgentTestCase(resultVal)
 	// The task/prompt the agent was given. Default to the run's own input so the
 	// judge always sees what the agent was asked to do, not just what it did.
 	input := getString(o, "input", "")
@@ -92,25 +92,25 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	return rt.ToValue(judgeResult{Score: score, Reason: reason, Passed: passed}).ToObject(rt)
 }
 
-// exportRunResult recovers the *RunResult wrapped in a JS value, or nil.
-func (mi *ModuleInstance) exportRunResult(v sobek.Value) *RunResult {
+// exportAgentTestCase recovers the *AgentTestCase wrapped in a JS value, or nil.
+func (mi *ModuleInstance) exportAgentTestCase(v sobek.Value) *AgentTestCase {
 	if v == nil || common.IsNullish(v) {
 		return nil
 	}
-	if rr, ok := v.Export().(*RunResult); ok {
+	if rr, ok := v.Export().(*AgentTestCase); ok {
 		return rr
 	}
 	return nil
 }
 
-func (mi *ModuleInstance) judgeTags(rr *RunResult) *metrics.TagSet {
+func (mi *ModuleInstance) judgeTags(rr *AgentTestCase) *metrics.TagSet {
 	if rr != nil && rr.tags != nil {
 		return rr.tags
 	}
 	return mi.vu.State().Tags.GetCurrentValues().Tags
 }
 
-func serializeTrajectory(rr *RunResult) string {
+func serializeTrajectory(rr *AgentTestCase) string {
 	var sb strings.Builder
 	for i, c := range rr.ToolCalls {
 		args, err := json.Marshal(c.Input)

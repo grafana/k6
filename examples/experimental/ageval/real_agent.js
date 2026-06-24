@@ -12,7 +12,7 @@
 //
 //   ANTHROPIC_API_KEY_JUDGE=sk-...  k6 run real_agent.js
 import { check } from 'k6';
-import { fromAgentRun, judge } from 'k6/experimental/ageval';
+import { AgentTestCase, judge } from 'k6/experimental/ageval';
 
 export const options = {
   vus: 1,
@@ -35,13 +35,14 @@ const recordedRun = {
     { name: 'get_customer', input: { email: 'alice@example.com' }, output: '{"id":"cust_123","plan":"Pro"}' },
     { name: 'get_invoice', input: { invoice_id: 'INV-123' }, output: '{"status":"paid","amount":99}' },
   ],
+  expectedTools: [{ name: 'get_customer' }, { name: 'get_invoice', input: { invoice_id: 'INV-123' } }],
   usage: { inputTokens: 1500, outputTokens: 120 }, // optional
   durationMs: 5300, // optional
   tags: { case: 'invoice_paid', source: 'production' },
 };
 
 export default function () {
-  const res = fromAgentRun(recordedRun);
+  const res = new AgentTestCase(recordedRun);
 
   check(res, {
     'called get_customer': (r) => r.calledTool('get_customer'),
@@ -50,10 +51,7 @@ export default function () {
     'hides internal id': (r) => !/cust_123/.test(r.output),
   });
 
-  res.expectSequence(
-    [{ name: 'get_customer' }, { name: 'get_invoice', args: { invoice_id: 'INV-123' } }],
-    { mode: 'in-order', allowOtherCalls: true },
-  );
+  res.expectSequence();
 
   judge(res, {
     provider: 'anthropic',

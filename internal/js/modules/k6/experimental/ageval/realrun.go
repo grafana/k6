@@ -12,38 +12,43 @@ import (
 	"go.k6.io/k6/v2/metrics"
 )
 
-// fromAgentRun builds a RunResult from a real agent's recorded trajectory, with
-// no simulation and no model call for the agent. Use it to evaluate an agent run
-// you already have — a logged production run, a dataset of captured runs, or a
-// transcript you parsed yourself. (To run the agent as part of the k6 test
-// instead, use ExternalAgent.)
+// newAgentTestCase is the `new AgentTestCase({...})` constructor: it builds an AgentTestCase
+// from a recorded agent trajectory — no simulation, no agent model call.
+// Use it to evaluate a run you already have
+// (a logged production run, a captured dataset, a framework shim's output, or a
+// raw payload parsed via `format`). To run the agent as part of the k6 test
+// instead, use a producer (AgentSimulator / ExternalAgent) — they return an
+// AgentTestCase too, so everything downstream (check/expectSequence/judge) is identical.
 //
-//	input: {
-//	  output, toolCalls: [{ name, input, output }],   // the recorded trajectory
-//	  input?,                                          // the task/prompt the agent was given (used by judge)
-//	  model?, usage?: { inputTokens, outputTokens },  // optional, enables token/cost metrics
+//	new AgentTestCase({
+//	  output, toolCalls: [{ name, input, output }],    // the recorded trajectory
+//	  input?,                                           // the task/prompt the agent was given (used by judge)
+//	  expectedTools?: [{ name, input? }],               // graded by expectSequence() called with no argument
+//	  model?, usage?: { inputTokens, outputTokens },    // optional, enables token/cost metrics
 //	  durationMs?, steps?, name?, stepReportTool?, tags?,
-//	}
+//	  format?, raw?,                                    // alternative: parse a raw payload via an adapter
+//	})
 //
 // It emits the same k6 metrics as a simulated run for whatever data is provided
 // (always agent_tool_calls; agent_duration/steps/tokens/cost when supplied), so
-// real and simulated runs share the same dashboards and thresholds.
-func (mi *ModuleInstance) fromAgentRun(input sobek.Value) sobek.Value {
+// recorded and simulated runs share the same dashboards and thresholds.
+func (mi *ModuleInstance) newAgentTestCase(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 	state := mi.vu.State()
 	if state == nil {
 		common.Throw(rt, errInitContext)
 	}
-	if input == nil || common.IsNullish(input) {
-		common.Throw(rt, errors.New("fromAgentRun() requires an object with `output` and/or `toolCalls`"))
+	arg := call.Argument(0)
+	if common.IsNullish(arg) {
+		common.Throw(rt, errors.New("new AgentTestCase() requires an object with `output` and/or `toolCalls`"))
 	}
-	o := input.ToObject(rt)
+	o := arg.ToObject(rt)
 
 	modelName := getString(o, "model", "")
 	tags := mi.realRunTags(state, getString(o, "name", defaultAgentName), modelName, o.Get("tags"))
-	tr := mi.fromAgentRunTrajectory(rt, o)
+	tr := mi.trajectoryFromConfig(rt, o)
 
-	result := mi.newRealRunResult(rt, realRunData{
+	result := mi.newRealAgentTestCase(rt, realRunData{
 		tags:           tags,
 		stepReportTool: getString(o, "stepReportTool", defaultStepReportTool),
 		input:          getString(o, "input", ""),
@@ -55,13 +60,14 @@ func (mi *ModuleInstance) fromAgentRun(input sobek.Value) sobek.Value {
 		durationMs:     getFloat(o, "durationMs", 0),
 		steps:          getInt(o, "steps", len(tr.toolCalls)),
 	})
+	result.ExpectedTools = parseToolCalls(rt, o.Get("expectedTools"))
 	return rt.ToValue(result).ToObject(rt)
 }
 
-// fromAgentRunTrajectory builds the trajectory from either a `format` + `raw`
+// trajectoryFromConfig builds the trajectory from either a `format` + `raw`
 // payload (run through the adapter registry) or the explicit
 // `output`/`toolCalls`/`usage` fields.
-func (mi *ModuleInstance) fromAgentRunTrajectory(rt *sobek.Runtime, o *sobek.Object) trajectory {
+func (mi *ModuleInstance) trajectoryFromConfig(rt *sobek.Runtime, o *sobek.Object) trajectory {
 	if format := getString(o, "format", ""); format != "" {
 		adapter, ok := lookupAdapter(format)
 		if !ok {
@@ -73,8 +79,8 @@ func (mi *ModuleInstance) fromAgentRunTrajectory(rt *sobek.Runtime, o *sobek.Obj
 	return trajectoryFromJS(rt, o)
 }
 
-// realRunData is the provider-agnostic trajectory used to build a RunResult for
-// both fromAgentRun and ExternalAgent.
+// realRunData is the provider-agnostic trajectory used to build an AgentTestCase for
+// both new AgentTestCase and ExternalAgent.
 type realRunData struct {
 	tags           *metrics.TagSet
 	stepReportTool string
@@ -88,13 +94,13 @@ type realRunData struct {
 	steps          int
 }
 
-// newRealRunResult builds a RunResult from a real (non-simulated) trajectory and
+// newRealAgentTestCase builds an AgentTestCase from a real (non-simulated) trajectory and
 // emits its metrics.
-func (mi *ModuleInstance) newRealRunResult(rt *sobek.Runtime, d realRunData) *RunResult {
+func (mi *ModuleInstance) newRealAgentTestCase(rt *sobek.Runtime, d realRunData) *AgentTestCase {
 	if d.toolCalls == nil {
 		d.toolCalls = []ToolCall{}
 	}
-	result := &RunResult{
+	result := &AgentTestCase{
 		vu:             mi.vu,
 		rt:             rt,
 		metrics:        mi.metrics,
@@ -130,7 +136,7 @@ func (mi *ModuleInstance) realRunTags(
 
 // emitRealRunMetrics emits the metrics derivable from a provided trajectory.
 func (mi *ModuleInstance) emitRealRunMetrics(
-	result *RunResult, tags *metrics.TagSet, modelName string, inTok, outTok int64,
+	result *AgentTestCase, tags *metrics.TagSet, modelName string, inTok, outTok int64,
 ) {
 	for _, c := range result.ToolCalls {
 		pushSample(mi.vu, mi.metrics.toolCalls, tags.With("tool", c.Name), 1)

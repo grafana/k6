@@ -22,25 +22,31 @@ type RunUsage struct {
 	OutputTokens int64 `js:"outputTokens"`
 }
 
-// RunResult is the outcome of Agent.run(), exposed to JS. Exported fields become
-// camelCase properties; exported methods become camelCase methods.
-type RunResult struct {
+// AgentTestCase is the single agent-evaluation data container, exposed to JS.
+// It holds an agent run's input, produced
+// output, recorded tool calls and usage, plus the optional expectedTools to grade
+// against. It is obtained either directly (`new AgentTestCase({...})`) or from a
+// producer (`AgentSimulator.run()`, `ExternalAgent.run()`), and is the value that
+// check/expectSequence/judge operate on. Exported fields become camelCase
+// properties; exported methods become camelCase methods.
+type AgentTestCase struct {
 	vu             modules.VU
 	rt             *sobek.Runtime
 	metrics        *agevalMetrics
 	tags           *metrics.TagSet
 	stepReportTool string
 
-	Input     string     `js:"input"`
-	Output    string     `js:"output"`
-	ToolCalls []ToolCall `js:"toolCalls"`
-	Usage     RunUsage   `js:"usage"`
-	Steps     int        `js:"steps"`
-	Duration  float64    `js:"duration"`
+	Input         string     `js:"input"`
+	Output        string     `js:"output"`
+	ToolCalls     []ToolCall `js:"toolCalls"`
+	ExpectedTools []ToolCall `js:"expectedTools"`
+	Usage         RunUsage   `js:"usage"`
+	Steps         int        `js:"steps"`
+	Duration      float64    `js:"duration"`
 }
 
 // CalledTool reports whether a tool with the given name was called at least once.
-func (r *RunResult) CalledTool(name string) bool {
+func (r *AgentTestCase) CalledTool(name string) bool {
 	for _, c := range r.ToolCalls {
 		if c.Name == name {
 			return true
@@ -50,7 +56,7 @@ func (r *RunResult) CalledTool(name string) bool {
 }
 
 // CallsOf returns every recorded call to the named tool, in order.
-func (r *RunResult) CallsOf(name string) []ToolCall {
+func (r *AgentTestCase) CallsOf(name string) []ToolCall {
 	out := []ToolCall{}
 	for _, c := range r.ToolCalls {
 		if c.Name == name {
@@ -61,7 +67,7 @@ func (r *RunResult) CallsOf(name string) []ToolCall {
 }
 
 // ToolSequence returns the ordered list of tool names called during the run.
-func (r *RunResult) ToolSequence() []string {
+func (r *AgentTestCase) ToolSequence() []string {
 	out := make([]string, 0, len(r.ToolCalls))
 	for _, c := range r.ToolCalls {
 		out = append(out, c.Name)
@@ -70,12 +76,12 @@ func (r *RunResult) ToolSequence() []string {
 }
 
 // StepReports returns the calls the agent made to its step-reporting tool.
-func (r *RunResult) StepReports() []ToolCall {
+func (r *AgentTestCase) StepReports() []ToolCall {
 	return r.CallsOf(r.stepReportTool)
 }
 
 // FailedSteps returns the step reports whose `success` field is false.
-func (r *RunResult) FailedSteps() []ToolCall {
+func (r *AgentTestCase) FailedSteps() []ToolCall {
 	out := []ToolCall{}
 	for _, c := range r.StepReports() {
 		if success, ok := c.Input["success"].(bool); ok && !success {
@@ -99,8 +105,13 @@ type expectedCall struct {
 //     actual calls. With allowOtherCalls=false, no tool outside the expected set
 //     may be called.
 //   - mode "exact": the actual sequence must equal expected one-to-one, in order.
-func (r *RunResult) ExpectSequence(expected sobek.Value, opts sobek.Value) bool {
+func (r *AgentTestCase) ExpectSequence(expected sobek.Value, opts sobek.Value) bool {
 	exp := r.parseExpected(expected)
+	if len(exp) == 0 && (expected == nil || sobek.IsUndefined(expected) || sobek.IsNull(expected)) {
+		for _, tc := range r.ExpectedTools {
+			exp = append(exp, expectedCall{name: tc.Name, args: tc.Input})
+		}
+	}
 	mode, allowOther := "in-order", true
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		o := opts.ToObject(r.rt)
@@ -122,7 +133,7 @@ func (r *RunResult) ExpectSequence(expected sobek.Value, opts sobek.Value) bool 
 	return ok
 }
 
-func (r *RunResult) parseExpected(expected sobek.Value) []expectedCall {
+func (r *AgentTestCase) parseExpected(expected sobek.Value) []expectedCall {
 	out := []expectedCall{}
 	if expected == nil || sobek.IsUndefined(expected) || sobek.IsNull(expected) {
 		return out
@@ -143,8 +154,14 @@ func (r *RunResult) parseExpected(expected sobek.Value) []expectedCall {
 		if v := obj.Get("name"); v != nil {
 			ec.name = v.String()
 		}
-		if v := obj.Get("args"); v != nil && !sobek.IsUndefined(v) && !sobek.IsNull(v) {
-			if m, ok := v.Export().(map[string]any); ok {
+		// Accept either `args` (expectSequence's explicit form) or `input` (the
+		// toolCalls/expectedTools shape) for the expected arguments.
+		argsVal := obj.Get("args")
+		if argsVal == nil || sobek.IsUndefined(argsVal) || sobek.IsNull(argsVal) {
+			argsVal = obj.Get("input")
+		}
+		if argsVal != nil && !sobek.IsUndefined(argsVal) && !sobek.IsNull(argsVal) {
+			if m, ok := argsVal.Export().(map[string]any); ok {
 				ec.args = m
 			}
 		}

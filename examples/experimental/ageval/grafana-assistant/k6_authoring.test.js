@@ -3,7 +3,7 @@
 //
 // k6 calls the assistant directly (POST /api/v1/a2a, A2A/JSON-RPC, SSE), parses
 // the streamed trajectory (step.toolCall / step.message / step.complete) into the
-// ageval shape, then grades it with fromAgentRun + check/expectSequence/judge —
+// ageval shape, then grades it with AgentTestCase + check/expectSequence/judge —
 // emitting the standard agent_* metrics. Because it runs in k6, you can also run
 // it under VUs/ramping to measure the assistant's quality + latency/cost under
 // concurrency.
@@ -19,7 +19,7 @@
 import http from 'k6/http';
 import { check } from 'k6';
 import encoding from 'k6/encoding';
-import { fromAgentRun, judge } from 'k6/experimental/ageval';
+import { AgentTestCase, judge } from 'k6/experimental/ageval';
 
 const A2A_URL = __ENV.A2A_URL || 'http://localhost:9191/api/v1/a2a';
 const TASK =
@@ -150,7 +150,7 @@ export default function () {
   const body = callAssistant(TASK);
   const run = parseA2A(body);
 
-  const res = fromAgentRun({
+  const res = new AgentTestCase({
     name: 'grafana-assistant',
     input: TASK,
     output: run.output,

@@ -8,7 +8,7 @@ import (
 
 // trajectory is the normalized agent run an adapter produces from a raw payload.
 // It is the single intermediate shape that every wire format maps into before
-// becoming a RunResult.
+// becoming an AgentTestCase.
 type trajectory struct {
 	output    string
 	toolCalls []ToolCall

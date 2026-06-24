@@ -45,7 +45,11 @@ export const options = {
 };
 
 export default function () {
-  const res = claude.run({ input: TASK, tags: { case: 'count-go-files' } });
+  const res = claude.run({
+    input: TASK,
+    expectedTools: [{ name: 'Glob' }], // graded by expectSequence() below
+    tags: { case: 'count-go-files' },
+  });
 
   check(res, {
     'used a file-search tool (Glob)': (r) => r.calledTool('Glob'),
@@ -53,7 +57,7 @@ export default function () {
     'answer contains a number': (r) => /\d/.test(r.output),
   });
 
-  res.expectSequence([{ name: 'Glob' }], { mode: 'in-order', allowOtherCalls: true });
+  res.expectSequence();
 
   judge(res, {
     provider: 'anthropic',

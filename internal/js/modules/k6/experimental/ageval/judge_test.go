@@ -58,7 +58,7 @@ func TestJudgeIncludesRunInputInPrompt(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	_, err := ts.rt.VU.Runtime().RunString(fmt.Sprintf(`
-		const r = fromAgentRun({
+		const r = new AgentTestCase({
 			input: "Count the go files in the repo",
 			output: "There are 18 go files.",
 			toolCalls: [{ name: "Glob", input: { pattern: "*.go" }, output: "18 files" }],

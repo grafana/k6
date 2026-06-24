@@ -59,6 +59,8 @@ const supportAgent = new AgentSimulator({
 export default function () {
   const res = supportAgent.run({
     input: 'Was invoice INV-123 for alice@example.com paid?',
+    // expectedTools (≈ DeepEval's expected_tools) is graded by expectSequence() below.
+    expectedTools: [{ name: 'get_customer' }, { name: 'get_invoice' }],
     tags: { case: 'invoice_paid' },
   });
 
@@ -69,10 +71,8 @@ export default function () {
     'hides internal id': (r) => !/cust_123/.test(r.output),
   });
 
-  res.expectSequence(
-    [{ name: 'get_customer' }, { name: 'get_invoice' }],
-    { mode: 'in-order', allowOtherCalls: true },
-  );
+  // No argument → grade the trajectory against res.expectedTools (in-order).
+  res.expectSequence();
 
   judge(res, {
     provider: 'anthropic',

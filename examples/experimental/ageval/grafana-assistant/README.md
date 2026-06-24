@@ -4,7 +4,7 @@ This evaluates the **real Grafana Assistant** — its "k6 Script Authoring" beha
 by calling its local **A2A REST endpoint** from k6 and grading the result with
 `k6/experimental/ageval`. One `k6 run`: k6 POSTs the A2A `message/stream` request,
 parses the SSE trajectory (`step.toolCall` / `step.message` / `step.complete`) into
-`{output, toolCalls, usage}`, feeds it to `fromAgentRun`, and grades with
+`{output, toolCalls, usage}`, wraps it in `new AgentTestCase(...)`, and grades with
 `check` + an LLM-as-judge — emitting the standard `agent_*` metrics (and you can
 run it under VUs to measure quality + latency/cost under load).
 
