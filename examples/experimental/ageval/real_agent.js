@@ -54,6 +54,10 @@ export default function () {
   res.expectSequence();
 
   judge(res, {
+    // name tags agent_quality_score / agent_judge_pass with metric:"answer_quality",
+    // so multiple judge() rubrics stay distinguishable in dashboards. The judge's own
+    // spend is emitted separately as agent_judge_cost_usd / agent_judge_tokens.
+    name: 'answer_quality',
     provider: 'anthropic',
     model: 'claude-haiku-4-5',
     apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE || __ENV.ANTHROPIC_API_KEY,

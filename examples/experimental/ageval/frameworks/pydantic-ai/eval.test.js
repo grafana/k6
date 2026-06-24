@@ -40,7 +40,6 @@ export const options = {
 };
 
 export default function () {
-  // expectedTools (≈ DeepEval's expected_tools) is attached to the produced
   // AgentTestCase, then graded by expectSequence() with no argument below.
   const res = agent.run({
     input: TASK,

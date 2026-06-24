@@ -11,6 +11,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestJudgeNameTagAndCost(t *testing.T) {
+	t.Parallel()
+	ts := newTestSetup(t)
+	srv := cannedServer(t, judgeResponse) // usage: 3 input / 4 output tokens
+
+	_, err := ts.rt.VU.Runtime().RunString(fmt.Sprintf(`
+		const r = new AgentTestCase({ input: "q", output: "Invoice INV-123 is paid." });
+		judge(r, {
+			name: "answer_quality",
+			model: "claude-sonnet-4-5", apiKey: "jt", baseURL: %q,
+			rubric: "The answer states the invoice is paid.",
+		});
+	`, srv.URL))
+	require.NoError(t, err)
+
+	type tagged struct {
+		value float64
+		tags  map[string]string
+	}
+	got := map[string][]tagged{}
+	for done := false; !done; {
+		select {
+		case sc := <-ts.samples:
+			for _, s := range sc.GetSamples() {
+				got[s.Metric.Name] = append(got[s.Metric.Name], tagged{s.Value, s.GetTags().Map()})
+			}
+		default:
+			done = true
+		}
+	}
+
+	// (1) the score/pass metrics carry the metric=<name> tag.
+	require.Len(t, got["agent_quality_score"], 1)
+	assert.Equal(t, "answer_quality", got["agent_quality_score"][0].tags["metric"])
+	require.Len(t, got["agent_judge_pass"], 1)
+	assert.Equal(t, "answer_quality", got["agent_judge_pass"][0].tags["metric"])
+
+	// (2) the judge's own spend is emitted, tagged with the judge model.
+	require.Len(t, got["agent_judge_tokens"], 2) // input + output
+	require.Len(t, got["agent_judge_cost_usd"], 1)
+	assert.Equal(t, "claude-sonnet-4-5", got["agent_judge_cost_usd"][0].tags["model"])
+	// cost = 3/1e6*3 + 4/1e6*15 (sonnet-4-5 pricing $3/$15 per Mtok)
+	assert.InDelta(t, 3.0/1e6*3+4.0/1e6*15, got["agent_judge_cost_usd"][0].value, 1e-12)
+}
+
 func TestJudgeScoresAndEmitsMetrics(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)

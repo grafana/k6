@@ -19,6 +19,8 @@ type agevalMetrics struct {
 	toolCorrectness *metrics.Metric // Rate: expectSequence pass/fail
 	qualityScore    *metrics.Metric // Trend: LLM-as-judge score 0..1
 	judgePass       *metrics.Metric // Rate: judge score >= threshold
+	judgeTokens     *metrics.Metric // Counter: judge model tokens, tagged by direction
+	judgeCost       *metrics.Metric // Counter: estimated USD spend by the judge itself
 }
 
 // registerMetrics creates (or reuses) the module metrics in the registry.
@@ -32,6 +34,8 @@ func registerMetrics(registry *metrics.Registry) *agevalMetrics {
 		toolCorrectness: registry.MustNewMetric("agent_tool_correctness", metrics.Rate),
 		qualityScore:    registry.MustNewMetric("agent_quality_score", metrics.Trend),
 		judgePass:       registry.MustNewMetric("agent_judge_pass", metrics.Rate),
+		judgeTokens:     registry.MustNewMetric("agent_judge_tokens", metrics.Counter),
+		judgeCost:       registry.MustNewMetric("agent_judge_cost_usd", metrics.Counter),
 	}
 }
 

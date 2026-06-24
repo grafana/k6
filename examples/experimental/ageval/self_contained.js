@@ -59,7 +59,6 @@ const supportAgent = new AgentSimulator({
 export default function () {
   const res = supportAgent.run({
     input: 'Was invoice INV-123 for alice@example.com paid?',
-    // expectedTools (≈ DeepEval's expected_tools) is graded by expectSequence() below.
     expectedTools: [{ name: 'get_customer' }, { name: 'get_invoice' }],
     tags: { case: 'invoice_paid' },
   });

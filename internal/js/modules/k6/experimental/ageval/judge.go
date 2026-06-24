@@ -25,7 +25,12 @@ type judgeResult struct {
 // agent_quality_score (Trend) and agent_judge_pass (Rate) metrics, and returns
 // `{ score, reason, passed }`.
 //
-// opts: { provider, model, apiKey, rubric, threshold?, input?, actualOutput?, baseURL? }
+// `name` tags agent_quality_score / agent_judge_pass with metric=<name> so several
+// judge() calls (different rubrics) are distinguishable in dashboards. The judge's
+// own spend is emitted as agent_judge_tokens / agent_judge_cost_usd, tagged with the
+// judge model (separate from the agent's agent_tokens / agent_cost_usd).
+//
+// opts: { provider, model, apiKey, rubric, name?, threshold?, input?, actualOutput?, baseURL? }
 func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.Value {
 	rt := mi.vu.Runtime()
 	if mi.vu.State() == nil {
@@ -82,14 +87,34 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	passed := score >= threshold
 
 	tags := mi.judgeTags(rr)
+	if name := getString(o, "name", ""); name != "" {
+		tags = tags.With("metric", name)
+	}
 	pushSample(mi.vu, mi.metrics.qualityScore, tags, score)
 	passVal := 0.0
 	if passed {
 		passVal = 1
 	}
 	pushSample(mi.vu, mi.metrics.judgePass, tags, passVal)
+	mi.emitJudgeCost(tags, prov, modelName, rep.usage)
 
 	return rt.ToValue(judgeResult{Score: score, Reason: reason, Passed: passed}).ToObject(rt)
+}
+
+// emitJudgeCost records the judge model's own token usage and estimated USD spend
+// (distinct from the agent's). It tags the samples with the judge model so judge
+// spend is attributable separately from agent spend.
+func (mi *ModuleInstance) emitJudgeCost(tags *metrics.TagSet, prov provider, modelName string, u usage) {
+	if u.inputTokens == 0 && u.outputTokens == 0 {
+		return
+	}
+	jt := tags.With("model", modelName)
+	pushSample(mi.vu, mi.metrics.judgeTokens, jt.With("direction", "input"), float64(u.inputTokens))
+	pushSample(mi.vu, mi.metrics.judgeTokens, jt.With("direction", "output"), float64(u.outputTokens))
+	if info, ok := prov.model(modelName); ok {
+		cost := float64(u.inputTokens)/1e6*info.inUSDPerMTok + float64(u.outputTokens)/1e6*info.outUSDPerMTok
+		pushSample(mi.vu, mi.metrics.judgeCost, jt, cost)
+	}
 }
 
 // exportAgentTestCase recovers the *AgentTestCase wrapped in a JS value, or nil.
