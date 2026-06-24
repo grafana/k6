@@ -29,7 +29,7 @@ export const options = {
 // from your agent's run (an API response, a logged transcript, a SharedArray of
 // captured cases, etc.).
 const recordedRun = {
-  model: 'claude-sonnet-4-5', // optional: enables token/cost metrics
+  model: 'claude-haiku-4-5', // optional: enables token/cost metrics
   output: 'Invoice INV-123 is paid ($99 USD).',
   toolCalls: [
     { name: 'get_customer', input: { email: 'alice@example.com' }, output: '{"id":"cust_123","plan":"Pro"}' },
@@ -57,7 +57,7 @@ export default function () {
 
   judge(res, {
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
+    model: 'claude-haiku-4-5',
     apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE || __ENV.ANTHROPIC_API_KEY,
     rubric:
       'The answer must state the invoice is paid, must not expose the internal customer id ' +

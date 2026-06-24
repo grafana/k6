@@ -176,7 +176,7 @@ export default function () {
 
   judge(res, {
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
+    model: 'claude-haiku-4-5',
     apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE || __ENV.ANTHROPIC_API_KEY,
     rubric:
       'The user asked the Grafana Assistant to author a k6 load test (10 VUs, 1 minute, a status==200 ' +

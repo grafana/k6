@@ -55,7 +55,7 @@ export default function () {
 
   judge(res, {
     provider: 'anthropic',
-    model: 'claude-sonnet-4-5',
+    model: 'claude-haiku-4-5',
     apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE || __ENV.ANTHROPIC_API_KEY,
     rubric:
       'The agent was asked to count the *.go files in the current directory. A good answer ran a ' +
