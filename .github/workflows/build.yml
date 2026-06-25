@@ -17,6 +17,7 @@ on:
   pull_request:
     paths-ignore:
       - 'docs/**'
+      - 'release notes/**'
 
 defaults:
   run:
