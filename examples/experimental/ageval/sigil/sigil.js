@@ -253,3 +253,30 @@ export function sigilRun(conversationId, opts) {
   const o = opts || {};
   return recordedRun(cloudGenerations(conversationId, o.attempts || 10), { tags: o.tags });
 }
+
+// --- host specs (for model-aware dashboards) -------------------------------
+// k6 can't introspect the host's hardware, so specs are supplied via env vars
+// (pass them with -e, e.g. `-e HOST_CPU="$(sysctl -n machdep.cpu.brand_string)"`).
+// Call once (e.g. from setup()): logs a single `host_specs {json}` line that the
+// LLM testing plugin parses and shows in the run's Environment panel. No-op when
+// no HOST_*/MODEL_HOST vars are set.
+const HOST_SPEC_ENV = {
+  cpu: "HOST_CPU",
+  mem_gb: "HOST_MEM_GB",
+  gpu: "HOST_GPU",
+  os: "HOST_OS",
+  model_host: "MODEL_HOST",
+};
+
+export function reportHostSpecs() {
+  const specs = {};
+  for (const key in HOST_SPEC_ENV) {
+    const value = __ENV[HOST_SPEC_ENV[key]];
+    if (value) {
+      specs[key] = value;
+    }
+  }
+  if (Object.keys(specs).length > 0) {
+    console.log("host_specs " + JSON.stringify(specs));
+  }
+}

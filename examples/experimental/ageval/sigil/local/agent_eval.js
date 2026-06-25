@@ -10,7 +10,7 @@
 import { check } from "k6";
 import { Rate, Counter } from "k6/metrics";
 import { AgentTestCase, judge } from "k6/experimental/ageval";
-import { askAgent, convId, fetchGenerations, recordedRun } from "../sigil.js";
+import { askAgent, convId, fetchGenerations, recordedRun, reportHostSpecs } from "../sigil.js";
 
 const PROMPTS = [
   { query: "What changed in k6 v1.3.0?" },
@@ -44,8 +44,21 @@ export const options = {
     agent_forbidden_tool_calls: ["count==0"],
     agent_judge_pass: ["rate>0.6"],
     agent_quality_score: ["p(50)>0.5"],
+    // #1 — gate citation behaviour (answers should cite at least one [n]).
+    agent_citation_rate: ["rate>0.9"],
+    // #2 — per-eval gates: the run scores two named judges (answer_quality, trajectory),
+    // tagged `eval`, so each is gated independently rather than only in aggregate.
+    "agent_quality_score{eval:answer_quality}": ["p(50)>0.6"],
+    "agent_quality_score{eval:trajectory}": ["p(50)>0.5"],
+    "agent_judge_pass{eval:answer_quality}": ["rate>0.6"],
+    "agent_judge_pass{eval:trajectory}": ["rate>0.5"],
   },
 };
+
+// Runs once per test: record the host the agent ran on (from HOST_*/MODEL_HOST env).
+export function setup() {
+  reportHostSpecs();
+}
 
 export default function () {
   const p = PROMPTS[__ITER % PROMPTS.length];

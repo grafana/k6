@@ -1,1 +1,4 @@
 .env
+
+# compiled k6 binary built for local validation
+/k6
