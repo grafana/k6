@@ -3,6 +3,8 @@ on:
   # Enable manually triggering this workflow via the API or web UI
   workflow_dispatch:
   pull_request:
+    paths-ignore:
+      - 'docs/**'
 
 defaults:
   run:
