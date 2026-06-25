@@ -136,6 +136,25 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		return getFS([]file{{defaultFlags.ConfigFilePath, jsonConfig}})
 	}
 	I := null.IntFrom // shortcut for "Valid" (i.e. user-specified) ints
+	sharedItersScenario := func(name string, vus, iters null.Int) lib.ScenarioConfigs {
+		ds := executor.NewSharedIterationsConfig(name)
+		ds.VUs = vus
+		ds.Iterations = iters
+		return lib.ScenarioConfigs{name: ds}
+	}
+	verifyNamedSharedIters := func(name string, vus, iters null.Int) func(t *testing.T, c Config) {
+		return func(t *testing.T, c Config) {
+			exec := c.Scenarios[name]
+			require.NotEmpty(t, exec)
+			require.IsType(t, executor.SharedIterationsConfig{}, exec)
+			sharedIterConfig, ok := exec.(executor.SharedIterationsConfig)
+			require.True(t, ok)
+			assert.Equal(t, vus, sharedIterConfig.VUs)
+			assert.Equal(t, iters, sharedIterConfig.Iterations)
+			assert.NotContains(t, c.Scenarios, lib.DefaultScenarioName)
+			assert.False(t, c.VUs.Valid)
+		}
+	}
 	// This is a function, because some of these test cases actually need for the init() functions
 	// to be executed, since they depend on defaultConfigFilePath
 	return []configConsolidationTestCase{
@@ -248,6 +267,16 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 			exp{},
 			verifyRampingVUs(I(5), buildStages(20, 10)),
+		},
+		{
+			opts{
+				fs: defaultConfig(`{"vus": 7}`),
+				runner: &lib.Options{
+					Scenarios: sharedItersScenario("api", I(100), I(100)),
+				},
+			},
+			exp{},
+			verifyNamedSharedIters("api", I(100), I(100)),
 		},
 		{
 			opts{
