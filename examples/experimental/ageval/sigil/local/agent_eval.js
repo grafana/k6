@@ -60,7 +60,8 @@ export default function () {
   check(null, { "generations exported to Sigil": () => exported });
   if (!exported) return;
 
-  const res = new AgentTestCase(recordedRun(gens, { tags: { prompt: `p${__ITER % PROMPTS.length}` } }));
+  const run = recordedRun(gens, { tags: { prompt: `p${__ITER % PROMPTS.length}` } });
+  const res = new AgentTestCase(run);
 
   const usedRetrieval = res.toolSequence().some((n) => RETRIEVAL_TOOLS.includes(n));
   const forbidden = res.toolCalls.filter((c) => FORBIDDEN_TOOLS.includes(c.name));
@@ -70,7 +71,8 @@ export default function () {
   check(res, {
     "used a retrieval tool before answering": () => usedRetrieval,
     "no forbidden tool call": () => forbidden.length === 0,
-    [`model is ${EXPECT_MODEL}`]: () => res.model === EXPECT_MODEL,
+    // AgentTestCase doesn't expose model; assert on the source's recorded run.
+    [`model is ${EXPECT_MODEL}`]: () => run.model === EXPECT_MODEL,
     "answer is non-empty": () => res.output.length > 0,
   });
 
