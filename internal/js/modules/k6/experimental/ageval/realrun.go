@@ -153,6 +153,8 @@ func (mi *ModuleInstance) emitRealRunMetrics(
 		if info, ok := modelPricing(modelName); ok {
 			cost := float64(inTok)/1e6*info.inUSDPerMTok + float64(outTok)/1e6*info.outUSDPerMTok
 			pushSample(mi.vu, mi.metrics.cost, tags, cost)
+			// Also emit micro-USD (integer-scale) so sub-cent costs survive cloud rounding.
+			pushSample(mi.vu, mi.metrics.costMicroUsd, tags, cost*1e6)
 		}
 	}
 }
