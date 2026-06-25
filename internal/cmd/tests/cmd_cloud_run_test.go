@@ -388,6 +388,60 @@ export default function() {};`
 	assert.Nil(t, ts.CloudSecretSource, "cloud secret source should not be registered when --no-cloud-secrets is set")
 }
 
+func TestCloudRunLocalExecutionPreservesSingleExplicitSecretSourceDefault(t *testing.T) {
+	t.Parallel()
+
+	script := `
+import secrets from "k6/secrets";
+
+export const options = {
+  cloud: {
+      name: 'Test local secret source default',
+      projectID: 123456,
+  },
+};
+
+export default async function() {
+	const secret = await secrets.get("file-secret");
+	console.log(secret);
+};`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
+	secretsFile := filepath.Join(ts.Cwd, "secrets.env")
+	require.NoError(t, fsext.WriteFile(ts.FS, secretsFile, []byte("file-secret=file-secret-value\n"), 0o644))
+
+	testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprint(resp, `{
+			"reference_id": "1337",
+			"test_run_token": "mock-test-run-token",
+			"secrets_config": {
+				"endpoint": "https://mock-secrets.example.com/{key}",
+				"response_path": "plaintext"
+			},
+			"config": {
+				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
+			}
+		}`)
+		assert.NoError(t, err)
+	})
+
+	srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	ts.CmdArgs = []string{"k6", "cloud", "run", "--local-execution", "--log-output=stdout", "--secret-source=file=" + secretsFile, "test.js"}
+	ts.Env["K6_CLOUD_TOKEN"] = "foo"
+	ts.Env["K6_CLOUD_STACK_ID"] = "1234"
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.NotContains(t, stdout, "level=error")
+	assert.Contains(t, stdout, `level=info msg="***SECRET_REDACTED***" source=console`)
+	assert.NotContains(t, stdout, "file-secret-value")
+}
+
 func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
