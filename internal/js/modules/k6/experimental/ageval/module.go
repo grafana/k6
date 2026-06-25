@@ -8,7 +8,7 @@
 //     parsed via a `format` adapter); no agent is run;
 //   - AgentSimulator.run() — an optional producer that simulates an agent by
 //     running a model loop against a provider (Anthropic) with mocked tools; or
-//   - ExternalAgent.run() — an optional producer that runs a real agent CLI as a
+//   - CliAgent.run() — an optional producer that runs a real agent CLI as a
 //     subprocess (so the agent runs as part of the k6 test, even under load).
 //
 // All three yield an AgentTestCase that scripts assert on with check()/expectSequence()
@@ -58,7 +58,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 		Named: map[string]any{
 			"AgentTestCase":  mi.newAgentTestCase,
 			"AgentSimulator": mi.newAgentSimulator,
-			"ExternalAgent":  mi.newExternalAgent,
+			"CliAgent":       mi.newCliAgent,
 			"judge":          mi.judge,
 		},
 	}

@@ -19,7 +19,7 @@ type trajectory struct {
 // adapters maps a `format` name to a converter from a raw payload (an agent's
 // stdout, an HTTP response body, etc.) into a normalized trajectory. New agent
 // wire formats are added here once, rather than re-parsed in every test script.
-// The `parse` callback on ExternalAgent remains the escape hatch for bespoke
+// The `parse` callback on CliAgent remains the escape hatch for bespoke
 // formats not worth a built-in adapter.
 //
 //nolint:gochecknoglobals // package-level registry, like the provider registry

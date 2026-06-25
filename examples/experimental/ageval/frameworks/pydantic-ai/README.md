@@ -3,7 +3,7 @@
 Evaluates a **real [Pydantic-AI](https://ai.pydantic.dev) agent** end-to-end in one
 `k6 run`. `agent.py` is a small bank-support agent (two tools: `get_customer`,
 `get_invoice`) running on Claude; on each run it prints a **canonical ageval
-trajectory** as JSON. k6's `ExternalAgent` runs it and grades the result.
+trajectory** as JSON. k6's `CliAgent` runs it and grades the result.
 
 This is the "framework app" pattern: ageval's only hard contract is the canonical
 shape `{ output, toolCalls:[{name,input,output}], usage }`. A ~15-line shim in
@@ -27,7 +27,7 @@ PYTHON=./venv/bin/python  k6 run eval.test.js
 ```
 
 `ANTHROPIC_API_KEY_AGENT` is used by the agent; `ANTHROPIC_API_KEY_JUDGE` by the
-LLM judge. `PYTHON` points `ExternalAgent` at the venv interpreter (defaults to
+LLM judge. `PYTHON` points `CliAgent` at the venv interpreter (defaults to
 `python3`). The agent defaults to the cheap `claude-haiku-4-5`
 (set `AGENT_MODEL=claude-sonnet-4-5` to compare). Verified result: 4/4 checks,
 `agent_tool_correctness` 100%, `agent_quality_score` 1.0, cost ~$0.002/run on Haiku

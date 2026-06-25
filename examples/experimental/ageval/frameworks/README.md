@@ -36,7 +36,7 @@ adapter baked into the module. (For agents instrumented with OpenTelemetry GenAI
 OpenInference, a future built-in `otel` adapter would remove even the shim.)
 
 **Live vs recorded.** The live example (`pydantic-ai`) runs the agent inside
-`k6 run` via `ExternalAgent`. The recorded examples replay a committed
+`k6 run` via `CliAgent`. The recorded examples replay a committed
 `trajectory.json` via `new AgentTestCase(...)`, so they are deterministic and CI-safe — only
 the LLM judge needs a key. Each recorded dir's `capture.py` regenerates its fixture.
 

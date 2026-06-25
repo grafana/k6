@@ -1,6 +1,6 @@
 // Evaluate a REAL agent — OpenAI Codex CLI — in a SINGLE `k6 run`.
 //
-// ExternalAgent runs the `codex` CLI non-interactively (`codex exec --json`) as
+// CliAgent runs the `codex` CLI non-interactively (`codex exec --json`) as
 // part of the test, captures its trajectory (shell/tool calls + final answer) via
 // the built-in `codex` adapter, and scores it. No simulation, no mocks, and no
 // separate capture step.
@@ -10,13 +10,13 @@
 // (Run it from a directory that contains some .go files — the default task counts
 // them. `codex` must be installed and logged in: `codex login`.)
 import { check } from 'k6';
-import { ExternalAgent, judge } from 'k6/experimental/ageval';
+import { CliAgent, judge } from 'k6/experimental/ageval';
 
 const TASK =
   __ENV.TASK ||
   'How many .go files are in the current directory? Use a shell command to list them, then state the number.';
 
-const codex = new ExternalAgent({
+const codex = new CliAgent({
   name: 'codex',
   command: 'codex',
   args: [

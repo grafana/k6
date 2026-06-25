@@ -21,11 +21,11 @@ const (
 	inputToken = "{{input}}"
 )
 
-// ExternalAgent runs a real agent CLI as a subprocess, captures its output, and
+// CliAgent runs a real agent CLI as a subprocess, captures its output, and
 // turns it into an AgentTestCase — so the agent runs as part of a single `k6 run`
 // (no separate capture step). Output is parsed by a built-in `format` (currently
 // "claude-code") or a custom `parse(stdout)` JS callback.
-type ExternalAgent struct {
+type CliAgent struct {
 	mi *ModuleInstance
 	rt *sobek.Runtime
 
@@ -41,23 +41,23 @@ type ExternalAgent struct {
 	timeoutSec     int
 }
 
-// newExternalAgent is the `new ExternalAgent({...})` constructor.
+// newCliAgent is the `new CliAgent({...})` constructor.
 //
 //	{ command, args?, env?, cwd?, format? ("claude-code"), parse?(stdout)->trajectory,
 //	  model?, name?, stepReportTool?, timeoutSeconds? }
-func (mi *ModuleInstance) newExternalAgent(call sobek.ConstructorCall) *sobek.Object {
+func (mi *ModuleInstance) newCliAgent(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 	if len(call.Arguments) < 1 || common.IsNullish(call.Argument(0)) {
-		common.Throw(rt, errors.New("ExternalAgent constructor requires a config object"))
+		common.Throw(rt, errors.New("CliAgent constructor requires a config object"))
 	}
 	cfg := call.Argument(0).ToObject(rt)
 
 	command := getString(cfg, "command", "")
 	if command == "" {
-		common.Throw(rt, errors.New("ExternalAgent config requires a non-empty `command`"))
+		common.Throw(rt, errors.New("CliAgent config requires a non-empty `command`"))
 	}
 
-	a := &ExternalAgent{
+	a := &CliAgent{
 		mi:             mi,
 		rt:             rt,
 		name:           getString(cfg, "name", "external-agent"),
@@ -74,7 +74,7 @@ func (mi *ModuleInstance) newExternalAgent(call sobek.ConstructorCall) *sobek.Ob
 		if fn, ok := sobek.AssertFunction(p); ok {
 			a.parse = fn
 		} else {
-			common.Throw(rt, errors.New("ExternalAgent `parse` must be a function"))
+			common.Throw(rt, errors.New("CliAgent `parse` must be a function"))
 		}
 	}
 	return rt.ToValue(a).ToObject(rt)
@@ -87,7 +87,7 @@ func (mi *ModuleInstance) newExternalAgent(call sobek.ConstructorCall) *sobek.Ob
 //
 // expectedTools is attached to the returned AgentTestCase so expectSequence() can
 // grade against it with no argument.
-func (a *ExternalAgent) Run(opts sobek.Value) sobek.Value {
+func (a *CliAgent) Run(opts sobek.Value) sobek.Value {
 	state := a.mi.vu.State()
 	if state == nil {
 		common.Throw(a.rt, errInitContext)
@@ -126,7 +126,7 @@ func (a *ExternalAgent) Run(opts sobek.Value) sobek.Value {
 }
 
 // execCommand runs the agent CLI and returns its stdout and wall-clock duration.
-func (a *ExternalAgent) execCommand(input string) (string, time.Duration, error) {
+func (a *CliAgent) execCommand(input string) (string, time.Duration, error) {
 	ctx := a.mi.vu.Context()
 	if a.timeoutSec > 0 {
 		var cancel context.CancelFunc
@@ -182,11 +182,11 @@ func (a *ExternalAgent) execCommand(input string) (string, time.Duration, error)
 // parseOutput turns the command's stdout into a trajectory using the custom
 // parse callback, a built-in format adapter, or (default) the raw text as the
 // output.
-func (a *ExternalAgent) parseOutput(stdout string) trajectory {
+func (a *CliAgent) parseOutput(stdout string) trajectory {
 	if a.parse != nil {
 		res, err := a.parse(sobek.Undefined(), a.rt.ToValue(stdout))
 		if err != nil {
-			common.Throw(a.rt, fmt.Errorf("ExternalAgent parse callback threw: %w", err))
+			common.Throw(a.rt, fmt.Errorf("CliAgent parse callback threw: %w", err))
 		}
 		return trajectoryFromJS(a.rt, res)
 	}

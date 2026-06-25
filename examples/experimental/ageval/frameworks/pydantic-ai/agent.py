@@ -3,7 +3,7 @@
 This is the ~15-line "capture shim" pattern: run a real framework agent, then map
 its result onto ageval's only hard contract — the canonical trajectory shape
 `{input, output, toolCalls:[{name,input,output}], usage}` — and print it as JSON.
-k6's ExternalAgent runs this and grades the result, all in one `k6 run`.
+k6's CliAgent runs this and grades the result, all in one `k6 run`.
 
     ANTHROPIC_API_KEY_AGENT=sk-...  python agent.py "Was invoice INV-123 for alice@example.com paid?"
 """
@@ -83,7 +83,7 @@ def main():
         print("ANTHROPIC_API_KEY_AGENT (or ANTHROPIC_API_KEY) must be set", file=sys.stderr)
         sys.exit(1)
     result = agent.run_sync(task)
-    # Only the canonical JSON goes to stdout; ExternalAgent parses it with JSON.parse.
+    # Only the canonical JSON goes to stdout; CliAgent parses it with JSON.parse.
     print(json.dumps(to_trajectory(task, result)))
 
 

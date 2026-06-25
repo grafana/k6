@@ -21,12 +21,12 @@ const cannedTranscript = `{"type":"system","subtype":"init"}
 // the command-failure path; the os/exec helper-process idiom is avoided because
 // k6's linter forbids direct os.* usage.
 
-func TestExternalAgentCommandFailureThrows(t *testing.T) {
+func TestCliAgentCommandFailureThrows(t *testing.T) {
 	t.Parallel()
 	ts := newTestSetup(t)
 
 	_, err := ts.rt.VU.Runtime().RunString(`
-		const a = new ExternalAgent({ command: "this-command-does-not-exist-ageval", format: "claude-code" });
+		const a = new CliAgent({ command: "this-command-does-not-exist-ageval", format: "claude-code" });
 		a.run({ input: "x" });
 	`)
 	require.Error(t, err)

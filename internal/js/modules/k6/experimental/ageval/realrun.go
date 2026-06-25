@@ -17,7 +17,7 @@ import (
 // Use it to evaluate a run you already have
 // (a logged production run, a captured dataset, a framework shim's output, or a
 // raw payload parsed via `format`). To run the agent as part of the k6 test
-// instead, use a producer (AgentSimulator / ExternalAgent) — they return an
+// instead, use a producer (AgentSimulator / CliAgent) — they return an
 // AgentTestCase too, so everything downstream (check/expectSequence/judge) is identical.
 //
 //	new AgentTestCase({
@@ -80,7 +80,7 @@ func (mi *ModuleInstance) trajectoryFromConfig(rt *sobek.Runtime, o *sobek.Objec
 }
 
 // realRunData is the provider-agnostic trajectory used to build an AgentTestCase for
-// both new AgentTestCase and ExternalAgent.
+// both new AgentTestCase and CliAgent.
 type realRunData struct {
 	tags           *metrics.TagSet
 	stepReportTool string

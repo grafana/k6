@@ -26,7 +26,7 @@ type RunUsage struct {
 // It holds an agent run's input, produced
 // output, recorded tool calls and usage, plus the optional expectedTools to grade
 // against. It is obtained either directly (`new AgentTestCase({...})`) or from a
-// producer (`AgentSimulator.run()`, `ExternalAgent.run()`), and is the value that
+// producer (`AgentSimulator.run()`, `CliAgent.run()`), and is the value that
 // check/expectSequence/judge operate on. Exported fields become camelCase
 // properties; exported methods become camelCase methods.
 type AgentTestCase struct {

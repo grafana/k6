@@ -1,6 +1,6 @@
 // Evaluate a REAL Pydantic-AI agent in a SINGLE `k6 run`.
 //
-// ExternalAgent runs agent.py (a real Pydantic-AI bank-support agent on Claude),
+// CliAgent runs agent.py (a real Pydantic-AI bank-support agent on Claude),
 // which prints a canonical ageval trajectory as JSON; the `parse` callback hands
 // that straight back. We then assert the tool trajectory with a deterministic,
 // non-LLM oracle (expectSequence) and grade the answer quality with an LLM judge.
@@ -15,11 +15,11 @@
 //   ANTHROPIC_API_KEY_AGENT=sk-...  ANTHROPIC_API_KEY_JUDGE=sk-... \
 //   PYTHON=./venv/bin/python  k6 run eval.test.js
 import { check } from 'k6';
-import { ExternalAgent, judge } from 'k6/experimental/ageval';
+import { CliAgent, judge } from 'k6/experimental/ageval';
 
 const TASK = __ENV.TASK || 'Was invoice INV-123 for alice@example.com paid?';
 
-const agent = new ExternalAgent({
+const agent = new CliAgent({
   name: 'pydantic-ai',
   command: __ENV.PYTHON || 'python3',
   args: [`${__ENV.AGENT_DIR || '.'}/agent.py`, '{{input}}'],
