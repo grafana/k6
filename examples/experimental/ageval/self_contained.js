@@ -74,6 +74,7 @@ export default function () {
   res.expectSequence();
 
   judge(res, {
+    name: 'support_answer',
     provider: 'anthropic',
     model: 'claude-opus-4-8',
     apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE || __ENV.ANTHROPIC_API_KEY,

@@ -53,8 +53,8 @@ export default function () {
 
   const gSeq = g.expectSequence(SEQ, SEQ_OPTS);
   const bSeq = b.expectSequence(SEQ, SEQ_OPTS);
-  const gJudge = judge(g, { provider: 'anthropic', model: 'claude-haiku-4-5', apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE, rubric: RUBRIC, threshold: 0.7 });
-  const bJudge = judge(b, { provider: 'anthropic', model: 'claude-haiku-4-5', apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE, rubric: RUBRIC, threshold: 0.7 });
+  const gJudge = judge(g, { name: 'invoice_paid', provider: 'anthropic', model: 'claude-haiku-4-5', apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE, rubric: RUBRIC, threshold: 0.7 });
+  const bJudge = judge(b, { name: 'invoice_paid', provider: 'anthropic', model: 'claude-haiku-4-5', apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE, rubric: RUBRIC, threshold: 0.7 });
 
   console.log(`good: seq=${gSeq} judge=${gJudge.score} | bad: seq=${bSeq} judge=${bJudge.score} (${bJudge.reason})`);
 

@@ -175,6 +175,7 @@ export default function () {
   });
 
   judge(res, {
+    name: 'k6_authoring',
     provider: 'anthropic',
     model: 'claude-haiku-4-5',
     apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE || __ENV.ANTHROPIC_API_KEY,

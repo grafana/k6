@@ -121,7 +121,7 @@ func TestAgentTestCaseIsJudgeable(t *testing.T) {
 		// Explicit expectSequence([...]) form with exact mode (still supported API).
 		const seqOK = r.expectSequence([{ name: "get_invoice" }], { mode: "exact" });
 		const verdict = judge(r, {
-			model: "claude-sonnet-4-5", apiKey: "jt", baseURL: ` + "`" + judgeSrv.URL + "`" + `,
+			name: "invoice_paid", model: "claude-sonnet-4-5", apiKey: "jt", baseURL: ` + "`" + judgeSrv.URL + "`" + `,
 			rubric: "The answer states the invoice is paid.", threshold: 0.7,
 		});
 		[seqOK, verdict.score, verdict.passed];

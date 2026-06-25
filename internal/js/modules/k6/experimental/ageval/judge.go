@@ -25,12 +25,15 @@ type judgeResult struct {
 // agent_quality_score (Trend) and agent_judge_pass (Rate) metrics, and returns
 // `{ score, reason, passed }`.
 //
-// `name` tags agent_quality_score / agent_judge_pass with metric=<name> so several
-// judge() calls (different rubrics) are distinguishable in dashboards. The judge's
-// own spend is emitted as agent_judge_tokens / agent_judge_cost_usd, tagged with the
-// judge model (separate from the agent's agent_tokens / agent_cost_usd).
+// `name` is REQUIRED: it tags agent_quality_score / agent_judge_pass (and the judge
+// cost/token metrics) with eval=<name> so each eval is identifiable in dashboards and
+// downstream tools — which matters because the rubric/reason are not metrics. The
+// judge also logs a parseable line (ageval_eval {json}) carrying name/score/passed/
+// reason, so the reason is recoverable from k6 logs even under --local-execution.
+// The judge's own spend is emitted as agent_judge_tokens / agent_judge_cost_usd,
+// tagged with the judge model (separate from the agent's agent_tokens/agent_cost_usd).
 //
-// opts: { provider, model, apiKey, rubric, name?, threshold?, input?, actualOutput?, baseURL? }
+// opts: { name, provider, model, apiKey, rubric, threshold?, input?, actualOutput?, baseURL? }
 func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.Value {
 	rt := mi.vu.Runtime()
 	if mi.vu.State() == nil {
@@ -41,6 +44,10 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	}
 	o := opts.ToObject(rt)
 
+	name := getString(o, "name", "")
+	if name == "" {
+		common.Throw(rt, errors.New("judge() requires a non-empty `name` (the eval label; emitted as the `eval` tag)"))
+	}
 	rubric := getString(o, "rubric", "")
 	if rubric == "" {
 		common.Throw(rt, errors.New("judge() requires a non-empty `rubric`"))
@@ -86,10 +93,7 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	score, reason := parseJudgeReply(rep)
 	passed := score >= threshold
 
-	tags := mi.judgeTags(rr)
-	if name := getString(o, "name", ""); name != "" {
-		tags = tags.With("metric", name)
-	}
+	tags := mi.judgeTags(rr).With("eval", name)
 	pushSample(mi.vu, mi.metrics.qualityScore, tags, score)
 	passVal := 0.0
 	if passed {
@@ -97,8 +101,32 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	}
 	pushSample(mi.vu, mi.metrics.judgePass, tags, passVal)
 	mi.emitJudgeCost(tags, prov, modelName, rep.usage)
+	mi.logEval(name, score, passed, reason)
 
 	return rt.ToValue(judgeResult{Score: score, Reason: reason, Passed: passed}).ToObject(rt)
+}
+
+// logEvalPrefix marks judge result log lines so tools can find and parse them
+// (the JSON after the prefix carries name/score/passed/reason). Logged because the
+// rubric/reason can't be metric tags, yet logs are streamed to the cloud even under
+// --local-execution.
+const logEvalPrefix = "ageval_eval"
+
+func (mi *ModuleInstance) logEval(name string, score float64, passed bool, reason string) {
+	state := mi.vu.State()
+	if state == nil || state.Logger == nil {
+		return
+	}
+	payload, err := json.Marshal(struct {
+		Name   string  `json:"name"`
+		Score  float64 `json:"score"`
+		Passed bool    `json:"passed"`
+		Reason string  `json:"reason"`
+	}{name, score, passed, reason})
+	if err != nil {
+		return
+	}
+	state.Logger.Info(logEvalPrefix + " " + string(payload))
 }
 
 // emitJudgeCost records the judge model's own token usage and estimated USD spend

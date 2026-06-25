@@ -44,9 +44,9 @@ func TestJudgeNameTagAndCost(t *testing.T) {
 
 	// (1) the score/pass metrics carry the metric=<name> tag.
 	require.Len(t, got["agent_quality_score"], 1)
-	assert.Equal(t, "answer_quality", got["agent_quality_score"][0].tags["metric"])
+	assert.Equal(t, "answer_quality", got["agent_quality_score"][0].tags["eval"])
 	require.Len(t, got["agent_judge_pass"], 1)
-	assert.Equal(t, "answer_quality", got["agent_judge_pass"][0].tags["metric"])
+	assert.Equal(t, "answer_quality", got["agent_judge_pass"][0].tags["eval"])
 
 	// (2) the judge's own spend is emitted, tagged with the judge model.
 	require.Len(t, got["agent_judge_tokens"], 2) // input + output
@@ -54,6 +54,17 @@ func TestJudgeNameTagAndCost(t *testing.T) {
 	assert.Equal(t, "claude-sonnet-4-5", got["agent_judge_cost_usd"][0].tags["model"])
 	// cost = 3/1e6*3 + 4/1e6*15 (sonnet-4-5 pricing $3/$15 per Mtok)
 	assert.InDelta(t, 3.0/1e6*3+4.0/1e6*15, got["agent_judge_cost_usd"][0].value, 1e-12)
+}
+
+func TestJudgeRequiresName(t *testing.T) {
+	t.Parallel()
+	ts := newTestSetup(t)
+	_, err := ts.rt.VU.Runtime().RunString(`
+		const r = new AgentTestCase({ input: "q", output: "x" });
+		judge(r, { model: "claude-sonnet-4-5", apiKey: "k", rubric: "ok" });
+	`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "name")
 }
 
 func TestJudgeScoresAndEmitsMetrics(t *testing.T) {
@@ -69,6 +80,7 @@ func TestJudgeScoresAndEmitsMetrics(t *testing.T) {
 		});
 		const r = agent.run({ input: "go", tags: { case: "judge" } });
 		judge(r, {
+			name: "echoes",
 			model: "claude-sonnet-4-5",
 			apiKey: "jt",
 			baseURL: %q,
@@ -109,7 +121,7 @@ func TestJudgeIncludesRunInputInPrompt(t *testing.T) {
 			toolCalls: [{ name: "Glob", input: { pattern: "*.go" }, output: "18 files" }],
 		});
 		// Note: no input passed to judge() -- it must fall back to the run's input.
-		judge(r, { model: "claude-sonnet-4-5", apiKey: "jt", baseURL: %q, rubric: "Reports a count." });
+		judge(r, { name: "count", model: "claude-sonnet-4-5", apiKey: "jt", baseURL: %q, rubric: "Reports a count." });
 	`, srv.URL))
 	require.NoError(t, err)
 	assert.Contains(t, captured, "Count the go files in the repo", "judge prompt should include the run's task/input")

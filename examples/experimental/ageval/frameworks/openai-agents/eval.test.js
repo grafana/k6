@@ -45,6 +45,7 @@ export default function () {
   res.expectSequence();
 
   judge(res, {
+    name: 'invoice_paid',
     provider: 'anthropic',
     model: 'claude-haiku-4-5',
     apiKey: __ENV.ANTHROPIC_API_KEY_JUDGE || __ENV.ANTHROPIC_API_KEY,
