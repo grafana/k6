@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -93,7 +94,10 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	score, reason := parseJudgeReply(rep)
 	passed := score >= threshold
 
-	tags := mi.judgeTags(rr).With("eval", name)
+	// eval = which eval; threshold = its judge cutoff (low-cardinality, so tools can
+	// read the real per-eval threshold from the metrics — distinct from the k6
+	// options.thresholds config).
+	tags := mi.judgeTags(rr).With("eval", name).With("threshold", strconv.FormatFloat(threshold, 'g', -1, 64))
 	pushSample(mi.vu, mi.metrics.qualityScore, tags, score)
 	passVal := 0.0
 	if passed {
@@ -101,32 +105,73 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	}
 	pushSample(mi.vu, mi.metrics.judgePass, tags, passVal)
 	mi.emitJudgeCost(tags, prov, modelName, rep.usage)
-	mi.logEval(name, score, passed, reason)
+	mi.logEval(evalLog{
+		name:      name,
+		score:     score,
+		threshold: threshold,
+		passed:    passed,
+		reason:    reason,
+		rubric:    rubric,
+		input:     input,
+		actual:    actual,
+	})
 
 	return rt.ToValue(judgeResult{Score: score, Reason: reason, Passed: passed}).ToObject(rt)
 }
 
-// logEvalPrefix marks judge result log lines so tools can find and parse them
-// (the JSON after the prefix carries name/score/passed/reason). Logged because the
-// rubric/reason can't be metric tags, yet logs are streamed to the cloud even under
-// --local-execution.
+// logEvalPrefix marks judge result log lines so tools can find and parse them (the
+// JSON after the prefix carries the eval result). Logged because the rubric/reason
+// can't be metric tags; under --local-execution logs stay on the CLI, and under
+// cloud execution they reach the cloud Logs tab.
 const logEvalPrefix = "ageval_eval"
 
-func (mi *ModuleInstance) logEval(name string, score float64, passed bool, reason string) {
+type evalLog struct {
+	name      string
+	score     float64
+	threshold float64
+	passed    bool
+	reason    string
+	rubric    string
+	input     string
+	actual    string
+}
+
+// logEval logs one parseable `ageval_eval {json}` line per judge. A FAILING eval is
+// logged at Error level (prominent on the CLI, filterable as level=error in the
+// cloud) and carries extra debugging detail — the rubric, the task input and the
+// agent's actual behavior — so the failure is self-explanatory. A passing eval logs
+// a lean line at Info level.
+func (mi *ModuleInstance) logEval(e evalLog) {
 	state := mi.vu.State()
 	if state == nil || state.Logger == nil {
 		return
 	}
-	payload, err := json.Marshal(struct {
-		Name   string  `json:"name"`
-		Score  float64 `json:"score"`
-		Passed bool    `json:"passed"`
-		Reason string  `json:"reason"`
-	}{name, score, passed, reason})
+	payload := struct {
+		Name      string  `json:"name"`
+		Score     float64 `json:"score"`
+		Threshold float64 `json:"threshold"`
+		Passed    bool    `json:"passed"`
+		Reason    string  `json:"reason"`
+		Rubric    string  `json:"rubric,omitempty"`
+		Input     string  `json:"input,omitempty"`
+		Actual    string  `json:"actual,omitempty"`
+	}{Name: e.name, Score: e.score, Threshold: e.threshold, Passed: e.passed, Reason: e.reason}
+	if !e.passed {
+		// Pack as much context as possible on failure (truncated to keep the line sane).
+		payload.Rubric = truncate(e.rubric, 1000)
+		payload.Input = truncate(e.input, 1000)
+		payload.Actual = truncate(e.actual, 2000)
+	}
+	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return
 	}
-	state.Logger.Info(logEvalPrefix + " " + string(payload))
+	msg := logEvalPrefix + " " + string(encoded)
+	if e.passed {
+		state.Logger.Info(msg)
+	} else {
+		state.Logger.Error(msg)
+	}
 }
 
 // emitJudgeCost records the judge model's own token usage and estimated USD spend

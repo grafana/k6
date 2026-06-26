@@ -45,6 +45,7 @@ func TestJudgeNameTagAndCost(t *testing.T) {
 	// (1) the score/pass metrics carry the metric=<name> tag.
 	require.Len(t, got["agent_quality_score"], 1)
 	assert.Equal(t, "answer_quality", got["agent_quality_score"][0].tags["eval"])
+	assert.Equal(t, "0.7", got["agent_quality_score"][0].tags["threshold"]) // judge threshold as a tag
 	require.Len(t, got["agent_judge_pass"], 1)
 	assert.Equal(t, "answer_quality", got["agent_judge_pass"][0].tags["eval"])
 
