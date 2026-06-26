@@ -61,6 +61,65 @@ func TestMaskToken(t *testing.T) {
 	}
 }
 
+func TestNormalizeStackURL(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "full URL is kept as is",
+			input:    "https://my-team.grafana.net",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "full URL with trailing slash is trimmed",
+			input:    "https://my-team.grafana.net/",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "slug is expanded to a full URL",
+			input:    "my-team",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "slug with trailing slash is trimmed then expanded",
+			input:    "my-team/",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "grafana.net suffix is stripped from a slug",
+			input:    "my-team.grafana.net",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "grafana.net suffix with trailing slash is stripped from a slug",
+			input:    "my-team.grafana.net/",
+			expected: "https://my-team.grafana.net",
+		},
+		{
+			name:     "localhost URL is kept as is",
+			input:    "http://localhost:8080",
+			expected: "http://localhost:8080",
+		},
+		{
+			name:     "localhost URL with trailing slash is trimmed",
+			input:    "http://localhost:8080/",
+			expected: "http://localhost:8080",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.expected, normalizeStackURL(tc.input))
+		})
+	}
+}
+
 func TestPrintConfigTokenOutput(t *testing.T) {
 	t.Parallel()
 
