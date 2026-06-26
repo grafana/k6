@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -93,7 +94,10 @@ func (mi *ModuleInstance) judge(resultVal sobek.Value, opts sobek.Value) sobek.V
 	score, reason := parseJudgeReply(rep)
 	passed := score >= threshold
 
-	tags := mi.judgeTags(rr).With("eval", name)
+	// eval = which eval; threshold = its judge cutoff (low-cardinality, so tools can
+	// read the real per-eval threshold from the metrics — distinct from the k6
+	// options.thresholds config).
+	tags := mi.judgeTags(rr).With("eval", name).With("threshold", strconv.FormatFloat(threshold, 'g', -1, 64))
 	pushSample(mi.vu, mi.metrics.qualityScore, tags, score)
 	passVal := 0.0
 	if passed {
