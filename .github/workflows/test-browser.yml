@@ -13,12 +13,27 @@ permissions:
   contents: read
 
 jobs:
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      go_current: ${{ steps.go_versions.outputs.current }}
+      go_prev: ${{ steps.go_versions.outputs.prev }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - name: Resolve Go versions
+        id: go_versions
+        uses: ./.github/actions/go-versions
+
   test-prev:
+    needs: configure
     if: ${{ github.ref == 'refs/heads/master' }}
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.25.x]
+        go-version: ["${{ needs.configure.outputs.go_prev }}"]
         platform:
           [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
@@ -71,10 +86,11 @@ jobs:
           use_gotip: "true"
 
   test-latest:
+    needs: configure
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.26.x]
+        go-version: ["${{ needs.configure.outputs.go_current }}"]
         platform:
           [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
