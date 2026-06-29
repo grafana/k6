@@ -9,26 +9,36 @@
 //   - AgentSimulator.run() — an optional producer that simulates an agent by
 //     running a model loop against a provider (Anthropic) with mocked tools; or
 //   - CliAgent.run() — an optional producer that runs a real agent CLI as a
-//     subprocess (so the agent runs as part of the k6 test, even under load).
+//     subprocess (so the agent runs as part of the k6 test, even under load); or
+//   - SigilAgent.run() — like CliAgent, but the trajectory is collected from the
+//     Sigil (Grafana AI observability) telemetry the instrumented agent streams
+//     to an ageval-hosted gRPC endpoint, instead of being parsed from stdout.
 //
-// All three yield an AgentTestCase that scripts assert on with check()/expectSequence()
+// All yield an AgentTestCase that scripts assert on with check()/expectSequence()
 // and an LLM-as-judge, and it emits standard k6 metrics (Trend/Rate/Counter) so
 // results visualize in k6 Cloud and Grafana with no extra configuration.
 package ageval
 
 import (
+	"sync"
+
 	"go.k6.io/k6/v2/js/modules"
 )
 
 type (
 	// RootModule is the global module instance that creates a ModuleInstance
-	// per VU.
-	RootModule struct{}
+	// per VU. It also holds the process-wide Sigil ingest server, lazily started
+	// and shared across all VUs (see sigil.go).
+	RootModule struct {
+		mu     sync.Mutex
+		server *sigilServer
+	}
 
 	// ModuleInstance is the per-VU instance of the ageval module.
 	ModuleInstance struct {
 		vu      modules.VU
 		metrics *agevalMetrics
+		root    *RootModule
 	}
 )
 
@@ -45,10 +55,11 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface and returns a new
 // instance of the module for the given VU. Metrics are registered here, in the
 // init context, where the registry is available.
-func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	return &ModuleInstance{
 		vu:      vu,
 		metrics: registerMetrics(vu.InitEnv().Registry),
+		root:    rm,
 	}
 }
 
@@ -59,6 +70,8 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 			"AgentTestCase":  mi.newAgentTestCase,
 			"AgentSimulator": mi.newAgentSimulator,
 			"CliAgent":       mi.newCliAgent,
+			"SigilAgent":     mi.newSigilAgent,
+			"sigilSummary":   mi.sigilSummary,
 			"judge":          mi.judge,
 		},
 	}
