@@ -180,6 +180,23 @@ func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setu
 	return m
 }
 
+// toJSONCompatibleValue converts a Go value into a JSON-compatible structure made only of
+// maps, slices, numbers, strings, booleans, and nils. This preserves JSON tags when passing
+// data through the JS runtime, which otherwise uses the Sobek field mapper for structs.
+func toJSONCompatibleValue(v any) (any, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return nil, err
+	}
+
+	return decoded, nil
+}
+
 func exportGroup(group *lib.Group) map[string]any {
 	subGroups := make([]map[string]any, len(group.OrderedGroups))
 	for i, subGroup := range group.OrderedGroups {

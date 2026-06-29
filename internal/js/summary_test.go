@@ -641,6 +641,50 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
 }
 
+func TestMachineReadableHandleSummaryUsesCamelCaseKeys(t *testing.T) {
+	t.Parallel()
+
+	runner, err := getSimpleRunner(
+		t, "/script.js",
+		`
+		exports.default = function() { /* we don't run this, metrics are mocked */ };
+		exports.handleSummary = function(data) {
+			return {'rawdata.json': JSON.stringify(data, null, 4)};
+		};
+		`,
+		lib.RuntimeOptions{
+			CompatibilityMode: null.NewString("base", true),
+			SummaryExport:     null.StringFrom("summary.json"),
+		},
+	)
+	require.NoError(t, err)
+
+	s := summary.New()
+	s.NewMachineReadableSummary = true
+	s.TestRunDuration = time.Second
+
+	result, err := runner.HandleSummary(t.Context(), nil, s, summary.Meta{Script: "export default function() {}\n"})
+	require.NoError(t, err)
+
+	rawData, err := io.ReadAll(result["rawdata.json"])
+	require.NoError(t, err)
+	rawDataString := string(rawData)
+	assert.Contains(t, rawDataString, `"generatedAt"`)
+	assert.Contains(t, rawDataString, `"k6Version"`)
+	assert.NotContains(t, rawDataString, `"generated_at"`)
+	assert.NotContains(t, rawDataString, `"k6_version"`)
+
+	summaryExport, err := io.ReadAll(result["summary.json"])
+	require.NoError(t, err)
+	summaryExportString := string(summaryExport)
+	assert.Contains(t, summaryExportString, `"generatedAt"`)
+	assert.Contains(t, summaryExportString, `"k6Version"`)
+	assert.NotContains(t, summaryExportString, `"generated_at"`)
+	assert.NotContains(t, summaryExportString, `"k6_version"`)
+	assert.Contains(t, summaryExportString, `"script": "export default function() {}\n"`)
+	assert.Contains(t, summaryExportString, `"version": "1.0.0"`)
+}
+
 func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 	t.Parallel()
 	testCases := []string{"{}", `"foo"`, "null", "undefined", "123"}
