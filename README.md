@@ -1,3 +1,5 @@
+THIS IS A TEST
+
 <p align="center">
   <a href="https://grafana.com/oss/k6/">
     <picture>
@@ -53,10 +55,9 @@ This is what load testing looks like in the 21st century.
 
 ## Example script
 
-
 ```js
-import http from "k6/http";
 import { check, sleep } from "k6";
+import http from "k6/http";
 
 // Test configuration
 export const options = {
@@ -73,7 +74,7 @@ export const options = {
 };
 
 // Simulated user behavior
-export default function () {
+export default function() {
   let res = http.get("https://quickpizza.grafana.com");
   // Validate response status
   check(res, { "status was 200": (r) => r.status == 200 });
@@ -85,7 +86,7 @@ You can run scripts like this on the CLI, or in your CI, or across a Kubernetes 
 
 > [!NOTE]
 > Don't want to write code ?
-> 
+>
 > We got you! Meet [k6 Studio](https://github.com/grafana/k6-studio), a desktop application made to help you generate k6 scripts without having to touch code!
 
 ## Documentation
