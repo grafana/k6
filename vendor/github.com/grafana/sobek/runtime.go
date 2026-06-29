@@ -474,14 +474,12 @@ func (r *Runtime) typeErrorResult(throw bool, args ...interface{}) {
 	}
 }
 
-func (r *Runtime) newError(typ *Object, format string, args ...interface{}) Value {
-	var msg string
-	if len(args) > 0 {
-		msg = fmt.Sprintf(format, args...)
-	} else {
-		msg = format
-	}
+func (r *Runtime) newError(typ *Object, msg string) Value {
 	return r.builtin_new(typ, []Value{newStringValue(msg)})
+}
+
+func (r *Runtime) newErrorf(typ *Object, format string, args ...interface{}) Value {
+	return r.builtin_new(typ, []Value{newStringValue(fmt.Sprintf(format, args...))})
 }
 
 func (r *Runtime) throwReferenceError(name unistring.String) {
@@ -489,7 +487,7 @@ func (r *Runtime) throwReferenceError(name unistring.String) {
 }
 
 func (r *Runtime) newReferenceError(name unistring.String) Value {
-	return r.newError(r.getReferenceError(), "%s is not defined", name)
+	return r.newErrorf(r.getReferenceError(), "%s is not defined", name)
 }
 
 func (r *Runtime) newSyntaxError(msg string, offset int) Value {
@@ -1289,11 +1287,11 @@ func (r *Runtime) toIndex(v Value) int {
 	num := v.ToInteger()
 	if num >= 0 && num < maxInt {
 		if bits.UintSize == 32 && num >= math.MaxInt32 {
-			panic(r.newError(r.getRangeError(), "Index %s overflows int", v.String()))
+			panic(r.newErrorf(r.getRangeError(), "Index %s overflows int", v.String()))
 		}
 		return int(num)
 	}
-	panic(r.newError(r.getRangeError(), "Invalid index %s", v.String()))
+	panic(r.newErrorf(r.getRangeError(), "Invalid index %s", v.String()))
 }
 
 func (r *Runtime) toBoolean(b bool) Value {
@@ -2208,7 +2206,7 @@ func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCt
 		}
 	case reflect.Struct:
 		if o, ok := v.(*Object); ok {
-			t := reflect.PtrTo(typ)
+			t := reflect.PointerTo(typ)
 			if v, exists := ctx.getTyped(o, t); exists {
 				dst.Set(reflect.ValueOf(v).Elem())
 				return nil

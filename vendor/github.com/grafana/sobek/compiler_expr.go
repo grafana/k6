@@ -1387,7 +1387,7 @@ func (e *compiledFunctionLiteral) compile() (prg *Program, name unistring.String
 			b.isArg = true
 			hasPatterns = true
 		default:
-			e.c.throwSyntaxError(int(item.Idx0())-1, "Unsupported BindingElement type: %T", item)
+			e.c.throwSyntaxErrorf(int(item.Idx0())-1, "Unsupported BindingElement type: %T", item)
 			return
 		}
 		if item.Initializer != nil {
@@ -1742,7 +1742,7 @@ func (e *compiledFunctionLiteral) emitGetter(putOnStack bool) {
 			}
 		}
 	default:
-		e.c.throwSyntaxError(e.offset, "Unsupported func type: %v", e.typ)
+		e.c.throwSyntaxErrorf(e.offset, "Unsupported func type: %v", e.typ)
 	}
 	if !putOnStack {
 		e.c.emit(pop)
@@ -2272,7 +2272,7 @@ func (c *compiler) compileArrowFunctionLiteral(v *ast.ArrowFunctionLiteral) *com
 			},
 		}
 	default:
-		c.throwSyntaxError(int(b.Idx0())-1, "Unsupported ConciseBody type: %T", b)
+		c.throwSyntaxErrorf(int(b.Idx0())-1, "Unsupported ConciseBody type: %T", b)
 	}
 	r := &compiledFunctionLiteral{
 		parameterList:   v.ParameterList,
@@ -2395,7 +2395,7 @@ func (c *compiler) compileMetaProperty(v *ast.MetaProperty) compiledExpr {
 		return r
 	}
 
-	c.throwSyntaxError(int(v.Idx)-1, "Unsupported meta property: %s.%s", v.Meta.Name, v.Property.Name)
+	c.throwSyntaxErrorf(int(v.Idx)-1, "Unsupported meta property: %s.%s", v.Meta.Name, v.Property.Name)
 	return nil
 }
 
@@ -3398,7 +3398,7 @@ func (c *compiler) emitObjectPattern(pattern *ast.ObjectPattern, emitAssign func
 				c.emit(getKey)
 			}, initializer, prop.Idx0()), emitAssign)
 		default:
-			c.throwSyntaxError(int(prop.Idx0()-1), "Unsupported AssignmentProperty type: %T", prop)
+			c.throwSyntaxErrorf(int(prop.Idx0()-1), "Unsupported AssignmentProperty type: %T", prop)
 		}
 	}
 	if pattern.Rest != nil {
