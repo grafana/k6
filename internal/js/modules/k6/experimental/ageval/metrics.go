@@ -11,31 +11,35 @@ import (
 // standard k6 metric types (Trend/Rate/Counter) so existing k6 outputs and
 // Grafana Cloud dashboards render them with no extra configuration.
 type agevalMetrics struct {
-	duration        *metrics.Metric // Trend (time): wall-clock of a full agent run
-	steps           *metrics.Metric // Trend: number of model round-trips per run
-	toolCalls       *metrics.Metric // Counter: tool calls, tagged by tool name
-	tokens          *metrics.Metric // Counter: tokens, tagged by direction
-	cost            *metrics.Metric // Counter: estimated USD spend
-	toolCorrectness *metrics.Metric // Rate: expectSequence pass/fail
-	qualityScore    *metrics.Metric // Trend: LLM-as-judge score 0..1
-	judgePass       *metrics.Metric // Rate: judge score >= threshold
-	judgeTokens     *metrics.Metric // Counter: judge model tokens, tagged by direction
-	judgeCost       *metrics.Metric // Counter: estimated USD spend by the judge itself
+	duration          *metrics.Metric // Trend (time): wall-clock of a full agent run
+	steps             *metrics.Metric // Trend: number of model round-trips per run
+	toolCalls         *metrics.Metric // Counter: tool calls, tagged by tool name
+	tokens            *metrics.Metric // Counter: tokens, tagged by direction
+	cost              *metrics.Metric // Counter: estimated USD spend
+	costMicroUsd      *metrics.Metric // Counter: estimated spend in micro-USD (cost*1e6; integer-scale survives cloud rounding)
+	toolCorrectness   *metrics.Metric // Rate: expectSequence pass/fail
+	qualityScore      *metrics.Metric // Trend: LLM-as-judge score 0..1
+	judgePass         *metrics.Metric // Rate: judge score >= threshold
+	judgeTokens       *metrics.Metric // Counter: judge model tokens, tagged by direction
+	judgeCost         *metrics.Metric // Counter: estimated USD spend by the judge itself
+	judgeCostMicroUsd *metrics.Metric // Counter: judge spend in micro-USD (cost*1e6)
 }
 
 // registerMetrics creates (or reuses) the module metrics in the registry.
 func registerMetrics(registry *metrics.Registry) *agevalMetrics {
 	return &agevalMetrics{
-		duration:        registry.MustNewMetric("agent_duration", metrics.Trend, metrics.Time),
-		steps:           registry.MustNewMetric("agent_steps", metrics.Trend),
-		toolCalls:       registry.MustNewMetric("agent_tool_calls", metrics.Counter),
-		tokens:          registry.MustNewMetric("agent_tokens", metrics.Counter),
-		cost:            registry.MustNewMetric("agent_cost_usd", metrics.Counter),
-		toolCorrectness: registry.MustNewMetric("agent_tool_correctness", metrics.Rate),
-		qualityScore:    registry.MustNewMetric("agent_quality_score", metrics.Trend),
-		judgePass:       registry.MustNewMetric("agent_judge_pass", metrics.Rate),
-		judgeTokens:     registry.MustNewMetric("agent_judge_tokens", metrics.Counter),
-		judgeCost:       registry.MustNewMetric("agent_judge_cost_usd", metrics.Counter),
+		duration:          registry.MustNewMetric("agent_duration", metrics.Trend, metrics.Time),
+		steps:             registry.MustNewMetric("agent_steps", metrics.Trend),
+		toolCalls:         registry.MustNewMetric("agent_tool_calls", metrics.Counter),
+		tokens:            registry.MustNewMetric("agent_tokens", metrics.Counter),
+		cost:              registry.MustNewMetric("agent_cost_usd", metrics.Counter),
+		costMicroUsd:      registry.MustNewMetric("agent_cost_microusd", metrics.Counter),
+		toolCorrectness:   registry.MustNewMetric("agent_tool_correctness", metrics.Rate),
+		qualityScore:      registry.MustNewMetric("agent_quality_score", metrics.Trend),
+		judgePass:         registry.MustNewMetric("agent_judge_pass", metrics.Rate),
+		judgeTokens:       registry.MustNewMetric("agent_judge_tokens", metrics.Counter),
+		judgeCost:         registry.MustNewMetric("agent_judge_cost_usd", metrics.Counter),
+		judgeCostMicroUsd: registry.MustNewMetric("agent_judge_cost_microusd", metrics.Counter),
 	}
 }
 

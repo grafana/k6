@@ -187,6 +187,8 @@ func (mi *ModuleInstance) emitJudgeCost(tags *metrics.TagSet, prov provider, mod
 	if info, ok := prov.model(modelName); ok {
 		cost := float64(u.inputTokens)/1e6*info.inUSDPerMTok + float64(u.outputTokens)/1e6*info.outUSDPerMTok
 		pushSample(mi.vu, mi.metrics.judgeCost, jt, cost)
+		// Also emit micro-USD (integer-scale) so sub-cent costs survive cloud rounding.
+		pushSample(mi.vu, mi.metrics.judgeCostMicroUsd, jt, cost*1e6)
 	}
 }
 
