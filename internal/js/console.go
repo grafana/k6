@@ -47,7 +47,7 @@ func (c console) log(level logrus.Level, args ...sobek.Value) {
 		}
 		strs.WriteString(c.valueString(args[i]))
 	}
-	msg := strs.String()
+	msg := escapeConsoleControlChars(strs.String())
 
 	switch level {
 	case logrus.DebugLevel:
@@ -61,6 +61,33 @@ func (c console) log(level logrus.Level, args ...sobek.Value) {
 	default:
 		panic("unsupported log level: " + level.String())
 	}
+}
+
+func escapeConsoleControlChars(msg string) string {
+	var escaped strings.Builder
+	for _, r := range msg {
+		switch r {
+		case '\n', '\t':
+			escaped.WriteRune(r)
+		case '\r':
+			escaped.WriteString(`\r`)
+		case '\a':
+			escaped.WriteString(`\a`)
+		case '\b':
+			escaped.WriteString(`\b`)
+		case '\f':
+			escaped.WriteString(`\f`)
+		case '\v':
+			escaped.WriteString(`\v`)
+		default:
+			if r < ' ' || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
+				escaped.WriteString(fmt.Sprintf(`\x%02x`, r))
+				continue
+			}
+			escaped.WriteRune(r)
+		}
+	}
+	return escaped.String()
 }
 
 func (c console) Log(args ...sobek.Value) {
