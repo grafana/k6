@@ -30,7 +30,7 @@ require (
 	github.com/klauspost/compress v1.18.5
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mattn/go-isatty v0.0.22
-	github.com/mccutchen/go-httpbin/v2 v2.23.0
+	github.com/mccutchen/go-httpbin/v2 v2.23.1
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
