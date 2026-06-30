@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -12,6 +13,22 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
+
+type recordingConn struct {
+	connection
+	calls []struct {
+		method string
+		params any
+	}
+}
+
+func (c *recordingConn) Execute(_ context.Context, method string, params, _ any) error {
+	c.calls = append(c.calls, struct {
+		method string
+		params any
+	}{method: method, params: params})
+	return nil
+}
 
 func TestNewBrowserContext(t *testing.T) {
 	t.Parallel()
@@ -22,6 +39,7 @@ func TestNewBrowserContext(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		logger := log.NewNullLogger()
 		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), logger)
+		b.conn = &recordingConn{}
 
 		vu := k6test.NewVU(t)
 		ctx = k6ext.WithVU(ctx, vu)
@@ -75,6 +93,70 @@ func TestSetDownloadsPath(t *testing.T) {
 		assert.DirExists(t, bc.DownloadsPath)
 		require.NoError(t, bc.cleanup())
 		assert.NoDirExists(t, bc.DownloadsPath)
+	})
+}
+
+func TestSetDownloadBehavior(t *testing.T) {
+	t.Parallel()
+
+	newBrowserCtx := func(t *testing.T, opts *BrowserOptions) (*BrowserContext, *recordingConn) {
+		t.Helper()
+
+		conn := &recordingConn{}
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+
+		b := newBrowser(context.Background(), ctx, cancel, nil, opts, log.NewNullLogger())
+		b.conn = conn
+
+		return &BrowserContext{
+			ctx:     ctx,
+			browser: b,
+			id:      "test-ctx-id",
+			logger:  log.NewNullLogger(),
+		}, conn
+	}
+
+	t.Run("allow", func(t *testing.T) {
+		t.Parallel()
+
+		bc, conn := newBrowserCtx(t, NewLocalBrowserOptions())
+		bc.DownloadsPath = "/tmp/downloads"
+
+		require.NoError(t, bc.setDownloadBehavior(true))
+		require.Len(t, conn.calls, 1)
+		assert.Equal(t, "Browser.setDownloadBehavior", conn.calls[0].method)
+
+		params, ok := conn.calls[0].params.(*cdpbrowser.SetDownloadBehaviorParams)
+		require.True(t, ok)
+		assert.Equal(t, cdpbrowser.SetDownloadBehaviorBehaviorAllow, params.Behavior)
+		assert.Equal(t, "/tmp/downloads", params.DownloadPath)
+	})
+
+	t.Run("deny", func(t *testing.T) {
+		t.Parallel()
+
+		bc, conn := newBrowserCtx(t, NewLocalBrowserOptions())
+
+		require.NoError(t, bc.setDownloadBehavior(false))
+		require.Len(t, conn.calls, 1)
+
+		params, ok := conn.calls[0].params.(*cdpbrowser.SetDownloadBehaviorParams)
+		require.True(t, ok)
+		assert.Equal(t, cdpbrowser.SetDownloadBehaviorBehaviorDeny, params.Behavior)
+	})
+
+	t.Run("remote_browser_denies_downloads", func(t *testing.T) {
+		t.Parallel()
+
+		bc, conn := newBrowserCtx(t, NewRemoteBrowserOptions())
+
+		require.NoError(t, bc.setDownloadBehavior(true))
+		require.Len(t, conn.calls, 1)
+
+		params, ok := conn.calls[0].params.(*cdpbrowser.SetDownloadBehaviorParams)
+		require.True(t, ok)
+		assert.Equal(t, cdpbrowser.SetDownloadBehaviorBehaviorDeny, params.Behavior)
 	})
 }
 

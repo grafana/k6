@@ -106,6 +106,32 @@ func (b *BrowserContext) setDownloadsPath(path string) error {
 	return nil
 }
 
+// setDownloadBehavior sets the download behavior for the browser context based on the acceptDownloads flag.
+func (b *BrowserContext) setDownloadBehavior(acceptDownloads bool) error {
+	// Downloads are not supported in remote browsers for security reasons.
+	if b.browser.browserOpts.isRemoteBrowser && acceptDownloads {
+		b.logger.Warnf("BrowserContext:setDownloadBehavior", "downloads are not supported in remote browsers, disabling acceptDownloads")
+		acceptDownloads = false
+	}
+
+	var behavior cdpbrowser.SetDownloadBehaviorBehavior
+	if acceptDownloads {
+		behavior = cdpbrowser.SetDownloadBehaviorBehaviorAllow
+	} else {
+		behavior = cdpbrowser.SetDownloadBehaviorBehaviorDeny
+	}
+
+	action := cdpbrowser.
+		SetDownloadBehavior(behavior).
+		WithDownloadPath(b.DownloadsPath).
+		WithBrowserContextID(b.id)
+	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		return fmt.Errorf("set download behavior: %w", err)
+	}
+
+	return nil
+}
+
 // cleanup cleans up the resources associated with the browser context.
 func (b *BrowserContext) cleanup() error {
 	if err := os.RemoveAll(b.DownloadsPath); err != nil { //nolint:forbidigo
@@ -155,6 +181,9 @@ func NewBrowserContext(
 	}
 	if err := b.setDownloadsPath(opts.DownloadsPath); err != nil {
 		return nil, fmt.Errorf("setting downloads path: %w", err)
+	}
+	if err := b.setDownloadBehavior(opts.AcceptDownloads); err != nil {
+		return nil, fmt.Errorf("setting download behavior: %w", err)
 	}
 
 	return &b, nil
