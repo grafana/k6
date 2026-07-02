@@ -20,10 +20,13 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Resolve Go versions
+        id: go_versions
+        uses: ./.github/actions/go-versions
       - name: Install Go
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
-          go-version: 1.26.x
+          go-version: ${{ steps.go_versions.outputs.current }}
           check-latest: true
       - name: Check dependencies
         run: |
