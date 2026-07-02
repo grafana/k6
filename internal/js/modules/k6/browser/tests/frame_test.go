@@ -77,6 +77,90 @@ func TestFrameDismissDialogBox(t *testing.T) {
 	}
 }
 
+func TestPageOnDialogAccept(t *testing.T) {
+	t.Parallel()
+
+	var (
+		tb = newTestBrowser(t, withFileServer())
+		p  = tb.NewPage(nil)
+	)
+
+	err := p.On(common.PageEventDialog, func(event common.PageEvent) error {
+		return event.Dialog.Accept()
+	})
+	require.NoError(t, err)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	_, err = p.Goto(tb.staticURL("dialog.html?dialogType=alert"), opts)
+	require.NoError(t, err)
+
+	result, ok, err := p.TextContent("#textField", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.EqualValues(t, "alert dismissed", result)
+}
+
+func TestPageOnDialogDismiss(t *testing.T) {
+	t.Parallel()
+
+	var (
+		tb = newTestBrowser(t, withFileServer())
+		p  = tb.NewPage(nil)
+	)
+
+	err := p.On(common.PageEventDialog, func(event common.PageEvent) error {
+		return event.Dialog.Dismiss()
+	})
+	require.NoError(t, err)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	_, err = p.Goto(tb.staticURL("dialog.html?dialogType=confirm"), opts)
+	require.NoError(t, err)
+
+	result, ok, err := p.TextContent("#textField", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.EqualValues(t, "confirm dismissed", result)
+}
+
+func TestPageOnDialogAutoDissmissWhenHandlerDoesNotHandle(t *testing.T) {
+	t.Parallel()
+
+	var (
+		tb      = newTestBrowser(t, withFileServer())
+		p       = tb.NewPage(nil)
+		handled = false
+	)
+
+	// Register a handler that deliberately does not call Accept or Dismiss.
+	err := p.On(common.PageEventDialog, func(_ common.PageEvent) error {
+		handled = true
+		return nil
+	})
+	require.NoError(t, err)
+
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventNetworkIdle,
+		Timeout:   common.DefaultTimeout,
+	}
+	// The dialog must be auto-dismissed so that navigation completes.
+	_, err = p.Goto(tb.staticURL("dialog.html?dialogType=alert"), opts)
+	require.NoError(t, err)
+
+	assert.True(t, handled, "handler must have been called")
+
+	result, ok, err := p.TextContent("#textField", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.EqualValues(t, "alert dismissed", result)
+}
+
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	t.Parallel()
 

@@ -688,6 +688,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					return mapRequestEvent(vu, pe), nil
 				case common.PageEventMetric:
 					// intentionally left blank
+				case common.PageEventDialog:
+					// PageEventDialog is intentionally excluded from waitForEvent.
+					// Dialogs must be handled synchronously via page.on('dialog') because
+					// the browser blocks until the dialog is accepted or dismissed. A
+					// promise-based waitForEvent would deadlock waiting for user code to
+					// resolve the promise while the browser is stalled on the open dialog.
 				}
 				return nil, fmt.Errorf("waitForEvent does not support mapping for event: %q", event)
 			}
@@ -781,6 +787,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			wait bool // Whether to wait for the handler to complete.
 		}{
 			common.PageEventConsole:         {mapp: mapConsoleMessage},
+			common.PageEventDialog:          {mapp: mapDialog, wait: true},
 			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true},
 			common.PageEventRequest:         {mapp: mapRequestEvent},
 			common.PageEventResponse:        {mapp: mapResponseEvent},
