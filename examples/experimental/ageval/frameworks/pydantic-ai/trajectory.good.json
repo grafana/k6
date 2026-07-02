@@ -1,0 +1,25 @@
+{
+    "input": "Was invoice INV-123 for alice@example.com paid?",
+    "output": "Yes, invoice INV-123 has been paid. It was for $99.00 USD and is associated with the account for alice@example.com.",
+    "model": "claude-haiku-4-5",
+    "toolCalls": [
+        {
+            "name": "get_customer",
+            "input": {
+                "email": "alice@example.com"
+            },
+            "output": "{\"id\": \"cust_123\", \"name\": \"Alice\", \"plan\": \"Pro\"}"
+        },
+        {
+            "name": "get_invoice",
+            "input": {
+                "invoice_id": "INV-123"
+            },
+            "output": "{\"status\": \"paid\", \"amount\": 99, \"currency\": \"USD\", \"customer\": \"cust_123\"}"
+        }
+    ],
+    "usage": {
+        "inputTokens": 1602,
+        "outputTokens": 136
+    }
+}

@@ -1,0 +1,25 @@
+{
+    "input": "Acme Corp",
+    "output": "**Final Answer:**\n\nAcme Corp is a widget manufacturer founded in 1998 and headquartered in Springfield.",
+    "model": "claude-haiku-4-5",
+    "toolCalls": [
+        {
+            "name": "lookup_company",
+            "input": {
+                "name": "Acme Corp"
+            },
+            "output": "{\"founded\": 1998, \"industry\": \"widgets\", \"hq\": \"Springfield\"}"
+        },
+        {
+            "name": "publish_summary",
+            "input": {
+                "summary": "Acme Corp is a widget manufacturer founded in 1998 and headquartered in Springfield."
+            },
+            "output": "published"
+        }
+    ],
+    "usage": {
+        "inputTokens": 5938,
+        "outputTokens": 468
+    }
+}
