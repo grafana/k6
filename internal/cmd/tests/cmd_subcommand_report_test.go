@@ -62,6 +62,12 @@ func TestSubcommandReportsUsage(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "subcommand absent from catalog is dropped",
+			args:           []string{"x", "testsub"},
+			catalog:        `{"other": {"subcommands":["other"],"module":"example.com/x-other"}}`,
+			wantExtensions: nil,
+		},
 	}
 
 	for _, tc := range tt {
