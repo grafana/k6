@@ -61,15 +61,22 @@ func TestRunReportsExtensions(t *testing.T) {
 	registerRunReportTestExtensions(t)
 
 	tt := []struct {
-		name           string
-		args           []string
-		script         string
-		catalog        string
-		wantExtensions []map[string]any
+		name                string
+		args                []string
+		script              string
+		catalog             string
+		wantExtensions      []map[string]any
+		wantNoExtensionsKey bool
 	}{
 		{
 			name:   "sends the usage report to the configured endpoint",
 			script: `export default function() {};`,
+		},
+		{
+			name:                "compiled but unused extension omits the extensions key",
+			script:              `export default function() {};`,
+			catalog:             `{"k6/x/testimport": {"module":"` + testImportModule + `"}}`,
+			wantNoExtensionsKey: true,
 		},
 		{
 			name:    "used public import is reported",
@@ -161,6 +168,16 @@ func TestRunReportsExtensions(t *testing.T) {
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			require.True(t, reported.Load(), "expected the usage report to reach the configured endpoint")
+
+			if tc.wantNoExtensionsKey {
+				raw, ok := gotBody.Load().([]byte)
+				require.True(t, ok, "expected a report body")
+				var report map[string]json.RawMessage
+				require.NoError(t, json.Unmarshal(raw, &report))
+				_, present := report["extensions"]
+				require.False(t, present, "expected no extensions key when nothing catalogued was used")
+				return
+			}
 
 			if tc.wantExtensions == nil {
 				return
