@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -80,6 +81,27 @@ Run "k6 x explore" to see the full list of official and community-provided subco
 	cmd.AddCommand(registryStubs(gs, baked)...)
 
 	return cmd
+}
+
+// reportSubcommandUsage reports usage for a subcommand extension after it runs.
+// It is called with the command cobra actually executed, whether that command
+// succeeded or failed, so a subcommand that exits non-zero is still counted. It
+// reports only for a name backed by a registered subcommand extension, so the
+// catch-all `x` help, `k6 run`, completions, and provisioning stubs are ignored.
+func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
+	if executed == nil {
+		return
+	}
+	extension, ok := ext.Get(ext.SubcommandExtension)[executed.Name()]
+	if !ok {
+		return
+	}
+	if conf, err := readEnvConfig(gs.Env); err != nil || conf.NoUsageReport.Bool {
+		return
+	}
+	reportUsage(gs.Ctx, gs, func(ctx context.Context) map[string]any {
+		return createSubcommandReport(ctx, gs, extension)
+	})
 }
 
 // registryStubs returns cobra stubs for registry-advertised subcommands not

@@ -460,15 +460,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// usage report after the context is done.
 	if !conf.NoUsageReport.Bool {
 		backgroundProcesses.Go(func() {
-			reportCtx, reportCancel := context.WithTimeout(globalCtx, 3*time.Second)
-			defer reportCancel()
-			logger.Debug("Sending usage report...")
-
-			if rerr := reportUsage(reportCtx, c.gs, execScheduler, test); rerr != nil {
-				logger.WithError(rerr).Debug("Error sending usage report")
-			} else {
-				logger.Debug("Usage report sent successfully")
-			}
+			reportUsage(globalCtx, c.gs, func(ctx context.Context) map[string]any {
+				return createReport(test.preInitState.Usage, execScheduler, catalogModulePaths(ctx, c.gs))
+			})
 		})
 	}
 
