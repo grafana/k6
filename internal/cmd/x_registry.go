@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -69,6 +70,12 @@ func catalogMajorVersion() string {
 	return v
 }
 
+// catalogURL returns the extension registry catalog URL, honouring the
+// K6_PROVISION_CATALOG_URL override.
+func catalogURL(gs *state.GlobalState) string {
+	return cmp.Or(gs.Env[state.ProvisionCatalogURL], defaultCatalogURL())
+}
+
 // catalogCachePath returns the on-disk location of the k6 extension registry
 // catalog cache, alongside the build cache so both share the user cache dir.
 func catalogCachePath(gs *state.GlobalState) string {
@@ -79,23 +86,9 @@ func catalogCachePath(gs *state.GlobalState) string {
 // cache. A missing or stale cache returns (nil, nil); real I/O or parse
 // failures return an error so the caller can surface them at debug.
 func readCachedCatalog(gs *state.GlobalState, cachePath string) (registrySubcommands, error) {
-	maxAge := 24 * time.Hour
-	if d, err := time.ParseDuration(gs.Env[state.ProvisionCatalogTTL]); err == nil {
-		maxAge = d
-	}
-	info, err := gs.FS.Stat(cachePath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("checking extensions cache: %w", err)
-	}
-	if time.Since(info.ModTime()) > maxAge {
-		return nil, nil
-	}
-	raw, err := fsext.ReadFile(gs.FS, cachePath)
-	if err != nil {
-		return nil, fmt.Errorf("reading extensions cache: %w", err)
+	raw, err := readCachedCatalogBytes(gs, cachePath)
+	if raw == nil || err != nil {
+		return nil, err
 	}
 	var subs registrySubcommands
 	if err := json.Unmarshal(raw, &subs); err != nil {
@@ -134,6 +127,86 @@ func fetchCatalog(ctx context.Context, url string) (registrySubcommands, []byte,
 		return nil, nil, fmt.Errorf("parsing extensions catalog: %w", err)
 	}
 	return subs, raw, nil
+}
+
+// catalogModulePaths returns the set of Go module paths advertised in the k6
+// extension registry catalog. It shares the same cache file, TTL, and
+// K6_PROVISION_CATALOG_URL override as `k6 x`: it reads the on-disk cache and,
+// on a miss, fetches the catalog and writes the fresh bytes back. The caller
+// bounds ctx so the fetch stays non-fatal and off the run's hot path; any
+// failure yields an empty set.
+func catalogModulePaths(ctx context.Context, gs *state.GlobalState) map[string]struct{} {
+	cachePath := catalogCachePath(gs)
+	raw, err := readCachedCatalogBytes(gs, cachePath)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("k6 extension catalog")
+	}
+	if raw == nil {
+		raw, err = fetchCatalogBytes(ctx, gs, cachePath)
+		if err != nil {
+			gs.Logger.WithError(err).Debug("k6 extension catalog")
+			return nil
+		}
+	}
+	return parseCatalogModulePaths(raw)
+}
+
+// readCachedCatalogBytes returns the raw catalog cache bytes when the cache
+// exists and is fresh, honouring the K6_PROVISION_CATALOG_TTL override. A miss
+// (absent or stale cache) returns (nil, nil); real I/O failures return an
+// error so the caller can surface them at debug.
+func readCachedCatalogBytes(gs *state.GlobalState, cachePath string) ([]byte, error) {
+	maxAge := 24 * time.Hour
+	if d, err := time.ParseDuration(gs.Env[state.ProvisionCatalogTTL]); err == nil {
+		maxAge = d
+	}
+	info, err := gs.FS.Stat(cachePath)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("checking extensions cache: %w", err)
+	}
+	if time.Since(info.ModTime()) > maxAge {
+		return nil, nil
+	}
+	raw, err := fsext.ReadFile(gs.FS, cachePath)
+	if err != nil {
+		return nil, fmt.Errorf("reading extensions cache: %w", err)
+	}
+	return raw, nil
+}
+
+// fetchCatalogBytes downloads the catalog exactly as `k6 x` does, honouring the
+// K6_PROVISION_CATALOG_URL override, and writes the fresh bytes to the cache.
+func fetchCatalogBytes(ctx context.Context, gs *state.GlobalState, cachePath string) ([]byte, error) {
+	_, raw, err := fetchCatalog(ctx, catalogURL(gs))
+	if err != nil {
+		return nil, err
+	}
+	if err := writeCachedCatalog(gs, cachePath, raw); err != nil {
+		gs.Logger.WithError(err).Debug("k6 extension catalog")
+	}
+	return raw, nil
+}
+
+// parseCatalogModulePaths reads the per-entry "module" field the
+// registrySubcommands decoder drops, collecting each catalog entry's Go module
+// path into a set. Entries without a module path are skipped.
+func parseCatalogModulePaths(raw []byte) map[string]struct{} {
+	var catalog map[string]struct {
+		Module string `json:"module"`
+	}
+	if err := json.Unmarshal(raw, &catalog); err != nil {
+		return nil
+	}
+	paths := make(map[string]struct{}, len(catalog))
+	for _, e := range catalog {
+		if e.Module != "" {
+			paths[e.Module] = struct{}{}
+		}
+	}
+	return paths
 }
 
 // writeCachedCatalog persists raw catalog bytes under cachePath, creating any

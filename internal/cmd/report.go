@@ -9,12 +9,30 @@ import (
 	"strconv"
 
 	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/execution"
 	"go.k6.io/k6/v2/internal/usage"
 )
 
-func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string]any {
+// extensionEntry identifies a used extension in the usage report by its Go
+// module path, along with its version and kind.
+type extensionEntry struct {
+	Module  string `json:"module"`
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+}
+
+// newExtensionEntry builds the usage-report entry for a registered extension.
+func newExtensionEntry(e *ext.Extension) extensionEntry {
+	return extensionEntry{
+		Module:  e.Path,
+		Version: e.Version,
+		Kind:    e.Type.String(),
+	}
+}
+
+func createReport(u *usage.Usage, execScheduler *execution.Scheduler, catalog map[string]struct{}) map[string]any {
 	execState := execScheduler.GetState()
 	m := u.Map()
 
@@ -31,15 +49,57 @@ func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string
 	m["executors"] = executors
 	m["is_ci"] = isCI(execState.Test.LookupEnv)
 
+	resolveExtensions(m, catalog)
+
 	return m
+}
+
+// resolveExtensions replaces the used extensions recorded under "extensions" in
+// usage with report entries, keeping only those advertised in the public
+// catalog. Fail closed: dropping the raw list first means an empty catalog
+// reports no extensions rather than leaking it, and the key stays omitted when
+// nothing survives instead of sending [].
+func resolveExtensions(m map[string]any, catalog map[string]struct{}) {
+	used, ok := m["extensions"].([]any)
+	if !ok {
+		return
+	}
+	delete(m, "extensions")
+	if entries := filterExtensions(used, catalog); len(entries) > 0 {
+		m["extensions"] = entries
+	}
+}
+
+// filterExtensions turns the recorded used extensions into report entries,
+// keeping only those whose module path is advertised in the public catalog and
+// de-duplicating per (module, kind).
+func filterExtensions(used []any, public map[string]struct{}) []extensionEntry {
+	seen := make(map[[2]string]struct{}, len(used))
+	entries := make([]extensionEntry, 0, len(used))
+	for _, v := range used {
+		e, ok := v.(*ext.Extension)
+		if !ok {
+			continue
+		}
+		if _, ok := public[e.Path]; !ok {
+			continue
+		}
+		key := [2]string{e.Path, e.Type.String()}
+		if _, dup := seen[key]; dup {
+			continue
+		}
+		seen[key] = struct{}{}
+		entries = append(entries, newExtensionEntry(e))
+	}
+	return entries
 }
 
 // defaultUsageReportURL is the production endpoint the anonymous usage report
 // is sent to when K6_USAGE_REPORT_URL is not set.
 const defaultUsageReportURL = "https://stats.grafana.org/k6-usage-report"
 
-func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
-	m := createReport(test.preInitState.Usage, execScheduler)
+func reportUsage(ctx context.Context, gs *state.GlobalState, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
+	m := createReport(test.preInitState.Usage, execScheduler, catalogModulePaths(ctx, gs))
 	body, err := json.Marshal(m)
 	if err != nil {
 		return err

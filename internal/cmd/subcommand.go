@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -107,7 +106,7 @@ func registryStubs(gs *state.GlobalState, baked []*cobra.Command) []*cobra.Comma
 		gs.Logger.WithError(err).Debug("k6 extension catalog")
 	}
 	if subs == nil && first == 0 { // first == 0: not TAB completion, network allowed
-		url := cmp.Or(gs.Env[state.ProvisionCatalogURL], defaultCatalogURL())
+		url := catalogURL(gs)
 		_, _ = fmt.Fprint(gs.Stderr, "Loading the subcommand list...")
 		tail := "\n\n"
 		if gs.Stderr.IsTTY {
