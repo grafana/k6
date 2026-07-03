@@ -155,6 +155,15 @@ func TestRunReportsExtensions(t *testing.T) {
 			},
 		},
 		{
+			// The output extension is used but its module path is absent from the
+			// catalog, so the shared filter must drop it just like a JS import.
+			name:                "output extension not in the catalog is dropped",
+			args:                []string{"--out", "testoutput"},
+			script:              `export default function() {};`,
+			catalog:             `{"k6/x/testimport": {"module":"` + testImportModule + `"}}`,
+			wantNoExtensionsKey: true,
+		},
+		{
 			name:    "extension not in the catalog is filtered out",
 			script:  `import "k6/x/testimport"; import "k6/x/testimport2"; export default function() {};`,
 			catalog: `{"k6/x/testimport2": {"module":"` + testImportModule2 + `"}}`,
