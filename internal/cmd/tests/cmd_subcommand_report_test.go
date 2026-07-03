@@ -8,7 +8,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
@@ -16,6 +18,7 @@ import (
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/cmd"
+	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/subcommand"
 )
 
@@ -50,6 +53,7 @@ func TestSubcommandReportsUsage(t *testing.T) {
 		args               []string
 		catalog            string
 		unreachableCatalog bool
+		slowReport         bool
 		wantNoReport       bool
 		wantExitCode       int
 		wantExtensions     []map[string]any
@@ -82,6 +86,15 @@ func TestSubcommandReportsUsage(t *testing.T) {
 			wantNoReport:       true,
 			wantExitCode:       int(exitcodes.ScriptException),
 		},
+		{
+			// A slow report endpoint must not delay or fail the command: the send
+			// is abandoned within the bounded timeout, the command still exits 0,
+			// and only a debug-level log records the failure.
+			name:       "slow endpoint does not delay or fail the command",
+			args:       []string{"x", "testsub", "-v"},
+			catalog:    `{"testsub": {"subcommands":["testsub"],"module":"` + testSubModule + `"}}`,
+			slowReport: true,
+		},
 	}
 
 	for _, tc := range tt {
@@ -90,7 +103,17 @@ func TestSubcommandReportsUsage(t *testing.T) {
 
 			var reportCount atomic.Int32
 			var gotBody atomic.Value
+			released := make(chan struct{})
 			reportServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if tc.slowReport {
+					// Hang past the bounded timeout so the client abandons the send;
+					// release only at cleanup to avoid leaking the handler goroutine.
+					select {
+					case <-r.Context().Done():
+					case <-released:
+					}
+					return
+				}
 				if r.Method == http.MethodPost {
 					body, _ := io.ReadAll(r.Body)
 					gotBody.Store(body)
@@ -98,7 +121,9 @@ func TestSubcommandReportsUsage(t *testing.T) {
 				}
 				w.WriteHeader(http.StatusOK)
 			}))
+			// Release the hung handler before Close waits on it (cleanups run LIFO).
 			t.Cleanup(reportServer.Close)
+			t.Cleanup(func() { close(released) })
 
 			var catalogHit atomic.Bool
 
@@ -128,7 +153,30 @@ func TestSubcommandReportsUsage(t *testing.T) {
 			ts.CmdArgs = append([]string{"k6"}, tc.args...)
 			ts.ReparseFlags()
 
+			start := time.Now()
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			elapsed := time.Since(start)
+
+			if tc.slowReport {
+				// Exit 0 (default, asserted by the harness) with the send abandoned
+				// within the bounded run-report timeout, surfacing the failure only
+				// at debug level.
+				require.Equal(t, int32(0), reportCount.Load(), "expected the slow send to be abandoned")
+				require.Less(t, elapsed, 10*time.Second, "expected the slow send to be abandoned within the bounded timeout")
+
+				entries := ts.LoggerHook.Drain()
+				require.True(t,
+					testutils.LogContains(entries, logrus.DebugLevel, "Error sending usage report"),
+					"expected a debug-level log for the failed usage report",
+				)
+				for _, e := range entries {
+					if e.Level < logrus.DebugLevel {
+						require.NotContains(t, e.Message, "usage report",
+							"expected the report failure to surface only at debug level")
+					}
+				}
+				return
+			}
 
 			if tc.wantNoReport {
 				require.Equal(t, int32(0), reportCount.Load(), "expected no usage report for an unknown subcommand")
