@@ -62,6 +62,7 @@ func TestRunReportsExtensions(t *testing.T) {
 
 	tt := []struct {
 		name           string
+		args           []string
 		script         string
 		catalog        string
 		wantExtensions []map[string]any
@@ -72,6 +73,19 @@ func TestRunReportsExtensions(t *testing.T) {
 		},
 		{
 			name:    "used public import is reported",
+			script:  `import "k6/x/testimport"; export default function() {};`,
+			catalog: `{"k6/x/testimport": {"module":"` + testImportModule + `"}}`,
+			wantExtensions: []map[string]any{
+				{
+					"module":  testImportModule,
+					"version": ext.Get(ext.JSExtension)["k6/x/testimport"].Version,
+					"kind":    "js",
+				},
+			},
+		},
+		{
+			name:    "module imported by many VUs is reported once",
+			args:    []string{"--vus", "5", "--iterations", "5"},
 			script:  `import "k6/x/testimport"; export default function() {};`,
 			catalog: `{"k6/x/testimport": {"module":"` + testImportModule + `"}}`,
 			wantExtensions: []map[string]any{
@@ -123,7 +137,8 @@ func TestRunReportsExtensions(t *testing.T) {
 				t.Cleanup(catalogServer.Close)
 				ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
 			}
-			ts.CmdArgs = []string{"k6", "run", "-"}
+			ts.CmdArgs = append([]string{"k6", "run"}, tc.args...)
+			ts.CmdArgs = append(ts.CmdArgs, "-")
 			ts.Stdin = bytes.NewBufferString(tc.script)
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
