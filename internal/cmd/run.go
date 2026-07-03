@@ -464,7 +464,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			defer reportCancel()
 			logger.Debug("Sending usage report...")
 
-			if rerr := reportUsage(reportCtx, execScheduler, test); rerr != nil {
+			if rerr := reportUsage(reportCtx, c.gs, execScheduler, test); rerr != nil {
 				logger.WithError(rerr).Debug("Error sending usage report")
 			} else {
 				logger.Debug("Usage report sent successfully")
