@@ -18,6 +18,8 @@ import (
 	"go.k6.io/k6/v2/internal/cmd/tests/testfork"
 	"go.k6.io/k6/v2/internal/cmd/tests/testimport2"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 )
 
 // testImportModule is the resolved module path of the in-tree k6/x/testimport
@@ -30,6 +32,20 @@ const testImportModule = "go.k6.io/k6/v2/internal/cmd/tests"
 // extension. Its module type lives in its own Go package, so it resolves to a
 // distinct path from testImportModule.
 const testImportModule2 = "go.k6.io/k6/v2/internal/cmd/tests/testimport2"
+
+// newReportTestOutput is the output extension constructor registered under the
+// "testoutput" name. Its resolved module path is the runtime name of this
+// function, read back via ext.Get(ext.OutputExtension)["testoutput"].Path.
+func newReportTestOutput(output.Params) (output.Output, error) {
+	return reportTestOutput{}, nil
+}
+
+type reportTestOutput struct{}
+
+func (reportTestOutput) Description() string                        { return "testoutput" }
+func (reportTestOutput) Start() error                               { return nil }
+func (reportTestOutput) AddMetricSamples([]metrics.SampleContainer) {}
+func (reportTestOutput) Stop() error                                { return nil }
 
 type runReportTestModule struct{}
 
@@ -54,6 +70,7 @@ func registerRunReportTestExtensions(t *testing.T) {
 		modules.Register("k6/x/testimport", &runReportTestModule{})
 		modules.Register("k6/x/testimport2", &testimport2.Module{})
 		modules.Register("k6/x/testfork", &testfork.Module{})
+		output.RegisterExtension("testoutput", newReportTestOutput)
 	})
 }
 
@@ -121,6 +138,19 @@ func TestRunReportsExtensions(t *testing.T) {
 					"module":  testImportModule2,
 					"version": ext.Get(ext.JSExtension)["k6/x/testimport2"].Version,
 					"kind":    "js",
+				},
+			},
+		},
+		{
+			name:    "selected output extension is reported",
+			args:    []string{"--out", "testoutput"},
+			script:  `export default function() {};`,
+			catalog: `{"testoutput": {"module":"` + ext.Get(ext.OutputExtension)["testoutput"].Path + `"}}`,
+			wantExtensions: []map[string]any{
+				{
+					"module":  ext.Get(ext.OutputExtension)["testoutput"].Path,
+					"version": ext.Get(ext.OutputExtension)["testoutput"].Version,
+					"kind":    "output",
 				},
 			},
 		},
