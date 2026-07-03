@@ -54,6 +54,8 @@ func TestSubcommandReportsUsage(t *testing.T) {
 		catalog            string
 		unreachableCatalog bool
 		slowReport         bool
+		optOut             bool
+		autoOff            bool
 		wantNoReport       bool
 		wantExitCode       int
 		wantExtensions     []map[string]any
@@ -95,6 +97,18 @@ func TestSubcommandReportsUsage(t *testing.T) {
 			catalog:    `{"testsub": {"subcommands":["testsub"],"module":"` + testSubModule + `"}}`,
 			slowReport: true,
 		},
+		{
+			// The existing opt-out gates the subcommand report too, so neither the
+			// report endpoint nor the catalog is consulted by the telemetry path
+			// even though the wrapped subcommand body still runs. Auto-resolution is
+			// off so the unrelated `k6 x` stub listing never touches the catalog,
+			// leaving the report as the only possible catalog consumer.
+			name:    "opt-out suppresses the subcommand report",
+			args:    []string{"x", "testsub"},
+			catalog: `{"testsub": {"subcommands":["testsub"],"module":"` + testSubModule + `"}}`,
+			optOut:  true,
+			autoOff: true,
+		},
 	}
 
 	for _, tc := range tt {
@@ -128,7 +142,14 @@ func TestSubcommandReportsUsage(t *testing.T) {
 			var catalogHit atomic.Bool
 
 			ts := NewGlobalTestState(t)
-			ts.Env["K6_NO_USAGE_REPORT"] = "false"
+			if tc.optOut {
+				ts.Env["K6_NO_USAGE_REPORT"] = "true"
+			} else {
+				ts.Env["K6_NO_USAGE_REPORT"] = "false"
+			}
+			if tc.autoOff {
+				ts.Env[state.AutoExtensionResolution] = "false"
+			}
 			ts.Env[state.UsageReportURL] = reportServer.URL
 			if tc.catalog != "" {
 				catalogServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -175,6 +196,12 @@ func TestSubcommandReportsUsage(t *testing.T) {
 							"expected the report failure to surface only at debug level")
 					}
 				}
+				return
+			}
+
+			if tc.optOut {
+				require.Equal(t, int32(0), reportCount.Load(), "expected the opt-out to suppress the usage report")
+				require.False(t, catalogHit.Load(), "expected the opt-out to suppress the catalog fetch")
 				return
 			}
 
