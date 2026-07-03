@@ -67,6 +67,7 @@ func TestRunReportsExtensions(t *testing.T) {
 		args                []string
 		script              string
 		catalog             string
+		unreachableCatalog  bool
 		wantExtensions      []map[string]any
 		wantNoExtensionsKey bool
 	}{
@@ -143,6 +144,15 @@ func TestRunReportsExtensions(t *testing.T) {
 			catalog:             `{"k6/x/testfork": {"module":"` + testImportModule + `"}}`,
 			wantNoExtensionsKey: true,
 		},
+		{
+			// An unreachable catalog with no cache must fail closed: report no
+			// extensions rather than leak the unfiltered import, and never fail
+			// the run.
+			name:                "unreachable catalog reports nothing",
+			script:              `import "k6/x/testimport"; export default function() {};`,
+			unreachableCatalog:  true,
+			wantNoExtensionsKey: true,
+		},
 	}
 
 	for _, tc := range tt {
@@ -170,6 +180,12 @@ func TestRunReportsExtensions(t *testing.T) {
 					_, _ = w.Write([]byte(tc.catalog))
 				}))
 				t.Cleanup(catalogServer.Close)
+				ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
+			}
+			if tc.unreachableCatalog {
+				// Close the server immediately so its URL refuses connections.
+				catalogServer := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+				catalogServer.Close()
 				ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
 			}
 			ts.CmdArgs = append([]string{"k6", "run"}, tc.args...)
