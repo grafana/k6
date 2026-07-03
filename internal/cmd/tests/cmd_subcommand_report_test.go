@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/subcommand"
@@ -45,10 +46,13 @@ func TestSubcommandReportsUsage(t *testing.T) {
 	testSubModule := ext.Get(ext.SubcommandExtension)["testsub"].Path
 
 	tt := []struct {
-		name           string
-		args           []string
-		catalog        string
-		wantExtensions []map[string]any
+		name               string
+		args               []string
+		catalog            string
+		unreachableCatalog bool
+		wantNoReport       bool
+		wantExitCode       int
+		wantExtensions     []map[string]any
 	}{
 		{
 			name:    "catalogued subcommand run is reported",
@@ -68,6 +72,16 @@ func TestSubcommandReportsUsage(t *testing.T) {
 			catalog:        `{"other": {"subcommands":["other"],"module":"example.com/x-other"}}`,
 			wantExtensions: nil,
 		},
+		{
+			// An unregistered name cannot be provisioned from an unreachable
+			// catalog, so the host builds no command for it and the wrapped hook
+			// never runs. Neither the report endpoint nor the catalog is consulted.
+			name:               "unknown subcommand is not reported",
+			args:               []string{"x", "not-a-catalog-name"},
+			unreachableCatalog: true,
+			wantNoReport:       true,
+			wantExitCode:       int(exitcodes.ScriptException),
+		},
 	}
 
 	for _, tc := range tt {
@@ -86,21 +100,41 @@ func TestSubcommandReportsUsage(t *testing.T) {
 			}))
 			t.Cleanup(reportServer.Close)
 
+			var catalogHit atomic.Bool
+
 			ts := NewGlobalTestState(t)
 			ts.Env["K6_NO_USAGE_REPORT"] = "false"
 			ts.Env[state.UsageReportURL] = reportServer.URL
 			if tc.catalog != "" {
 				catalogServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					catalogHit.Store(true)
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = w.Write([]byte(tc.catalog))
 				}))
 				t.Cleanup(catalogServer.Close)
 				ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
 			}
+			if tc.unreachableCatalog {
+				// Close the server immediately so its URL refuses connections.
+				catalogServer := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+					catalogHit.Store(true)
+				}))
+				catalogServer.Close()
+				ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
+				// Keep the provisioning attempt off the real build service.
+				ts.Env["K6_BUILD_SERVICE_URL"] = "http://127.0.0.1:1/unreachable"
+			}
+			ts.ExpectedExitCode = tc.wantExitCode
 			ts.CmdArgs = append([]string{"k6"}, tc.args...)
 			ts.ReparseFlags()
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			if tc.wantNoReport {
+				require.Equal(t, int32(0), reportCount.Load(), "expected no usage report for an unknown subcommand")
+				require.False(t, catalogHit.Load(), "expected no catalog request for an unknown subcommand")
+				return
+			}
 
 			require.Equal(t, int32(1), reportCount.Load(), "expected exactly one usage report")
 
