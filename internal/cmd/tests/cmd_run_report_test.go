@@ -88,6 +88,7 @@ func TestRunReportsExtensions(t *testing.T) {
 		optOut              bool
 		wantExtensions      []map[string]any
 		wantNoExtensionsKey bool
+		wantOutputs         []any
 	}{
 		{
 			name:   "sends the usage report to the configured endpoint",
@@ -153,6 +154,16 @@ func TestRunReportsExtensions(t *testing.T) {
 					"kind":    "output",
 				},
 			},
+		},
+		{
+			// A built-in output is classified by the built-in output enum and never
+			// enters the extensions bucket, so it is absent from "extensions" yet
+			// still listed under "outputs".
+			name:                "built-in output is not an extension",
+			args:                []string{"--out", "json"},
+			script:              `export default function() {};`,
+			wantNoExtensionsKey: true,
+			wantOutputs:         []any{"json"},
 		},
 		{
 			// The output extension is used but its module path is absent from the
@@ -256,6 +267,20 @@ func TestRunReportsExtensions(t *testing.T) {
 			}
 
 			require.True(t, reported.Load(), "expected the usage report to reach the configured endpoint")
+
+			if tc.wantOutputs != nil {
+				raw, ok := gotBody.Load().([]byte)
+				require.True(t, ok, "expected a report body")
+				var report struct {
+					Outputs    []any            `json:"outputs"`
+					Extensions []map[string]any `json:"extensions"`
+				}
+				require.NoError(t, json.Unmarshal(raw, &report))
+				require.Equal(t, tc.wantOutputs, report.Outputs, "expected the built-in output to stay listed under outputs")
+				for _, e := range report.Extensions {
+					require.NotEqual(t, "output", e["kind"], "expected no output-kind extension entry for a built-in output")
+				}
+			}
 
 			if tc.wantNoExtensionsKey {
 				raw, ok := gotBody.Load().([]byte)
