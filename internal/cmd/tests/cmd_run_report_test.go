@@ -97,6 +97,23 @@ func TestRunReportsExtensions(t *testing.T) {
 			},
 		},
 		{
+			name:    "distinct imported extensions are each reported",
+			script:  `import "k6/x/testimport"; import "k6/x/testimport2"; export default function() {};`,
+			catalog: `{"k6/x/testimport": {"module":"` + testImportModule + `"},"k6/x/testimport2": {"module":"` + testImportModule2 + `"}}`,
+			wantExtensions: []map[string]any{
+				{
+					"module":  testImportModule,
+					"version": ext.Get(ext.JSExtension)["k6/x/testimport"].Version,
+					"kind":    "js",
+				},
+				{
+					"module":  testImportModule2,
+					"version": ext.Get(ext.JSExtension)["k6/x/testimport2"].Version,
+					"kind":    "js",
+				},
+			},
+		},
+		{
 			name:    "extension not in the catalog is filtered out",
 			script:  `import "k6/x/testimport"; import "k6/x/testimport2"; export default function() {};`,
 			catalog: `{"k6/x/testimport2": {"module":"` + testImportModule2 + `"}}`,
