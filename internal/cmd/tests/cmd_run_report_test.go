@@ -68,6 +68,7 @@ func TestRunReportsExtensions(t *testing.T) {
 		script              string
 		catalog             string
 		unreachableCatalog  bool
+		optOut              bool
 		wantExtensions      []map[string]any
 		wantNoExtensionsKey bool
 	}{
@@ -153,6 +154,14 @@ func TestRunReportsExtensions(t *testing.T) {
 			unreachableCatalog:  true,
 			wantNoExtensionsKey: true,
 		},
+		{
+			// The existing opt-out gates the whole report, so neither the report
+			// endpoint nor the catalog is consulted.
+			name:    "opt-out suppresses the report and catalog fetch",
+			script:  `import "k6/x/testimport"; export default function() {};`,
+			catalog: `{"k6/x/testimport": {"module":"` + testImportModule + `"}}`,
+			optOut:  true,
+		},
 	}
 
 	for _, tc := range tt {
@@ -171,11 +180,18 @@ func TestRunReportsExtensions(t *testing.T) {
 			}))
 			t.Cleanup(reportServer.Close)
 
+			var catalogHit atomic.Bool
+
 			ts := NewGlobalTestState(t)
-			ts.Env["K6_NO_USAGE_REPORT"] = "false"
+			if tc.optOut {
+				ts.Env["K6_NO_USAGE_REPORT"] = "true"
+			} else {
+				ts.Env["K6_NO_USAGE_REPORT"] = "false"
+			}
 			ts.Env[state.UsageReportURL] = reportServer.URL
 			if tc.catalog != "" {
 				catalogServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					catalogHit.Store(true)
 					w.Header().Set("Content-Type", "application/json")
 					_, _ = w.Write([]byte(tc.catalog))
 				}))
@@ -193,6 +209,12 @@ func TestRunReportsExtensions(t *testing.T) {
 			ts.Stdin = bytes.NewBufferString(tc.script)
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			if tc.optOut {
+				require.False(t, reported.Load(), "expected the opt-out to suppress the usage report")
+				require.False(t, catalogHit.Load(), "expected the opt-out to suppress the catalog fetch")
+				return
+			}
 
 			require.True(t, reported.Load(), "expected the usage report to reach the configured endpoint")
 
