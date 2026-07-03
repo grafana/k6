@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/cmd"
+	"go.k6.io/k6/v2/internal/cmd/tests/testfork"
 	"go.k6.io/k6/v2/internal/cmd/tests/testimport2"
 	"go.k6.io/k6/v2/js/modules"
 )
@@ -52,6 +53,7 @@ func registerRunReportTestExtensions(t *testing.T) {
 	registerRunReportTestExtensionsOnce.Do(func() {
 		modules.Register("k6/x/testimport", &runReportTestModule{})
 		modules.Register("k6/x/testimport2", &testimport2.Module{})
+		modules.Register("k6/x/testfork", &testfork.Module{})
 	})
 }
 
@@ -131,6 +133,15 @@ func TestRunReportsExtensions(t *testing.T) {
 					"kind":    "js",
 				},
 			},
+		},
+		{
+			// The catalog lists the real extension's module path for this import
+			// name, but the imported fork resolves to its own path, so matching
+			// by module path drops it.
+			name:                "private fork reusing a public import name is dropped",
+			script:              `import "k6/x/testfork"; export default function() {};`,
+			catalog:             `{"k6/x/testfork": {"module":"` + testImportModule + `"}}`,
+			wantNoExtensionsKey: true,
 		},
 	}
 
