@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 
+	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/execution"
 	"go.k6.io/k6/v2/internal/usage"
@@ -33,6 +34,10 @@ func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string
 	return m
 }
 
+// defaultUsageReportURL is the production endpoint the anonymous usage report
+// is sent to when K6_USAGE_REPORT_URL is not set.
+const defaultUsageReportURL = "https://stats.grafana.org/k6-usage-report"
+
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
 	m := createReport(test.preInitState.Usage, execScheduler)
 	body, err := json.Marshal(m)
@@ -40,7 +45,10 @@ func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *
 		return err
 	}
 
-	const usageStatsURL = "https://stats.grafana.org/k6-usage-report"
+	usageStatsURL := defaultUsageReportURL
+	if url, ok := test.preInitState.LookupEnv(state.UsageReportURL); ok && url != "" {
+		usageStatsURL = url
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, usageStatsURL, bytes.NewBuffer(body))
 	if err != nil {
 		return err

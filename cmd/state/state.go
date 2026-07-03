@@ -44,6 +44,11 @@ const (
 	// to keep the command tree construction off the real network.
 	ProvisionCatalogURL = "K6_PROVISION_CATALOG_URL"
 
+	// UsageReportURL overrides the endpoint the anonymous usage report is sent
+	// to. It defaults to the production endpoint and lets tests point it at an
+	// httptest server to observe the report.
+	UsageReportURL = "K6_USAGE_REPORT_URL"
+
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
 
