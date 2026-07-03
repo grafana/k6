@@ -197,7 +197,11 @@ func (c *rootCommand) execute() {
 	if ext, ok := detectExtensionCompletion(c.cmd, c.globalState); ok {
 		err = completeExtension(c.globalState, ext, newCacheProvisioner(c.globalState))
 	} else {
-		err = c.cmd.Execute()
+		var executed *cobra.Command
+		executed, err = c.cmd.ExecuteC()
+		// Report subcommand usage after the command runs, regardless of its exit
+		// error, so a failed subcommand is still counted.
+		reportSubcommandUsage(c.globalState, executed)
 	}
 	if err == nil {
 		exitCode = 0

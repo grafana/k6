@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"runtime"
 	"strconv"
+	"time"
 
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/ext"
@@ -32,14 +33,35 @@ func newExtensionEntry(e *ext.Extension) extensionEntry {
 	}
 }
 
+// envLookup adapts an environment map to the lookup-function shape the report
+// helpers share with the run path's LookupEnv.
+func envLookup(env map[string]string) func(string) (string, bool) {
+	return func(key string) (string, bool) {
+		val, ok := env[key]
+		return val, ok
+	}
+}
+
+// addEnvironmentInfo stamps the fields identifying this k6 binary and where it
+// runs. Both the run report and the subcommand report carry them.
+func addEnvironmentInfo(m map[string]any, lookupEnv func(string) (string, bool)) {
+	m["k6_version"] = build.Version
+	m["goos"] = runtime.GOOS
+	m["goarch"] = runtime.GOARCH
+	m["is_ci"] = isCI(lookupEnv)
+}
+
+// createReport assembles the anonymous usage report for a run from its
+// scheduler and recorded usage, keeping only the used extensions advertised in
+// the public catalog. It is the run report k6 has always sent, with the
+// extensions field added.
 func createReport(u *usage.Usage, execScheduler *execution.Scheduler, catalog map[string]struct{}) map[string]any {
 	execState := execScheduler.GetState()
 	m := u.Map()
 
-	m["k6_version"] = build.Version
+	addEnvironmentInfo(m, execState.Test.LookupEnv)
+
 	m["duration"] = execState.GetCurrentTestRunDuration().String()
-	m["goos"] = runtime.GOOS
-	m["goarch"] = runtime.GOARCH
 	m["vus_max"] = uint64(execState.GetInitializedVUsCount()) //nolint:gosec
 	m["iterations"] = execState.GetFullIterationCount()
 	executors := make(map[string]int)
@@ -47,9 +69,21 @@ func createReport(u *usage.Usage, execScheduler *execution.Scheduler, catalog ma
 		executors[ec.GetType()]++
 	}
 	m["executors"] = executors
-	m["is_ci"] = isCI(execState.Test.LookupEnv)
 
 	resolveExtensions(m, catalog)
+
+	return m
+}
+
+// createSubcommandReport builds the usage report for an invoked subcommand
+// extension. A subcommand is not a load test, so it reports the identity fields
+// and the used extension without the run summary that createReport derives from
+// a scheduler.
+func createSubcommandReport(ctx context.Context, gs *state.GlobalState, extension *ext.Extension) map[string]any {
+	m := make(map[string]any)
+	addEnvironmentInfo(m, envLookup(gs.Env))
+	m["extensions"] = []any{extension}
+	resolveExtensions(m, catalogModulePaths(ctx, gs))
 
 	return m
 }
@@ -94,19 +128,33 @@ func filterExtensions(used []any, public map[string]struct{}) []extensionEntry {
 	return entries
 }
 
+// reportUsage sends the report built by create, logging the attempt and outcome
+// at debug, all bounded by a timeout. Both k6 run and k6 x call it; whether to
+// run it in the background is the caller's concern, not the pipeline's.
+func reportUsage(ctx context.Context, gs *state.GlobalState, create func(ctx context.Context) map[string]any) {
+	reportCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	gs.Logger.Debug("Sending usage report...")
+	if err := postUsageReport(reportCtx, envLookup(gs.Env), create(reportCtx)); err != nil {
+		gs.Logger.WithError(err).Debug("Error sending usage report")
+	} else {
+		gs.Logger.Debug("Usage report sent successfully")
+	}
+}
+
 // defaultUsageReportURL is the production endpoint the anonymous usage report
 // is sent to when K6_USAGE_REPORT_URL is not set.
 const defaultUsageReportURL = "https://stats.grafana.org/k6-usage-report"
 
-func reportUsage(ctx context.Context, gs *state.GlobalState, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
-	m := createReport(test.preInitState.Usage, execScheduler, catalogModulePaths(ctx, gs))
+func postUsageReport(ctx context.Context, lookupEnv func(string) (string, bool), m map[string]any) error {
 	body, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}
 
 	usageStatsURL := defaultUsageReportURL
-	if url, ok := test.preInitState.LookupEnv(state.UsageReportURL); ok && url != "" {
+	if url, ok := lookupEnv(state.UsageReportURL); ok && url != "" {
 		usageStatsURL = url
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, usageStatsURL, bytes.NewBuffer(body))
