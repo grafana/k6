@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -208,7 +209,10 @@ func runCloudTest(
 			return err
 		}
 		executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
-		testURL := fmt.Sprintf("%s/a/k6-app/tests/%d", strings.TrimSuffix(cloudConfig.StackURL.String, "/"), loadTest.GetId())
+		testURL, err := resolveCloudTestURL(cloudConfig.StackURL.String, loadTest.GetId())
+		if err != nil {
+			return err
+		}
 		printExecutionDescription(
 			gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 		)
@@ -544,4 +548,13 @@ func resolveAndSetProjectID(
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
 	return nil
+}
+
+func resolveCloudTestURL(stackURL string, testID int32) (string, error) {
+	u, err := url.Parse(stackURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid stack URL: %w", err)
+	}
+
+	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(int64(testID), 10)).String(), nil
 }
