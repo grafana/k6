@@ -44,6 +44,8 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 		"ReadableStream":              mi.NewReadableStream,
 		"CountQueuingStrategy":        mi.NewCountQueuingStrategy,
 		"ReadableStreamDefaultReader": mi.NewReadableStreamDefaultReader,
+		"WritableStream":              mi.NewWritableStream,
+		"WritableStreamDefaultWriter": mi.NewWritableStreamDefaultWriter,
 	}}
 }
 
@@ -134,6 +136,100 @@ func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 
 	return streamObj
 }
+
+// NewWritableStream is the constructor for the WritableStream object.
+func (mi *ModuleInstance) NewWritableStream(call sobek.ConstructorCall) *sobek.Object {
+	return newWritableStream(mi.vu, call)
+}
+
+func newWritableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object {
+	rt := vu.Runtime()
+
+	var (
+		// 1. If underlyingSink is missing, set it to null.
+		underlyingSink *sobek.Object
+
+		err                error
+		strategy           *sobek.Object
+		underlyingSinkDict UnderlyingSink
+	)
+
+	// We look for the queuing strategy first, and validate it before the underlying sink,
+	// in order to match the specification's argument conversion order and pass the Web
+	// Platform Tests constructor tests.
+	strategy = initializeStrategy(rt, call)
+
+	// 2. Let underlyingSinkDict be underlyingSink, converted to an IDL value of type UnderlyingSink.
+	if len(call.Arguments) > 0 && !sobek.IsUndefined(call.Arguments[0]) {
+		// We first assert that it is an object (requirement).
+		if !isObject(call.Arguments[0]) {
+			throw(rt, newTypeError(rt, "underlyingSink must be an object"))
+		}
+
+		// Then we try to convert it to an UnderlyingSink.
+		underlyingSink = call.Arguments[0].ToObject(rt)
+		underlyingSinkDict, err = NewUnderlyingSinkFromObject(rt, underlyingSink)
+		if err != nil {
+			throw(rt, err)
+		}
+	}
+
+	// 3. If underlyingSinkDict["type"] exists, throw a RangeError exception.
+	if !common.IsNullish(underlyingSinkDict.Type) {
+		throw(rt, newRangeError(rt, "'type' is not supported by WritableStream"))
+	}
+
+	// 4. Perform ! InitializeWritableStream(this).
+	stream := &WritableStream{
+		runtime: rt,
+		vu:      vu,
+	}
+	stream.initialize()
+
+	// 5. Let sizeAlgorithm be ! ExtractSizeAlgorithm(strategy).
+	sizeAlgorithm := extractSizeAlgorithm(rt, strategy)
+
+	// 6. Let highWaterMark be ? ExtractHighWaterMark(strategy, 1).
+	highWaterMark := extractHighWaterMark(rt, strategy, 1)
+
+	// 7. Perform ? SetUpWritableStreamDefaultControllerFromUnderlyingSink(...).
+	stream.setupWritableStreamDefaultControllerFromUnderlyingSink(
+		underlyingSink,
+		underlyingSinkDict,
+		highWaterMark,
+		sizeAlgorithm,
+	)
+
+	return stream.toObject(call.This.Prototype())
+}
+
+// NewWritableStreamDefaultWriter is the constructor for the [WritableStreamDefaultWriter] object.
+//
+// [WritableStreamDefaultWriter]: https://streams.spec.whatwg.org/#writablestreamdefaultwriter
+func (mi *ModuleInstance) NewWritableStreamDefaultWriter(call sobek.ConstructorCall) *sobek.Object {
+	rt := mi.vu.Runtime()
+
+	if len(call.Arguments) != 1 {
+		throw(rt, newTypeError(rt, "WritableStreamDefaultWriter takes a single argument"))
+	}
+
+	stream := writableStreamFromValue(rt, call.Argument(0))
+	if stream == nil {
+		throw(rt, newTypeError(rt, "WritableStreamDefaultWriter argument must be a WritableStream"))
+	}
+
+	// 1. Perform ? SetUpWritableStreamDefaultWriter(this, stream).
+	writer := &WritableStreamDefaultWriter{}
+	writer.setup(stream)
+
+	object, err := NewWritableStreamDefaultWriterObject(writer)
+	if err != nil {
+		throw(rt, err)
+	}
+
+	return object
+}
+
 func defaultSizeFunc(_ sobek.Value) (float64, error) { return 1.0, nil }
 
 func initializeStrategy(rt *sobek.Runtime, call sobek.ConstructorCall) *sobek.Object {
