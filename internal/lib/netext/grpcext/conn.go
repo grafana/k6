@@ -2,10 +2,16 @@
 package grpcext
 
 import (
+	"bufio"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +37,8 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+type proxyFromEnvironmentFunc func(*http.Request) (*url.URL, error)
 
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
@@ -82,7 +90,7 @@ type Conn struct {
 // with common options for requests from a VU.
 func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
-		return getState().Dialer.DialContext(ctx, "tcp", addr)
+		return dialGRPCContext(ctx, getState(), addr)
 	}
 
 	return []grpc.DialOption{
@@ -92,6 +100,137 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 		grpc.WithStatsHandler(statsHandler{getState: getState}),
 		grpc.WithContextDialer(dialer),
 	}
+}
+
+func dialGRPCContext(ctx context.Context, state *lib.State, addr string) (net.Conn, error) {
+	return dialGRPCContextWithProxy(ctx, state, addr, http.ProxyFromEnvironment)
+}
+
+func dialGRPCContextWithProxy(
+	ctx context.Context, state *lib.State, addr string, proxyFromEnvironment proxyFromEnvironmentFunc,
+) (net.Conn, error) {
+	proxyURL, err := proxyURLForGRPCTarget(addr, proxyFromEnvironment)
+	if err != nil {
+		return nil, err
+	}
+	if proxyURL == nil {
+		return state.Dialer.DialContext(ctx, "tcp", addr)
+	}
+
+	return dialGRPCContextViaProxy(ctx, state, addr, proxyURL)
+}
+
+func proxyURLForGRPCTarget(addr string, proxyFromEnvironment proxyFromEnvironmentFunc) (*url.URL, error) {
+	req := &http.Request{URL: &url.URL{
+		Scheme: "https",
+		Host:   addr,
+	}}
+	return proxyFromEnvironment(req)
+}
+
+func dialGRPCContextViaProxy(
+	ctx context.Context, state *lib.State, addr string, proxyURL *url.URL,
+) (_ net.Conn, err error) {
+	proxyAddr, err := proxyDialAddress(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := state.Dialer.DialContext(ctx, "tcp", proxyAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	return doHTTPConnectHandshake(ctx, conn, addr, proxyURL.User)
+}
+
+func proxyDialAddress(proxyURL *url.URL) (string, error) {
+	scheme := proxyURL.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+	if scheme != "http" {
+		return "", fmt.Errorf("unsupported grpc proxy scheme %q", scheme)
+	}
+
+	host := proxyURL.Hostname()
+	if host == "" {
+		return "", errors.New("proxy URL has no host")
+	}
+
+	port := proxyURL.Port()
+	if port == "" {
+		port = "80"
+	}
+
+	return net.JoinHostPort(host, port), nil
+}
+
+type proxyBufferConn struct {
+	net.Conn
+	r io.Reader
+}
+
+func (c *proxyBufferConn) Read(b []byte) (int, error) {
+	return c.r.Read(b)
+}
+
+func doHTTPConnectHandshake(
+	ctx context.Context, conn net.Conn, addr string, user *url.Userinfo,
+) (_ net.Conn, err error) {
+	cancelHandshake := context.AfterFunc(ctx, func() {
+		_ = conn.Close()
+	})
+
+	defer func() {
+		if err != nil {
+			_ = conn.Close()
+		}
+		cancelHandshake()
+	}()
+
+	req := (&http.Request{
+		Method: http.MethodConnect,
+		URL:    &url.URL{Host: addr},
+		Host:   addr,
+		Header: make(http.Header),
+	}).WithContext(ctx)
+	if user != nil {
+		username := user.Username()
+		password, _ := user.Password()
+		auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+		req.Header.Set("Proxy-Authorization", "Basic "+auth)
+	}
+
+	if err := req.Write(conn); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("failed to write proxy CONNECT request: %w", err)
+	}
+
+	reader := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(reader, req) //nolint:bodyclose // CONNECT success returns the tunnel stream.
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("failed to read proxy CONNECT response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("proxy CONNECT failed: %s", resp.Status)
+	}
+	if reader.Buffered() > 0 {
+		if !cancelHandshake() && ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return &proxyBufferConn{Conn: conn, r: reader}, nil
+	}
+
+	if !cancelHandshake() && ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	return conn, nil
 }
 
 // Dial establish a gRPC connection.
