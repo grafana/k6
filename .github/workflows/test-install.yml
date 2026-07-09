@@ -8,7 +8,7 @@ on:
     - cron: '0 6 * * 1' # every Monday at 06:00 UTC
   # Allow manual triggering for debugging
   workflow_dispatch:
-
+permissions: {}
 defaults:
   run:
     shell: bash
