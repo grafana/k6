@@ -279,7 +279,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		runAbort(err)
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
-	// Spin up the REST API server, if not disabled.
+	if c.gs.Flags.ProfilingEnabled && c.gs.Flags.Address == "" {
+		logger.Warn("Profiling is enabled but no REST API server is running — " +
+			"profiling endpoints won't be reachable until you enable the REST API server via --address (or K6_ADDRESS)")
+	}
+	// Spin up the REST API server, if enabled.
 	if c.gs.Flags.Address != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 
@@ -564,10 +568,8 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 		Long: `Start a test. This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
 		Example: exampleText,
-		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-		PreRunE: func(_ *cobra.Command, _ []string) error {
-			return validateNoCloudSecretSource(gs.Flags.SecretSource)
-		},
+		Args: exactArgsWithMsg(1,
+			"arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE: c.run,
 	}
 

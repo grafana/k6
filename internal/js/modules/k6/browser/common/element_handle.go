@@ -226,7 +226,13 @@ func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
 }
 
 // DefaultTimeout returns the default timeout for this element handle.
+// If the receiver or any of the chained fields are nil (which can happen
+// when the element handle is no longer attached to a live frame), the
+// package-level DefaultTimeout constant is returned instead of panicking.
 func (h *ElementHandle) DefaultTimeout() time.Duration {
+	if h == nil || h.frame == nil || h.frame.manager == nil || h.frame.manager.timeoutSettings == nil {
+		return DefaultTimeout
+	}
 	return h.frame.manager.timeoutSettings.timeout()
 }
 
@@ -385,6 +391,31 @@ func (h *ElementHandle) isHidden(apiCtx context.Context) (bool, error) {
 
 func (h *ElementHandle) isVisible(apiCtx context.Context) (bool, error) {
 	return h.waitForElementState(apiCtx, []string{"visible"}, 0)
+}
+
+func (h *ElementHandle) isInViewport(apiCtx context.Context, ratio float64) (bool, error) {
+	fn := `
+		(node, injected, ratio) => {
+			return injected.isInViewport(node, ratio);
+		}
+	`
+	opts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := h.evalWithScript(apiCtx, opts, fn, ratio)
+	if err != nil {
+		return false, errorFromDOMError(err)
+	}
+	switch v := result.(type) {
+	case string: // An error happened (returned as "error:..." from JS)
+		return false, errorFromDOMError(v)
+	case bool:
+		return v, nil
+	}
+
+	return false, fmt.Errorf(
+		"checking element is in viewport: unexpected type %T", result)
 }
 
 func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position) (*Position, error) {

@@ -2,6 +2,7 @@ package httpbin
 
 import (
 	"bytes"
+	"context"
 	crypto_rand "crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
@@ -104,6 +105,75 @@ func getURL(r *http.Request) *url.URL {
 		RawQuery:   r.URL.RawQuery,
 		Fragment:   r.URL.Fragment,
 	}
+}
+
+func isHTTPS(r *http.Request) bool {
+	return getURL(r).Scheme == "https"
+}
+
+func isCookieAttrParam(k string) bool {
+	return strings.HasPrefix(k, "attr[") && strings.HasSuffix(k, "]")
+}
+
+// parseCookies builds the list of cookies to set from the request's query
+// params, applying attribute overrides from attr[Name] params.
+func parseCookies(r *http.Request) []http.Cookie {
+	params := r.URL.Query()
+	attrs := parseCookieAttrs(params, isHTTPS(r))
+	var cookies []http.Cookie
+	for k := range params {
+		if isCookieAttrParam(k) {
+			continue
+		}
+		cookie := attrs
+		cookie.Name = k
+		cookie.Value = params.Get(k)
+		cookies = append(cookies, cookie)
+	}
+	return cookies
+}
+
+// parseCookieAttrs returns an [http.Cookie] with attributes optionally
+// controlled by attr[Name] query params. E.g.
+//
+//	?attr[Secure]=true&attr[Path]=/foo
+//
+// Attribute names are case-insensitive.
+func parseCookieAttrs(params url.Values, defaultSecure bool) http.Cookie {
+	c := http.Cookie{
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   defaultSecure,
+	}
+	for k, v := range params {
+		if !isCookieAttrParam(k) || len(v) == 0 {
+			continue
+		}
+		switch strings.ToLower(k[5 : len(k)-1]) {
+		case "domain":
+			c.Domain = v[0]
+		case "httponly":
+			c.HttpOnly = parseBoolParam(v[0])
+		case "path":
+			c.Path = v[0]
+		case "samesite":
+			switch strings.ToLower(v[0]) {
+			case "strict":
+				c.SameSite = http.SameSiteStrictMode
+			case "lax":
+				c.SameSite = http.SameSiteLaxMode
+			case "none":
+				c.SameSite = http.SameSiteNoneMode
+			}
+		case "secure":
+			c.Secure = parseBoolParam(v[0])
+		}
+	}
+	return c
+}
+
+func parseBoolParam(s string) bool {
+	return s == "1" || strings.EqualFold(s, "true")
 }
 
 func writeResponse(w http.ResponseWriter, status int, contentType string, body []byte) {
@@ -313,6 +383,59 @@ func parseSeed(rawSeed string) (*rand.Rand, error) {
 	src := rand.NewSource(seed)
 	rng := rand.New(src)
 	return rng, nil
+}
+
+func computePausePerWrite(duration time.Duration, count int64) time.Duration {
+	pause := duration
+	if count > 1 {
+		// compensate for lack of pause after final write (i.e. if we're
+		// doing 10 writes we will only pause 9 times).
+		//
+		// note: use ceiling division to ensure pause*count >= duration when
+		// count does not divided evenly.
+		n := time.Duration(count - 1)
+		pause = (duration + n - 1) / n
+	}
+	return pause
+}
+
+// newPacer returns a channel that emits indices 0..count-1, waiting pause
+// (with jitter) between each. The channel closes when all indices are sent
+// or ctx is cancelled.
+func newPacer(ctx context.Context, count int, pause time.Duration, jitter float64) <-chan int {
+	ch := make(chan int)
+	go func() {
+		defer close(ch)
+		for i := 0; i < count; i++ {
+			if i > 0 && pause > 0 {
+				select {
+				case <-time.After(applyJitter(pause, jitter)):
+				case <-ctx.Done():
+					return
+				}
+			}
+			select {
+			case ch <- i:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch
+}
+
+// applyJitter randomizes a duration by +/- jitter fraction.
+// jitter must be in [0, 1]; 0 returns d unchanged.
+func applyJitter(d time.Duration, jitter float64) time.Duration {
+	if jitter <= 0 {
+		return d
+	}
+	scale := 1.0 + jitter*(2*rand.Float64()-1)
+	j := time.Duration(float64(d) * scale)
+	if j < 0 {
+		return 0
+	}
+	return j
 }
 
 // syntheticByteStream implements the ReadSeeker interface to allow reading
@@ -561,13 +684,13 @@ func parseWeightedChoices[T any](rawChoices string, parser func(string) (T, erro
 // weightedRandomChoice returns a randomly chosen element from the weighted
 // choices, given as a slice of "choice:weight" strings where weight is a
 // floating point number. Weights do not need to sum to 1.
-func weightedRandomChoice[T any](choices []weightedChoice[T]) T {
+func weightedRandomChoice[T any](choices []weightedChoice[T], randomFloat64 func() float64) T {
 	// Calculate total weight
 	var totalWeight float64
 	for _, wc := range choices {
 		totalWeight += wc.Weight
 	}
-	randomNumber := rand.Float64() * totalWeight
+	randomNumber := randomFloat64() * totalWeight
 	currentWeight := 0.0
 	for _, wc := range choices {
 		currentWeight += wc.Weight

@@ -455,7 +455,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 	case <-b.vuCtx.Done():
 		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:<-ctx.Done",
 			"sid:%v tid:%v pageType:%s err:%v",
-			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
+			ev.SessionID, targetPage.TargetID, targetPage.Type, ContextErr(b.vuCtx))
 		return true
 	default:
 	}
@@ -549,7 +549,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ContextErr(ctx))
 	}
 
 	if err = ContextErr(ctx); err != nil {
@@ -673,8 +673,20 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	if b.context != nil {
 		return nil, spanRecordErrorf(span, "existing browser context must be closed before creating a new one")
 	}
+	if opts == nil {
+		opts = DefaultBrowserContextOptions()
+	}
+	if err := opts.Proxy.Validate(); err != nil {
+		return nil, spanRecordError(span, err)
+	}
 
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
+	if opts.Proxy != nil {
+		action = action.WithProxyServer(strings.TrimSpace(opts.Proxy.Server))
+		if bypass := strings.TrimSpace(opts.Proxy.Bypass); bypass != "" {
+			action = action.WithProxyBypassList(bypass)
+		}
+	}
 	browserContextID, err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {

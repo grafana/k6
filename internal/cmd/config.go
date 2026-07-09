@@ -35,6 +35,7 @@ func configFlagSet() *pflag.FlagSet {
 		false,
 		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
+	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 	return flags
 }
 
@@ -42,8 +43,9 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	Out    []string  `json:"out" envconfig:"K6_OUT"`
+	Linger null.Bool `json:"linger" envconfig:"K6_LINGER"`
+
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
@@ -151,19 +153,42 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	return conf, nil
 }
 
+// Permissions for the on-disk config file and its containing directory.
+// The config can contain the Grafana Cloud API token (collectors.cloud.token),
+// so it must not be readable by other local users.
+const (
+	configFileMode = fs.FileMode(0o600)
+	configDirMode  = fs.FileMode(0o700)
+)
+
 // writeDiskConfig serializes the configuration to a JSON file and writes it in the supplied
 // location on the supplied filesystem.
+//
+// The file may contain the Grafana Cloud API token, so it is written with
+// owner-only permissions (0o600), inside a directory created with owner-only
+// permissions (0o700). If the file or directory already exists with looser
+// permissions (e.g. from a previous k6 version that used 0o644/0o755), it is
+// re-chmod'd here so existing installs are upgraded on the next write.
 func writeDiskConfig(gs *state.GlobalState, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
+	dir := filepath.Dir(gs.Flags.ConfigFilePath)
+	if err := gs.FS.MkdirAll(dir, configDirMode); err != nil {
+		return err
+	}
+	// MkdirAll does not tighten perms on a pre-existing directory.
+	if err := gs.FS.Chmod(dir, configDirMode); err != nil {
 		return err
 	}
 
-	return fsext.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, 0o644)
+	if err := fsext.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, configFileMode); err != nil {
+		return err
+	}
+	// WriteFile does not tighten perms on a pre-existing file.
+	return gs.FS.Chmod(gs.Flags.ConfigFilePath, configFileMode)
 }
 
 // readEnvConfig reads configuration variables from the environment.

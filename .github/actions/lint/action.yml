@@ -4,21 +4,24 @@ description: Run golangci-lint with the k6 ruleset
 runs:
   using: composite
   steps:
+    - name: Resolve Go versions
+      id: go_versions
+      uses: ./.github/actions/go-versions
     - name: Install Go
       uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
       with:
-        go-version: 1.26.x
+        go-version: ${{ steps.go_versions.outputs.current }}
         check-latest: true
     - name: Get golangci-lint version and download rules
       shell: bash
       env:
         GITHUB_ACTION_REF: ${{ github.action_ref }}
-        GITHUB_HEAD_REF: ${{  github.head_ref }}
+        GITHUB_HEAD_REF: ${{ github.head_ref }}
         REPO_FULL_NAME: ${{ github.event.pull_request.head.repo.full_name }}
       run: |
-        branch="master"
-        if [ "${REPO_FULL_NAME}" = "grafana/k6" ]; then
-          branch="${GITHUB_ACTION_REF:-${GITHUB_HEAD_REF}}"
+        branch="${GITHUB_HEAD_REF:-master}"
+        if [ "${REPO_FULL_NAME}" != "grafana/k6" ]; then
+          branch="${GITHUB_ACTION_REF:-master}"
         fi
         rules_url="https://raw.githubusercontent.com/grafana/k6/${branch}/.golangci.yml"
         echo "Downloading '${rules_url}' ..."

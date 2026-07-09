@@ -211,7 +211,7 @@ func (vu *ActiveVU) RunOnce() error {
 
 	select {
 	case <-vu.RunContext.Done():
-		return vu.RunContext.Err() // we are done, return
+		return lib.ContextErr(vu.RunContext) // we are done, return
 	case vu.busy <- struct{}{}:
 		// nothing else can run now, and the VU cannot be deactivated
 	}

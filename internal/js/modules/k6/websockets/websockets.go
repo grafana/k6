@@ -369,11 +369,28 @@ func (w *webSocket) emitConnectionMetrics(ctx context.Context, start time.Time, 
 const writeWait = 10 * time.Second
 
 func (w *webSocket) loop() {
-	// Pass ping/pong events through the main control loop
+	// Pass ping/pong events through the main control loop.
+	// The handlers below run synchronously inside ReadMessage (via advanceFrame),
+	// so a blocking send here stalls the entire readPump goroutine.
+	// The select on w.done lets them bail out when the loop has already exited,
+	// preventing a deadlock where readPump blocks forever on an unbuffered send
+	// that nobody will receive.
 	pingChan := make(chan string)
 	pongChan := make(chan string)
-	w.conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
-	w.conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
+	w.conn.SetPingHandler(func(msg string) error {
+		select {
+		case pingChan <- msg:
+		case <-w.done:
+		}
+		return nil
+	})
+	w.conn.SetPongHandler(func(pingID string) error {
+		select {
+		case pongChan <- pingID:
+		case <-w.done:
+		}
+		return nil
+	})
 
 	ctx := w.vu.Context()
 	wg := new(sync.WaitGroup)

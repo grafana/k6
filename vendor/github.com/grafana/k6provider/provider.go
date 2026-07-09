@@ -96,6 +96,10 @@ type Config struct {
 	PruneInterval time.Duration
 	// Download configuration
 	DownloadConfig DownloadConfig
+	// K6ModPath is the Go module path for k6. If empty, k6_mod_path is omitted from
+	// build requests and the build service defaults to go.k6.io/k6 (v1).
+	// Set to "go.k6.io/k6/v2" for k6 v2 builds.
+	K6ModPath string
 }
 
 // Dependencies defines a group of dependencies with their version constrains
@@ -112,6 +116,7 @@ type Provider struct {
 	binDir     string
 	buildSrv   *buildClient
 	platform   string
+	k6ModPath  string
 	pruner     *Pruner
 	logger     *slog.Logger
 }
@@ -210,6 +215,7 @@ func NewProviderWithLogger(config Config, logger *slog.Logger) (*Provider, error
 		binDir:     binDir,
 		buildSrv:   buildSrv,
 		platform:   platform,
+		k6ModPath:  config.K6ModPath,
 		pruner:     pruner,
 		logger:     logger,
 	}, nil
@@ -242,7 +248,7 @@ func (p *Provider) GetArtifact(
 		"deps", deps,
 		"platform", p.platform,
 	)
-	artifact, err := p.buildSrv.Build(ctx, p.platform, k6Constrains, buildDeps)
+	artifact, err := p.buildSrv.Build(ctx, p.platform, p.k6ModPath, k6Constrains, buildDeps)
 	if err != nil {
 		if !errors.Is(err, ErrInvalidParameters) {
 			return Artifact{}, NewWrappedError(ErrBuild, err)
