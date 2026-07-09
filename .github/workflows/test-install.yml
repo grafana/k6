@@ -15,6 +15,7 @@ defaults:
 
 jobs:
   install-linux-deb:
+    name: "APT: ${{ matrix.image }}"
     strategy:
       fail-fast: false
       matrix:
@@ -57,6 +58,7 @@ jobs:
           fi
 
   install-linux-rpm:
+    name: "RPM: ${{ matrix.image }}"
     strategy:
       fail-fast: false
       matrix:
@@ -88,6 +90,7 @@ jobs:
           fi
 
   install-macos:
+    name: "Homebrew: ${{ matrix.os }}"
     strategy:
       fail-fast: false
       matrix:
@@ -111,6 +114,7 @@ jobs:
           fi
 
   install-windows-choco:
+    name: "Chocolatey: windows-latest"
     runs-on: windows-latest
     steps:
       - name: Install k6 via Chocolatey
@@ -139,6 +143,7 @@ jobs:
           }
 
   install-windows-msi:
+    name: "MSI: windows-latest"
     runs-on: windows-latest
     steps:
       - name: Download and install k6 MSI
@@ -182,6 +187,7 @@ jobs:
           }
 
   install-windows-winget:
+    name: "winget: windows-latest"
     # winget source updates on GHA runners can be flaky; do not
     # let transient CDN issues block the entire workflow.
     continue-on-error: true
@@ -213,6 +219,7 @@ jobs:
           }
 
   install-docker:
+    name: "Docker"
     runs-on: ubuntu-latest
     steps:
       - name: Pull k6 Docker image
