@@ -148,18 +148,26 @@ jobs:
           $msiPath = "$env:RUNNER_TEMP\k6-latest-amd64.msi"
           Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath
           Start-Process msiexec.exe -ArgumentList "/i", $msiPath, "/quiet", "/norestart" -Wait -NoNewWindow
+      - name: Add k6 to PATH
+        shell: pwsh
+        run: |
+          # Discover the install path from the registry instead of hardcoding it
+          $installDir = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
+            Where-Object { $_.DisplayName -like "k6*" }).InstallLocation
+          if (-not $installDir) {
+            # Fall back to the default location
+            $installDir = "C:\Program Files\k6"
+          }
+          echo "$installDir" >> $env:GITHUB_PATH
       - name: Verify k6
         shell: pwsh
         run: |
-          # MSI installs to Program Files by default
-          $env:PATH = "C:\Program Files\k6;$env:PATH"
           k6 version
           k6 --help | Out-Null
       - name: Verify expected version
         if: github.event_name == 'release'
         shell: pwsh
         run: |
-          $env:PATH = "C:\Program Files\k6;$env:PATH"
           $output = k6 version
           if ($output -match 'v\d+\.\d+\.\d+') {
             $installed = $Matches[0]
@@ -174,11 +182,14 @@ jobs:
           }
 
   install-windows-winget:
+    # winget source updates on GHA runners can be flaky; do not
+    # let transient CDN issues block the entire workflow.
+    continue-on-error: true
     runs-on: windows-latest
     steps:
       - name: Install k6 via winget
         shell: pwsh
-        run: winget install k6 --source winget --accept-source-agreements --accept-package-agreements
+        run: winget install k6 --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
       - name: Verify k6
         shell: pwsh
         run: |
