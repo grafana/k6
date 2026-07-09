@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,6 +30,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const cloudRunAuthPrefix = "Running cloud tests requires auth settings"
+
 var (
 	errCloudAuth = errors.New( //nolint:staticcheck // user-facing error message, capitalization is intentional
 		"Run `k6 cloud login` to authenticate, or check the docs for other options at" +
@@ -36,12 +39,22 @@ var (
 	)
 	errMissingToken   = errors.New("access token not configured")
 	errMissingStackID = errors.New("stack ID not configured")
+
+	// errNoProjectConfigured is returned by cloud sub-commands that require a
+	// concrete project to operate on when none can be resolved from the flags,
+	// the environment, or the logged-in configuration.
+	errNoProjectConfigured = errors.New(
+		"no project specified. Use --project-id, set K6_CLOUD_PROJECT_ID, or run `k6 cloud login` to set a default project",
+	)
 )
 
 // checkCloudLogin verifies that both a token and a stack are configured.
 // Together they represent a complete Grafana Cloud login.
 func checkCloudLogin(conf cloudapi.Config) error {
-	const prefix = "Running cloud tests requires auth settings"
+	return checkCloudLoginFor(conf, cloudRunAuthPrefix)
+}
+
+func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 	if !conf.Token.Valid || conf.Token.String == "" {
 		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingToken, errCloudAuth)
 	}
@@ -196,7 +209,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
-		testURL := fmt.Sprintf("%s/a/k6-app/tests/%d", strings.TrimSuffix(cloudConfig.StackURL.String, "/"), loadTest.GetId())
+		testURL, err := resolveCloudTestURL(cloudConfig.StackURL.String, loadTest.GetId())
+		if err != nil {
+			return err
+		}
 		printExecutionDescription(
 			c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 		)
@@ -426,6 +442,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	projectCmd := getCmdCloudProject(c)
 	cloudCmd.AddCommand(projectCmd)
 
+	testCmd := getCmdCloudTest(c)
+	cloudCmd.AddCommand(testCmd)
+
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
@@ -529,4 +548,13 @@ func resolveAndSetProjectID(
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
 	return nil
+}
+
+func resolveCloudTestURL(stackURL string, testID int32) (string, error) {
+	u, err := url.Parse(stackURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid stack URL: %w", err)
+	}
+
+	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(int64(testID), 10)).String(), nil
 }

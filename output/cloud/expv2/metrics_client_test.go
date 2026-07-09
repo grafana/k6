@@ -42,7 +42,7 @@ func TestMetricsClientPush(t *testing.T) {
 	require.NoError(t, err)
 
 	mset := pbcloud.MetricSet{}
-	err = mc.push(&mset)
+	err = mc.push(t.Context(), &mset)
 	require.NoError(t, err)
 	assert.Equal(t, 1, reqs)
 }
@@ -57,7 +57,7 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	mc, err := newMetricsClient(mock, "test-ref-id")
 	require.NoError(t, err)
 
-	err = mc.push(nil)
+	err = mc.push(t.Context(), nil)
 	assert.ErrorContains(t, err, "500 Internal Server Error")
 }
 

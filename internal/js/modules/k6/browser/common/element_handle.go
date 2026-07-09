@@ -393,6 +393,31 @@ func (h *ElementHandle) isVisible(apiCtx context.Context) (bool, error) {
 	return h.waitForElementState(apiCtx, []string{"visible"}, 0)
 }
 
+func (h *ElementHandle) isInViewport(apiCtx context.Context, ratio float64) (bool, error) {
+	fn := `
+		(node, injected, ratio) => {
+			return injected.isInViewport(node, ratio);
+		}
+	`
+	opts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := h.evalWithScript(apiCtx, opts, fn, ratio)
+	if err != nil {
+		return false, errorFromDOMError(err)
+	}
+	switch v := result.(type) {
+	case string: // An error happened (returned as "error:..." from JS)
+		return false, errorFromDOMError(v)
+	case bool:
+		return v, nil
+	}
+
+	return false, fmt.Errorf(
+		"checking element is in viewport: unexpected type %T", result)
+}
+
 func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position) (*Position, error) {
 	fn := `
 		(node, injected) => {

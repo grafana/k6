@@ -61,7 +61,7 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 		c.globalState.Logger.Warn(warn)
 	}
 
-	if err := checkCloudLogin(cloudConfig); err != nil {
+	if err := checkCloudLoginFor(cloudConfig, "Listing cloud projects requires auth settings"); err != nil {
 		return err
 	}
 
