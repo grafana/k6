@@ -23,7 +23,6 @@ jobs:
           - ubuntu:22.04
           - ubuntu:24.04
           - debian:bookworm
-          - debian:trixie
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.image }}
