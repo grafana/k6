@@ -48,11 +48,12 @@ jobs:
           k6 --help > /dev/null
       - name: Verify expected version
         if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
         run: |
           installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
-          expected="${{ github.event.release.tag_name }}"
-          if [ "$installed" != "$expected" ]; then
-            echo "::error::Version mismatch: installed $installed, expected $expected"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
             exit 1
           fi
 
@@ -80,11 +81,12 @@ jobs:
           k6 --help > /dev/null
       - name: Verify expected version
         if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
         run: |
           installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
-          expected="${{ github.event.release.tag_name }}"
-          if [ "$installed" != "$expected" ]; then
-            echo "::error::Version mismatch: installed $installed, expected $expected"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
             exit 1
           fi
 
@@ -104,11 +106,12 @@ jobs:
           k6 --help > /dev/null
       - name: Verify expected version
         if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
         run: |
           installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
-          expected="${{ github.event.release.tag_name }}"
-          if [ "$installed" != "$expected" ]; then
-            echo "::error::Version mismatch: installed $installed, expected $expected"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
             exit 1
           fi
 
@@ -127,6 +130,8 @@ jobs:
       - name: Verify expected version
         if: github.event_name == 'release'
         shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
         run: |
           $output = k6 version
           if ($output -match 'v\d+\.\d+\.\d+') {
@@ -135,9 +140,8 @@ jobs:
             Write-Error "Could not parse version from: $output"
             exit 1
           }
-          $expected = "${{ github.event.release.tag_name }}"
-          if ($installed -ne $expected) {
-            Write-Error "Version mismatch: installed $installed, expected $expected"
+          if ($installed -ne $env:EXPECTED_VERSION) {
+            Write-Error "Version mismatch: installed $installed, expected $env:EXPECTED_VERSION"
             exit 1
           }
 
@@ -171,6 +175,8 @@ jobs:
       - name: Verify expected version
         if: github.event_name == 'release'
         shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
         run: |
           $output = k6 version
           if ($output -match 'v\d+\.\d+\.\d+') {
@@ -179,9 +185,8 @@ jobs:
             Write-Error "Could not parse version from: $output"
             exit 1
           }
-          $expected = "${{ github.event.release.tag_name }}"
-          if ($installed -ne $expected) {
-            Write-Error "Version mismatch: installed $installed, expected $expected"
+          if ($installed -ne $env:EXPECTED_VERSION) {
+            Write-Error "Version mismatch: installed $installed, expected $env:EXPECTED_VERSION"
             exit 1
           }
 
@@ -203,6 +208,8 @@ jobs:
       - name: Verify expected version
         if: github.event_name == 'release'
         shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
         run: |
           $output = k6 version
           if ($output -match 'v\d+\.\d+\.\d+') {
@@ -211,9 +218,8 @@ jobs:
             Write-Error "Could not parse version from: $output"
             exit 1
           }
-          $expected = "${{ github.event.release.tag_name }}"
-          if ($installed -ne $expected) {
-            Write-Error "Version mismatch: installed $installed, expected $expected"
+          if ($installed -ne $env:EXPECTED_VERSION) {
+            Write-Error "Version mismatch: installed $installed, expected $env:EXPECTED_VERSION"
             exit 1
           }
 
@@ -235,10 +241,11 @@ jobs:
           docker run --rm grafana/k6:latest-with-browser --help > /dev/null
       - name: Verify expected version
         if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
         run: |
           installed="$(docker run --rm grafana/k6:latest version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
-          expected="${{ github.event.release.tag_name }}"
-          if [ "$installed" != "$expected" ]; then
-            echo "::error::Version mismatch: installed $installed, expected $expected"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
             exit 1
           fi
