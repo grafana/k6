@@ -752,12 +752,17 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		params.Exec = consts.DefaultFn
 	}
 
-	// Override the preset global env with any custom env vars
+	// Override the preset global env with any custom env vars.
+	// __ENV is deliberately a frozen object to prevent JS from modifying it.
 	env := make(map[string]string, len(u.env)+len(params.Env))
 	maps.Copy(env, u.env)
 	maps.Copy(env, params.Env)
-	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722#issuecomment-1761173634
-	u.Runtime.Set("__ENV", env)
+	envObj, err := newFrozenEnvObject(u.Runtime, env)
+	if err != nil {
+		panic(err) // should not happen with string values
+	}
+	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722
+	u.Runtime.Set("__ENV", envObj)
 
 	opts := u.Runner.Bundle.Options
 

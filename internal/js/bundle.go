@@ -406,11 +406,13 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
-	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
-	err := rt.Set("__ENV", env)
+	envObj, err := newFrozenEnvObject(rt, b.preInitState.RuntimeOptions.Env)
 	if err != nil {
 		return err
+	}
+	err = rt.Set("__ENV", envObj)
+	if err != nil {
+		return fmt.Errorf("setting __ENV: %w", err)
 	}
 	err = rt.Set("__VU", vuID)
 	if err != nil {
