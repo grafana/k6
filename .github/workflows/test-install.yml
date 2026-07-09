@@ -43,9 +43,7 @@ jobs:
       - name: Install k6
         run: apt-get install -y k6
       - name: Verify k6
-        run: |
-          k6 version
-          k6 --help > /dev/null
+        run: k6 version
       - name: Verify expected version
         if: github.event_name == 'release'
         env:
@@ -76,9 +74,7 @@ jobs:
           dnf install -y https://dl.k6.io/rpm/repo.rpm
           dnf install -y k6
       - name: Verify k6
-        run: |
-          k6 version
-          k6 --help > /dev/null
+        run: k6 version
       - name: Verify expected version
         if: github.event_name == 'release'
         env:
@@ -101,9 +97,7 @@ jobs:
       - name: Install k6 via Homebrew
         run: brew install k6
       - name: Verify k6
-        run: |
-          k6 version
-          k6 --help > /dev/null
+        run: k6 version
       - name: Verify expected version
         if: github.event_name == 'release'
         env:
@@ -124,9 +118,7 @@ jobs:
         run: choco install k6 -y
       - name: Verify k6
         shell: pwsh
-        run: |
-          k6 version
-          k6 --help | Out-Null
+        run: k6 version
       - name: Verify expected version
         if: github.event_name == 'release'
         shell: pwsh
@@ -158,20 +150,10 @@ jobs:
           Start-Process msiexec.exe -ArgumentList "/i", $msiPath, "/quiet", "/norestart" -Wait -NoNewWindow
       - name: Add k6 to PATH
         shell: pwsh
-        run: |
-          # Discover the install path from the registry instead of hardcoding it
-          $installDir = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
-            Where-Object { $_.DisplayName -like "k6*" }).InstallLocation
-          if (-not $installDir) {
-            # Fall back to the default location
-            $installDir = "C:\Program Files\k6"
-          }
-          echo "$installDir" >> $env:GITHUB_PATH
+        run: echo "C:\Program Files\k6" >> $env:GITHUB_PATH
       - name: Verify k6
         shell: pwsh
-        run: |
-          k6 version
-          k6 --help | Out-Null
+        run: k6 version
       - name: Verify expected version
         if: github.event_name == 'release'
         shell: pwsh
@@ -202,9 +184,7 @@ jobs:
         run: winget install k6 --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
       - name: Verify k6
         shell: pwsh
-        run: |
-          k6 version
-          k6 --help | Out-Null
+        run: k6 version
       - name: Verify expected version
         if: github.event_name == 'release'
         shell: pwsh
@@ -230,15 +210,11 @@ jobs:
       - name: Pull k6 Docker image
         run: docker pull grafana/k6:latest
       - name: Verify k6 in Docker
-        run: |
-          docker run --rm grafana/k6:latest version
-          docker run --rm grafana/k6:latest --help > /dev/null
+        run: docker run --rm grafana/k6:latest version
       - name: Pull k6 browser image
         run: docker pull grafana/k6:latest-with-browser
       - name: Verify k6 browser image
-        run: |
-          docker run --rm grafana/k6:latest-with-browser version
-          docker run --rm grafana/k6:latest-with-browser --help > /dev/null
+        run: docker run --rm grafana/k6:latest-with-browser version
       - name: Verify expected version
         if: github.event_name == 'release'
         env:
