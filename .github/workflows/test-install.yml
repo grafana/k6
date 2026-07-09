@@ -52,8 +52,8 @@ jobs:
       fail-fast: false
       matrix:
         image:
-          - fedora:40
           - fedora:41
+          - fedora:42
           - rockylinux:9
           - amazonlinux:2023
     runs-on: ubuntu-latest
