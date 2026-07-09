@@ -46,6 +46,15 @@ jobs:
         run: |
           k6 version
           k6 --help > /dev/null
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        run: |
+          installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          expected="${{ github.event.release.tag_name }}"
+          if [ "$installed" != "$expected" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $expected"
+            exit 1
+          fi
 
   install-linux-rpm:
     strategy:
@@ -68,6 +77,15 @@ jobs:
         run: |
           k6 version
           k6 --help > /dev/null
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        run: |
+          installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          expected="${{ github.event.release.tag_name }}"
+          if [ "$installed" != "$expected" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $expected"
+            exit 1
+          fi
 
   install-macos:
     strategy:
@@ -82,6 +100,15 @@ jobs:
         run: |
           k6 version
           k6 --help > /dev/null
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        run: |
+          installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          expected="${{ github.event.release.tag_name }}"
+          if [ "$installed" != "$expected" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $expected"
+            exit 1
+          fi
 
   install-windows-choco:
     runs-on: windows-latest
@@ -94,6 +121,22 @@ jobs:
         run: |
           k6 version
           k6 --help | Out-Null
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        shell: pwsh
+        run: |
+          $output = k6 version
+          if ($output -match 'v\d+\.\d+\.\d+') {
+            $installed = $Matches[0]
+          } else {
+            Write-Error "Could not parse version from: $output"
+            exit 1
+          }
+          $expected = "${{ github.event.release.tag_name }}"
+          if ($installed -ne $expected) {
+            Write-Error "Version mismatch: installed $installed, expected $expected"
+            exit 1
+          }
 
   install-windows-msi:
     runs-on: windows-latest
@@ -112,6 +155,23 @@ jobs:
           $env:PATH = "C:\Program Files\k6;$env:PATH"
           k6 version
           k6 --help | Out-Null
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        shell: pwsh
+        run: |
+          $env:PATH = "C:\Program Files\k6;$env:PATH"
+          $output = k6 version
+          if ($output -match 'v\d+\.\d+\.\d+') {
+            $installed = $Matches[0]
+          } else {
+            Write-Error "Could not parse version from: $output"
+            exit 1
+          }
+          $expected = "${{ github.event.release.tag_name }}"
+          if ($installed -ne $expected) {
+            Write-Error "Version mismatch: installed $installed, expected $expected"
+            exit 1
+          }
 
   install-windows-winget:
     runs-on: windows-latest
@@ -124,6 +184,22 @@ jobs:
         run: |
           k6 version
           k6 --help | Out-Null
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        shell: pwsh
+        run: |
+          $output = k6 version
+          if ($output -match 'v\d+\.\d+\.\d+') {
+            $installed = $Matches[0]
+          } else {
+            Write-Error "Could not parse version from: $output"
+            exit 1
+          }
+          $expected = "${{ github.event.release.tag_name }}"
+          if ($installed -ne $expected) {
+            Write-Error "Version mismatch: installed $installed, expected $expected"
+            exit 1
+          }
 
   install-docker:
     runs-on: ubuntu-latest
@@ -137,4 +213,15 @@ jobs:
       - name: Pull k6 browser image
         run: docker pull grafana/k6:latest-with-browser
       - name: Verify k6 browser image
-        run: docker run --rm grafana/k6:latest-with-browser version
+        run: |
+          docker run --rm grafana/k6:latest-with-browser version
+          docker run --rm grafana/k6:latest-with-browser --help > /dev/null
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        run: |
+          installed="$(docker run --rm grafana/k6:latest version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          expected="${{ github.event.release.tag_name }}"
+          if [ "$installed" != "$expected" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $expected"
+            exit 1
+          fi
