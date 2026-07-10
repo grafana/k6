@@ -272,7 +272,7 @@ func (stream *WritableStream) GetWriter() sobek.Value {
 	// 1. Return ? AcquireWritableStreamDefaultWriter(this).
 	writer := stream.acquireDefaultWriter()
 
-	obj, err := NewWritableStreamDefaultWriterObject(writer)
+	obj, err := NewWritableStreamDefaultWriterObject(writer, writableStreamDefaultWriterPrototype(stream.runtime))
 	if err != nil {
 		common.Throw(stream.runtime, err)
 	}

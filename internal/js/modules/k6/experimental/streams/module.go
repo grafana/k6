@@ -222,7 +222,7 @@ func (mi *ModuleInstance) NewWritableStreamDefaultWriter(call sobek.ConstructorC
 	writer := &WritableStreamDefaultWriter{}
 	writer.setup(stream)
 
-	object, err := NewWritableStreamDefaultWriterObject(writer)
+	object, err := NewWritableStreamDefaultWriterObject(writer, call.This.Prototype())
 	if err != nil {
 		throw(rt, err)
 	}

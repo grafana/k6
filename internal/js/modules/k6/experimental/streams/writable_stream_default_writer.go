@@ -29,63 +29,228 @@ type WritableStreamDefaultWriter struct {
 	vu      modules.VU
 }
 
+const writerGoRefKey = "__k6WritableStreamDefaultWriter__"
+
 // NewWritableStreamDefaultWriterObject creates a new [sobek.Object] from a
 // [WritableStreamDefaultWriter] instance.
-func NewWritableStreamDefaultWriterObject(writer *WritableStreamDefaultWriter) (*sobek.Object, error) {
+func NewWritableStreamDefaultWriterObject(
+	writer *WritableStreamDefaultWriter,
+	proto *sobek.Object,
+) (*sobek.Object, error) {
 	rt := writer.runtime
 	obj := rt.NewObject()
-	objName := "WritableStreamDefaultWriter"
 
-	// closed getter
-	err := obj.DefineAccessorProperty("closed", rt.ToValue(func() *sobek.Promise {
-		return writer.closedPromise.promise
-	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-	if err != nil {
+	if err := obj.DefineDataProperty(
+		writerGoRefKey, rt.ToValue(writer), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE,
+	); err != nil {
 		return nil, err
 	}
 
-	// desiredSize getter
-	err = obj.DefineAccessorProperty("desiredSize", rt.ToValue(func() sobek.Value {
-		return writer.DesiredSize()
-	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-	if err != nil {
+	if proto == nil {
+		proto = writableStreamDefaultWriterPrototype(rt)
+	}
+	if proto == nil {
+		proto = rt.NewObject()
+	}
+
+	if err := installWritableStreamDefaultWriterPrototype(rt, proto); err != nil {
 		return nil, err
 	}
 
-	// ready getter
-	err = obj.DefineAccessorProperty("ready", rt.ToValue(func() *sobek.Promise {
-		return writer.readyPromise.promise
-	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-	if err != nil {
-		return nil, err
-	}
-
-	// We wire the writer object's `constructor` to the module's exported
-	// WritableStreamDefaultWriter constructor, so that scripts can retrieve and re-use it
-	// (e.g. `new writer.constructor(stream)`), as exercised by the Web Platform Tests.
-	if ctor := rt.Get("WritableStreamDefaultWriter"); ctor != nil {
-		if err := setReadOnlyPropertyOf(obj, objName, "constructor", ctor); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := setReadOnlyPropertyOf(obj, objName, "abort", rt.ToValue(writer.Abort)); err != nil {
-		return nil, err
-	}
-
-	if err := setReadOnlyPropertyOf(obj, objName, "close", rt.ToValue(writer.Close)); err != nil {
-		return nil, err
-	}
-
-	if err := setReadOnlyPropertyOf(obj, objName, "releaseLock", rt.ToValue(writer.ReleaseLock)); err != nil {
-		return nil, err
-	}
-
-	if err := setReadOnlyPropertyOf(obj, objName, "write", rt.ToValue(writer.Write)); err != nil {
+	if err := obj.SetPrototype(proto); err != nil {
 		return nil, err
 	}
 
 	return obj, nil
+}
+
+func writableStreamDefaultWriterPrototype(rt *sobek.Runtime) *sobek.Object {
+	ctor := rt.Get("WritableStreamDefaultWriter")
+	if ctor == nil || common.IsNullish(ctor) {
+		return nil
+	}
+
+	proto := ctor.ToObject(rt).Get("prototype")
+	if proto == nil || common.IsNullish(proto) {
+		return nil
+	}
+
+	return proto.ToObject(rt)
+}
+
+func installWritableStreamDefaultWriterPrototype(rt *sobek.Runtime, proto *sobek.Object) error {
+	objName := "WritableStreamDefaultWriter.prototype"
+
+	if !hasOwnProperty(proto, "closed") {
+		getter, err := wrapWriterGetter(rt, func(this sobek.Value) *sobek.Promise {
+			writer := writableStreamDefaultWriterFromThis(rt, this)
+			return writer.closedPromise.promise
+		})
+		if err != nil {
+			return err
+		}
+
+		err = proto.DefineAccessorProperty("closed", getter, nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !hasOwnProperty(proto, "desiredSize") {
+		getter, err := wrapWriterGetter(rt, func(this sobek.Value) sobek.Value {
+			writer := writableStreamDefaultWriterFromThis(rt, this)
+			return writer.DesiredSize()
+		})
+		if err != nil {
+			return err
+		}
+
+		err = proto.DefineAccessorProperty("desiredSize", getter, nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+		if err != nil {
+			return err
+		}
+	}
+
+	if !hasOwnProperty(proto, "ready") {
+		getter, err := wrapWriterGetter(rt, func(this sobek.Value) *sobek.Promise {
+			writer := writableStreamDefaultWriterFromThis(rt, this)
+			return writer.readyPromise.promise
+		})
+		if err != nil {
+			return err
+		}
+
+		err = proto.DefineAccessorProperty("ready", getter, nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+		if err != nil {
+			return err
+		}
+	}
+
+	// We wire the writer prototype's `constructor` to the module's exported
+	// WritableStreamDefaultWriter constructor, so that scripts can retrieve and re-use it
+	// (e.g. `new writer.constructor(stream)`), as exercised by the Web Platform Tests.
+	if ctor := rt.Get("WritableStreamDefaultWriter"); ctor != nil && !hasOwnProperty(proto, "constructor") {
+		if err := setDefaultPrototypePropertyOf(proto, objName, "constructor", ctor); err != nil {
+			return err
+		}
+	}
+
+	if !hasOwnProperty(proto, "abort") {
+		method, err := wrapWriterMethod(rt, func(this, reason sobek.Value) *sobek.Promise {
+			writer := writableStreamDefaultWriterFromThis(rt, this)
+			return writer.Abort(reason)
+		})
+		if err != nil {
+			return err
+		}
+
+		if err := setDefaultPrototypePropertyOf(proto, objName, "abort", method); err != nil {
+			return err
+		}
+	}
+
+	if !hasOwnProperty(proto, "close") {
+		method, err := wrapWriterMethod(rt, func(this, _ sobek.Value) *sobek.Promise {
+			writer := writableStreamDefaultWriterFromThis(rt, this)
+			return writer.Close()
+		})
+		if err != nil {
+			return err
+		}
+
+		if err := setDefaultPrototypePropertyOf(proto, objName, "close", method); err != nil {
+			return err
+		}
+	}
+
+	if !hasOwnProperty(proto, "releaseLock") {
+		method, err := wrapWriterMethod(rt, func(this, _ sobek.Value) sobek.Value {
+			writer := writableStreamDefaultWriterFromThis(rt, this)
+			writer.ReleaseLock()
+			return sobek.Undefined()
+		})
+		if err != nil {
+			return err
+		}
+
+		if err := setDefaultPrototypePropertyOf(proto, objName, "releaseLock", method); err != nil {
+			return err
+		}
+	}
+
+	if !hasOwnProperty(proto, "write") {
+		method, err := wrapWriterMethod(rt, func(this, chunk sobek.Value) *sobek.Promise {
+			writer := writableStreamDefaultWriterFromThis(rt, this)
+			return writer.Write(chunk)
+		})
+		if err != nil {
+			return err
+		}
+
+		if err := setDefaultPrototypePropertyOf(proto, objName, "write", method); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func wrapWriterGetter(rt *sobek.Runtime, getter any) (sobek.Value, error) {
+	return wrapWriterPrototypeFunction(rt, getter, `
+(function(getter) {
+  return function() {
+    return getter(this);
+  };
+})`)
+}
+
+func wrapWriterMethod(rt *sobek.Runtime, method any) (sobek.Value, error) {
+	return wrapWriterPrototypeFunction(rt, method, `
+(function(method) {
+  return function(arg) {
+    return method(this, arg);
+  };
+})`)
+}
+
+func wrapWriterPrototypeFunction(rt *sobek.Runtime, callback any, source string) (sobek.Value, error) {
+	wrapper, err := rt.RunString(source)
+	if err != nil {
+		return nil, err
+	}
+
+	call, ok := sobek.AssertFunction(wrapper)
+	if !ok {
+		return nil, newError(RuntimeError, "writer prototype wrapper is not a function")
+	}
+
+	return call(sobek.Undefined(), rt.ToValue(callback))
+}
+
+func writableStreamDefaultWriterFromValue(rt *sobek.Runtime, value sobek.Value) *WritableStreamDefaultWriter {
+	if value == nil || common.IsNullish(value) {
+		return nil
+	}
+
+	ref := value.ToObject(rt).Get(writerGoRefKey)
+	if ref == nil {
+		return nil
+	}
+
+	writer, _ := ref.Export().(*WritableStreamDefaultWriter)
+	return writer
+}
+
+func writableStreamDefaultWriterFromThis(
+	rt *sobek.Runtime,
+	this sobek.Value,
+) *WritableStreamDefaultWriter {
+	writer := writableStreamDefaultWriterFromValue(rt, this)
+	if writer == nil {
+		throw(rt, newTypeError(rt, "value is not a WritableStreamDefaultWriter"))
+	}
+
+	return writer
 }
 
 // Abort aborts the stream, signaling that the producer can no longer successfully write to

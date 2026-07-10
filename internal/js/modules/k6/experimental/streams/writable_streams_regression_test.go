@@ -211,3 +211,29 @@ return writer.ready.then(
 
 	require.Equal(t, "ready rejected with boom", result.String())
 }
+
+func TestWritableStreamDefaultWriterUsesConstructorPrototype(t *testing.T) {
+	t.Parallel()
+
+	result := runStreamPromiseScript(t, `
+const stream = new WritableStream();
+const writer = stream.getWriter();
+const originalWrite = WritableStreamDefaultWriter.prototype.write;
+let patchedCalled = false;
+
+WritableStreamDefaultWriter.prototype.write = function(chunk) {
+  patchedCalled = true;
+  return originalWrite.call(this, chunk);
+};
+
+await writer.write("chunk");
+
+return JSON.stringify([
+  writer instanceof WritableStreamDefaultWriter,
+  Object.prototype.hasOwnProperty.call(writer, "write"),
+  patchedCalled,
+]);
+`)
+
+	require.Equal(t, `[true,false,true]`, result.String())
+}

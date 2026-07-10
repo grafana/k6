@@ -109,6 +109,32 @@ func setReadOnlyPropertyOf(obj *sobek.Object, objName, propName string, propValu
 	return nil
 }
 
+// setDefaultPrototypePropertyOf sets a property with the default Web IDL prototype method
+// descriptors: writable and configurable, but not enumerable.
+func setDefaultPrototypePropertyOf(obj *sobek.Object, objName, propName string, propValue sobek.Value) error {
+	err := obj.DefineDataProperty(propName,
+		propValue,
+		sobek.FLAG_TRUE,
+		sobek.FLAG_FALSE,
+		sobek.FLAG_TRUE,
+	)
+	if err != nil {
+		return fmt.Errorf("unable to define %s property on %s object; reason: %w", propName, objName, err)
+	}
+
+	return nil
+}
+
+func hasOwnProperty(obj *sobek.Object, propName string) bool {
+	for _, name := range obj.GetOwnPropertyNames() {
+		if name == propName {
+			return true
+		}
+	}
+
+	return false
+}
+
 // isObject determines whether the given [sobek.Value] is a [sobek.Object] or not.
 func isObject(val sobek.Value) bool {
 	return val != nil && val.ExportType() != nil && val.ExportType().Kind() == reflect.Map
