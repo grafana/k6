@@ -43,6 +43,9 @@ type WritableStreamDefaultController struct {
 	// writeAlgorithm is a promise-returning algorithm, taking one argument (the chunk to
 	// write), which writes data to the underlying sink.
 	writeAlgorithm UnderlyingSinkWriteCallback
+
+	// object is the JavaScript wrapper exposed to the underlying sink.
+	object *sobek.Object
 }
 
 // closeSentinelType is the type of the close sentinel enqueued in the controller's queue to
@@ -456,7 +459,17 @@ func (controller *WritableStreamDefaultController) isCloseSentinel(value sobek.V
 }
 
 func (controller *WritableStreamDefaultController) toObject() (*sobek.Object, error) {
-	return NewWritableStreamDefaultControllerObject(controller)
+	if controller.object != nil {
+		return controller.object, nil
+	}
+
+	object, err := NewWritableStreamDefaultControllerObject(controller)
+	if err != nil {
+		return nil, err
+	}
+
+	controller.object = object
+	return object, nil
 }
 
 // exceptionValue extracts the underlying JavaScript value from a Go error, if it wraps a

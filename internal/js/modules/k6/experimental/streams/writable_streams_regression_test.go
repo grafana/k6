@@ -30,6 +30,32 @@ func runStreamScript(t testing.TB, script string) sobek.Value {
 	return value
 }
 
+func runStreamPromiseScript(t testing.TB, script string) sobek.Value {
+	t.Helper()
+
+	rt := newStreamsRuntime(t)
+	callback := rt.VU.RegisterCallback()
+	var result sobek.Value
+
+	require.NoError(t, rt.VU.Runtime().Set("__streamTestDone", func(value sobek.Value) {
+		result = value
+		callback(func() error { return nil })
+	}))
+
+	_, err := rt.RunOnEventLoop(`
+Promise.resolve((async () => {
+` + script + `
+})()).then(
+  value => __streamTestDone(value),
+  error => __streamTestDone("ERROR:" + (error && error.message || error))
+);
+`)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	return result
+}
+
 func TestStreamControllerConstructorsThrowWhenCalled(t *testing.T) {
 	t.Parallel()
 
@@ -93,4 +119,32 @@ JSON.stringify(results);
 `)
 
 	require.Equal(t, `["undefined callbacks ignored",true]`, result.String())
+}
+
+func TestWritableStreamReusesControllerObject(t *testing.T) {
+	t.Parallel()
+
+	result := runStreamPromiseScript(t, `
+let startController;
+let writeController;
+let marker;
+
+const stream = new WritableStream({
+  start(controller) {
+    startController = controller;
+    controller.marker = "kept";
+  },
+  write(_chunk, controller) {
+    writeController = controller;
+    marker = controller.marker;
+  },
+});
+
+const writer = stream.getWriter();
+await writer.write("chunk");
+
+return JSON.stringify([writeController === startController, marker]);
+`)
+
+	require.Equal(t, `[true,"kept"]`, result.String())
 }
