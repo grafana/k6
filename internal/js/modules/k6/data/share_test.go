@@ -216,6 +216,154 @@ func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestSharedArrayReadValuesIntact verifies that values read back through the
+// (now primitive-skipping) deepFreeze path are intact: primitives of every JSON
+// kind, an ASCII and a non-ASCII string (different internal representations),
+// and a large string (the shape that used to blow up memory). Repeated reads
+// must be consistent.
+func TestSharedArrayReadValuesIntact(t *testing.T) {
+	t.Parallel()
+	runtime, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
+	rt := runtime.VU.Runtime()
+
+	_, err = rt.RunString(`'use strict';
+		var LEN = 200000;
+		var s = new SharedArray("reads", function() {
+			return ["hello", "", "ünïçödé 🚀", 42, 3.5, -7, true, false, null, "A".repeat(LEN)];
+		});
+		if (s.length !== 10) { throw new Error("length="+s.length); }
+		if (s[0] !== "hello" || typeof s[0] !== "string") { throw new Error("s[0]="+s[0]); }
+		if (s[1] !== "" || typeof s[1] !== "string") { throw new Error("s[1]="+s[1]); }
+		if (s[2] !== "ünïçödé 🚀") { throw new Error("s[2]="+s[2]); }
+		if (s[3] !== 42) { throw new Error("s[3]="+s[3]); }
+		if (s[4] !== 3.5) { throw new Error("s[4]="+s[4]); }
+		if (s[5] !== -7) { throw new Error("s[5]="+s[5]); }
+		if (s[6] !== true) { throw new Error("s[6]="+s[6]); }
+		if (s[7] !== false) { throw new Error("s[7]="+s[7]); }
+		if (s[8] !== null) { throw new Error("s[8]="+s[8]); }
+		if (s[9].length !== LEN || s[9][0] !== "A" || s[9][LEN-1] !== "A") { throw new Error("bad large string"); }
+		// Repeated reads must be consistent.
+		if (s[0] !== s[0] || s[9].length !== s[9].length) { throw new Error("inconsistent read"); }
+	`)
+	require.NoError(t, err)
+}
+
+// TestSharedArrayDeepFreezeSemantics verifies the safety property that matters:
+// object and array elements (including nested ones) remain deeply frozen after
+// the primitive fast-path change, so a VU cannot mutate the shared data.
+func TestSharedArrayDeepFreezeSemantics(t *testing.T) {
+	t.Parallel()
+
+	const setup = `'use strict';
+		var s = new SharedArray("rich", function() {
+			return [{
+				str: "hello",
+				num: 1,
+				flag: true,
+				nothing: null,
+				nested: { deep: "x", arr: [1, 2, 3] },
+				list: [ {k: "a"}, {k: "b"} ]
+			}, [10, 20, 30]];
+		});
+	`
+
+	// integrity asserts the shared structure is untouched. It throws (failing
+	// the surrounding RunString) if any value changed or a property was added.
+	const integrity = `'use strict';
+		if (s[0].str !== "hello") { throw new Error("str changed: "+s[0].str); }
+		if (s[0].num !== 1) { throw new Error("num changed: "+s[0].num); }
+		if ("extra" in s[0]) { throw new Error("property was added to object"); }
+		if (s[0].nested.deep !== "x") { throw new Error("nested.deep changed"); }
+		if ("extra" in s[0].nested) { throw new Error("property added to nested"); }
+		if (s[0].nested.arr.length !== 3 || s[0].nested.arr[0] !== 1) { throw new Error("nested.arr changed"); }
+		if (s[0].list.length !== 2 || s[0].list[0].k !== "a") { throw new Error("list changed"); }
+		if (s[1].length !== 3 || s[1][0] !== 10) { throw new Error("top-level array changed"); }
+	`
+
+	// The deep freeze must reject every one of these mutations. Top-level plain
+	// object freezing is already covered by TestSharedArrayAnotherRuntimeExceptions;
+	// these focus on the nested and array cases, which exercise the recursion and
+	// the values that pass through the *sobek.Object guard as containers.
+	cases := map[string]string{
+		"mutate nested object":                 `s[0].nested.deep = "bad";`,
+		"add property to nested object":        `s[0].nested.extra = "bad";`,
+		"delete nested property":               `delete s[0].nested.deep;`,
+		"push to nested array":                 `s[0].nested.arr.push(4);`,
+		"set nested array index":               `s[0].nested.arr[0] = 99;`,
+		"mutate object inside array":           `s[0].list[0].k = "bad";`,
+		"push to top-level array element":      `s[1].push(40);`,
+		"set index on top-level array element": `s[1][0] = 99;`,
+	}
+
+	for name, code := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			runtime, err := newConfiguredRuntime(t)
+			require.NoError(t, err)
+			rt := runtime.VU.Runtime()
+			_, err = rt.RunString(setup)
+			require.NoError(t, err)
+
+			// Strict mode is required: in sloppy mode, writes to frozen
+			// objects fail silently instead of throwing.
+			_, err = rt.RunString("'use strict';\n" + code)
+			require.Error(t, err, "mutation should have been rejected by the freeze")
+			exc := new(sobek.Exception)
+			require.True(t, errors.As(err, &exc))
+			require.Contains(t, exc.Error(), "TypeError",
+				"a frozen write must fail with a TypeError")
+
+			// The shared data must be completely unchanged.
+			_, err = rt.RunString(integrity)
+			require.NoError(t, err)
+		})
+	}
+}
+
+// TestSharedArrayLargeStringGetAllocations is a regression guard for the memory
+// blow-up: reading a large string element must not allocate an amount of memory
+// proportional to the string length.
+//
+//nolint:tparallel // testing.AllocsPerRun must not run concurrently.
+func TestSharedArrayLargeStringGetAllocations(t *testing.T) {
+	runtime, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
+	rt := runtime.VU.Runtime()
+
+	_, err = rt.RunString(`
+		var shared = new SharedArray("alloc", function() {
+			return ["short", "A".repeat(100000)];
+		});
+		var get = function(i) { return shared[i]; };
+	`)
+	require.NoError(t, err)
+
+	get, ok := sobek.AssertFunction(rt.Get("get"))
+	require.True(t, ok)
+
+	small := testing.AllocsPerRun(50, func() {
+		_, err := get(sobek.Undefined(), rt.ToValue(0))
+		if err != nil {
+			panic(err)
+		}
+	})
+	large := testing.AllocsPerRun(50, func() {
+		_, err := get(sobek.Undefined(), rt.ToValue(1))
+		if err != nil {
+			panic(err)
+		}
+	})
+
+	t.Logf("allocations per Get: small string=%.0f, 100k string=%.0f", small, large)
+
+	// With the bug, `large` was on the order of the string length (100k+).
+	// After the fix it is a small constant, close to `small`. Use a generous
+	// bound that is decisively below the buggy behavior.
+	require.Less(t, large, 2000.0,
+		"reading a large string element allocates too much; deepFreeze may be enumerating characters again")
+}
+
 func TestSharedArrayRaceInInitialization(t *testing.T) {
 	t.Parallel()
 
