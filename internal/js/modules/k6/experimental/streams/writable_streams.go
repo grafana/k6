@@ -995,28 +995,28 @@ func (stream *WritableStream) setupWritableStreamDefaultControllerFromUnderlying
 	// 6. If underlyingSinkDict["start"] exists, then set startAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["start"] with argument list « controller »
 	// and callback this value underlyingSink.
-	if isDictionaryMemberPresent(underlyingSinkDict.Start) {
+	if underlyingSinkDict.Start != nil && !sobek.IsUndefined(underlyingSinkDict.Start) {
 		startAlgorithm = stream.startAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 
 	// 7. If underlyingSinkDict["write"] exists, then set writeAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["write"] with argument list « chunk, controller »
 	// and callback this value underlyingSink.
-	if isDictionaryMemberPresent(underlyingSinkDict.Write) {
+	if underlyingSinkDict.Write != nil && !sobek.IsUndefined(underlyingSinkDict.Write) {
 		writeAlgorithm = stream.writeAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 
 	// 8. If underlyingSinkDict["close"] exists, then set closeAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["close"] with argument list « »
 	// and callback this value underlyingSink.
-	if isDictionaryMemberPresent(underlyingSinkDict.Close) {
+	if underlyingSinkDict.Close != nil && !sobek.IsUndefined(underlyingSinkDict.Close) {
 		closeAlgorithm = stream.closeAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 
 	// 9. If underlyingSinkDict["abort"] exists, then set abortAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["abort"] with argument list « reason »
 	// and callback this value underlyingSink.
-	if isDictionaryMemberPresent(underlyingSinkDict.Abort) {
+	if underlyingSinkDict.Abort != nil && !sobek.IsUndefined(underlyingSinkDict.Abort) {
 		abortAlgorithm = stream.abortAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 

@@ -175,7 +175,7 @@ func newWritableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 	}
 
 	// 3. If underlyingSinkDict["type"] exists, throw a RangeError exception.
-	if isDictionaryMemberPresent(underlyingSinkDict.Type) {
+	if underlyingSinkDict.Type != nil && !sobek.IsUndefined(underlyingSinkDict.Type) {
 		throw(rt, newRangeError(rt, "'type' is not supported by WritableStream"))
 	}
 
