@@ -174,7 +174,13 @@ func (controller *WritableStreamDefaultController) getChunkSize(chunk sobek.Valu
 	}
 
 	// 3. Return returnValue.[[Value]].
-	return size.ToFloat()
+	sizeFloat, err := valueToFloat(size)
+	if err != nil {
+		controller.errorIfNeeded(exceptionValue(err))
+		return 1
+	}
+
+	return sizeFloat
 }
 
 // getDesiredSize implements the [specification]'s WritableStreamDefaultControllerGetDesiredSize
@@ -456,6 +462,21 @@ func (controller *WritableStreamDefaultController) resetQueue() {
 func (controller *WritableStreamDefaultController) isCloseSentinel(value sobek.Value) bool {
 	sentinel, ok := value.Export().(*closeSentinelType)
 	return ok && sentinel == closeSentinel
+}
+
+func valueToFloat(value sobek.Value) (result float64, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if recoveredErr, ok := recovered.(error); ok {
+				err = recoveredErr
+				return
+			}
+
+			panic(recovered)
+		}
+	}()
+
+	return value.ToFloat(), nil
 }
 
 func (controller *WritableStreamDefaultController) toObject() (*sobek.Object, error) {

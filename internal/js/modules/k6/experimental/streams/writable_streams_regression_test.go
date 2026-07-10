@@ -148,3 +148,43 @@ return JSON.stringify([writeController === startController, marker]);
 
 	require.Equal(t, `[true,"kept"]`, result.String())
 }
+
+func TestWritableStreamSizeConversionAbruptCompletionRejectsWrite(t *testing.T) {
+	t.Parallel()
+
+	result := runStreamPromiseScript(t, `
+const boom = new Error("sz");
+const stream = new WritableStream({
+  write() {},
+}, {
+  size() {
+    return {
+      valueOf() {
+        throw boom;
+      },
+    };
+  },
+});
+const writer = stream.getWriter();
+
+let writePromise;
+try {
+  writePromise = writer.write("chunk");
+} catch (error) {
+  return "threw:" + error.message;
+}
+
+const writeResult = await writePromise.then(
+  () => "write fulfilled",
+  error => error === boom ? "write rejected with boom" : "write rejected with " + error.message,
+);
+const closeResult = await writer.close().then(
+  () => "close fulfilled",
+  error => error ? "close rejected" : "close rejected without error",
+);
+
+return JSON.stringify([writeResult, closeResult]);
+`)
+
+	require.Equal(t, `["write rejected with boom","close rejected"]`, result.String())
+}

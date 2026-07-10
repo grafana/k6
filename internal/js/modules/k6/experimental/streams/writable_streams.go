@@ -162,11 +162,14 @@ func markPromiseHandled(rt *sobek.Runtime, p *sobek.Promise) {
 // settle in a deterministic, specification-compliant (FIFO) order.
 func (stream *WritableStream) withTransaction(fn func()) {
 	stream.txDepth++
+	defer func() {
+		stream.txDepth--
+		if stream.txDepth == 0 {
+			stream.drainSettlements()
+		}
+	}()
+
 	fn()
-	stream.txDepth--
-	if stream.txDepth == 0 {
-		stream.drainSettlements()
-	}
 }
 
 // drainSettlements runs the deferred promise settlements in FIFO order.
