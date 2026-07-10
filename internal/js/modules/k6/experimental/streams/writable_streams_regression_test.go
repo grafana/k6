@@ -63,3 +63,34 @@ JSON.stringify(results);
 
 	require.Equal(t, `[true,true]`, result.String())
 }
+
+func TestWritableStreamUnderlyingSinkDictionaryPresence(t *testing.T) {
+	t.Parallel()
+
+	result := runStreamScript(t, `
+const results = [];
+
+try {
+  new WritableStream({
+    start: undefined,
+    write: undefined,
+    close: undefined,
+    abort: undefined,
+  });
+  results.push("undefined callbacks ignored");
+} catch (error) {
+  results.push(error && error.message);
+}
+
+try {
+  new WritableStream({ type: null });
+  results.push("type null accepted");
+} catch (error) {
+  results.push(error instanceof RangeError);
+}
+
+JSON.stringify(results);
+`)
+
+	require.Equal(t, `["undefined callbacks ignored",true]`, result.String())
+}

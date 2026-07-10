@@ -970,28 +970,28 @@ func (stream *WritableStream) setupWritableStreamDefaultControllerFromUnderlying
 	// 6. If underlyingSinkDict["start"] exists, then set startAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["start"] with argument list « controller »
 	// and callback this value underlyingSink.
-	if underlyingSinkDict.Start != nil {
+	if isDictionaryMemberPresent(underlyingSinkDict.Start) {
 		startAlgorithm = stream.startAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 
 	// 7. If underlyingSinkDict["write"] exists, then set writeAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["write"] with argument list « chunk, controller »
 	// and callback this value underlyingSink.
-	if underlyingSinkDict.Write != nil {
+	if isDictionaryMemberPresent(underlyingSinkDict.Write) {
 		writeAlgorithm = stream.writeAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 
 	// 8. If underlyingSinkDict["close"] exists, then set closeAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["close"] with argument list « »
 	// and callback this value underlyingSink.
-	if underlyingSinkDict.Close != nil {
+	if isDictionaryMemberPresent(underlyingSinkDict.Close) {
 		closeAlgorithm = stream.closeAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 
 	// 9. If underlyingSinkDict["abort"] exists, then set abortAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSinkDict["abort"] with argument list « reason »
 	// and callback this value underlyingSink.
-	if underlyingSinkDict.Abort != nil {
+	if isDictionaryMemberPresent(underlyingSinkDict.Abort) {
 		abortAlgorithm = stream.abortAlgorithm(underlyingSink, underlyingSinkDict)
 	}
 

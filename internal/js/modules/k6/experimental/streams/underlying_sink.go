@@ -88,3 +88,7 @@ func NewUnderlyingSinkFromObject(rt *sobek.Runtime, obj *sobek.Object) (Underlyi
 
 	return underlyingSink, nil
 }
+
+func isDictionaryMemberPresent(value sobek.Value) bool {
+	return value != nil && !sobek.IsUndefined(value)
+}
