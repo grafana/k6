@@ -71,7 +71,8 @@ func NewWritableStreamDefaultControllerObject(
 	// Exposing a plain Go function (which is not a constructor) achieves this, as calling it
 	// with `new` throws a TypeError.
 	if err := setReadOnlyPropertyOf(obj, objName, "constructor", rt.ToValue(func() sobek.Value {
-		return rt.ToValue(&WritableStreamDefaultController{})
+		throw(rt, newTypeError(rt, "WritableStreamDefaultController is not constructable"))
+		return sobek.Undefined()
 	})); err != nil {
 		return nil, err
 	}
