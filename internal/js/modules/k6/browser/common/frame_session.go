@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -372,6 +373,10 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	}
 
 	tags = tags.With("rating", wv.Rating)
+	// Use the committed navigation order: web vitals are flushed by the page
+	// on pagehide, which Chrome delivers after the next navigation has
+	// started but before its document commits.
+	tags = tags.With("page_order", strconv.FormatInt(fs.page.committedNavigationOrder(), 10))
 
 	now := time.Now()
 	pushIfNotDone(fs.vu.Context(), fs.logger, state.Samples, k6metrics.ConnectedSamples{

@@ -202,7 +202,10 @@ func (m *FrameManager) frameLifecycleEvent(frameID cdp.FrameID, event LifecycleE
 
 	frame, ok := m.getFrameByID(frameID)
 	if ok {
-		frame.onLifecycleEvent(event)
+		newlyFired := frame.onLifecycleEvent(event)
+		if newlyFired && event == LifecycleEventLoad && m.page != nil && frame == m.MainFrame() {
+			m.page.emitPageDurationMetric(frame)
+		}
 	}
 }
 
@@ -240,6 +243,9 @@ func (m *FrameManager) frameNavigated(
 
 	isMainFrame := parentFrameID == ""
 	frame := m.frames[frameID]
+	// The first main-frame commit is the frame's initial (about:blank)
+	// document, which doesn't count as a page navigation.
+	firstMainFrameCommit := isMainFrame && frame == nil
 
 	if !isMainFrame && frame == nil {
 		m.logger.Debugf("FrameManager:frameNavigated:nil frame",
@@ -297,6 +303,10 @@ func (m *FrameManager) frameNavigated(
 	}
 
 	frame.navigated(name, url, documentID)
+
+	if isMainFrame && m.page != nil {
+		m.page.navigationCommitted(initial || firstMainFrameCommit)
+	}
 
 	frame.pendingDocumentMu.Lock()
 	defer frame.pendingDocumentMu.Unlock()

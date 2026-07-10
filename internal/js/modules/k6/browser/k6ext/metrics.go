@@ -21,6 +21,7 @@ const (
 	browserDataReceivedName    = "browser_data_received"
 	browserHTTPReqDurationName = "browser_http_req_duration"
 	browserHTTPReqFailedName   = "browser_http_req_failed"
+	browserPageDurationName    = "browser_page_duration"
 )
 
 // CustomMetrics are the custom k6 metrics used by xk6-browser.
@@ -31,6 +32,7 @@ type CustomMetrics struct {
 	BrowserDataReceived    *k6metrics.Metric
 	BrowserHTTPReqDuration *k6metrics.Metric
 	BrowserHTTPReqFailed   *k6metrics.Metric
+	BrowserPageDuration    *k6metrics.Metric
 }
 
 // RegisterCustomMetrics creates and registers our custom metrics with the k6
@@ -62,5 +64,6 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 		BrowserDataReceived:    registry.MustNewMetric(browserDataReceivedName, k6metrics.Counter, k6metrics.Data),
 		BrowserHTTPReqDuration: registry.MustNewMetric(browserHTTPReqDurationName, k6metrics.Trend, k6metrics.Time),
 		BrowserHTTPReqFailed:   registry.MustNewMetric(browserHTTPReqFailedName, k6metrics.Rate),
+		BrowserPageDuration:    registry.MustNewMetric(browserPageDurationName, k6metrics.Trend, k6metrics.Time),
 	}
 }

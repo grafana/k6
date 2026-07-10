@@ -9,6 +9,7 @@ import (
 	"iter"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
+	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
 // BlankPage represents a blank page.
@@ -276,6 +278,21 @@ type Page struct {
 	eventHandlersMu    sync.RWMutex
 	eventHandlerLastID atomic.Uint64
 
+	// navOrder is the 0-based index of the current main-frame hard
+	// navigation ("page") and rotates as soon as the main-frame document
+	// request starts, so in-flight work (the document request and its
+	// redirect chain) is attributed to the destination page.
+	// committedNavOrder lags behind until the new document commits, so data
+	// reported by the outgoing document after the next navigation has
+	// started (e.g. web vitals flushed on pagehide) is still attributed to
+	// the page it belongs to. Both start at -1: the initial about:blank
+	// document doesn't count as a page. navStartNano is the wall-clock start
+	// (UnixNano) of the current navigation, used for browser_page_duration;
+	// 0 means no navigation start has been observed.
+	navOrder          atomic.Int64
+	committedNavOrder atomic.Int64
+	navStartNano      atomic.Int64
+
 	mainFrameSession *FrameSession
 	frameSessions    map[cdp.FrameID]*FrameSession
 	frameSessionsMu  sync.RWMutex
@@ -322,6 +339,9 @@ func NewPage(
 		workers:          make(map[target.SessionID]*Worker),
 		logger:           logger,
 	}
+
+	p.navOrder.Store(-1)
+	p.committedNavOrder.Store(-1)
 
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
 		p.sessionID(), tid, bp)
@@ -509,6 +529,85 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", tag, matched)
 
 	return tag, matched
+}
+
+// navigationStarted rotates the navigation order when a main-frame
+// navigation (document) request starts. It is keyed off the document request
+// rather than Page.frameStartedLoading, as Chrome can emit spurious
+// frameStartedLoading events for a single navigation. See the navOrder field
+// docs for the semantics.
+func (p *Page) navigationStarted(startedAt time.Time) {
+	p.navOrder.Add(1)
+	p.navStartNano.Store(startedAt.UnixNano())
+}
+
+// navigationCommitted catches the committed navigation order up with the
+// current one when a main-frame document commits. initial is true for the
+// first document of the frame (about:blank), which doesn't count as a page.
+// If the navigation request was missed (e.g. a popup that navigates before
+// we attach to it, or a back-forward cache restore, which issues no
+// request), the order is rotated here instead.
+func (p *Page) navigationCommitted(initial bool) {
+	if initial {
+		return
+	}
+	if p.navOrder.Load() == p.committedNavOrder.Load() {
+		p.navOrder.Add(1)
+		p.navStartNano.Store(time.Now().UnixNano())
+	}
+	p.committedNavOrder.Store(p.navOrder.Load())
+}
+
+// navigationOrder returns the 0-based order of the current main-frame
+// navigation, used to tag metrics of in-flight work with the page it belongs
+// to. Clamped to 0 for work that happens before the first navigation.
+func (p *Page) navigationOrder() int64 {
+	return max(p.navOrder.Load(), 0)
+}
+
+// committedNavigationOrder returns the 0-based order of the last committed
+// main-frame navigation, used to tag per-document data that can be reported
+// after the next navigation has already started (e.g. web vitals flushed on
+// pagehide). Clamped to 0 for the initial about:blank document.
+func (p *Page) committedNavigationOrder() int64 {
+	return max(p.committedNavOrder.Load(), 0)
+}
+
+// emitPageDurationMetric emits the browser_page_duration metric for a
+// committed main-frame document once its load lifecycle event fires,
+// measuring from the start of the navigation (the document request).
+func (p *Page) emitPageDurationMetric(frame *Frame) {
+	startNano := p.navStartNano.Load()
+	if startNano == 0 {
+		// No observed navigation start: the initial about:blank document, or
+		// a document that was already loading when we attached to the target.
+		return
+	}
+	started := time.Unix(0, startNano)
+
+	vu := k6ext.GetVU(p.ctx)
+	customMetrics := k6ext.GetCustomMetrics(p.ctx)
+	if vu == nil || customMetrics == nil {
+		return
+	}
+	state := vu.State()
+
+	tags := state.Tags.GetCurrentValues().Tags
+	if state.Options.SystemTags.Has(k6metrics.TagURL) {
+		tags = handleURLTag(p, frame.URL(), http.MethodGet, tags)
+	}
+	tags = tags.With("page_order", strconv.FormatInt(p.committedNavigationOrder(), 10))
+
+	now := time.Now()
+	pushIfNotDone(vu.Context(), p.logger, state.Samples, k6metrics.ConnectedSamples{
+		Samples: []k6metrics.Sample{
+			{
+				TimeSeries: k6metrics.TimeSeries{Metric: customMetrics.BrowserPageDuration, Tags: tags},
+				Value:      k6metrics.D(now.Sub(started)),
+				Time:       now,
+			},
+		},
+	})
 }
 
 // onRequest calls [PageEventRequest] handlers after each request is made.

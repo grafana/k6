@@ -47,6 +47,7 @@ func (c Credentials) IsEmpty() bool {
 
 type eventInterceptor interface {
 	urlTagName(urlTag string, method string) (string, bool)
+	navigationOrder() int64
 	onRequest(request *Request)
 	onResponse(response *Response)
 	onRequestFinished(request *Request)
@@ -219,6 +220,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = handleURLTag(m.eventInterceptor, req.URL(), req.method, tags)
 	}
 	tags = tags.With("resource_type", req.ResourceType())
+	tags = tags.With("page_order", strconv.FormatInt(m.eventInterceptor.navigationOrder(), 10))
 
 	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
@@ -286,6 +288,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags = tags.With("from_prefetch_cache", strconv.FormatBool(fromPreCache))
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 	tags = tags.With("resource_type", req.ResourceType())
+	tags = tags.With("page_order", strconv.FormatInt(m.eventInterceptor.navigationOrder(), 10))
 
 	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
@@ -572,6 +575,15 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	if isInternalURL(req.url) {
 		m.logger.Debugf("NetworkManager", "skipping request handling of %s URL", req.url.Scheme)
 		return
+	}
+	// A main-frame navigation request starts a new page: rotate the page
+	// order before emitting metrics, so the document request and its
+	// redirect chain (event.RedirectResponse != nil for later hops) are
+	// attributed to the destination page.
+	if req.isNavigationRequest && event.RedirectResponse == nil &&
+		m.frameManager != nil && m.frameManager.page != nil &&
+		frame != nil && frame == m.frameManager.MainFrame() {
+		m.frameManager.page.navigationStarted(req.wallTime)
 	}
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req

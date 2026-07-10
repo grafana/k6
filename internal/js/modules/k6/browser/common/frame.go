@@ -339,10 +339,14 @@ func (f *Frame) nullContext(execCtxID runtime.ExecutionContextID) {
 	}
 }
 
-func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
+// onLifecycleEvent marks the lifecycle event as fired for the frame's current
+// document and returns whether it newly fired (false if it had already fired
+// for this document).
+func (f *Frame) onLifecycleEvent(event LifecycleEvent) bool {
 	f.log.Debugf("Frame:onLifecycleEvent", "fid:%s furl:%q event:%s", f.ID(), f.URL(), event)
 
 	f.lifecycleEventsMu.Lock()
+	newlyFired := !f.lifecycleEvents[event]
 	f.lifecycleEvents[event] = true
 	f.lifecycleEventsMu.Unlock()
 
@@ -350,6 +354,8 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 		URL:   f.URL(),
 		Event: event,
 	})
+
+	return newlyFired
 }
 
 func (f *Frame) onLoadingStarted() {

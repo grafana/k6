@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -165,4 +166,45 @@ func TestPageOn(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, p.eventHandlers[("metric")], 1)
 	})
+}
+
+func TestPageNavigationOrder(t *testing.T) {
+	t.Parallel()
+
+	p := &Page{}
+	p.navOrder.Store(-1)
+	p.committedNavOrder.Store(-1)
+
+	// Before any navigation both orders clamp to 0.
+	assert.Equal(t, int64(0), p.navigationOrder())
+	assert.Equal(t, int64(0), p.committedNavigationOrder())
+
+	// The initial about:blank commit doesn't count as a page.
+	p.navigationCommitted(true)
+	assert.Equal(t, int64(0), p.navigationOrder())
+	assert.Equal(t, int64(0), p.committedNavigationOrder())
+
+	// First navigation: in-flight work belongs to page 0, while
+	// late-reported data still belongs to the (non-existent) previous page.
+	p.navigationStarted(time.Now())
+	assert.Equal(t, int64(0), p.navigationOrder())
+	assert.Equal(t, int64(0), p.committedNavigationOrder())
+	p.navigationCommitted(false)
+	assert.Equal(t, int64(0), p.navigationOrder())
+	assert.Equal(t, int64(0), p.committedNavigationOrder())
+
+	// Second navigation: in-flight work belongs to page 1, late-reported
+	// data (e.g. web vitals flushed on pagehide) still to page 0.
+	p.navigationStarted(time.Now())
+	assert.Equal(t, int64(1), p.navigationOrder())
+	assert.Equal(t, int64(0), p.committedNavigationOrder())
+	p.navigationCommitted(false)
+	assert.Equal(t, int64(1), p.navigationOrder())
+	assert.Equal(t, int64(1), p.committedNavigationOrder())
+
+	// A commit whose start event was missed (e.g. a popup that navigates
+	// before we attach to it) still rotates the order.
+	p.navigationCommitted(false)
+	assert.Equal(t, int64(2), p.navigationOrder())
+	assert.Equal(t, int64(2), p.committedNavigationOrder())
 }

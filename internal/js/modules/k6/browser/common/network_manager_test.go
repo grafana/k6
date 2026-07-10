@@ -219,6 +219,8 @@ func (m *EventInterceptorMock) urlTagName(_ string, _ string) (string, bool) {
 	return "", false
 }
 
+func (m *EventInterceptorMock) navigationOrder() int64 { return 0 }
+
 func (m *EventInterceptorMock) onRequest(_ *Request) {}
 
 func (m *EventInterceptorMock) onResponse(_ *Response) {}
@@ -316,6 +318,43 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 			assert.Equalf(t, 3, n, "should emit 8 response metrics")
 		})
 	}
+}
+
+func TestNetworkManagerEmitMetricsPageOrderTag(t *testing.T) {
+	t.Parallel()
+
+	registry := k6metrics.NewRegistry()
+	k6m := k6ext.RegisterCustomMetrics(registry)
+
+	var (
+		vu = k6test.NewVU(t)
+		nm = &NetworkManager{ctx: vu.Context(), vu: vu, customMetrics: k6m, eventInterceptor: &EventInterceptorMock{}}
+	)
+	vu.ActivateVU()
+
+	now := time.Now()
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event: &network.EventRequestWillBeSent{
+			Request:   &network.Request{},
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+		},
+	})
+	require.NoError(t, err)
+
+	nm.emitRequestMetrics(req)
+	res := NewHTTPResponse(vu.Context(), req,
+		&network.Response{Timing: &network.ResourceTiming{}},
+		(*cdp.MonotonicTime)(&now),
+	)
+	nm.emitResponseMetrics(res, req)
+
+	n := vu.AssertSamples(func(s k6metrics.Sample) {
+		order, ok := s.Tags.Get("page_order")
+		assert.Truef(t, ok, "sample %s should have a page_order tag", s.Metric.Name)
+		assert.Equalf(t, "0", order, "page_order tag on %s", s.Metric.Name)
+	})
+	assert.Equal(t, 4, n, "should emit 4 samples")
 }
 
 func TestRequestForOnLoadingFinished(t *testing.T) {
