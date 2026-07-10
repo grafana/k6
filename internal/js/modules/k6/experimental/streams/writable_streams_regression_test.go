@@ -188,3 +188,26 @@ return JSON.stringify([writeResult, closeResult]);
 
 	require.Equal(t, `["write rejected with boom","close rejected"]`, result.String())
 }
+
+func TestWritableStreamQueuedReadyRejectionWinsOverQueuedFulfillment(t *testing.T) {
+	t.Parallel()
+
+	result := runStreamPromiseScript(t, `
+const boom = new Error("boom");
+const stream = new WritableStream({
+  write(_chunk, controller) {
+    controller.error(boom);
+  },
+}, { highWaterMark: 1 });
+const writer = stream.getWriter();
+
+await writer.write("chunk").catch(() => {});
+
+return writer.ready.then(
+  () => "ready fulfilled",
+  error => error === boom ? "ready rejected with boom" : "ready rejected with " + error.message,
+);
+`)
+
+	require.Equal(t, "ready rejected with boom", result.String())
+}

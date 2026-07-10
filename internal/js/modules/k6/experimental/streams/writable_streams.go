@@ -91,9 +91,10 @@ type pendingAbortRequest struct {
 // promiseWrapper holds a [sobek.Promise] together with its resolve and reject functions,
 // so that it can be settled later from Go code.
 type promiseWrapper struct {
-	promise *sobek.Promise
-	resolve func(any) error
-	reject  func(any) error
+	promise          *sobek.Promise
+	resolve          func(any) error
+	reject           func(any) error
+	settlementQueued bool
 }
 
 // newPromiseWrapper creates a new pending [promiseWrapper].
@@ -102,8 +103,17 @@ func newPromiseWrapper(rt *sobek.Runtime) *promiseWrapper {
 	return &promiseWrapper{promise: p, resolve: resolve, reject: reject}
 }
 
+func (pw *promiseWrapper) isPending() bool {
+	return !pw.settlementQueued && pw.promise.State() == sobek.PromiseStatePending
+}
+
+func (pw *promiseWrapper) queueSettlement() {
+	pw.settlementQueued = true
+}
+
 // resolveWith resolves the wrapped promise with the given value.
 func (pw *promiseWrapper) resolveWith(value any) {
+	pw.queueSettlement()
 	if err := pw.resolve(value); err != nil {
 		panic(err) // TODO(@mstoykov): propagate as error instead
 	}
@@ -111,6 +121,7 @@ func (pw *promiseWrapper) resolveWith(value any) {
 
 // rejectWith rejects the wrapped promise with the given reason, unwrapping [jsError] values.
 func (pw *promiseWrapper) rejectWith(reason any) {
+	pw.queueSettlement()
 	if jsErr, ok := reason.(*jsError); ok {
 		reason = jsErr.Err()
 	}
@@ -193,6 +204,16 @@ func (stream *WritableStream) settle(fn func()) {
 		return
 	}
 	stream.txQueue = append(stream.txQueue, fn)
+}
+
+func (stream *WritableStream) resolvePromise(promise *promiseWrapper, value any) {
+	promise.queueSettlement()
+	stream.settle(func() { promise.resolveWith(value) })
+}
+
+func (stream *WritableStream) rejectPromise(promise *promiseWrapper, reason any) {
+	promise.queueSettlement()
+	stream.settle(func() { promise.rejectWith(reason) })
 }
 
 // Abort aborts the stream, signaling that the producer can no longer successfully write to
@@ -464,7 +485,7 @@ func (stream *WritableStream) close() *sobek.Promise {
 	// resolve writer.[[readyPromise]] with undefined.
 	if writer != nil && stream.backpressure && state == WritableStreamStateWritable {
 		readyPromise := writer.readyPromise
-		stream.settle(func() { readyPromise.resolveWith(sobek.Undefined()) })
+		stream.resolvePromise(readyPromise, sobek.Undefined())
 	}
 
 	// 9. Perform ! WritableStreamDefaultControllerClose(stream.[[controller]]).
@@ -602,7 +623,7 @@ func (stream *WritableStream) finishErroring() {
 	// 6. For each writeRequest of stream.[[writeRequests]]: reject writeRequest with storedError.
 	for _, writeRequest := range stream.writeRequests {
 		wr := writeRequest
-		stream.settle(func() { wr.rejectWith(storedError) })
+		stream.rejectPromise(wr, storedError)
 	}
 
 	// 7. Set stream.[[writeRequests]] to an empty list.
@@ -625,7 +646,7 @@ func (stream *WritableStream) finishErroring() {
 	// 11. If abortRequest's was already erroring is true,
 	if abortRequest.wasAlreadyErroring {
 		// 11.1. Reject abortRequest's promise with storedError.
-		stream.settle(func() { abortRequest.promise.rejectWith(storedError) })
+		stream.rejectPromise(abortRequest.promise, storedError)
 		// 11.2. Perform ! WritableStreamRejectCloseAndClosedPromiseIfNeeded(stream).
 		stream.rejectCloseAndClosedPromiseIfNeeded()
 		// 11.3. Return.
@@ -640,7 +661,7 @@ func (stream *WritableStream) finishErroring() {
 		func(sobek.Value) {
 			stream.withTransaction(func() {
 				// 13.1. Resolve abortRequest's promise with undefined.
-				stream.settle(func() { abortRequest.promise.resolveWith(sobek.Undefined()) })
+				stream.resolvePromise(abortRequest.promise, sobek.Undefined())
 				// 13.2. Perform ! WritableStreamRejectCloseAndClosedPromiseIfNeeded(stream).
 				stream.rejectCloseAndClosedPromiseIfNeeded()
 			})
@@ -649,7 +670,7 @@ func (stream *WritableStream) finishErroring() {
 		func(reason sobek.Value) {
 			stream.withTransaction(func() {
 				// 14.1. Reject abortRequest's promise with reason.
-				stream.settle(func() { abortRequest.promise.rejectWith(reason) })
+				stream.rejectPromise(abortRequest.promise, reason)
 				// 14.2. Perform ! WritableStreamRejectCloseAndClosedPromiseIfNeeded(stream).
 				stream.rejectCloseAndClosedPromiseIfNeeded()
 			})
@@ -672,7 +693,7 @@ func (stream *WritableStream) finishInFlightWrite() {
 
 	// 2. Resolve stream.[[inFlightWriteRequest]] with undefined.
 	inFlightWriteRequest := stream.inFlightWriteRequest
-	stream.settle(func() { inFlightWriteRequest.resolveWith(sobek.Undefined()) })
+	stream.resolvePromise(inFlightWriteRequest, sobek.Undefined())
 
 	// 3. Set stream.[[inFlightWriteRequest]] to undefined.
 	stream.inFlightWriteRequest = nil
@@ -690,7 +711,7 @@ func (stream *WritableStream) finishInFlightWriteWithError(err any) {
 
 	// 2. Reject stream.[[inFlightWriteRequest]] with error.
 	inFlightWriteRequest := stream.inFlightWriteRequest
-	stream.settle(func() { inFlightWriteRequest.rejectWith(err) })
+	stream.rejectPromise(inFlightWriteRequest, err)
 
 	// 3. Set stream.[[inFlightWriteRequest]] to undefined.
 	stream.inFlightWriteRequest = nil
@@ -716,7 +737,7 @@ func (stream *WritableStream) finishInFlightClose() {
 
 	// 2. Resolve stream.[[inFlightCloseRequest]] with undefined.
 	inFlightCloseRequest := stream.inFlightCloseRequest
-	stream.settle(func() { inFlightCloseRequest.resolveWith(sobek.Undefined()) })
+	stream.resolvePromise(inFlightCloseRequest, sobek.Undefined())
 
 	// 3. Set stream.[[inFlightCloseRequest]] to undefined.
 	stream.inFlightCloseRequest = nil
@@ -738,7 +759,7 @@ func (stream *WritableStream) finishInFlightClose() {
 		if stream.pendingAbortRequest != nil {
 			// 6.2.1. Resolve stream.[[pendingAbortRequest]]'s promise with undefined.
 			abortRequest := stream.pendingAbortRequest
-			stream.settle(func() { abortRequest.promise.resolveWith(sobek.Undefined()) })
+			stream.resolvePromise(abortRequest.promise, sobek.Undefined())
 			// 6.2.2. Set stream.[[pendingAbortRequest]] to undefined.
 			stream.pendingAbortRequest = nil
 		}
@@ -753,7 +774,7 @@ func (stream *WritableStream) finishInFlightClose() {
 	// 9. If writer is not undefined, resolve writer.[[closedPromise]] with undefined.
 	if writer != nil {
 		closedPromise := writer.closedPromise
-		stream.settle(func() { closedPromise.resolveWith(sobek.Undefined()) })
+		stream.resolvePromise(closedPromise, sobek.Undefined())
 	}
 
 	// 10. Assert: stream.[[pendingAbortRequest]] is undefined.
@@ -779,7 +800,7 @@ func (stream *WritableStream) finishInFlightCloseWithError(err any) {
 
 	// 2. Reject stream.[[inFlightCloseRequest]] with error.
 	inFlightCloseRequest := stream.inFlightCloseRequest
-	stream.settle(func() { inFlightCloseRequest.rejectWith(err) })
+	stream.rejectPromise(inFlightCloseRequest, err)
 
 	// 3. Set stream.[[inFlightCloseRequest]] to undefined.
 	stream.inFlightCloseRequest = nil
@@ -793,7 +814,7 @@ func (stream *WritableStream) finishInFlightCloseWithError(err any) {
 	if stream.pendingAbortRequest != nil {
 		// 5.1. Reject stream.[[pendingAbortRequest]]'s promise with error.
 		abortRequest := stream.pendingAbortRequest
-		stream.settle(func() { abortRequest.promise.rejectWith(err) })
+		stream.rejectPromise(abortRequest.promise, err)
 		// 5.2. Set stream.[[pendingAbortRequest]] to undefined.
 		stream.pendingAbortRequest = nil
 	}
@@ -880,7 +901,7 @@ func (stream *WritableStream) rejectCloseAndClosedPromiseIfNeeded() {
 
 		// 2.2. Reject stream.[[closeRequest]] with stream.[[storedError]].
 		closeRequest := stream.closeRequest
-		stream.settle(func() { closeRequest.rejectWith(storedError) })
+		stream.rejectPromise(closeRequest, storedError)
 
 		// 2.3. Set stream.[[closeRequest]] to undefined.
 		stream.closeRequest = nil
@@ -893,6 +914,7 @@ func (stream *WritableStream) rejectCloseAndClosedPromiseIfNeeded() {
 	if writer != nil {
 		// 4.1. Reject writer.[[closedPromise]] with stream.[[storedError]].
 		closedPromise := writer.closedPromise
+		closedPromise.queueSettlement()
 		stream.settle(func() {
 			closedPromise.rejectWith(storedError)
 			// 4.2. Set writer.[[closedPromise]].[[PromiseIsHandled]] to true.
@@ -929,7 +951,7 @@ func (stream *WritableStream) updateBackpressure(backpressure bool) {
 			// 4.2.1. Assert: backpressure is false.
 			// 4.2.2. Resolve writer.[[readyPromise]] with undefined.
 			readyPromise := writer.readyPromise
-			stream.settle(func() { readyPromise.resolveWith(sobek.Undefined()) })
+			stream.resolvePromise(readyPromise, sobek.Undefined())
 		}
 	}
 

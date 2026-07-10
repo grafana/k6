@@ -354,10 +354,11 @@ func (writer *WritableStreamDefaultWriter) ensureClosedPromiseRejected(err any) 
 	// The promise identity is updated synchronously (so that the `closed` getter reflects it
 	// immediately), but the actual rejection is deferred so that reactions observe up-to-date
 	// state. See [WritableStream.withTransaction].
-	if writer.closedPromise.promise.State() != sobek.PromiseStatePending {
+	if !writer.closedPromise.isPending() {
 		writer.closedPromise = newPromiseWrapper(writer.runtime)
 	}
 	closedPromise := writer.closedPromise
+	closedPromise.queueSettlement()
 	writer.settle(func() {
 		closedPromise.rejectWith(err)
 		// 3. Set writer.[[closedPromise]].[[PromiseIsHandled]] to true.
@@ -376,10 +377,11 @@ func (writer *WritableStreamDefaultWriter) ensureReadyPromiseRejected(err any) {
 	// The promise identity is updated synchronously (so that the `ready` getter reflects it
 	// immediately), but the actual rejection is deferred so that reactions observe up-to-date
 	// state. See [WritableStream.withTransaction].
-	if writer.readyPromise.promise.State() != sobek.PromiseStatePending {
+	if !writer.readyPromise.isPending() {
 		writer.readyPromise = newPromiseWrapper(writer.runtime)
 	}
 	readyPromise := writer.readyPromise
+	readyPromise.queueSettlement()
 	writer.settle(func() {
 		readyPromise.rejectWith(err)
 		// 3. Set writer.[[readyPromise]].[[PromiseIsHandled]] to true.
