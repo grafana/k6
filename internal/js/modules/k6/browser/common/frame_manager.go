@@ -305,7 +305,7 @@ func (m *FrameManager) frameNavigated(
 	frame.navigated(name, url, documentID)
 
 	if isMainFrame && m.page != nil {
-		m.page.navigationCommitted(initial || firstMainFrameCommit)
+		m.page.navigationCommitted(documentID, initial || firstMainFrameCommit)
 	}
 
 	frame.pendingDocumentMu.Lock()

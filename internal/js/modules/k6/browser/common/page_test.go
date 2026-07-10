@@ -172,39 +172,55 @@ func TestPageNavigationOrder(t *testing.T) {
 	t.Parallel()
 
 	p := &Page{}
-	p.navOrder.Store(-1)
-	p.committedNavOrder.Store(-1)
+	p.navOrder = -1
+	p.committedNavOrder = -1
 
 	// Before any navigation both orders clamp to 0.
 	assert.Equal(t, int64(0), p.navigationOrder())
 	assert.Equal(t, int64(0), p.committedNavigationOrder())
 
 	// The initial about:blank commit doesn't count as a page.
-	p.navigationCommitted(true)
+	p.navigationCommitted("docBlank", true)
 	assert.Equal(t, int64(0), p.navigationOrder())
 	assert.Equal(t, int64(0), p.committedNavigationOrder())
 
 	// First navigation: in-flight work belongs to page 0, while
 	// late-reported data still belongs to the (non-existent) previous page.
-	p.navigationStarted(time.Now())
+	assert.Equal(t, int64(0), p.navigationStarted("docA", time.Now()))
 	assert.Equal(t, int64(0), p.navigationOrder())
 	assert.Equal(t, int64(0), p.committedNavigationOrder())
-	p.navigationCommitted(false)
+	p.navigationCommitted("docA", false)
 	assert.Equal(t, int64(0), p.navigationOrder())
 	assert.Equal(t, int64(0), p.committedNavigationOrder())
 
 	// Second navigation: in-flight work belongs to page 1, late-reported
 	// data (e.g. web vitals flushed on pagehide) still to page 0.
-	p.navigationStarted(time.Now())
+	assert.Equal(t, int64(1), p.navigationStarted("docB", time.Now()))
 	assert.Equal(t, int64(1), p.navigationOrder())
 	assert.Equal(t, int64(0), p.committedNavigationOrder())
-	p.navigationCommitted(false)
+	p.navigationCommitted("docB", false)
 	assert.Equal(t, int64(1), p.navigationOrder())
 	assert.Equal(t, int64(1), p.committedNavigationOrder())
 
-	// A commit whose start event was missed (e.g. a popup that navigates
-	// before we attach to it) still rotates the order.
-	p.navigationCommitted(false)
+	// A commit whose document request was not seen (back-forward cache
+	// restore, pre-attach popup navigation) still rotates the order.
+	p.navigationCommitted("docC", false)
 	assert.Equal(t, int64(2), p.navigationOrder())
 	assert.Equal(t, int64(2), p.committedNavigationOrder())
+
+	// Each document rotates the order exactly once, whichever signal is
+	// processed first: a commit racing ahead of the network event loop must
+	// not double-count when the document request arrives late.
+	p.navigationCommitted("docD", false)
+	assert.Equal(t, int64(3), p.navigationOrder())
+	assert.Equal(t, int64(3), p.committedNavigationOrder())
+	assert.Equal(t, int64(3), p.navigationStarted("docD", time.Now()))
+	assert.Equal(t, int64(3), p.navigationOrder())
+	assert.Equal(t, int64(3), p.committedNavigationOrder())
+
+	// And the normal order (request first, then commit) counts once too.
+	assert.Equal(t, int64(4), p.navigationStarted("docE", time.Now()))
+	p.navigationCommitted("docE", false)
+	assert.Equal(t, int64(4), p.navigationOrder())
+	assert.Equal(t, int64(4), p.committedNavigationOrder())
 }

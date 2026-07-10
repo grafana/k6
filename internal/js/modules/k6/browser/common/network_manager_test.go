@@ -219,8 +219,6 @@ func (m *EventInterceptorMock) urlTagName(_ string, _ string) (string, bool) {
 	return "", false
 }
 
-func (m *EventInterceptorMock) navigationOrder() int64 { return 0 }
-
 func (m *EventInterceptorMock) onRequest(_ *Request) {}
 
 func (m *EventInterceptorMock) onResponse(_ *Response) {}

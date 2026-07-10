@@ -106,6 +106,11 @@ type Request struct {
 	timestamp         time.Time
 	wallTime          time.Time
 	responseEndTiming float64
+	// pageOrder is the 0-based order of the main-frame navigation this
+	// request belongs to, captured when the request starts so that its
+	// response metrics attribute to the same page even if they are emitted
+	// after the next navigation has begun.
+	pageOrder int64
 }
 
 // NewRequestParams are input parameters for NewRequest.
