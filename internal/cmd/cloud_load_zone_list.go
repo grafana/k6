@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/cmd/state"
-	"go.k6.io/k6/v2/internal/build"
 	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 )
 
@@ -45,41 +42,11 @@ func getCmdCloudLoadZoneList(loadZoneCmd *cmdCloudLoadZone) *cobra.Command {
 }
 
 func (c *cmdCloudLoadZoneList) run(_ *cobra.Command, _ []string) error {
-	currentDiskConf, err := readDiskConfig(c.globalState)
+	client, cloudConfig, err := newCloudV6ClientFromConfig(
+		c.globalState, "Listing cloud load zones requires auth settings")
 	if err != nil {
 		return err
 	}
-
-	currentJSONConfigRaw := currentDiskConf.Collectors["cloud"]
-
-	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		currentJSONConfigRaw, c.globalState.Env, "", nil)
-	if err != nil {
-		return err
-	}
-	if warn != "" {
-		c.globalState.Logger.Warn(warn)
-	}
-
-	if err := checkCloudLoginFor(cloudConfig, "Listing cloud load zones requires auth settings"); err != nil {
-		return err
-	}
-
-	client, err := cloudapiv6.NewClient(
-		c.globalState.Logger,
-		cloudConfig.Token.String,
-		cloudConfig.Hostv6.String,
-		build.Version,
-		cloudConfig.Timeout.TimeDuration(),
-	)
-	if err != nil {
-		return err
-	}
-
-	if cloudConfig.StackID.Int64 < math.MinInt32 || cloudConfig.StackID.Int64 > math.MaxInt32 {
-		return fmt.Errorf("stack ID %d overflows int32", cloudConfig.StackID.Int64)
-	}
-	client.SetStackID(int32(cloudConfig.StackID.Int64))
 
 	loadZones, err := client.ListLoadZones(c.globalState.Ctx)
 	if err != nil {
@@ -90,11 +57,7 @@ func (c *cmdCloudLoadZoneList) run(_ *cobra.Command, _ []string) error {
 		return c.outputJSON(loadZones)
 	}
 
-	stackName := cloudConfig.StackURL.String
-	if !cloudConfig.StackURL.Valid {
-		stackName = fmt.Sprintf("stack-%d", cloudConfig.StackID.Int64)
-	}
-	stackHeader := fmt.Sprintf("Load zones for %s:\n\n", stackName)
+	stackHeader := fmt.Sprintf("Load zones for %s:\n\n", cloudStackName(cloudConfig))
 
 	if len(loadZones) == 0 {
 		printToStdout(c.globalState, stackHeader+"No load zones found.\n")

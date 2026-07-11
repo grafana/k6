@@ -217,19 +217,29 @@ func TestListLoadZones(t *testing.T) {
 			"value": []any{
 				loadZone(1, "amazon:us:ashburn", "US East (Ashburn)", true, true),
 				loadZone(2, "my-cluster", "My private cluster", false, false),
+				// A zone that omits the untyped `public`/`available` fields
+				// entirely: the best-effort read must default them to false.
+				map[string]any{
+					"id":              int32(3),
+					"k6_load_zone_id": "legacy-zone",
+					"name":            "Legacy zone",
+				},
 			},
 		})
 	}))
 
 	zones, err := client.ListLoadZones(t.Context())
 	require.NoError(t, err)
-	require.Len(t, zones, 2)
+	require.Len(t, zones, 3)
 	assert.Equal(t,
 		LoadZone{ID: 1, K6LoadZoneID: "amazon:us:ashburn", Name: "US East (Ashburn)", Public: true, Available: true},
 		zones[0])
 	assert.Equal(t,
 		LoadZone{ID: 2, K6LoadZoneID: "my-cluster", Name: "My private cluster", Public: false, Available: false},
 		zones[1])
+	assert.Equal(t,
+		LoadZone{ID: 3, K6LoadZoneID: "legacy-zone", Name: "Legacy zone", Public: false, Available: false},
+		zones[2])
 }
 
 func TestRetryWithConnectionClose(t *testing.T) {

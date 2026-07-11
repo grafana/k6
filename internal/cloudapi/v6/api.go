@@ -156,7 +156,7 @@ func (c *Client) listLoadTestsPage(
 }
 
 // ListLoadZones retrieves the list of load zones available to the configured stack.
-func (c *Client) ListLoadZones(ctx context.Context) ([]LoadZone, error) {
+func (c *Client) ListLoadZones(ctx context.Context) (_ []LoadZone, err error) {
 	res, hr, err := c.apiClient.LoadZonesAPI.
 		LoadZonesList(c.authCtx(ctx)).
 		XStackId(c.stackID).
