@@ -442,6 +442,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	projectCmd := getCmdCloudProject(c)
 	cloudCmd.AddCommand(projectCmd)
 
+	loadZoneCmd := getCmdCloudLoadZone(c)
+	cloudCmd.AddCommand(loadZoneCmd)
+
 	testCmd := getCmdCloudTest(c)
 	cloudCmd.AddCommand(testCmd)
 

@@ -55,6 +55,9 @@ type Config struct {
 
 	// LoadTests is the load test list returned by the load-tests endpoint.
 	LoadTests []cloudapi.LoadTest
+
+	// LoadZones is the load zone list returned by the load-zones endpoint.
+	LoadZones []cloudapi.LoadZone
 }
 
 // NewServer creates a test server that serves v6 API endpoints.
@@ -70,6 +73,7 @@ func NewServer(t *testing.T, cfg Config) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /cloud/v6/projects", s.handleListProjects)
 	mux.HandleFunc("GET /cloud/v6/projects/{projectID}/load_tests", s.handleListLoadTests)
+	mux.HandleFunc("GET /cloud/v6/load_zones", s.handleListLoadZones)
 	mux.HandleFunc("POST /cloud/v6/validate_options", s.handleValidateOptions)
 	mux.HandleFunc("POST /cloud/v6/projects/{projectID}/load_tests", func(w http.ResponseWriter, r *http.Request) {
 		if s.cfg.InspectArchive != nil {
@@ -136,6 +140,22 @@ func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
 		))
 	}
 	res := k6cloud.NewLoadTestListResponse(tests)
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) handleListLoadZones(w http.ResponseWriter, _ *http.Request) {
+	zones := make([]k6cloud.LoadZoneApiModel, len(s.cfg.LoadZones))
+	for i, zone := range s.cfg.LoadZones {
+		m := k6cloud.NewLoadZoneApiModel(zone.ID, zone.Name, zone.K6LoadZoneID)
+		// The SDK doesn't model `public`/`available`, so emit them via the
+		// untyped catch-all, matching how the real API returns them.
+		m.AdditionalProperties = map[string]any{
+			"public":    zone.Public,
+			"available": zone.Available,
+		}
+		zones[i] = *m
+	}
+	res := k6cloud.NewLoadZonesListApiModel(zones)
 	writeJSON(w, http.StatusOK, res)
 }
 

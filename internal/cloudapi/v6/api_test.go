@@ -198,6 +198,40 @@ func TestListLoadTests(t *testing.T) {
 	assert.Equal(t, int32(2), tests[1].ID)
 }
 
+func TestListLoadZones(t *testing.T) {
+	t.Parallel()
+
+	loadZone := func(id int32, k6LoadZoneID, name string, public, available bool) map[string]any {
+		return map[string]any{
+			"id":              id,
+			"k6_load_zone_id": k6LoadZoneID,
+			"name":            name,
+			"public":          public,
+			"available":       available,
+		}
+	}
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/cloud/v6/load_zones", r.URL.Path)
+		writeJSON(t, w, http.StatusOK, map[string]any{
+			"value": []any{
+				loadZone(1, "amazon:us:ashburn", "US East (Ashburn)", true, true),
+				loadZone(2, "my-cluster", "My private cluster", false, false),
+			},
+		})
+	}))
+
+	zones, err := client.ListLoadZones(t.Context())
+	require.NoError(t, err)
+	require.Len(t, zones, 2)
+	assert.Equal(t,
+		LoadZone{ID: 1, K6LoadZoneID: "amazon:us:ashburn", Name: "US East (Ashburn)", Public: true, Available: true},
+		zones[0])
+	assert.Equal(t,
+		LoadZone{ID: 2, K6LoadZoneID: "my-cluster", Name: "My private cluster", Public: false, Available: false},
+		zones[1])
+}
+
 func TestRetryWithConnectionClose(t *testing.T) {
 	t.Parallel()
 
