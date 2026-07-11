@@ -1,13 +1,11 @@
-FROM debian:bullseye-20250811@sha256:8ec25a9073e8cc89a184a6256e219828196d75203375a8ad4f0977f3011f2115
+FROM debian:trixie-20260610@sha256:fe7312b5f05bf5f43fad76bcd8945642e4e47a68aefd1b73f447615899d0fac1
 
 LABEL maintainer="k6 Developers <developers@k6.io>"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
-    apt-get install -y apt-utils createrepo-c curl git gnupg2 python3-pip unzip rpm
-
-RUN pip3 install "s3cmd==2.4.0"
+    apt-get install -y apt-utils createrepo-c curl git gnupg2 s3cmd unzip rpm
 
 # Download awscli, check GPG signature and install.
 COPY ./awscli-key.gpg .

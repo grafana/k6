@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,27 +16,53 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/ui/pb"
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/build"
+	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
+	"go.k6.io/k6/v2/internal/ui/pb"
+	"go.k6.io/k6/v2/lib"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
-// errUserUnauthenticated represents an authentication error when trying to use
-// Grafana Cloud without being logged in or having a valid token.
-//
-//nolint:staticcheck // the error is shown to the user so here punctuation and capital are required
-var errUserUnauthenticated = errors.New("To run tests in Grafana Cloud, you must first authenticate." +
-	" Run the `k6 cloud login` command, or check the docs" +
-	" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication" +
-	" for additional authentication methods.")
+const cloudRunAuthPrefix = "Running cloud tests requires auth settings"
+
+var (
+	errCloudAuth = errors.New( //nolint:staticcheck // user-facing error message, capitalization is intentional
+		"Run `k6 cloud login` to authenticate, or check the docs for other options at" +
+			" https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
+	)
+	errMissingToken   = errors.New("access token not configured")
+	errMissingStackID = errors.New("stack ID not configured")
+
+	// errNoProjectConfigured is returned by cloud sub-commands that require a
+	// concrete project to operate on when none can be resolved from the flags,
+	// the environment, or the logged-in configuration.
+	errNoProjectConfigured = errors.New(
+		"no project specified. Use --project-id, set K6_CLOUD_PROJECT_ID, or run `k6 cloud login` to set a default project",
+	)
+)
+
+// checkCloudLogin verifies that both a token and a stack are configured.
+// Together they represent a complete Grafana Cloud login.
+func checkCloudLogin(conf cloudapi.Config) error {
+	return checkCloudLoginFor(conf, cloudRunAuthPrefix)
+}
+
+func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
+	if !conf.Token.Valid || conf.Token.String == "" {
+		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingToken, errCloudAuth)
+	}
+	if !conf.StackID.Valid || conf.StackID.Int64 == 0 {
+		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingStackID, errCloudAuth)
+	}
+	return nil
+}
 
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
@@ -70,16 +98,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 			c.exitOnRunning = exitOnRunningValue
 		}
 	}
-	if uploadOnlyEnv, ok := c.gs.Env["K6_CLOUD_UPLOAD_ONLY"]; ok {
-		uploadOnlyValue, err := strconv.ParseBool(uploadOnlyEnv)
-		if err != nil {
-			return fmt.Errorf("parsing K6_CLOUD_UPLOAD_ONLY returned an error: %w", err)
-		}
-		if !cmd.Flags().Changed("upload-only") {
-			c.uploadOnly = uploadOnlyValue
-		}
-	}
-
 	return nil
 }
 
@@ -87,20 +105,6 @@ func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 //
 //nolint:funlen,gocognit,cyclop
 func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
-	// If no args provided and called from main cloud command, show helpful error
-	if cmd.Name() == "cloud" && len(args) == 0 {
-		return errors.New("the \"k6 cloud\" command expects either a subcommand such as \"run\" or \"login\", " +
-			"or a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
-			"the command to read the test content from stdin; received no arguments")
-	}
-
-	// Show deprecation warning only when running tests directly via "k6 cloud <file>"
-	// (not when using subcommands like "k6 cloud run")
-	if cmd.Name() == "cloud" && len(args) > 0 {
-		c.gs.Logger.Warn("Running tests directly with \"k6 cloud <file>\" is deprecated. " +
-			"Use \"k6 cloud run <file>\" instead. This behavior will be removed in a future release.")
-	}
-
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
@@ -111,8 +115,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	// an execution shortcut option (e.g. `iterations` or `duration`),
 	// we will have multiple conflicting execution options since the
 	// derivation will set `scenarios` as well.
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
-	if err != nil {
+	if err := test.initRunner.SetOptions(test.consolidatedConfig.Options); err != nil {
 		return err
 	}
 
@@ -128,7 +131,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	printBar(c.gs, progressBar)
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Building the archive..."))
-	arc := testRunState.Runner.MakeArchive()
+	arc := test.makeArchive()
 
 	tmpCloudConfig, err := cloudapi.GetTemporaryCloudConfig(arc.Options.Cloud)
 	if err != nil {
@@ -141,8 +144,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if !cloudConfig.Token.Valid {
-		return errUserUnauthenticated
+	if err := checkCloudLogin(cloudConfig); err != nil {
+		return err
 	}
 
 	// Display config warning if needed
@@ -183,38 +186,46 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	// Start cloud test run
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Validating script options"))
-	client := cloudapi.NewClient(
-		logger, cloudConfig.Token.String, cloudConfig.Host.String, build.Version, cloudConfig.Timeout.TimeDuration())
-	if cloudConfig.StackID.Valid {
-		client.SetStackID(cloudConfig.StackID.Int64)
-	}
-	if err = client.ValidateOptions(arc.Options); err != nil {
+	client, err := cloudapiv6.NewClient(
+		logger, cloudConfig.Token.String, cloudConfig.Hostv6.String, build.Version, cloudConfig.Timeout.TimeDuration())
+	if err != nil {
 		return err
 	}
-
-	if cloudConfig.ProjectID.Int64 == 0 {
-		if err := resolveAndSetProjectID(c.gs, &cloudConfig, tmpCloudConfig, arc); err != nil {
-			return err
-		}
-	}
-
-	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
-
-	var cloudTestRun *cloudapi.CreateTestRunResponse
-	if c.uploadOnly {
-		cloudTestRun, err = client.UploadTestOnly(name, cloudConfig.ProjectID.Int64, arc)
-	} else {
-		cloudTestRun, err = client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
-	}
-
+	projectID, err := prepCloudTestRun(globalCtx, c.gs, client, &cloudConfig, tmpCloudConfig, arc)
 	if err != nil {
 		return err
 	}
 
-	refID := cloudTestRun.ReferenceID
-	if cloudTestRun.ConfigOverride != nil {
-		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
+	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
+
+	loadTest, err := client.UploadTest(globalCtx, name, projectID, arc)
+	if err != nil {
+		return fmt.Errorf("uploading test: %w", err)
 	}
+
+	if c.uploadOnly {
+		et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
+		if err != nil {
+			return err
+		}
+		executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
+		testURL, err := resolveCloudTestURL(cloudConfig.StackURL.String, loadTest.GetId())
+		if err != nil {
+			return err
+		}
+		printExecutionDescription(
+			c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
+		)
+		modifyAndPrintBar(c.gs, progressBar, pb.WithConstLeft("Run "), pb.WithConstProgress(1.0, "Archived"))
+		c.printTestStatus("Archived")
+		return nil
+	}
+
+	run, err := client.StartTest(globalCtx, loadTest.GetId())
+	if err != nil {
+		return fmt.Errorf("starting test: %w", err)
+	}
+	testRunID := run.GetId()
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.
 	gracefulStop := func(sig os.Signal) {
@@ -222,7 +233,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		// Do this in a separate goroutine so that if it blocks, the
 		// second signal can still abort the process execution.
 		go func() {
-			stopErr := client.StopCloudTestRun(refID)
+			stopErr := client.StopTest(context.WithoutCancel(globalCtx), testRunID)
 			if stopErr != nil {
 				logger.WithError(stopErr).Error("Stop cloud test error")
 			} else {
@@ -241,7 +252,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	testURL := cloudapi.URLForResults(refID, cloudConfig)
+	testURL := run.GetTestRunDetailsPageUrl()
 	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 	printExecutionDescription(
 		c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
@@ -262,14 +273,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		progressBarWG.Done()
 	}()
 
-	var (
-		startTime   time.Time
-		maxDuration time.Duration
-	)
-	maxDuration, _ = lib.GetEndOffset(executionPlan)
-
 	testProgressLock := &sync.Mutex{}
-	var testProgress *cloudapi.TestProgressResponse
+	var testProgress *cloudapiv6.TestProgress
 	progressBar.Modify(
 		pb.WithProgress(func() (float64, []string) {
 			testProgressLock.Lock()
@@ -278,30 +283,19 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 			if testProgress == nil {
 				return 0, []string{"Waiting..."}
 			}
-
-			statusText := testProgress.RunStatusText
-
-			switch testProgress.RunStatus { //nolint:exhaustive
-			case cloudapi.RunStatusFinished:
-				testProgress.Progress = 1
-			case cloudapi.RunStatusRunning:
-				if startTime.IsZero() {
-					startTime = time.Now()
-				}
-				spent := time.Since(startTime)
-				if spent > maxDuration {
-					statusText = maxDuration.String()
-				} else {
-					statusText = fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(spent, maxDuration), maxDuration)
+			if testProgress.IsRunning() {
+				est := testProgress.Estimated()
+				return testProgress.Progress(), []string{
+					fmt.Sprintf("%s/%s", pb.GetFixedLengthDuration(testProgress.Elapsed(), est), est),
 				}
 			}
-
-			return testProgress.Progress, []string{statusText}
+			return testProgress.Progress(), []string{testProgress.FormatStatus()}
 		}),
 	)
 
 	ticker := time.NewTicker(time.Millisecond * 2000)
 	if c.showCloudLogs {
+		refID := strconv.FormatInt(int64(testRunID), 10)
 		go func() {
 			logger.Debug("Connecting to cloud logs server...")
 			if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
@@ -311,7 +305,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	for range ticker.C {
-		newTestProgress, progressErr := client.GetTestProgress(refID)
+		newTestProgress, progressErr := client.FetchTest(context.WithoutCancel(globalCtx), testRunID)
 		if progressErr != nil {
 			logger.WithError(progressErr).Error("Test progress error")
 			continue
@@ -321,42 +315,45 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		testProgress = newTestProgress
 		testProgressLock.Unlock()
 
-		if (newTestProgress.RunStatus > cloudapi.RunStatusRunning) ||
-			(c.exitOnRunning && newTestProgress.RunStatus == cloudapi.RunStatusRunning) {
+		if newTestProgress.IsFinished() ||
+			(c.exitOnRunning && newTestProgress.IsRunning()) {
 			globalCancel()
 			break
 		}
 	}
+
+	// Stop progress rendering before printing final status to avoid ghost bars.
+	progressCancel()
+	progressBarWG.Wait()
 
 	if testProgress == nil {
 		//nolint:staticcheck
 		return errext.WithExitCodeIfNone(errors.New("Test progress error"), exitcodes.CloudFailedToGetProgress)
 	}
 
-	if !c.gs.Flags.Quiet {
-		valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
-		printToStdout(c.gs, fmt.Sprintf(
-			"     test status: %s\n", valueColor.Sprint(testProgress.RunStatusText),
-		))
-	} else {
-		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
+	c.printTestStatus(testProgress.FormatStatus())
+
+	if testProgress.ThresholdsFailed() {
+		//nolint:staticcheck
+		return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
 	}
-
-	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
-		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
-		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
-		// when thresholds have been crossed (failed). So, we report this situation as such.
-		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
-			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
-			//nolint:staticcheck
-			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
-		}
-
-		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed) //nolint:staticcheck
+	if testProgress.TestFailed() {
+		//nolint:staticcheck
+		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
 	}
 
 	return nil
+}
+
+func (c *cmdCloud) printTestStatus(status string) {
+	if !c.gs.Flags.Quiet {
+		valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.FgCyan)
+		printToStdout(c.gs, fmt.Sprintf(
+			"     test status: %s\n", valueColor.Sprint(status),
+		))
+	} else {
+		c.gs.Logger.WithField("run_status", status).Debug("Test finished")
+	}
 }
 
 func (c *cmdCloud) flagSet() *pflag.FlagSet {
@@ -370,13 +367,27 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"exits when test reaches the running status")
 	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
 		"enable showing of logs when a test is executed in the cloud")
-	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
-		"only upload the test to the cloud without actually starting a test run")
-	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
-		panic(err) // Should never happen
-	}
-
 	return flags
+}
+
+func getCloudUsageTemplate() string {
+	return `{{.Short}}
+
+Usage:{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{else if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+
+Available Commands:{{range .Commands}}{{if .IsAvailableCommand}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}
+
+Flags:
+{{.LocalFlags.FlagUsagesWrapped 120 | trimTrailingWhitespaces}}
+{{if .HasExample}}
+Examples:
+{{.Example}}
+{{end}}{{if .HasAvailableSubCommands}}
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
 }
 
 func getCmdCloud(gs *state.GlobalState) *cobra.Command {
@@ -384,21 +395,17 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		gs:            gs,
 		showCloudLogs: true,
 		exitOnRunning: false,
-		uploadOnly:    false,
 	}
 
 	exampleText := getExampleText(gs, `
-  # [deprecated] Run a test script in Grafana Cloud
-  $ {{.}} cloud script.js
-
-  # [deprecated] Run a test archive in Grafana Cloud
-  $ {{.}} cloud archive.tar
-
   # Authenticate with Grafana Cloud
   $ {{.}} cloud login
 
   # Run a test script in Grafana Cloud
   $ {{.}} cloud run script.js
+
+  # Run a test script locally and stream results to Grafana Cloud
+  $ {{.}} cloud run --local-execution script.js
 
   # Run a test archive in Grafana Cloud
   $ {{.}} cloud run archive.tar`[1:])
@@ -408,8 +415,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		Short:   "Run and manage Grafana Cloud tests",
 		Long:    "Run and manage tests in Grafana Cloud.",
 		Example: exampleText,
-		PreRunE: c.preRun,
-		RunE:    c.run,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
 	}
 
 	// Register `k6 cloud` subcommands with default usage template
@@ -418,37 +426,77 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
 	runCmd := getCmdCloudRun(c)
 	runCmd.SetUsageTemplate(defaultUsageTemplate)
+	runCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(runCmd)
 
 	loginCmd := getCmdCloudLogin(gs)
 	loginCmd.SetUsageTemplate(defaultUsageTemplate)
+	loginCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(loginCmd)
 
 	uploadCmd := getCmdCloudUpload(c)
 	uploadCmd.SetUsageTemplate(defaultUsageTemplate)
+	uploadCmd.SetHelpTemplate((&cobra.Command{}).HelpTemplate())
 	cloudCmd.AddCommand(uploadCmd)
+
+	projectCmd := getCmdCloudProject(c)
+	cloudCmd.AddCommand(projectCmd)
+
+	testCmd := getCmdCloudTest(c)
+	cloudCmd.AddCommand(testCmd)
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
-	cloudCmd.SetUsageTemplate(`Usage:
-  {{.CommandPath}} [command]
-
-Commands:{{range .Commands}}{{if (or (eq .Name "login") (eq .Name "run"))}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{range .Commands}}` +
-		`{{if and .IsAvailableCommand (ne .Name "login") (ne .Name "run")}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
-
-Flags:
-  -h, --help   Show help
-{{if .HasExample}}
-Examples:
-{{.Example}}
-{{end}}
-Use "{{.CommandPath}} [command] --help" for more information about a command.
-`)
+	// Use custom template similar to root - hardcode flags to avoid showing global flags
+	cloudTemplate := getCloudUsageTemplate()
+	cloudCmd.SetUsageTemplate(cloudTemplate)
+	cloudCmd.SetHelpTemplate(cloudTemplate)
 
 	return cloudCmd
+}
+
+// prepCloudTestRun wires stack and project IDs into the client, validates
+// script options, and resolves a default project when none was specified.
+// Returns the project ID as used by subsequent v6 calls.
+func prepCloudTestRun(
+	ctx context.Context, gs *state.GlobalState,
+	client *cloudapiv6.Client,
+	cloudConfig *cloudapi.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
+) (int32, error) {
+	toInt32 := func(v int64) (int32, error) {
+		if v < math.MinInt32 || v > math.MaxInt32 {
+			return 0, fmt.Errorf("value %d overflows int32", v)
+		}
+		return int32(v), nil
+	}
+
+	stackID, err := toInt32(cloudConfig.StackID.Int64)
+	if err != nil {
+		return 0, err
+	}
+	client.SetStackID(stackID)
+
+	projectID, err := toInt32(cloudConfig.ProjectID.Int64)
+	if err != nil {
+		return 0, err
+	}
+
+	if projectID == 0 {
+		if err := resolveAndSetProjectID(gs, cloudConfig, tmpCloudConfig, arc); err != nil {
+			return 0, err
+		}
+		projectID, err = toInt32(cloudConfig.ProjectID.Int64)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if err := client.ValidateOptions(ctx, projectID, arc.Options); err != nil {
+		return 0, err
+	}
+
+	return projectID, nil
 }
 
 func resolveDefaultProjectID(
@@ -499,14 +547,14 @@ func resolveAndSetProjectID(
 
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
-	if !cloudConfig.StackID.Valid || cloudConfig.StackID.Int64 == 0 {
-		fallBackMsg := ""
-		if !cloudConfig.ProjectID.Valid || cloudConfig.ProjectID.Int64 == 0 {
-			fallBackMsg = "Falling back to the first available stack. "
-		}
-		gs.Logger.Warn("DEPRECATED: No stack specified. " + fallBackMsg +
-			"Consider setting a default stack via the `k6 cloud login` command or the `K6_CLOUD_STACK_ID` " +
-			"environment variable as this will become mandatory in the next major release.")
-	}
 	return nil
+}
+
+func resolveCloudTestURL(stackURL string, testID int32) (string, error) {
+	u, err := url.Parse(stackURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid stack URL: %w", err)
+	}
+
+	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(int64(testID), 10)).String(), nil
 }

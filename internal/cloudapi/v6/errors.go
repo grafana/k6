@@ -12,6 +12,7 @@ import (
 var (
 	errNotAuthorized    = errors.New("not allowed to upload result to k6 Cloud")
 	errNotAuthenticated = errors.New("failed to authenticate with k6 Cloud")
+	errTestNotExists    = errors.New("load test not found")
 	errUnknown          = errors.New("an error occurred communicating with k6 Cloud")
 )
 

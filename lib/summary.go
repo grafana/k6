@@ -3,7 +3,7 @@ package lib
 import (
 	"time"
 
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // LegacySummary contains all the data the summary handler gets.

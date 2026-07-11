@@ -19,9 +19,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 )
 
 type MetricsServer interface {
@@ -229,12 +229,17 @@ func TestOutput(t *testing.T) {
 }
 
 func createTestConfig(protocol, endpoint string) map[string]string {
+	exporterProtocol := protocol
+	if protocol == "http" {
+		exporterProtocol = "http/protobuf"
+	}
+
 	config := map[string]string{
-		"K6_OTEL_SERVICE_NAME":    "test_service",
-		"K6_OTEL_FLUSH_INTERVAL":  "100ms",
-		"K6_OTEL_EXPORT_INTERVAL": "100ms",
-		"K6_OTEL_EXPORTER_TYPE":   protocol,
-		"K6_OTEL_METRIC_PREFIX":   "test.",
+		"K6_OTEL_SERVICE_NAME":      "test_service",
+		"K6_OTEL_FLUSH_INTERVAL":    "100ms",
+		"K6_OTEL_EXPORT_INTERVAL":   "100ms",
+		"K6_OTEL_EXPORTER_PROTOCOL": exporterProtocol,
+		"K6_OTEL_METRIC_PREFIX":     "test.",
 	}
 
 	if protocol == "http" {

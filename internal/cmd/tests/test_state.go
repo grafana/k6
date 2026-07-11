@@ -12,18 +12,18 @@ import (
 	"testing"
 	_ "unsafe" //nolint:revive,nolintlint // needed for the go:linkname and nolintlint is buggy
 
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/v2/lib"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/event"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/ui/console"
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/ui/console"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 // GlobalTestState is a wrapper around GlobalState for use in tests.
@@ -88,15 +88,19 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 
 	outMutex := &sync.Mutex{}
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
-	defaultFlags.Address = getFreeBindAddr(tb)
 
 	ts.GlobalState = &state.GlobalState{
-		Ctx:          ctx,
-		FS:           fs,
-		Getwd:        func() (string, error) { return ts.Cwd, nil },
-		BinaryName:   "k6",
-		CmdArgs:      []string{},
-		Env:          map[string]string{"K6_NO_USAGE_REPORT": "true"},
+		Ctx:        ctx,
+		FS:         fs,
+		Getwd:      func() (string, error) { return ts.Cwd, nil },
+		BinaryName: "k6",
+		CmdArgs:    []string{},
+		Env: map[string]string{
+			"K6_NO_USAGE_REPORT": "true",
+			// Keep `k6 x` command-tree construction off the real registry.k6.io
+			// when tests don't explicitly point it at an httptest server.
+			state.ProvisionCatalogURL: "http://127.0.0.1:1/unreachable",
+		},
 		Events:       event.NewEventSystem(100, logger),
 		DefaultFlags: defaultFlags,
 		Flags:        defaultFlags,
@@ -134,7 +138,7 @@ func (ts *GlobalTestState) ReparseFlags() {
 // TODO(@mstoykov): Figure out how to not do it this way and not have more public APIs
 // Also use this for testing more of the GlobalState.Flags
 //
-//go:linkname getFlags go.k6.io/k6/cmd/state.getFlags
+//go:linkname getFlags go.k6.io/k6/v2/cmd/state.getFlags
 func getFlags(defaultFlags state.GlobalFlags, env map[string]string, args []string) state.GlobalFlags
 
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals

@@ -15,8 +15,8 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 // maxRetry controls how many times to retry if an action fails.
@@ -1571,6 +1571,30 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 	}
 
 	return v, nil
+}
+
+func (f *Frame) isInViewport(selector string, opts *FrameIsInViewportOptions) (bool, error) {
+	isInViewport := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		v, err := handle.isInViewport(apiCtx, opts.Ratio)
+		if errors.Is(err, ErrTimedOut) { // We don't care about timeout errors here!
+			return v, nil
+		}
+		return v, err
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict, isInViewport, []string{}, false, withRetry, true, opts.Timeout,
+	)
+	v, err := call(f.ctx, act, opts.Timeout)
+	if err != nil {
+		return false, errorFromDOMError(err)
+	}
+
+	bv, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("checking is %q in viewport: unexpected type %T", selector, v)
+	}
+
+	return bv, nil
 }
 
 // ID returns the frame id.

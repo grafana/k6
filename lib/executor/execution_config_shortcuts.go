@@ -4,8 +4,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 // ExecutionConflictError is a custom error type used for all of the errors in
@@ -93,17 +93,22 @@ func DeriveScenariosFromShortcuts(opts lib.Options, logger logrus.FieldLogger) (
 		}
 		result.Scenarios = getRampingVUsScenario(opts.Stages, opts.VUs)
 
+	case opts.VUs.Valid && opts.Stages == nil && !opts.Iterations.Valid && !opts.Duration.Valid:
+		if opts.Scenarios != nil {
+			logger.Warnf("`vus=%d` overrides scenarios configuration", opts.VUs.Int64)
+		}
+		ds := NewSharedIterationsConfig(lib.DefaultScenarioName)
+		ds.VUs = opts.VUs
+		ds.Iterations = opts.VUs
+		result.Scenarios = lib.ScenarioConfigs{lib.DefaultScenarioName: ds}
+		result.VUs = opts.VUs
+		result.Iterations = opts.VUs
+
 	case len(opts.Scenarios) > 0:
 		// Do nothing, scenarios was explicitly specified
 
 	default:
 		// Check if we should emit some warnings
-		if opts.VUs.Valid && opts.VUs.Int64 != 1 {
-			logger.Warnf(
-				"`vus=%d` option will be ignored, it only works in conjunction with `iterations`, `duration`, or `stages`",
-				opts.VUs.Int64,
-			)
-		}
 		if opts.Stages != nil && len(opts.Stages) == 0 {
 			// No someone explicitly set stages to empty
 			logger.Warnf("`stages` was explicitly set to an empty value, running the script with 1 iteration in 1 VU")

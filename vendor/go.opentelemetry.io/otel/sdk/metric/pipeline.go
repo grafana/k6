@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/metric/embedded"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
@@ -236,7 +237,11 @@ func newInserter[N int64 | float64](p *pipeline, vc *cache[string, instID]) *ins
 //
 // If an instrument is determined to use a Drop aggregation, that instrument is
 // not inserted nor returned.
-func (i *inserter[N]) Instrument(inst Instrument, readerAggregation Aggregation) ([]aggregate.Measure[N], error) {
+func (i *inserter[N]) Instrument(
+	inst Instrument,
+	allowedKeys []attribute.Key,
+	readerAggregation Aggregation,
+) ([]aggregate.Measure[N], error) {
 	var (
 		matched  bool
 		measures []aggregate.Measure[N]
@@ -279,6 +284,12 @@ func (i *inserter[N]) Instrument(inst Instrument, readerAggregation Aggregation)
 		Description: inst.Description,
 		Unit:        inst.Unit,
 	}
+	// allowedKeys == nil indicates that the WithDefaultAttributes option was not passed,
+	// and all keys are allowed. An empty (non-nil) slice indicates that the option was passed
+	// with an empty set of keys, and no keys are allowed.
+	if allowedKeys != nil {
+		stream.AttributeFilter = attribute.NewAllowKeysFilter(allowedKeys...)
+	}
 	in, _, e := i.cachedAggregator(inst.Scope, inst.Kind, stream, readerAggregation)
 	if e != nil {
 		if err == nil {
@@ -301,7 +312,7 @@ func (i *inserter[N]) addCallback(cback func(context.Context) error) {
 	i.pipeline.callbacks = append(i.pipeline.callbacks, cback)
 }
 
-var aggIDCount uint64
+var aggIDCount atomic.Uint64
 
 // aggVal is the cached value in an aggregators cache.
 type aggVal[N int64 | float64] struct {
@@ -388,6 +399,7 @@ func (i *inserter[N]) cachedAggregator(
 		b := aggregate.Builder[N]{
 			Temporality: i.pipeline.reader.temporality(kind),
 			ReservoirFunc: reservoirFunc[N](
+				kind,
 				stream.ExemplarReservoirProviderSelector(stream.Aggregation),
 				i.pipeline.exemplarFilter,
 			),
@@ -395,9 +407,7 @@ func (i *inserter[N]) cachedAggregator(
 		b.Filter = stream.AttributeFilter
 		// A value less than or equal to zero will disable the aggregation
 		// limits for the builder (an all the created aggregates).
-		// cardinalityLimit will be 0 by default if unset (or
-		// unrecognized input). Use that value directly.
-		b.AggregationLimit = i.pipeline.cardinalityLimit
+		b.AggregationLimit = i.getCardinalityLimit(kind)
 		in, out, err := i.aggregateFunc(b, stream.Aggregation, kind)
 		if err != nil {
 			return aggVal[N]{0, nil, err}
@@ -413,10 +423,22 @@ func (i *inserter[N]) cachedAggregator(
 			unit:        stream.Unit,
 			compAgg:     out,
 		})
-		id := atomic.AddUint64(&aggIDCount, 1)
+		id := aggIDCount.Add(1)
 		return aggVal[N]{id, in, err}
 	})
 	return cv.Measure, cv.ID, cv.Err
+}
+
+// getCardinalityLimit returns the cardinality limit for the given instrument kind.
+// When the reader's selector returns fallback = true, the pipeline's global
+// limit is used, then the default if global is unset. When fallback is false,
+// the selector's limit is used (0 or less means unlimited).
+func (i *inserter[N]) getCardinalityLimit(kind InstrumentKind) int {
+	limit, fallback := i.pipeline.reader.cardinalityLimit(kind)
+	if fallback {
+		return i.pipeline.cardinalityLimit
+	}
+	return limit
 }
 
 // logConflict validates if an instrument with the same case-insensitive name
@@ -651,12 +673,12 @@ func newResolver[N int64 | float64](p pipelines, vc *cache[string, instID]) reso
 
 // Aggregators returns the Aggregators that must be updated by the instrument
 // defined by key.
-func (r resolver[N]) Aggregators(id Instrument) ([]aggregate.Measure[N], error) {
+func (r resolver[N]) Aggregators(id Instrument, allowedKeys []attribute.Key) ([]aggregate.Measure[N], error) {
 	var measures []aggregate.Measure[N]
 
 	var err error
 	for _, i := range r.inserters {
-		in, e := i.Instrument(id, i.readerDefaultAggregation(id.Kind))
+		in, e := i.Instrument(id, allowedKeys, i.readerDefaultAggregation(id.Kind))
 		if e != nil {
 			err = errors.Join(err, e)
 		}
@@ -668,7 +690,11 @@ func (r resolver[N]) Aggregators(id Instrument) ([]aggregate.Measure[N], error) 
 // HistogramAggregators returns the histogram Aggregators that must be updated by the instrument
 // defined by key. If boundaries were provided on instrument instantiation, those take precedence
 // over boundaries provided by the reader.
-func (r resolver[N]) HistogramAggregators(id Instrument, boundaries []float64) ([]aggregate.Measure[N], error) {
+func (r resolver[N]) HistogramAggregators(
+	id Instrument,
+	allowedKeys []attribute.Key,
+	boundaries []float64,
+) ([]aggregate.Measure[N], error) {
 	var measures []aggregate.Measure[N]
 
 	var err error
@@ -678,7 +704,7 @@ func (r resolver[N]) HistogramAggregators(id Instrument, boundaries []float64) (
 			histAgg.Boundaries = boundaries
 			agg = histAgg
 		}
-		in, e := i.Instrument(id, agg)
+		in, e := i.Instrument(id, allowedKeys, agg)
 		if e != nil {
 			err = errors.Join(err, e)
 		}

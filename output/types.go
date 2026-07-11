@@ -10,10 +10,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/internal/usage"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // Params contains all possible constructor parameters an output may need.
@@ -32,6 +33,10 @@ type Params struct {
 	RuntimeOptions lib.RuntimeOptions
 	ExecutionPlan  []lib.ExecutionStep
 	Usage          *usage.Usage
+
+	// Features is the resolved feature-flag activation set for the run, so
+	// outputs can gate behavior on a typed flag (e.g. native histograms).
+	Features *features.Flags
 }
 
 // TODO: make v2 with buffered channels?

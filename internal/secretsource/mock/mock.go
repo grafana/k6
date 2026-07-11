@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"go.k6.io/k6/secretsource"
+	"go.k6.io/k6/v2/secretsource"
 )
 
 func init() {

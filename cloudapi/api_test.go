@@ -3,6 +3,7 @@ package cloudapi
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,16 +15,16 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/v2/lib/fsext"
 
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/v2/lib"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/internal/build"
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/lib/types"
+	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 func TestNewClient(t *testing.T) {
@@ -416,4 +417,40 @@ func fprint(t *testing.T, w io.Writer, format string) int {
 	n, err := fmt.Fprint(w, format)
 	require.NoError(t, err)
 	return n
+}
+
+func TestClientDoStopsRetryingOnCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	firstReq := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		select {
+		case firstReq <- struct{}{}:
+		default:
+		}
+		w.WriteHeader(http.StatusInternalServerError) // always retryable
+	}))
+	defer server.Close()
+
+	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
+	// A long interval makes the test pass only if cancellation short-circuits
+	// the wait between retries instead of sleeping through it.
+	client.retryInterval = time.Hour
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/v1/whatever", nil)
+	require.NoError(t, err)
+
+	done := make(chan error, 1)
+	go func() { done <- client.Do(req, nil) }()
+
+	<-firstReq // the first attempt landed, so Do is now waiting to retry
+	cancel()
+
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Do kept waiting to retry after the context was canceled")
+	}
 }

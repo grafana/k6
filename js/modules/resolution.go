@@ -11,9 +11,9 @@ import (
 	"github.com/grafana/sobek/ast"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/internal/js/compiler"
-	"go.k6.io/k6/internal/loader"
-	"go.k6.io/k6/internal/usage"
+	"go.k6.io/k6/v2/internal/js/compiler"
+	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/internal/usage"
 )
 
 const notPreviouslyResolvedModule = "the module %q was not previously resolved during initialization (__VU==0)"

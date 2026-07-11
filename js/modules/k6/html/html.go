@@ -9,8 +9,8 @@ import (
 	"github.com/grafana/sobek"
 	gohtml "golang.org/x/net/html"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/modules"
 )
 
 // RootModule is the global module object type. It is instantiated once per test
@@ -170,6 +170,14 @@ func (s Selection) Add(arg any) Selection {
 
 func (s Selection) Find(arg any) Selection {
 	return s.varargFnCall(arg, s.sel.Find, s.sel.FindSelection, s.sel.FindNodes)
+}
+
+func (s Selection) Single(selector string) Selection {
+	sel := s.sel.FindMatcher(goquery.Single(selector))
+	if len(sel.Nodes) > 1 {
+		sel.Nodes = sel.Nodes[:1]
+	}
+	return Selection{s.rt, sel, s.URL}
 }
 
 func (s Selection) Closest(arg any) Selection {

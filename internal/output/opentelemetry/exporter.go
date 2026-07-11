@@ -3,6 +3,7 @@ package opentelemetry
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/url"
@@ -38,10 +39,13 @@ func getExporter(cfg Config) (metric.Exporter, error) {
 		}
 	}
 
-	// TODO: drop the merge when the deprecated exporter type is fully removed
-	protocol := mergeExporterTypeAndProtocol(cfg)
+	// if at least valid user was configured, use basic auth
+	if cfg.HTTPUsername.Valid {
+		auth := []byte(cfg.HTTPUsername.String + ":" + cfg.HTTPPassword.String)
+		headers["Authorization"] = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(auth))
+	}
 
-	switch protocol {
+	switch cfg.ExporterProtocol.String {
 	case grpcExporterProtocol:
 		return buildGRPCExporter(ctx, cfg, tlsConfig, headers)
 	case httpExporterProtocol:
@@ -49,24 +53,6 @@ func getExporter(cfg Config) (metric.Exporter, error) {
 	default:
 		return nil, errors.New("unsupported exporter protocol " + cfg.ExporterProtocol.String)
 	}
-}
-
-func mergeExporterTypeAndProtocol(cfg Config) string {
-	if cfg.ExporterProtocol.Valid {
-		return cfg.ExporterProtocol.String
-	}
-	if cfg.ExporterType.Valid {
-		switch cfg.ExporterType.String {
-		case httpExporterType:
-			return httpExporterProtocol
-		case grpcExporterType:
-			return grpcExporterProtocol
-		default:
-			return cfg.ExporterType.String
-		}
-	}
-	// return the default value
-	return cfg.ExporterProtocol.String
 }
 
 func buildHTTPExporter(

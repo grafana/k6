@@ -6,6 +6,9 @@ on:
     branches:
       - master
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'release notes/**'
 
 defaults:
   run:
@@ -27,11 +30,15 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+      - name: Resolve Go versions
+        id: go_versions
+        if: matrix.go != 'tip'
+        uses: ./.github/actions/go-versions
       - name: Install Go
         if: matrix.go != 'tip'
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
-          go-version: 1.26.x
+          go-version: ${{ steps.go_versions.outputs.current }}
           check-latest: true
       - name: Download Go tip
         if: matrix.go == 'tip'

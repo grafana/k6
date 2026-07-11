@@ -8,9 +8,10 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
-	k6common "go.k6.io/k6/js/common"
+	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // mapping is a type for mapping our module API to sobek.
@@ -30,7 +31,7 @@ func mapBrowserToSobek(vu moduleVU) *sobek.Object {
 	for k, v := range mapBrowser(vu) {
 		err := obj.Set(k, rt.ToValue(v))
 		if err != nil {
-			k6common.Throw(rt, fmt.Errorf("mapping: %w", err))
+			k6common.Throw(rt, k6ext.BrowserError(fmt.Errorf("mapping: %w", err)))
 		}
 	}
 

@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modulestest"
+	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/modulestest"
 )
 
 func makeRuntime(t *testing.T) *sobek.Runtime {

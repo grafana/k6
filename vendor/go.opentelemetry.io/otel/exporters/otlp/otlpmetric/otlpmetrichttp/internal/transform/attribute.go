@@ -81,12 +81,23 @@ func Value(v attribute.Value) *cpb.AnyValue {
 		av.Value = &cpb.AnyValue_StringValue{
 			StringValue: v.AsString(),
 		}
+	case attribute.BYTESLICE:
+		av.Value = &cpb.AnyValue_BytesValue{
+			BytesValue: v.AsByteSlice(),
+		}
+	case attribute.SLICE:
+		av.Value = &cpb.AnyValue_ArrayValue{
+			ArrayValue: &cpb.ArrayValue{
+				Values: attrValues(v.AsSlice()),
+			},
+		}
 	case attribute.STRINGSLICE:
 		av.Value = &cpb.AnyValue_ArrayValue{
 			ArrayValue: &cpb.ArrayValue{
 				Values: stringSliceValues(v.AsStringSlice()),
 			},
 		}
+	case attribute.EMPTY:
 	default:
 		av.Value = &cpb.AnyValue_StringValue{
 			StringValue: "INVALID",
@@ -139,6 +150,14 @@ func stringSliceValues(vals []string) []*cpb.AnyValue {
 				StringValue: v,
 			},
 		}
+	}
+	return converted
+}
+
+func attrValues(vals []attribute.Value) []*cpb.AnyValue {
+	converted := make([]*cpb.AnyValue, len(vals))
+	for i, v := range vals {
+		converted[i] = Value(v)
 	}
 	return converted
 }

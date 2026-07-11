@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,14 +15,15 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
+	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // configFlagSet returns a FlagSet with the default run configuration flags.
@@ -35,6 +37,7 @@ func configFlagSet() *pflag.FlagSet {
 		false,
 		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
+	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 	return flags
 }
 
@@ -42,8 +45,9 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	Out    []string  `json:"out" envconfig:"K6_OUT"`
+	Linger null.Bool `json:"linger" envconfig:"K6_LINGER"`
+
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
@@ -151,19 +155,42 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	return conf, nil
 }
 
+// Permissions for the on-disk config file and its containing directory.
+// The config can contain the Grafana Cloud API token (collectors.cloud.token),
+// so it must not be readable by other local users.
+const (
+	configFileMode = fs.FileMode(0o600)
+	configDirMode  = fs.FileMode(0o700)
+)
+
 // writeDiskConfig serializes the configuration to a JSON file and writes it in the supplied
 // location on the supplied filesystem.
+//
+// The file may contain the Grafana Cloud API token, so it is written with
+// owner-only permissions (0o600), inside a directory created with owner-only
+// permissions (0o700). If the file or directory already exists with looser
+// permissions (e.g. from a previous k6 version that used 0o644/0o755), it is
+// re-chmod'd here so existing installs are upgraded on the next write.
 func writeDiskConfig(gs *state.GlobalState, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
+	dir := filepath.Dir(gs.Flags.ConfigFilePath)
+	if err := gs.FS.MkdirAll(dir, configDirMode); err != nil {
+		return err
+	}
+	// MkdirAll does not tighten perms on a pre-existing directory.
+	if err := gs.FS.Chmod(dir, configDirMode); err != nil {
 		return err
 	}
 
-	return fsext.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, 0o644)
+	if err := fsext.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, configFileMode); err != nil {
+		return err
+	}
+	// WriteFile does not tighten perms on a pre-existing file.
+	return gs.FS.Chmod(gs.Flags.ConfigFilePath, configFileMode)
 }
 
 // readEnvConfig reads configuration variables from the environment.
@@ -186,7 +213,9 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // - set some defaults if they weren't previously specified
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
-func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (Config, error) {
+func getConsolidatedConfig(
+	gs *state.GlobalState, cliConf Config, runnerOpts lib.Options, flags *features.Flags,
+) (Config, error) {
 	fileConf, err := readDiskConfig(gs)
 	if err != nil {
 		err = fmt.Errorf("failed to load the configuration file from the local file system: %w", err)
@@ -209,6 +238,15 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 	warnOnShortHandOverride(conf.Options, cliConf.Options, "cli", gs.Logger)
 	conf = conf.Apply(cliConf)
 
+	if flags != nil && flags.MergeRunTags {
+		conf.RunTags = mergeRunTags(
+			fileConf.RunTags,
+			runnerOpts.RunTags,
+			envConf.RunTags,
+			cliConf.RunTags,
+		)
+	}
+
 	conf = applyDefault(conf)
 
 	// TODO(imiric): Move this validation where it makes sense in the configuration
@@ -221,6 +259,20 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 	}
 
 	return conf, nil
+}
+
+// mergeRunTags accumulates RunTags from each layer in precedence order (lowest first).
+// On key collision, later (higher-priority) layers overwrite earlier ones.
+// Returns nil when every layer is empty to preserve the codebase's "tags":null serialization.
+func mergeRunTags(layers ...map[string]string) map[string]string {
+	merged := map[string]string{}
+	for _, l := range layers {
+		maps.Copy(merged, l)
+	}
+	if len(merged) == 0 {
+		return nil
+	}
+	return merged
 }
 
 func warnOnShortHandOverride(a, b lib.Options, bName string, logger logrus.FieldLogger) {

@@ -9,13 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/cmd/tests"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {
@@ -54,19 +55,6 @@ func verifyConstLoopingVUs(vus null.Int, duration time.Duration) func(t *testing
 		assert.Equal(t, types.NullDurationFrom(duration), clvc.Duration)
 		assert.Equal(t, vus, c.VUs)
 		assert.Equal(t, types.NullDurationFrom(duration), c.Duration)
-	}
-}
-
-func verifyExternallyExecuted(scenarioName string, vus null.Int, duration time.Duration) func(t *testing.T, c Config) {
-	return func(t *testing.T, c Config) {
-		exec := c.Scenarios[scenarioName]
-		require.NotEmpty(t, exec)
-		require.IsType(t, executor.ExternallyControlledConfig{}, exec)
-		ecc, ok := exec.(executor.ExternallyControlledConfig)
-		require.True(t, ok)
-		assert.Equal(t, vus, ecc.VUs)
-		assert.Equal(t, types.NullDurationFrom(duration), ecc.Duration)
-		assert.Equal(t, vus, ecc.MaxVUs) // MaxVUs defaults to VUs unless specified
 	}
 }
 
@@ -118,11 +106,12 @@ func getFS(files []file) fsext.Fs {
 }
 
 type opts struct {
-	cli    []string
-	env    []string
-	runner *lib.Options
-	fs     fsext.Fs
-	cmds   []string
+	cli      []string
+	env      []string
+	runner   *lib.Options
+	fs       fsext.Fs
+	cmds     []string
+	features *features.Flags
 }
 
 // exp contains the different events or errors we expect our test case to trigger.
@@ -223,8 +212,8 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{fs: getFS(nil), cli: []string{"--config", "/my/config.file"}}, exp{consolidationError: true}, nil},
 
 		// Test combinations between options and levels
-		{opts{cli: []string{"--vus", "1"}}, exp{}, verifyOneIterPerOneVU},
-		{opts{cli: []string{"--vus", "10"}}, exp{logWarning: true}, verifyOneIterPerOneVU},
+		{opts{cli: []string{"--vus", "1"}}, exp{}, verifySharedIters(I(1), I(1))},
+		{opts{cli: []string{"--vus", "10"}}, exp{}, verifySharedIters(I(10), I(10))},
 		{
 			opts{
 				fs:  getFS([]file{{"/my/config.file", `{"vus": 8, "duration": "2m"}`}}),
@@ -316,15 +305,6 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, types.NullDurationFrom(10*time.Second), clvc.GracefulStop)
 			},
 		},
-		{
-			opts{
-				fs: defaultConfig(`{"scenarios": { "def": {
-					"executor": "externally-controlled", "vus": 15, "duration": "2h"
-				}}}`),
-			},
-			exp{},
-			verifyExternallyExecuted("def", I(15), 2*time.Hour),
-		},
 		// TODO: test execution-segment
 
 		// Just in case, verify that no options will result in the same 1 vu 1 iter config
@@ -369,6 +349,66 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			func(t *testing.T, c Config) {
 				exp := map[string]string{"clitagkey": "clitagvalue"}
 				assert.Equal(t, exp, c.RunTags)
+			},
+		},
+		// merge-run-tags off: each layer that sets tags replaces the previous one wholesale.
+		{
+			opts{
+				fs:     defaultConfig(`{"tags": {"file_only": "f", "shared": "from-file"}}`),
+				runner: &lib.Options{RunTags: map[string]string{"script_only": "s", "shared": "from-script"}},
+				env:    []string{"K6_TAGS=env_only:e,shared:from-env"},
+				cli:    []string{"--tag", "cli_only=c", "--tag", "shared=from-cli"},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, map[string]string{
+					"cli_only": "c",
+					"shared":   "from-cli",
+				}, c.RunTags)
+			},
+		},
+		// merge-run-tags on: every layer contributes; higher-priority wins on key collision.
+		// Precedence: file < script < env < CLI.
+		{
+			opts{
+				fs:       defaultConfig(`{"tags": {"file_only": "f", "shared": "from-file"}}`),
+				runner:   &lib.Options{RunTags: map[string]string{"script_only": "s", "shared": "from-script"}},
+				env:      []string{"K6_TAGS=env_only:e,shared:from-env"},
+				cli:      []string{"--tag", "cli_only=c", "--tag", "shared=from-cli"},
+				features: &features.Flags{MergeRunTags: true},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, map[string]string{
+					"file_only":   "f",
+					"script_only": "s",
+					"env_only":    "e",
+					"cli_only":    "c",
+					"shared":      "from-cli",
+				}, c.RunTags)
+			},
+		},
+		// merge-run-tags on with only file + CLI tags (the original PR scenario).
+		{
+			opts{
+				fs:       defaultConfig(`{"tags": {"codeTagKey": "codeTagValue"}}`),
+				cli:      []string{"--tag", "clitagkey=clitagvalue"},
+				features: &features.Flags{MergeRunTags: true},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, map[string]string{
+					"codeTagKey": "codeTagValue",
+					"clitagkey":  "clitagvalue",
+				}, c.RunTags)
+			},
+		},
+		// merge-run-tags on with no tags anywhere: result stays nil.
+		{
+			opts{features: &features.Flags{MergeRunTags: true}},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Nil(t, c.RunTags)
 			},
 		},
 
@@ -497,9 +537,32 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 			nil,
 		},
-		// TODO: test for differences between flagsets
-		// TODO: more tests in general, especially ones not related to execution parameters...
+		// --vus alone should create a shared-iterations scenario with N VUs and N iterations
+		{
+			opts{cli: []string{"--vus", "8"}},
+			exp{},
+			verifySharedIters(I(8), I(8)),
+		},
+		// --vus with script-defined scenarios should return a derivation error
+		{
+			opts{
+				cli: []string{"--vus", "8"},
+				fs: defaultConfig(`{
+					"scenarios": {
+						"api": {
+							"executor": "shared-iterations",
+							"vus": 100,
+							"iterations": 100
+						}
+					}
+				}`),
+			},
+			exp{logWarning: true},
+			verifySharedIters(I(8), I(8)),
+		},
 	}
+	// TODO: test for differences between flagsets
+	// TODO: more tests in general, especially ones not related to execution parameters...
 }
 
 func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd string) {
@@ -543,7 +606,7 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	if testCase.options.runner != nil {
 		opts = *testCase.options.runner
 	}
-	consolidatedConfig, err := getConsolidatedConfig(ts.GlobalState, cliConf, opts)
+	consolidatedConfig, err := getConsolidatedConfig(ts.GlobalState, cliConf, opts, testCase.options.features)
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return

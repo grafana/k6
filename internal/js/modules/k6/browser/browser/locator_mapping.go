@@ -6,8 +6,8 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"go.k6.io/k6/internal/js/modules/k6/browser/common"
-	k6common "go.k6.io/k6/js/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // mapLocator API to the JS module.
@@ -167,6 +167,15 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}
 			return promise(vu, func() (any, error) {
 				return lo.IsDisabled(copts) //nolint:wrapcheck
+			}), nil
+		},
+		"isInViewport": func(opts sobek.Value) (*sobek.Promise, error) {
+			copts := common.NewFrameIsInViewportOptions(lo.Timeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing is in viewport options: %w", err)
+			}
+			return promise(vu, func() (any, error) {
+				return lo.IsInViewport(copts) //nolint:wrapcheck
 			}), nil
 		},
 		"isVisible": func() *sobek.Promise {

@@ -14,14 +14,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/internal/lib/testutils"
-	"go.k6.io/k6/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/internal/lib/testutils"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
 )
 
 func TestMsgParsing(t *testing.T) {
@@ -67,7 +66,7 @@ func TestMsgParsing(t *testing.T) {
 		},
 	}
 	var message msg
-	require.NoError(t, easyjson.Unmarshal([]byte(m), &message))
+	require.NoError(t, json.Unmarshal([]byte(m), &message))
 	require.Equal(t, expectMsg, message)
 }
 

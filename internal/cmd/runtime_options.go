@@ -8,9 +8,9 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/lib"
+	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/lib"
 )
 
 // TODO: move this whole file out of the cmd package? maybe when fixing
@@ -31,11 +31,6 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.StringP("type", "t", "", "override test type, \"js\" or \"archive\"")
 	flags.StringArrayP("env", "e", nil, "add/override environment variable with `VAR=value`")
 	flags.Bool("no-thresholds", false, "don't run thresholds")
-	// TODO(@joanlopez): remove by k6 v2.0, once we completely drop the support of the deprecated --no-summary flag.
-	flags.Bool("no-summary", false, "don't show the summary at the end of the test")
-	if err := flags.MarkDeprecated("no-summary", "use --summary-mode=disabled instead"); err != nil {
-		panic(err) // Should never happen
-	}
 	flags.String("summary-mode", summary.ModeCompact.String(), "determine the summary mode,"+
 		" \"compact\", \"full\" or \"disabled\"")
 	flags.String(
@@ -85,7 +80,6 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		IncludeSystemEnvVars:      getNullBool(flags, "include-system-env-vars"),
 		CompatibilityMode:         getNullString(flags, "compatibility-mode"),
 		NoThresholds:              getNullBool(flags, "no-thresholds"),
-		NoSummary:                 getNullBool(flags, "no-summary"),
 		SummaryMode:               getNullString(flags, "summary-mode"),
 		SummaryExport:             getNullString(flags, "summary-export"),
 		NewMachineReadableSummary: getNullBool(flags, "new-machine-readable-summary"),
@@ -116,10 +110,6 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 
 	if err := saveBoolFromEnv(environment, "K6_NO_THRESHOLDS", &opts.NoThresholds); err != nil {
-		return opts, err
-	}
-
-	if err := saveBoolFromEnv(environment, "K6_NO_SUMMARY", &opts.NoSummary); err != nil {
 		return opts, err
 	}
 

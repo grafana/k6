@@ -5,11 +5,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.k6.io/k6/internal/lib/consts"
-	"go.k6.io/k6/internal/lib/summary"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/v2/internal/lib/consts"
+	"go.k6.io/k6/v2/internal/lib/summary"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/output"
 
 	"github.com/sirupsen/logrus"
 )
@@ -85,7 +85,7 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	// First, the sample data is stored into the metrics stored at the k6 metrics registry level.
 	o.storeSample(sample)
 
-	skipGroupSamples := o.summaryMode == summary.ModeCompact || o.summaryMode == summary.ModeLegacy
+	skipGroupSamples := o.summaryMode == summary.ModeCompact
 	if skipGroupSamples {
 		return
 	}
