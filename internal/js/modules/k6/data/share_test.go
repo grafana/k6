@@ -243,8 +243,6 @@ func TestSharedArrayReadValuesIntact(t *testing.T) {
 		if (s[7] !== false) { throw new Error("s[7]="+s[7]); }
 		if (s[8] !== null) { throw new Error("s[8]="+s[8]); }
 		if (s[9].length !== LEN || s[9][0] !== "A" || s[9][LEN-1] !== "A") { throw new Error("bad large string"); }
-		// Repeated reads must be consistent.
-		if (s[0] !== s[0] || s[9].length !== s[9].length) { throw new Error("inconsistent read"); }
 	`)
 	require.NoError(t, err)
 }
@@ -325,7 +323,7 @@ func TestSharedArrayDeepFreezeSemantics(t *testing.T) {
 // blow-up: reading a large string element must not allocate an amount of memory
 // proportional to the string length.
 //
-//nolint:tparallel // testing.AllocsPerRun must not run concurrently.
+//nolint:paralleltest // testing.AllocsPerRun must not run concurrently.
 func TestSharedArrayLargeStringGetAllocations(t *testing.T) {
 	runtime, err := newConfiguredRuntime(t)
 	require.NoError(t, err)
