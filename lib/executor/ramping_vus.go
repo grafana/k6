@@ -501,11 +501,12 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		return fmt.Errorf("%s expected graceful end offset at %s to be final", vlv.config.GetName(), maxDuration)
 	}
 	waitOnProgressChannel := make(chan struct{})
-	startTime, maxDurationCtx, regularDurationCtx, cancel := getDurationContexts(
+	startTime, maxDurationCtx, regularDurationCtx, cancel, regCancel := getDurationContexts(
 		ctx, regularDuration, maxDuration-regularDuration,
 	)
 	defer func() {
 		cancel()
+		regCancel()
 		<-waitOnProgressChannel
 	}()
 
