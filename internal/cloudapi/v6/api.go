@@ -176,9 +176,13 @@ func (c *Client) ListLoadZones(ctx context.Context) (_ []LoadZone, err error) {
 			ID:           zone.Id,
 			K6LoadZoneID: zone.K6LoadZoneId,
 			Name:         zone.Name,
-			// The `public` and `available` flags are not modeled by the SDK's
-			// LoadZoneApiModel yet, so read them best-effort from the untyped
-			// catch-all. They default to false if absent or not a bool.
+			// TODO(#6142): the pinned k6-cloud-openapi-client-go v0.0.2 does not
+			// model the `public` and `available` fields on LoadZoneApiModel, so
+			// read them best-effort from the untyped catch-all. Newer (not yet
+			// Go-consumable, non-v-tagged) releases expose them as typed fields;
+			// switch to those once the SDK is bumped. They are required fields
+			// in the API, so defaulting to false only guards a contract
+			// violation that should not happen in practice.
 			Public:    boolFromAny(zone.AdditionalProperties["public"]),
 			Available: boolFromAny(zone.AdditionalProperties["available"]),
 		})

@@ -13,7 +13,6 @@ import (
 
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/cmd/state"
-	"go.k6.io/k6/v2/internal/build"
 	v6cloudapi "go.k6.io/k6/v2/internal/cloudapi/v6"
 )
 
@@ -52,23 +51,9 @@ func getCmdCloudTestList(testCmd *cmdCloudTest) *cobra.Command {
 }
 
 func (c *cmdCloudTestList) run(cmd *cobra.Command, _ []string) error {
-	currentDiskConf, err := readDiskConfig(c.globalState)
+	client, cloudConfig, err := newCloudV6ClientFromConfig(
+		c.globalState, "Listing cloud tests requires auth settings")
 	if err != nil {
-		return err
-	}
-
-	currentJSONConfigRaw := currentDiskConf.Collectors["cloud"]
-
-	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		currentJSONConfigRaw, c.globalState.Env, "", nil)
-	if err != nil {
-		return err
-	}
-	if warn != "" {
-		c.globalState.Logger.Warn(warn)
-	}
-
-	if err := checkCloudLoginFor(cloudConfig, "Listing cloud tests requires auth settings"); err != nil {
 		return err
 	}
 
@@ -76,22 +61,6 @@ func (c *cmdCloudTestList) run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-
-	client, err := v6cloudapi.NewClient(
-		c.globalState.Logger,
-		cloudConfig.Token.String,
-		cloudConfig.Hostv6.String,
-		build.Version,
-		cloudConfig.Timeout.TimeDuration(),
-	)
-	if err != nil {
-		return err
-	}
-
-	if cloudConfig.StackID.Int64 < math.MinInt32 || cloudConfig.StackID.Int64 > math.MaxInt32 {
-		return fmt.Errorf("stack ID %d overflows int32", cloudConfig.StackID.Int64)
-	}
-	client.SetStackID(int32(cloudConfig.StackID.Int64))
 
 	tests, err := client.ListLoadTests(c.globalState.Ctx, projectID)
 	if err != nil {
