@@ -1,6 +1,7 @@
 package netext
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -241,7 +243,7 @@ func fetchAIAIntermediates(
 				continue
 			}
 
-			issuer, err := fetchCertFromAIAURL(rawURL, httpClient)
+			issuer, err := fetchCertFromAIAURL(rawURL, httpClient, logger)
 			if err != nil {
 				logger.WithError(err).WithField("url", rawURL).Debug("AIA intermediate certificate fetch failed")
 				continue
@@ -257,7 +259,9 @@ func fetchAIAIntermediates(
 }
 
 // fetchCertFromAIAURL retrieves a single X.509 certificate (DER or PEM) from rawURL.
-func fetchCertFromAIAURL(rawURL string, httpClient *http.Client) (*x509.Certificate, error) {
+func fetchCertFromAIAURL(
+	rawURL string, httpClient *http.Client, logger logrus.FieldLogger,
+) (*x509.Certificate, error) {
 	// AIA fetches use their own timeout context independent of any VU lifecycle context;
 	// the TLS VerifyPeerCertificate callback provides no context to thread through.
 	ctx, cancel := context.WithTimeout(context.Background(), aiaFetchTimeout)
@@ -290,6 +294,14 @@ func fetchCertFromAIAURL(rawURL string, httpClient *http.Client) (*x509.Certific
 
 	block, _ := pem.Decode(body)
 	if block == nil {
+		// PKCS#7/CMS bundles (Content-Type: application/pkcs7-mime, common on some
+		// public CAs such as Sectigo) are not currently supported. Log a Warn so
+		// users can diagnose "AIA didn't work" for these chains. See follow-up
+		// issue for full parser support.
+		if isLikelyPKCS7(resp.Header.Get("Content-Type"), body) {
+			logger.WithField("url", rawURL).WithField("content-type", resp.Header.Get("Content-Type")).
+				Warn("AIA response is PKCS#7 (not currently supported); chain will remain incomplete")
+		}
 		return nil, errors.New("AIA response is neither valid DER nor PEM")
 	}
 	cert, err := x509.ParseCertificate(block.Bytes)
@@ -297,4 +309,17 @@ func fetchCertFromAIAURL(rawURL string, httpClient *http.Client) (*x509.Certific
 		return nil, fmt.Errorf("parsing PEM certificate from AIA response: %w", err)
 	}
 	return cert, nil
+}
+
+// isLikelyPKCS7 reports whether the AIA response looks like a PKCS#7/CMS bundle
+// rather than a raw certificate. The check is intentionally forgiving: some
+// servers advertise the correct Content-Type, others do not, so we also look at
+// the ASN.1 body for the signedData OID (1.2.840.113549.1.7.2).
+func isLikelyPKCS7(contentType string, body []byte) bool {
+	ct := strings.ToLower(contentType)
+	if strings.Contains(ct, "pkcs7") || strings.Contains(ct, "pkcs-7") {
+		return true
+	}
+	// ASN.1 encoding of OID 1.2.840.113549.1.7.2 (id-signedData): 2A 86 48 86 F7 0D 01 07 02.
+	return bytes.Contains(body, []byte{0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02})
 }

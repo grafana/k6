@@ -13,11 +13,13 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -419,6 +421,40 @@ func TestWrapTLSConfigForAIAFetching_MalformedAIACert(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "certificate signed by unknown authority",
 		"malformed AIA certificate should be silently ignored; original error is returned")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// (d.1) PKCS#7 AIA responses are not supported; a Warn log must fire so users
+// can diagnose "AIA didn't work" for chains served in that format.
+// ────────────────────────────────────────────────────────────────────────────
+
+func TestFetchCertFromAIAURL_PKCS7ResponseLogsWarn(t *testing.T) {
+	t.Parallel()
+
+	// Body starts with the ASN.1 signedData OID so the heuristic fires even if
+	// the server's Content-Type is missing or misleading.
+	pkcs7Body := append([]byte{0x30, 0x82, 0x00, 0x00}, []byte{0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02}...)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/pkcs7-mime")
+		_, _ = w.Write(pkcs7Body)
+	}))
+	t.Cleanup(srv.Close)
+
+	logger, hook := logtest.NewNullLogger()
+	logger.SetLevel(logrus.WarnLevel)
+
+	cert, err := fetchCertFromAIAURL(srv.URL, aiaHTTPClient, logger)
+	require.Error(t, err)
+	assert.Nil(t, cert)
+
+	var warned bool
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel && strings.Contains(entry.Message, "PKCS#7") {
+			warned = true
+			break
+		}
+	}
+	assert.True(t, warned, "expected a Warn log about PKCS#7 not being supported")
 }
 
 // ────────────────────────────────────────────────────────────────────────────
