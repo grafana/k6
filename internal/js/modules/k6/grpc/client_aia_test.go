@@ -21,15 +21,12 @@ import (
 	"go.k6.io/k6/v2/lib/netext"
 )
 
-// TestBuildTLSConfig_AIAWithCustomCACerts asserts that when the VU tls.Config
-// is AIA-wrapped and a gRPC connect() supplies its own cacerts, chain
-// verification uses the gRPC-supplied RootCAs rather than the VU config's.
+// Verifies AIA verification honours gRPC-supplied cacerts, not the VU config's RootCAs.
 func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	t.Parallel()
 
 	chain := newGRPCTestChain(t)
 
-	// AIA endpoint that serves the intermediate cert as raw DER.
 	aiaSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/pkix-cert")
 		_, _ = w.Write(chain.intermediateDER)
@@ -37,35 +34,23 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	t.Cleanup(aiaSrv.Close)
 	chain.setAIAURL(t, aiaSrv.URL)
 
-	// Leaf-only TLS server: presents only the leaf certificate, no intermediate.
 	tlsListener := chain.newLeafOnlyTLSServer(t)
 	t.Cleanup(func() { _ = tlsListener.Close() })
 
-	// VU-level tls.Config has NO RootCAs — a common real-world case where the
-	// user relies on cacerts supplied per gRPC.connect() call. Wrap it with AIA.
+	// VU config has no RootCAs; the user relies on per-connect cacerts.
 	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12} //nolint:gosec // test
 	wrappedVU := netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
 
-	// gRPC connect() supplies the root CA via cacerts. buildTLSConfig should
-	// produce a config whose AIA verification honours cp, not the VU pool.
 	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.rootDER})
 	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{rootPEM}, true, nullLogger())
 	require.NoError(t, err)
 
 	tlsCfg.ServerName = "localhost"
 
-	// Dial the leaf-only server. AIA fetches the intermediate; verification
-	// must succeed against the user-supplied root in cp.
 	conn, err := tls.Dial("tcp", tlsListener.Addr().String(), tlsCfg)
-	require.NoError(t, err, "TLS handshake should succeed when AIA is enabled "+
-		"and the correct CA is supplied via gRPC cacerts")
+	require.NoError(t, err)
 	_ = conn.Close()
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Test helpers (local to this file — kept minimal and self-contained; the
-// larger AIA helpers in lib/netext/aia_test.go are package-private).
-// ────────────────────────────────────────────────────────────────────────────
 
 type grpcTestChain struct {
 	rootDER         []byte
@@ -75,7 +60,7 @@ type grpcTestChain struct {
 	intermediateKey *ecdsa.PrivateKey
 	interCert       *x509.Certificate
 	leafKey         *ecdsa.PrivateKey
-	leafTmpl        *x509.Certificate // rebuilt with AIA URL after aiaSrv starts
+	leafTmpl        *x509.Certificate
 }
 
 func newGRPCTestChain(t testing.TB) *grpcTestChain {
@@ -146,15 +131,11 @@ func newGRPCTestChain(t testing.TB) *grpcTestChain {
 	}
 }
 
-// setAIAURL rebuilds the leaf certificate template with the given AIA URL
-// baked into IssuingCertificateURL, so the AIA fetcher knows where to look.
 func (c *grpcTestChain) setAIAURL(t testing.TB, aiaURL string) {
 	t.Helper()
 	c.leafTmpl.IssuingCertificateURL = []string{aiaURL}
 }
 
-// newLeafOnlyTLSServer starts a plain net.Listener wrapped with TLS that
-// presents only the leaf (no intermediate) and accepts one handshake.
 func (c *grpcTestChain) newLeafOnlyTLSServer(t testing.TB) net.Listener {
 	t.Helper()
 	leafDER, err := x509.CreateCertificate(rand.Reader, c.leafTmpl, c.interCert, &c.leafKey.PublicKey, c.intermediateKey)

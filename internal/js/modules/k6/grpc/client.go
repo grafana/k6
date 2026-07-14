@@ -182,9 +182,7 @@ func buildTLSConfig(
 		}
 		tlsCfg.Certificates = []tls.Certificate{cert}
 	}
-	// Re-wrap with AIA fetching so the verification callback reads this config's
-	// RootCAs (cp), not the VU config's. Copying the parent's callbacks would keep
-	// the closure pointing at the VU config, silently ignoring user-supplied cacerts.
+	// Re-wrap so the verification closure reads this config's RootCAs, not the VU's.
 	if aiaEnabled {
 		tlsCfg = netext.WrapTLSConfigForAIAFetching(tlsCfg, logger, nil)
 	}

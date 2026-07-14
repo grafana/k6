@@ -294,10 +294,7 @@ func fetchCertFromAIAURL(
 
 	block, _ := pem.Decode(body)
 	if block == nil {
-		// PKCS#7/CMS bundles (Content-Type: application/pkcs7-mime, common on some
-		// public CAs such as Sectigo) are not currently supported. Log a Warn so
-		// users can diagnose "AIA didn't work" for these chains. See follow-up
-		// issue for full parser support.
+		// PKCS#7 responses are unsupported; warn so users can diagnose the failure.
 		if isLikelyPKCS7(resp.Header.Get("Content-Type"), body) {
 			logger.WithField("url", rawURL).WithField("content-type", resp.Header.Get("Content-Type")).
 				Warn("AIA response is PKCS#7 (not currently supported); chain will remain incomplete")
@@ -311,15 +308,12 @@ func fetchCertFromAIAURL(
 	return cert, nil
 }
 
-// isLikelyPKCS7 reports whether the AIA response looks like a PKCS#7/CMS bundle
-// rather than a raw certificate. The check is intentionally forgiving: some
-// servers advertise the correct Content-Type, others do not, so we also look at
-// the ASN.1 body for the signedData OID (1.2.840.113549.1.7.2).
+// isLikelyPKCS7 detects PKCS#7 by Content-Type or the signedData OID in the body.
 func isLikelyPKCS7(contentType string, body []byte) bool {
 	ct := strings.ToLower(contentType)
 	if strings.Contains(ct, "pkcs7") || strings.Contains(ct, "pkcs-7") {
 		return true
 	}
-	// ASN.1 encoding of OID 1.2.840.113549.1.7.2 (id-signedData): 2A 86 48 86 F7 0D 01 07 02.
+	// ASN.1 encoding of OID 1.2.840.113549.1.7.2 (id-signedData).
 	return bytes.Contains(body, []byte{0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02})
 }
