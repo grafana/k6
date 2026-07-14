@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 func TestCheckResponse(t *testing.T) {
@@ -43,7 +44,7 @@ func TestCheckResponse(t *testing.T) {
 				StatusCode: http.StatusUnauthorized,
 				Body:       io.NopCloser(strings.NewReader("invalid json")),
 			},
-			expectedError: errNotAuthenticated.Error(),
+			expectedError: httperr.ErrNotAuthenticated.Error(),
 		},
 		{
 			name: "forbidden 403 with invalid JSON",
@@ -51,7 +52,7 @@ func TestCheckResponse(t *testing.T) {
 				StatusCode: http.StatusForbidden,
 				Body:       io.NopCloser(strings.NewReader("invalid json")),
 			},
-			expectedError: errNotAuthorized.Error(),
+			expectedError: httperr.ErrNotAuthorized.Error(),
 		},
 		{
 			name: "server error 500 with invalid JSON",
