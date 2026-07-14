@@ -47,14 +47,7 @@ func NewWritableStreamDefaultWriterObject(
 	}
 
 	if proto == nil {
-		proto = writableStreamDefaultWriterPrototype(rt)
-	}
-	if proto == nil {
-		proto = rt.NewObject()
-	}
-
-	if err := installWritableStreamDefaultWriterPrototype(rt, proto); err != nil {
-		return nil, err
+		return nil, newError(RuntimeError, "WritableStreamDefaultWriter prototype is not initialized")
 	}
 
 	if err := obj.SetPrototype(proto); err != nil {
@@ -62,20 +55,6 @@ func NewWritableStreamDefaultWriterObject(
 	}
 
 	return obj, nil
-}
-
-func writableStreamDefaultWriterPrototype(rt *sobek.Runtime) *sobek.Object {
-	ctor := rt.Get("WritableStreamDefaultWriter")
-	if ctor == nil || common.IsNullish(ctor) {
-		return nil
-	}
-
-	proto := ctor.ToObject(rt).Get("prototype")
-	if proto == nil || common.IsNullish(proto) {
-		return nil
-	}
-
-	return proto.ToObject(rt)
 }
 
 func installWritableStreamDefaultWriterPrototype(rt *sobek.Runtime, proto *sobek.Object) error {
@@ -97,10 +76,6 @@ func installWritableStreamDefaultWriterPrototype(rt *sobek.Runtime, proto *sobek
 		writer := writableStreamDefaultWriterFromThis(rt, this)
 		return writer.readyPromise.promise
 	}); err != nil {
-		return err
-	}
-
-	if err := defineWriterConstructor(rt, proto); err != nil {
 		return err
 	}
 
@@ -142,20 +117,7 @@ func defineWriterGetter(rt *sobek.Runtime, proto *sobek.Object, name string, get
 		return err
 	}
 
-	return proto.DefineAccessorProperty(name, wrapped, nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-}
-
-func defineWriterConstructor(rt *sobek.Runtime, proto *sobek.Object) error {
-	if hasOwnProperty(proto, "constructor") {
-		return nil
-	}
-
-	ctor := rt.Get("WritableStreamDefaultWriter")
-	if ctor == nil {
-		return nil
-	}
-
-	return setDefaultPrototypePropertyOf(proto, "constructor", ctor)
+	return proto.DefineAccessorProperty(name, wrapped, nil, sobek.FLAG_TRUE, sobek.FLAG_FALSE)
 }
 
 func defineWriterMethod(rt *sobek.Runtime, proto *sobek.Object, name string, method any) error {

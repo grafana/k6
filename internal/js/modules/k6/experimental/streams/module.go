@@ -17,6 +17,11 @@ type (
 	// ModuleInstance is the module instance that will be created for each VU.
 	ModuleInstance struct {
 		vu modules.VU
+
+		exports modules.Exports
+
+		writableStreamPrototype              *sobek.Object
+		writableStreamDefaultWriterPrototype *sobek.Object
 	}
 )
 
@@ -33,20 +38,56 @@ func New() *RootModule {
 
 // NewModuleInstance creates a new instance of the module for a specific VU.
 func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &ModuleInstance{
-		vu: vu,
+	mi := &ModuleInstance{vu: vu}
+	rt := vu.Runtime()
+
+	// Convert the writable stream constructors once per VU. Besides keeping the exported
+	// constructor identities stable, this gives the implementation canonical prototypes that
+	// cannot be replaced by a caller-controlled `this` value.
+	writableStreamConstructor := rt.ToValue(mi.NewWritableStream)
+	writableStreamDefaultWriterConstructor := rt.ToValue(mi.NewWritableStreamDefaultWriter)
+
+	mi.writableStreamPrototype = constructorPrototype(rt, writableStreamConstructor)
+	mi.writableStreamDefaultWriterPrototype = constructorPrototype(rt, writableStreamDefaultWriterConstructor)
+	if err := installWritableStreamPrototype(rt, mi.writableStreamPrototype); err != nil {
+		throw(rt, err)
+	}
+	if err := installWritableStreamDefaultWriterPrototype(rt, mi.writableStreamDefaultWriterPrototype); err != nil {
+		throw(rt, err)
+	}
+	mi.exports = modules.Exports{Named: map[string]any{
+		"ReadableStream":              mi.NewReadableStream,
+		"CountQueuingStrategy":        mi.NewCountQueuingStrategy,
+		"ReadableStreamDefaultReader": mi.NewReadableStreamDefaultReader,
+		"WritableStream":              writableStreamConstructor,
+		"WritableStreamDefaultWriter": writableStreamDefaultWriterConstructor,
+	}}
+
+	return mi
+}
+
+func constructorPrototype(rt *sobek.Runtime, constructor sobek.Value) *sobek.Object {
+	return constructor.ToObject(rt).Get("prototype").ToObject(rt)
+}
+
+func validateConstructorReceiver(
+	rt *sobek.Runtime,
+	call sobek.ConstructorCall,
+	prototype *sobek.Object,
+	name string,
+) {
+	// Sobek passes an object `this` through to native constructors invoked as ordinary
+	// functions. Reject a foreign receiver before it can be used as an instance prototype.
+	// A non-nil NewTarget represents legitimate derived construction and may have a different
+	// prototype.
+	if call.NewTarget == nil && call.This.Prototype() != prototype {
+		throw(rt, newTypeError(rt, name+" constructor called with an invalid receiver"))
 	}
 }
 
 // Exports returns the module exports, that will be available in the runtime.
 func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{Named: map[string]any{
-		"ReadableStream":              mi.NewReadableStream,
-		"CountQueuingStrategy":        mi.NewCountQueuingStrategy,
-		"ReadableStreamDefaultReader": mi.NewReadableStreamDefaultReader,
-		"WritableStream":              mi.NewWritableStream,
-		"WritableStreamDefaultWriter": mi.NewWritableStreamDefaultWriter,
-	}}
+	return mi.exports
 }
 
 // NewReadableStream is the constructor for the ReadableStream object.
@@ -139,10 +180,17 @@ func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 
 // NewWritableStream is the constructor for the WritableStream object.
 func (mi *ModuleInstance) NewWritableStream(call sobek.ConstructorCall) *sobek.Object {
-	return newWritableStream(mi.vu, call)
+	rt := mi.vu.Runtime()
+	validateConstructorReceiver(rt, call, mi.writableStreamPrototype, "WritableStream")
+
+	return newWritableStream(mi.vu, call, mi.writableStreamDefaultWriterPrototype)
 }
 
-func newWritableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object {
+func newWritableStream(
+	vu modules.VU,
+	call sobek.ConstructorCall,
+	writerPrototype *sobek.Object,
+) *sobek.Object {
 	rt := vu.Runtime()
 
 	var (
@@ -181,8 +229,9 @@ func newWritableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 
 	// 4. Perform ! InitializeWritableStream(this).
 	stream := &WritableStream{
-		runtime: rt,
-		vu:      vu,
+		runtime:         rt,
+		vu:              vu,
+		writerPrototype: writerPrototype,
 	}
 	stream.initialize()
 
@@ -208,6 +257,12 @@ func newWritableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 // [WritableStreamDefaultWriter]: https://streams.spec.whatwg.org/#writablestreamdefaultwriter
 func (mi *ModuleInstance) NewWritableStreamDefaultWriter(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
+	validateConstructorReceiver(
+		rt,
+		call,
+		mi.writableStreamDefaultWriterPrototype,
+		"WritableStreamDefaultWriter",
+	)
 
 	if len(call.Arguments) != 1 {
 		throw(rt, newTypeError(rt, "WritableStreamDefaultWriter takes a single argument"))

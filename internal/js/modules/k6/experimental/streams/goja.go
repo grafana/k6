@@ -116,8 +116,8 @@ func setDefaultPrototypePropertyOf(obj *sobek.Object, propName string, propValue
 	err := obj.DefineDataProperty(propName,
 		propValue,
 		sobek.FLAG_TRUE,
-		sobek.FLAG_FALSE,
 		sobek.FLAG_TRUE,
+		sobek.FLAG_FALSE,
 	)
 	if err != nil {
 		return fmt.Errorf("unable to define %s property; reason: %w", propName, err)

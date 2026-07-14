@@ -42,6 +42,9 @@ type WritableStream struct {
 	// writer holds the current writer of the stream if the stream is locked to a writer,
 	// or nil otherwise.
 	writer *WritableStreamDefaultWriter
+	// writerPrototype is the canonical prototype shared by writers vended by this stream's
+	// module instance.
+	writerPrototype *sobek.Object
 
 	// writeRequests holds a list of pending write request promises.
 	writeRequests []*promiseWrapper
@@ -272,7 +275,7 @@ func (stream *WritableStream) GetWriter() sobek.Value {
 	// 1. Return ? AcquireWritableStreamDefaultWriter(this).
 	writer := stream.acquireDefaultWriter()
 
-	obj, err := NewWritableStreamDefaultWriterObject(writer, writableStreamDefaultWriterPrototype(stream.runtime))
+	obj, err := NewWritableStreamDefaultWriterObject(writer, stream.writerPrototype)
 	if err != nil {
 		common.Throw(stream.runtime, err)
 	}
@@ -302,13 +305,26 @@ func writableStreamFromValue(rt *sobek.Runtime, value sobek.Value) *WritableStre
 	return stream
 }
 
+func installWritableStreamPrototype(rt *sobek.Runtime, proto *sobek.Object) error {
+	if hasOwnProperty(proto, "locked") {
+		return nil
+	}
+
+	return proto.DefineAccessorProperty("locked", rt.ToValue(func(fc sobek.FunctionCall) sobek.Value {
+		stream := writableStreamFromValue(rt, fc.This)
+		if stream == nil {
+			return sobek.Undefined()
+		}
+		return rt.ToValue(stream.isLocked())
+	}), nil, sobek.FLAG_TRUE, sobek.FLAG_FALSE)
+}
+
 // toObject builds the stream's JavaScript object.
 //
 // We build it as a plain object rather than a reflect-wrapped Go value, because the latter is
 // not extensible: the Web Platform Tests' recordingWritableStream helper assigns extra
 // properties (such as `controller` and `events`) to the stream, which a reflect-wrapped host
-// object does not allow. The given proto is used as the object's prototype, and the `locked`
-// brand-check getter is installed on it (once).
+// object does not allow. The given proto is used as the object's prototype.
 func (stream *WritableStream) toObject(proto *sobek.Object) *sobek.Object {
 	rt := stream.runtime
 	obj := rt.NewObject()
@@ -331,19 +347,6 @@ func (stream *WritableStream) toObject(proto *sobek.Object) *sobek.Object {
 		streamGoRefKey, rt.ToValue(stream), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE,
 	); err != nil {
 		common.Throw(rt, newError(RuntimeError, err.Error()))
-	}
-
-	if proto.Get("locked") == nil {
-		err := proto.DefineAccessorProperty("locked", rt.ToValue(func(fc sobek.FunctionCall) sobek.Value {
-			s := writableStreamFromValue(rt, fc.This)
-			if s == nil {
-				return sobek.Undefined()
-			}
-			return rt.ToValue(s.isLocked())
-		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-		if err != nil {
-			common.Throw(rt, newError(RuntimeError, err.Error()))
-		}
 	}
 
 	if err := obj.SetPrototype(proto); err != nil {
