@@ -1,6 +1,7 @@
 package grpc
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -38,7 +39,7 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	t.Cleanup(func() { _ = tlsListener.Close() })
 
 	// VU config has no RootCAs; the user relies on per-connect cacerts.
-	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12} //nolint:gosec // test
+	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12}
 	wrappedVU := netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
 
 	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.rootDER})
@@ -47,7 +48,10 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 
 	tlsCfg.ServerName = "localhost"
 
-	conn, err := tls.Dial("tcp", tlsListener.Addr().String(), tlsCfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dialer := &tls.Dialer{Config: tlsCfg}
+	conn, err := dialer.DialContext(ctx, "tcp", tlsListener.Addr().String())
 	require.NoError(t, err)
 	_ = conn.Close()
 }
@@ -165,7 +169,9 @@ func (c *grpcTestChain) newLeafOnlyTLSServer(t testing.TB) net.Listener {
 			}
 			// Force the handshake to complete, then close.
 			if tlsConn, ok := conn.(*tls.Conn); ok {
-				_ = tlsConn.Handshake()
+				hctx, hcancel := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = tlsConn.HandshakeContext(hctx)
+				hcancel()
 			}
 			_ = conn.Close()
 		}
@@ -178,4 +184,3 @@ func nullLogger() logrus.FieldLogger {
 	l.SetLevel(logrus.PanicLevel)
 	return l
 }
-
