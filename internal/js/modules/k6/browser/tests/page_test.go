@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -4024,6 +4025,29 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)
 	})
+}
+
+func TestPageRouteConcurrentEnableDataRace(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	p := tb.NewPage(nil)
+
+	matcher := func(pattern, url string) (bool, error) {
+		return regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+	}
+	h := func(rt *common.Route) error { return rt.Continue(common.ContinueOptions{}) }
+
+	// Test checks for data race because : Each first-time registration sees routes empty, so each calls updateRequestInterception(true).
+	var wg sync.WaitGroup
+	for i := range 16 {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_ = p.Route(fmt.Sprintf("/api/%d", i), h, matcher)
+		}(i)
+	}
+	wg.Wait()
 }
 
 func TestPageUnroute(t *testing.T) {
