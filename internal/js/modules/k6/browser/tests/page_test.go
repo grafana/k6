@@ -4038,16 +4038,22 @@ func TestPageRouteConcurrentEnableDataRace(t *testing.T) {
 	}
 	h := func(rt *common.Route) error { return rt.Continue(common.ContinueOptions{}) }
 
-	// Test checks for data race because : Each first-time registration sees routes empty, so each calls updateRequestInterception(true).
+	// This test is intended to surface a data race under `go test -race`: concurrent first-time registrations
+	// can each observe routes as empty and call updateRequestInterception(true).
 	var wg sync.WaitGroup
+	errCh := make(chan error, 16)
 	for i := range 16 {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_ = p.Route(fmt.Sprintf("/api/%d", i), h, matcher)
+			errCh <- p.Route(fmt.Sprintf("/api/%d", i), h, matcher)
 		}(i)
 	}
 	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
 }
 
 func TestPageUnroute(t *testing.T) {
