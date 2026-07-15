@@ -69,18 +69,27 @@ assert(
 
 const locked = Object.getOwnPropertyDescriptor(WritableStream.prototype, "locked");
 assert(locked.configurable === true, "locked must be configurable");
-assert(locked.enumerable === false, "locked must not be enumerable");
+assert(locked.enumerable === true, "locked must be enumerable");
 
 const closed = Object.getOwnPropertyDescriptor(WritableStreamDefaultWriter.prototype, "closed");
 assert(closed.configurable === true, "closed must be configurable");
-assert(closed.enumerable === false, "closed must not be enumerable");
+assert(closed.enumerable === true, "closed must be enumerable");
 
 const write = Object.getOwnPropertyDescriptor(WritableStreamDefaultWriter.prototype, "write");
 assert(write.writable === true, "write must be writable");
 assert(write.configurable === true, "write must be configurable");
-assert(write.enumerable === false, "write must not be enumerable");
+assert(write.enumerable === true, "write must be enumerable");
 
 writer.releaseLock();
+
+assertThrowsTypeError(
+  () => WritableStream({}),
+  "stream constructor must require new",
+);
+assertThrowsTypeError(
+  () => WritableStreamDefaultWriter(stream),
+  "writer constructor must require new",
+);
 
 assertThrowsTypeError(
   () => WritableStreamDefaultWriter.call({}, stream),

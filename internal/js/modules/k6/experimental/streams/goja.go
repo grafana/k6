@@ -11,6 +11,33 @@ import (
 	"go.k6.io/k6/v2/js/modules"
 )
 
+// newWebIDLConstructor wraps a native Sobek constructor so it follows Web IDL call semantics.
+// Sobek otherwise treats a native constructor call without `new` exactly like construction and
+// does not expose a NewTarget that lets the native function distinguish the two cases.
+func newWebIDLConstructor(rt *sobek.Runtime, name string, constructor any) (sobek.Value, error) {
+	factory, err := rt.RunString(`
+(function(constructor, name) {
+  const wrapper = function(...args) {
+    if (new.target === undefined) {
+      throw new TypeError(name + " constructor must be called with new");
+    }
+    return Reflect.construct(constructor, args, new.target);
+  };
+  Object.defineProperty(wrapper, "name", { value: name, configurable: true });
+  return wrapper;
+})`)
+	if err != nil {
+		return nil, err
+	}
+
+	call, ok := sobek.AssertFunction(factory)
+	if !ok {
+		return nil, newError(RuntimeError, "Web IDL constructor wrapper factory is not a function")
+	}
+
+	return call(sobek.Undefined(), rt.ToValue(constructor), rt.ToValue(name))
+}
+
 // newResolvedPromise instantiates a new resolved promise.
 func newResolvedPromise(vu modules.VU, with sobek.Value) *sobek.Promise {
 	promise, resolve, _ := vu.Runtime().NewPromise()
@@ -111,13 +138,13 @@ func setReadOnlyPropertyOf(obj *sobek.Object, objName, propName string, propValu
 }
 
 // setDefaultPrototypePropertyOf sets a property with the default Web IDL prototype method
-// descriptors: writable and configurable, but not enumerable.
+// descriptors: writable, configurable, and enumerable.
 func setDefaultPrototypePropertyOf(obj *sobek.Object, propName string, propValue sobek.Value) error {
 	err := obj.DefineDataProperty(propName,
 		propValue,
 		sobek.FLAG_TRUE,
 		sobek.FLAG_TRUE,
-		sobek.FLAG_FALSE,
+		sobek.FLAG_TRUE,
 	)
 	if err != nil {
 		return fmt.Errorf("unable to define %s property; reason: %w", propName, err)

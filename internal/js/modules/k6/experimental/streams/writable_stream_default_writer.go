@@ -117,7 +117,7 @@ func defineWriterGetter(rt *sobek.Runtime, proto *sobek.Object, name string, get
 		return err
 	}
 
-	return proto.DefineAccessorProperty(name, wrapped, nil, sobek.FLAG_TRUE, sobek.FLAG_FALSE)
+	return proto.DefineAccessorProperty(name, wrapped, nil, sobek.FLAG_TRUE, sobek.FLAG_TRUE)
 }
 
 func defineWriterMethod(rt *sobek.Runtime, proto *sobek.Object, name string, method any) error {

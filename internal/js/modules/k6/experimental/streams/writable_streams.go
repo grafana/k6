@@ -316,7 +316,7 @@ func installWritableStreamPrototype(rt *sobek.Runtime, proto *sobek.Object) erro
 			return sobek.Undefined()
 		}
 		return rt.ToValue(stream.isLocked())
-	}), nil, sobek.FLAG_TRUE, sobek.FLAG_FALSE)
+	}), nil, sobek.FLAG_TRUE, sobek.FLAG_TRUE)
 }
 
 // toObject builds the stream's JavaScript object.

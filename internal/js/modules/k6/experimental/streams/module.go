@@ -44,8 +44,18 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	// Convert the writable stream constructors once per VU. Besides keeping the exported
 	// constructor identities stable, this gives the implementation canonical prototypes that
 	// cannot be replaced by a caller-controlled `this` value.
-	writableStreamConstructor := rt.ToValue(mi.NewWritableStream)
-	writableStreamDefaultWriterConstructor := rt.ToValue(mi.NewWritableStreamDefaultWriter)
+	writableStreamConstructor, err := newWebIDLConstructor(rt, "WritableStream", mi.NewWritableStream)
+	if err != nil {
+		throw(rt, err)
+	}
+	writableStreamDefaultWriterConstructor, err := newWebIDLConstructor(
+		rt,
+		"WritableStreamDefaultWriter",
+		mi.NewWritableStreamDefaultWriter,
+	)
+	if err != nil {
+		throw(rt, err)
+	}
 
 	mi.writableStreamPrototype = constructorPrototype(rt, writableStreamConstructor)
 	mi.writableStreamDefaultWriterPrototype = constructorPrototype(rt, writableStreamDefaultWriterConstructor)
@@ -70,18 +80,12 @@ func constructorPrototype(rt *sobek.Runtime, constructor sobek.Value) *sobek.Obj
 	return constructor.ToObject(rt).Get("prototype").ToObject(rt)
 }
 
-func validateConstructorReceiver(
-	rt *sobek.Runtime,
-	call sobek.ConstructorCall,
-	prototype *sobek.Object,
-	name string,
-) {
-	// Sobek passes an object `this` through to native constructors invoked as ordinary
-	// functions. Reject a foreign receiver before it can be used as an instance prototype.
-	// A non-nil NewTarget represents legitimate derived construction and may have a different
-	// prototype.
-	if call.NewTarget == nil && call.This.Prototype() != prototype {
-		throw(rt, newTypeError(rt, name+" constructor called with an invalid receiver"))
+func requireNewTarget(rt *sobek.Runtime, call sobek.ConstructorCall, name string) {
+	// Web IDL interface constructors must be invoked with `new`. Rejecting every ordinary
+	// function call also prevents a caller-controlled `this` value from being used as an
+	// instance prototype.
+	if call.NewTarget == nil {
+		throw(rt, newTypeError(rt, name+" constructor must be called with new"))
 	}
 }
 
@@ -181,7 +185,7 @@ func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 // NewWritableStream is the constructor for the WritableStream object.
 func (mi *ModuleInstance) NewWritableStream(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
-	validateConstructorReceiver(rt, call, mi.writableStreamPrototype, "WritableStream")
+	requireNewTarget(rt, call, "WritableStream")
 
 	return newWritableStream(mi.vu, call, mi.writableStreamDefaultWriterPrototype)
 }
@@ -257,12 +261,7 @@ func newWritableStream(
 // [WritableStreamDefaultWriter]: https://streams.spec.whatwg.org/#writablestreamdefaultwriter
 func (mi *ModuleInstance) NewWritableStreamDefaultWriter(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
-	validateConstructorReceiver(
-		rt,
-		call,
-		mi.writableStreamDefaultWriterPrototype,
-		"WritableStreamDefaultWriter",
-	)
+	requireNewTarget(rt, call, "WritableStreamDefaultWriter")
 
 	if len(call.Arguments) != 1 {
 		throw(rt, newTypeError(rt, "WritableStreamDefaultWriter takes a single argument"))
