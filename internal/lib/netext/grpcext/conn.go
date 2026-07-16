@@ -145,12 +145,8 @@ func dialGRPCContextViaProxy(
 }
 
 func proxyDialAddress(proxyURL *url.URL) (string, error) {
-	scheme := proxyURL.Scheme
-	if scheme == "" {
-		scheme = "http"
-	}
-	if scheme != "http" {
-		return "", fmt.Errorf("unsupported grpc proxy scheme %q", scheme)
+	if proxyURL.Scheme != "" && proxyURL.Scheme != "http" {
+		return "", fmt.Errorf("unsupported grpc proxy scheme %q", proxyURL.Scheme)
 	}
 
 	host := proxyURL.Hostname()

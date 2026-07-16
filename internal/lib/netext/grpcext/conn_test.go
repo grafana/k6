@@ -55,7 +55,7 @@ func (healthcheckmock) NewStream(_ context.Context, _ *grpc.StreamDesc, _ string
 	panic("not implemented")
 }
 
-func TestDefaultOptionsUsesHTTPSProxy(t *testing.T) { //nolint:paralleltest // t.Setenv cannot be used in parallel tests.
+func TestDefaultOptionsUsesHTTPSProxy(t *testing.T) {
 	proxyAddr := "proxy.example:3128"
 
 	t.Setenv("HTTPS_PROXY", "http://"+proxyAddr)
@@ -403,6 +403,7 @@ func TestDialGRPCContextUsesHTTPSProxy(t *testing.T) {
 	proxyAddr := "proxy.example:80"
 	proxyURL, err := url.Parse("http://user:pass@proxy.example")
 	require.NoError(t, err)
+	var noProxyURL *url.URL
 
 	proxyFromEnvironment := func(req *http.Request) (*url.URL, error) {
 		assert.Equal(t, "https", req.URL.Scheme)
@@ -411,7 +412,7 @@ func TestDialGRPCContextUsesHTTPSProxy(t *testing.T) {
 		case grpcProxyTargetAddr:
 			return proxyURL, nil
 		case directAddr:
-			return nil, nil
+			return noProxyURL, nil
 		default:
 			return nil, fmt.Errorf("unexpected proxy lookup for %q", req.URL.Host)
 		}
