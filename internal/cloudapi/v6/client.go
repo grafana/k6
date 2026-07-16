@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"time"
 
@@ -62,9 +63,15 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 	return c, nil
 }
 
-// SetStackID sets the stack ID for the client.
-func (c *Client) SetStackID(stackID int32) {
-	c.stackID = stackID
+// SetStackID sets the stack ID for the client. It returns an error if
+// stackID does not fit in the int32 range the underlying SDK requires for
+// the X-Stack-Id header.
+func (c *Client) SetStackID(stackID int64) error {
+	if stackID < math.MinInt32 || stackID > math.MaxInt32 {
+		return fmt.Errorf("stack ID %d overflows int32", stackID)
+	}
+	c.stackID = int32(stackID)
+	return nil
 }
 
 // BaseURL returns configured host.
