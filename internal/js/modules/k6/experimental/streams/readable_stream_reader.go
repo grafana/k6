@@ -35,11 +35,11 @@ type ReadableStreamGenericReader interface {
 	// SetStream sets the stream that owns this reader.
 	SetStream(stream *ReadableStream)
 
-	// GetClosed returns the promise that resolves when the stream is closed.
-	GetClosed() *promiseWrapper
+	// getClosed returns the promise that resolves when the stream is closed.
+	getClosed() *promiseWrapper
 
-	// SetClosed sets the promise that resolves when the stream is closed.
-	SetClosed(*promiseWrapper)
+	// setClosed sets the promise that resolves when the stream is closed.
+	setClosed(*promiseWrapper)
 
 	// Cancel returns a [sobek.Promise] that resolves when the stream is canceled.
 	Cancel(reason sobek.Value) *sobek.Promise
@@ -71,13 +71,13 @@ func (reader *BaseReadableStreamReader) SetStream(stream *ReadableStream) {
 	reader.vu = stream.vu
 }
 
-// GetClosed returns the reader's closed promise.
-func (reader *BaseReadableStreamReader) GetClosed() *promiseWrapper {
+// getClosed returns the reader's closed promise.
+func (reader *BaseReadableStreamReader) getClosed() *promiseWrapper {
 	return reader.closedPromise
 }
 
-// SetClosed sets the reader's closed promise.
-func (reader *BaseReadableStreamReader) SetClosed(promise *promiseWrapper) {
+// setClosed sets the reader's closed promise.
+func (reader *BaseReadableStreamReader) setClosed(promise *promiseWrapper) {
 	reader.closedPromise = promise
 }
 
@@ -205,5 +205,5 @@ func ReadableStreamReaderGenericInitialize(reader ReadableStreamGenericReader, s
 		markPromiseHandled(stream.runtime, promise.promise)
 	}
 
-	reader.SetClosed(promise)
+	reader.setClosed(promise)
 }

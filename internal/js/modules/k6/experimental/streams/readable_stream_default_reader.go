@@ -22,7 +22,7 @@ func NewReadableStreamDefaultReaderObject(reader *ReadableStreamDefaultReader) (
 	objName := "ReadableStreamDefaultReader"
 
 	err := obj.DefineAccessorProperty("closed", rt.ToValue(func() *sobek.Promise {
-		return reader.GetClosed().promise
+		return reader.getClosed().promise
 	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	if err != nil {
 		return nil, err

@@ -455,7 +455,7 @@ func (stream *ReadableStream) close() {
 		common.Throw(stream.vu.Runtime(), newError(AssertionError, "reader is not a ReadableStreamGenericReader"))
 	}
 
-	genericReader.GetClosed().resolveWith(sobek.Undefined())
+	genericReader.getClosed().resolveWith(sobek.Undefined())
 
 	// 6. If reader implements ReadableStreamDefaultReader,
 	defaultReader, ok := reader.(*ReadableStreamDefaultReader)
@@ -502,7 +502,7 @@ func (stream *ReadableStream) error(e any) {
 	}
 
 	// 6. Reject reader.[[closedPromise]] with e.
-	promise := genericReader.GetClosed()
+	promise := genericReader.getClosed()
 	promise.rejectWith(e)
 
 	// 7. Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
