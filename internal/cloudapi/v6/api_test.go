@@ -219,7 +219,7 @@ func TestRetryWithConnectionClose(t *testing.T) {
 
 	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "1.0", 5*time.Second)
 	require.NoError(t, err)
-	client.SetStackID(1)
+	require.NoError(t, client.SetStackID(1))
 
 	opts := lib.Options{VUs: null.IntFrom(10)}
 	require.NoError(t, client.ValidateOptions(t.Context(), 1, opts))
@@ -440,7 +440,7 @@ func newTestClient(t *testing.T, handler http.Handler) *Client {
 
 	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "1.0", 5*time.Second)
 	require.NoError(t, err)
-	client.SetStackID(1)
+	require.NoError(t, client.SetStackID(1))
 
 	return client
 }

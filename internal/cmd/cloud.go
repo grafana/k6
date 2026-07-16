@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -464,11 +463,9 @@ func prepCloudTestRun(
 	client *cloudapiv6.Client,
 	cloudConfig *cloudapi.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
 ) (int64, error) {
-	stackID := cloudConfig.StackID.Int64
-	if stackID < math.MinInt32 || stackID > math.MaxInt32 {
-		return 0, fmt.Errorf("stack ID %d overflows int32", stackID)
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
+		return 0, err
 	}
-	client.SetStackID(int32(stackID))
 
 	projectID := cloudConfig.ProjectID.Int64
 

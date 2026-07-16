@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 	"text/tabwriter"
 
@@ -88,10 +87,9 @@ func (c *cmdCloudTestList) run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if cloudConfig.StackID.Int64 < math.MinInt32 || cloudConfig.StackID.Int64 > math.MaxInt32 {
-		return fmt.Errorf("stack ID %d overflows int32", cloudConfig.StackID.Int64)
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
+		return err
 	}
-	client.SetStackID(int32(cloudConfig.StackID.Int64))
 
 	tests, err := client.ListLoadTests(c.globalState.Ctx, projectID)
 	if err != nil {
