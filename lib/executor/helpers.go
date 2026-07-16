@@ -141,7 +141,7 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 
 	maxDurationCtx, maxDurationCancel = context.WithDeadline(parentCtx, maxEndTime)
 	if gracefulStop == 0 {
-		return startTime, maxDurationCtx, maxDurationCtx, maxDurationCancel, func() {}
+		return startTime, maxDurationCtx, maxDurationCtx, maxDurationCancel, maxDurationCancel
 	}
 	regDurationCtx, regDurationCancel = context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration))
 	return startTime, maxDurationCtx, regDurationCtx, maxDurationCancel, regDurationCancel
