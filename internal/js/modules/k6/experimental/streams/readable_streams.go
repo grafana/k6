@@ -219,13 +219,86 @@ func installReadableStreamPrototype(rt *sobek.Runtime, proto *sobek.Object) erro
 		if options == nil || common.IsNullish(options) {
 			return stream.GetReader(nil)
 		}
+		if !isObject(options) {
+			throw(rt, newTypeError(rt, "getReader options must be an object"))
+		}
 		return stream.GetReader(options.ToObject(rt))
 	}); err != nil {
 		return err
 	}
-	return defineStreamMethod(rt, proto, "tee", func(this, _ sobek.Value) sobek.Value {
+	if err := defineStreamMethod(rt, proto, "tee", func(this, _ sobek.Value) sobek.Value {
 		return readableStreamFromThis(rt, this).Tee()
-	})
+	}); err != nil {
+		return err
+	}
+	return installReadableStreamPipeMethods(rt, proto)
+}
+
+func installReadableStreamPipeMethods(rt *sobek.Runtime, proto *sobek.Object) error {
+	pipeTo, err := wrapPrototypeFunction(rt,
+		func(this, destinationValue, optionsValue sobek.Value) *sobek.Promise {
+			source := readableStreamFromThis(rt, this)
+			destination := writableStreamFromValue(rt, destinationValue)
+			if destination == nil {
+				throw(rt, newTypeError(rt, "destination is not a WritableStream"))
+			}
+			options := convertStreamPipeOptions(rt, optionsValue)
+			return source.pipeTo(destination, options)
+		}, `
+(function(pipeTo) {
+  const reject = Promise.reject.bind(Promise);
+  return function(destination, options) {
+    try {
+      return pipeTo(this, destination, options);
+    } catch (error) {
+      return reject(error);
+    }
+  };
+})`)
+	if err != nil {
+		return err
+	}
+	if err := setDefaultPrototypePropertyOf(proto, "pipeTo", pipeTo); err != nil {
+		return err
+	}
+
+	pipeThrough, err := wrapPrototypeFunction(rt,
+		func(this, pairValue, optionsValue sobek.Value) sobek.Value {
+			source := readableStreamFromThis(rt, this)
+			if !isObject(pairValue) {
+				throw(rt, newTypeError(rt, "transform must be an object"))
+			}
+			pair := pairValue.ToObject(rt)
+			readableValue := pair.Get("readable")
+			readable := readableStreamFromValue(rt, readableValue)
+			if readable == nil {
+				throw(rt, newTypeError(rt, "transform.readable is not a ReadableStream"))
+			}
+			writableValue := pair.Get("writable")
+			writable := writableStreamFromValue(rt, writableValue)
+			if writable == nil {
+				throw(rt, newTypeError(rt, "transform.writable is not a WritableStream"))
+			}
+			options := convertStreamPipeOptions(rt, optionsValue)
+			if source.isLocked() {
+				throw(rt, newTypeError(rt, "source stream is locked"))
+			}
+			if writable.isLocked() {
+				throw(rt, newTypeError(rt, "destination stream is locked"))
+			}
+			promise := source.pipeTo(writable, options)
+			markPromiseHandled(rt, promise)
+			return readableValue
+		}, `
+(function(pipeThrough) {
+  return function(transform, options) {
+    return pipeThrough(this, transform, options);
+  };
+})`)
+	if err != nil {
+		return err
+	}
+	return setDefaultPrototypePropertyOf(proto, "pipeThrough", pipeThrough)
 }
 
 // toObject builds an extensible JavaScript object with the given prototype.
