@@ -59,6 +59,19 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	if err != nil {
 		throw(rt, err)
 	}
+	readableIntrinsics := readableIntrinsicsForRuntime(rt)
+	if readableIntrinsics != nil {
+		if err := useConstructorPrototype(
+			rt, readableStreamConstructor, readableIntrinsics.streamPrototype,
+		); err != nil {
+			throw(rt, err)
+		}
+		if err := useConstructorPrototype(
+			rt, readableStreamDefaultReaderConstructor, readableIntrinsics.readerPrototype,
+		); err != nil {
+			throw(rt, err)
+		}
+	}
 	writableStreamConstructor, err := newWebIDLConstructor(rt, "WritableStream", mi.NewWritableStream)
 	if err != nil {
 		throw(rt, err)
@@ -85,6 +98,14 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		rt,
 		readableStreamDefaultReaderConstructor,
 	)
+	if readableIntrinsics == nil {
+		if err := storeReadableIntrinsics(rt, &readableStreamIntrinsics{
+			streamPrototype: mi.readableStreamPrototype,
+			readerPrototype: mi.readableStreamDefaultReaderPrototype,
+		}); err != nil {
+			throw(rt, err)
+		}
+	}
 	mi.writableStreamPrototype = constructorPrototype(rt, writableStreamConstructor)
 	mi.writableStreamDefaultWriterPrototype = constructorPrototype(
 		rt,
@@ -616,18 +637,26 @@ func (mi *ModuleInstance) NewReadableStreamDefaultReader(call sobek.ConstructorC
 // It is useful for those situations when a [io.Reader] needs to be surfaced up to the JS runtime.
 func NewReadableStreamFromReader(vu modules.VU, reader io.Reader) *sobek.Object {
 	rt := vu.Runtime()
-	proto := rt.NewObject()
-	readerProto := rt.NewObject()
-	if err := installReadableStreamPrototype(rt, proto); err != nil {
-		throw(rt, err)
-	}
-	if err := installReadableStreamDefaultReaderPrototype(rt, readerProto); err != nil {
-		throw(rt, err)
+	intrinsics := readableIntrinsicsForRuntime(rt)
+	if intrinsics == nil {
+		intrinsics = &readableStreamIntrinsics{
+			streamPrototype: rt.NewObject(),
+			readerPrototype: rt.NewObject(),
+		}
+		if err := installReadableStreamPrototype(rt, intrinsics.streamPrototype); err != nil {
+			throw(rt, err)
+		}
+		if err := installReadableStreamDefaultReaderPrototype(rt, intrinsics.readerPrototype); err != nil {
+			throw(rt, err)
+		}
+		if err := storeReadableIntrinsics(rt, intrinsics); err != nil {
+			throw(rt, err)
+		}
 	}
 	return newReadableStream(vu, sobek.ConstructorCall{
 		Arguments: []sobek.Value{rt.ToValue(underlyingSourceFromReader(vu, reader))},
-		This:      objectWithPrototype(rt, proto),
-	}, readerProto)
+		This:      objectWithPrototype(rt, intrinsics.streamPrototype),
+	}, intrinsics.readerPrototype)
 }
 
 func objectWithPrototype(rt *sobek.Runtime, proto *sobek.Object) *sobek.Object {
