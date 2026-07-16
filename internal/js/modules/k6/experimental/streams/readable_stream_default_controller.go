@@ -121,6 +121,9 @@ func (controller *ReadableStreamDefaultController) Close() {
 // [specification]: https://streams.spec.whatwg.org/#rs-default-controller-enqueue
 func (controller *ReadableStreamDefaultController) Enqueue(chunk sobek.Value) {
 	rt := controller.stream.vu.Runtime()
+	if chunk == nil {
+		chunk = sobek.Undefined()
+	}
 
 	// 1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(this) is false, throw a TypeError exception.
 	if !controller.canCloseOrEnqueue() {
