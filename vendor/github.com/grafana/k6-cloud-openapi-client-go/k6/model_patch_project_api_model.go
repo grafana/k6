@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -12,7 +12,6 @@ Contact: info@grafana.com
 package k6
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -23,7 +22,8 @@ var _ MappedNullable = &PatchProjectApiModel{}
 // PatchProjectApiModel struct for PatchProjectApiModel
 type PatchProjectApiModel struct {
 	// Project name.
-	Name string `json:"name"`
+	Name                 string `json:"name"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _PatchProjectApiModel PatchProjectApiModel
@@ -81,6 +81,11 @@ func (o PatchProjectApiModel) MarshalJSON() ([]byte, error) {
 func (o PatchProjectApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["name"] = o.Name
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -108,15 +113,20 @@ func (o *PatchProjectApiModel) UnmarshalJSON(data []byte) (err error) {
 
 	varPatchProjectApiModel := _PatchProjectApiModel{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varPatchProjectApiModel)
+	err = json.Unmarshal(data, &varPatchProjectApiModel)
 
 	if err != nil {
 		return err
 	}
 
 	*o = PatchProjectApiModel(varPatchProjectApiModel)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

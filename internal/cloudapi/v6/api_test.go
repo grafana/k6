@@ -51,8 +51,8 @@ func TestValidateToken(t *testing.T) {
 		resp, err := client.ValidateToken(t.Context(), "https://stack.grafana.net")
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		assert.Equal(t, int32(123), resp.StackId)
-		assert.Equal(t, int32(456), resp.DefaultProjectId)
+		assert.Equal(t, int64(123), resp.StackId)
+		assert.Equal(t, int64(456), resp.DefaultProjectId)
 	})
 
 	t.Run("unauthorized token should fail", func(t *testing.T) {
@@ -195,7 +195,7 @@ func TestListLoadTests(t *testing.T) {
 		Created:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 		Updated:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
 	}, tests[0])
-	assert.Equal(t, int32(2), tests[1].ID)
+	assert.Equal(t, int64(2), tests[1].ID)
 }
 
 func TestRetryWithConnectionClose(t *testing.T) {
@@ -240,7 +240,7 @@ func TestValidateOptions(t *testing.T) {
 
 	var body struct {
 		Options   json.RawMessage `json:"options"`
-		ProjectID int32           `json:"project_id"`
+		ProjectID int64           `json:"project_id"`
 	}
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
@@ -258,7 +258,7 @@ func TestValidateOptions(t *testing.T) {
 	want, err := json.Marshal(opts)
 	require.NoError(t, err)
 	assert.JSONEq(t, string(want), string(body.Options))
-	assert.Equal(t, int32(42), body.ProjectID)
+	assert.Equal(t, int64(42), body.ProjectID)
 }
 
 func TestUploadTest(t *testing.T) {
@@ -359,7 +359,7 @@ func TestStartTest(t *testing.T) {
 	res := k6cloud.NewStartLoadTestResponseWithDefaults()
 	res.SetId(7)
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
-	res.SetResultDetails(map[string]any{})
+	res.SetResultDetails(*k6cloud.NewResultDetailsApiModel(""))
 	res.SetOptions(map[string]any{})
 
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -419,7 +419,7 @@ func TestFetchTest(t *testing.T) {
 	res.SetExecutionDuration(want.ExecutionDuration)
 	res.SetStatusHistory(ToStatusModel(want.StatusHistory))
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{*k6cloud.NewDistributionZoneApiModelWithDefaults()})
-	res.SetResultDetails(map[string]any{"foo": "bar"})
+	res.SetResultDetails(k6cloud.ResultDetailsApiModelAsTestRunApiModelResultDetails(k6cloud.NewResultDetailsApiModel("failed")))
 	res.SetOptions(map[string]any{"vus": 10})
 
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

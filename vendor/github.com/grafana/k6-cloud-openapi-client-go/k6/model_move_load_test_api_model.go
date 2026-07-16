@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -12,7 +12,6 @@ Contact: info@grafana.com
 package k6
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 )
@@ -23,7 +22,8 @@ var _ MappedNullable = &MoveLoadTestApiModel{}
 // MoveLoadTestApiModel struct for MoveLoadTestApiModel
 type MoveLoadTestApiModel struct {
 	// ID of the destination project.
-	ProjectId int32 `json:"project_id"`
+	ProjectId            int64 `json:"project_id"`
+	AdditionalProperties map[string]interface{}
 }
 
 type _MoveLoadTestApiModel MoveLoadTestApiModel
@@ -32,7 +32,7 @@ type _MoveLoadTestApiModel MoveLoadTestApiModel
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewMoveLoadTestApiModel(projectId int32) *MoveLoadTestApiModel {
+func NewMoveLoadTestApiModel(projectId int64) *MoveLoadTestApiModel {
 	this := MoveLoadTestApiModel{}
 	this.ProjectId = projectId
 	return &this
@@ -47,9 +47,9 @@ func NewMoveLoadTestApiModelWithDefaults() *MoveLoadTestApiModel {
 }
 
 // GetProjectId returns the ProjectId field value
-func (o *MoveLoadTestApiModel) GetProjectId() int32 {
+func (o *MoveLoadTestApiModel) GetProjectId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -58,7 +58,7 @@ func (o *MoveLoadTestApiModel) GetProjectId() int32 {
 
 // GetProjectIdOk returns a tuple with the ProjectId field value
 // and a boolean to check if the value has been set.
-func (o *MoveLoadTestApiModel) GetProjectIdOk() (*int32, bool) {
+func (o *MoveLoadTestApiModel) GetProjectIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -66,7 +66,7 @@ func (o *MoveLoadTestApiModel) GetProjectIdOk() (*int32, bool) {
 }
 
 // SetProjectId sets field value
-func (o *MoveLoadTestApiModel) SetProjectId(v int32) {
+func (o *MoveLoadTestApiModel) SetProjectId(v int64) {
 	o.ProjectId = v
 }
 
@@ -81,6 +81,11 @@ func (o MoveLoadTestApiModel) MarshalJSON() ([]byte, error) {
 func (o MoveLoadTestApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	toSerialize["project_id"] = o.ProjectId
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
 }
 
@@ -108,15 +113,20 @@ func (o *MoveLoadTestApiModel) UnmarshalJSON(data []byte) (err error) {
 
 	varMoveLoadTestApiModel := _MoveLoadTestApiModel{}
 
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&varMoveLoadTestApiModel)
+	err = json.Unmarshal(data, &varMoveLoadTestApiModel)
 
 	if err != nil {
 		return err
 	}
 
 	*o = MoveLoadTestApiModel(varMoveLoadTestApiModel)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "project_id")
+		o.AdditionalProperties = additionalProperties
+	}
 
 	return err
 }

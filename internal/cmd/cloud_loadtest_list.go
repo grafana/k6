@@ -121,7 +121,7 @@ func (c *cmdCloudTestList) run(cmd *cobra.Command, _ []string) error {
 // shared resolveDefaultProjectID helper (config projectID, then the stack's
 // default project). Unlike `k6 cloud run`, listing needs a concrete project, so
 // a zero result is treated as an error.
-func (c *cmdCloudTestList) resolveProjectID(cloudConfig cloudapi.Config, projectIDSet bool) (int32, error) {
+func (c *cmdCloudTestList) resolveProjectID(cloudConfig cloudapi.Config, projectIDSet bool) (int64, error) {
 	if projectIDSet {
 		if c.projectID <= 0 {
 			return 0, errNoProjectConfigured
@@ -137,11 +137,7 @@ func (c *cmdCloudTestList) resolveProjectID(cloudConfig cloudapi.Config, project
 		return 0, errNoProjectConfigured
 	}
 
-	if id < math.MinInt32 || id > math.MaxInt32 {
-		return 0, fmt.Errorf("project ID %d overflows int32", id)
-	}
-
-	return int32(id), nil
+	return id, nil
 }
 
 func (c *cmdCloudTestList) outputJSON(tests []v6cloudapi.LoadTest) error {

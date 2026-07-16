@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -206,7 +206,7 @@ type ApiLabelsDestroyRequest struct {
 	ctx        context.Context
 	ApiService *LabelsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -231,7 +231,7 @@ are cascade deleted.
 	@param id ID of the label key.
 	@return *ApiLabelsDestroyRequest
 */
-func (a *LabelsAPIService) LabelsDestroy(ctx context.Context, id int32) *ApiLabelsDestroyRequest {
+func (a *LabelsAPIService) LabelsDestroy(ctx context.Context, id int64) *ApiLabelsDestroyRequest {
 	return &ApiLabelsDestroyRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -498,7 +498,7 @@ type ApiLabelsPartialUpdateRequest struct {
 	ctx                  context.Context
 	ApiService           *LabelsAPIService
 	xStackId             *int32
-	id                   int32
+	id                   int64
 	labelKeyPatchRequest *LabelKeyPatchRequest
 }
 
@@ -526,7 +526,7 @@ Update a label key (rename or update description) (Admin only).
 	@param id ID of the label key.
 	@return *ApiLabelsPartialUpdateRequest
 */
-func (a *LabelsAPIService) LabelsPartialUpdate(ctx context.Context, id int32) *ApiLabelsPartialUpdateRequest {
+func (a *LabelsAPIService) LabelsPartialUpdate(ctx context.Context, id int64) *ApiLabelsPartialUpdateRequest {
 	return &ApiLabelsPartialUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -687,7 +687,7 @@ type ApiProjectsLabelsDestroyRequest struct {
 	ApiService *LabelsAPIService
 	xStackId   *int32
 	key        string
-	projectId  int32
+	projectId  int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -710,7 +710,7 @@ Remove a label from a project (Admin or Editor).
 	@param projectId ID of the project.
 	@return *ApiProjectsLabelsDestroyRequest
 */
-func (a *LabelsAPIService) ProjectsLabelsDestroy(ctx context.Context, key string, projectId int32) *ApiProjectsLabelsDestroyRequest {
+func (a *LabelsAPIService) ProjectsLabelsDestroy(ctx context.Context, key string, projectId int64) *ApiProjectsLabelsDestroyRequest {
 	return &ApiProjectsLabelsDestroyRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -836,7 +836,7 @@ type ApiProjectsLabelsListRequest struct {
 	ctx        context.Context
 	ApiService *LabelsAPIService
 	xStackId   *int32
-	projectId  int32
+	projectId  int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -858,7 +858,7 @@ List all labels on a project.
 	@param projectId ID of the project.
 	@return *ApiProjectsLabelsListRequest
 */
-func (a *LabelsAPIService) ProjectsLabelsList(ctx context.Context, projectId int32) *ApiProjectsLabelsListRequest {
+func (a *LabelsAPIService) ProjectsLabelsList(ctx context.Context, projectId int64) *ApiProjectsLabelsListRequest {
 	return &ApiProjectsLabelsListRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -994,7 +994,7 @@ type ApiProjectsLabelsUpdateRequest struct {
 	ctx                    context.Context
 	ApiService             *LabelsAPIService
 	xStackId               *int32
-	projectId              int32
+	projectId              int64
 	projectLabelPutRequest *ProjectLabelPutRequest
 }
 
@@ -1024,7 +1024,7 @@ This is a full replacement operation.
 	@param projectId ID of the project.
 	@return *ApiProjectsLabelsUpdateRequest
 */
-func (a *LabelsAPIService) ProjectsLabelsUpdate(ctx context.Context, projectId int32) *ApiProjectsLabelsUpdateRequest {
+func (a *LabelsAPIService) ProjectsLabelsUpdate(ctx context.Context, projectId int64) *ApiProjectsLabelsUpdateRequest {
 	return &ApiProjectsLabelsUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,
