@@ -21,12 +21,26 @@ func TestCheckResponse(t *testing.T) {
 		name       string
 		statusCode int
 		body       string
-		wantErr    bool
-		wantStatus int
+		wantErr    error // nil means "no error"; sentinel means require.ErrorIs
+		wantStatus int   // checked via *ResponseError when wantErr is nil and status is non-2xx
 	}{
-		{"2xx returns nil", 200, "{}", false, 0},
-		{"4xx wraps as ResponseError", 400, `{"error":{"message":"bad","code":"BAD_REQUEST"}}`, true, 400},
-		{"5xx wraps as ResponseError", 500, `{"error":{"message":"oops","code":"INTERNAL"}}`, true, 500},
+		{name: "2xx returns nil", statusCode: 200, body: "{}"},
+		{
+			name: "4xx parses into ResponseError", statusCode: 400,
+			body: `{"error":{"message":"bad","code":"BAD_REQUEST"}}`, wantStatus: 400,
+		},
+		{
+			name: "5xx parses into ResponseError", statusCode: 500,
+			body: `{"error":{"message":"oops","code":"INTERNAL"}}`, wantStatus: 500,
+		},
+		{
+			name: "401 with unparsable body falls back to httperr", statusCode: http.StatusUnauthorized,
+			body: "plain text, not JSON", wantErr: httperr.ErrNotAuthenticated,
+		},
+		{
+			name: "403 with unparsable body falls back to httperr", statusCode: http.StatusForbidden,
+			body: "plain text, not JSON", wantErr: httperr.ErrNotAuthorized,
+		},
 	}
 
 	for _, tc := range cases {
@@ -39,47 +53,21 @@ func TestCheckResponse(t *testing.T) {
 			}
 
 			err := CheckResponse(resp)
-			if !tc.wantErr {
+			switch {
+			case tc.statusCode >= 200 && tc.statusCode <= 299:
 				assert.NoError(t, err)
-				return
+			case tc.wantErr != nil:
+				require.ErrorIs(t, err, tc.wantErr)
+			default:
+				var respErr *ResponseError
+				require.ErrorAs(t, err, &respErr)
+				assert.Equal(t, tc.wantStatus, respErr.StatusCode)
 			}
-
-			require.Error(t, err)
-			var respErr *ResponseError
-			require.ErrorAs(t, err, &respErr)
-			assert.Equal(t, tc.wantStatus, respErr.StatusCode)
 		})
 	}
 }
 
-func TestCheckResponse_401And403FallBackToHttperr(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name       string
-		statusCode int
-		wantErr    error
-	}{
-		{"401 non-JSON body", http.StatusUnauthorized, httperr.ErrNotAuthenticated},
-		{"403 non-JSON body", http.StatusForbidden, httperr.ErrNotAuthorized},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			resp := &http.Response{
-				StatusCode: tc.statusCode,
-				Body:       io.NopCloser(strings.NewReader("plain text, not JSON")),
-			}
-
-			err := CheckResponse(resp)
-			require.ErrorIs(t, err, tc.wantErr)
-		})
-	}
-}
-
-func TestCheckResponse_UnparsableBodyFallsBackToGenericError(t *testing.T) {
+func TestCheckResponse_UnparsableBodyWithoutHttperrMatchFallsBackToGenericError(t *testing.T) {
 	t.Parallel()
 
 	resp := &http.Response{
@@ -93,15 +81,12 @@ func TestCheckResponse_UnparsableBodyFallsBackToGenericError(t *testing.T) {
 	assert.Contains(t, err.Error(), "418")
 }
 
-func TestResponseError_Error_FormatsStatusAndBody(t *testing.T) {
+func TestResponseError_Error(t *testing.T) {
 	t.Parallel()
 
 	re := &ResponseError{
 		StatusCode: 422,
-		APIError: k6cloud.ErrorApiModel{
-			Message: "validation failed",
-			Code:    "VALIDATION",
-		},
+		APIError:   k6cloud.ErrorApiModel{Message: "validation failed", Code: "VALIDATION"},
 	}
 
 	msg := re.Error()

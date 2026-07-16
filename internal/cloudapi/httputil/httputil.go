@@ -19,16 +19,9 @@ const (
 	RetryInterval = 500 * time.Millisecond
 )
 
-// CloseResponse drains res.Body to io.Discard and then closes it.
-//
-// Draining the body before closing it allows the underlying connection to
-// be returned to the client's connection pool and reused for a subsequent
-// request; closing an unread body forces the transport to discard the
-// connection instead. See https://pkg.go.dev/net/http#Response for details.
-//
-// If closing the body fails and *rerr is nil, the close error is assigned
-// to *rerr. An error already present in *rerr (e.g. one produced while
-// handling the response) is never overwritten.
+// CloseResponse drains res.Body before closing it, so the connection can be
+// reused instead of discarded, then assigns any close error to *rerr unless
+// it's already set.
 func CloseResponse(res *http.Response, rerr *error) {
 	if res == nil || res.Body == nil {
 		return
@@ -40,8 +33,7 @@ func CloseResponse(res *http.Response, rerr *error) {
 	}
 }
 
-// ToInt32 converts v to int32, returning an error if it overflows the
-// int32 range instead of truncating it.
+// ToInt32 errors on overflow instead of truncating.
 func ToInt32(v int64) (int32, error) {
 	if v < math.MinInt32 || v > math.MaxInt32 {
 		return 0, fmt.Errorf("value %d overflows int32", v)
