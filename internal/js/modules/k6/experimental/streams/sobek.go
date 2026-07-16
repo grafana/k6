@@ -38,25 +38,70 @@ func newWebIDLConstructor(rt *sobek.Runtime, name string, constructor any) (sobe
 	return call(sobek.Undefined(), rt.ToValue(constructor), rt.ToValue(name))
 }
 
+// promiseWrapper holds a [sobek.Promise] together with its resolve and reject functions,
+// so that it can be settled later from Go code.
+type promiseWrapper struct {
+	promise          *sobek.Promise
+	resolve          func(any) error
+	reject           func(any) error
+	settlementQueued bool
+}
+
+// newPromiseWrapper creates a new pending [promiseWrapper].
+func newPromiseWrapper(rt *sobek.Runtime) *promiseWrapper {
+	p, resolve, reject := rt.NewPromise()
+	return &promiseWrapper{promise: p, resolve: resolve, reject: reject}
+}
+
+func (pw *promiseWrapper) isPending() bool {
+	return !pw.settlementQueued && pw.promise.State() == sobek.PromiseStatePending
+}
+
+func (pw *promiseWrapper) queueSettlement() {
+	pw.settlementQueued = true
+}
+
+// resolveWith resolves the wrapped promise with the given value.
+func (pw *promiseWrapper) resolveWith(value any) {
+	pw.queueSettlement()
+	if err := pw.resolve(value); err != nil {
+		panic(err) // TODO(@mstoykov): propagate as error instead
+	}
+}
+
+// rejectWith rejects the wrapped promise with the given reason, unwrapping [jsError] values.
+func (pw *promiseWrapper) rejectWith(reason any) {
+	pw.queueSettlement()
+	if jsErr, ok := reason.(*jsError); ok {
+		reason = jsErr.Err()
+	}
+	if err := pw.reject(reason); err != nil {
+		panic(err) // TODO(@mstoykov): propagate as error instead
+	}
+}
+
+// newResolvedPromiseWrapper creates a new [promiseWrapper] resolved with the given value.
+func newResolvedPromiseWrapper(rt *sobek.Runtime, value any) *promiseWrapper {
+	pw := newPromiseWrapper(rt)
+	pw.resolveWith(value)
+	return pw
+}
+
+// newRejectedPromiseWrapper creates a new [promiseWrapper] rejected with the given reason.
+func newRejectedPromiseWrapper(rt *sobek.Runtime, reason any) *promiseWrapper {
+	pw := newPromiseWrapper(rt)
+	pw.rejectWith(reason)
+	return pw
+}
+
 // newResolvedPromise instantiates a new resolved promise.
 func newResolvedPromise(vu modules.VU, with sobek.Value) *sobek.Promise {
-	promise, resolve, _ := vu.Runtime().NewPromise()
-	err := resolve(with)
-	if err != nil { // TODO(@mstoykov): likely better to actually call Promise.resolve directly
-		panic(err)
-	}
-
-	return promise
+	return newResolvedPromiseWrapper(vu.Runtime(), with).promise
 }
 
 // newRejectedPromise instantiates a new rejected promise.
 func newRejectedPromise(vu modules.VU, with any) *sobek.Promise {
-	promise, _, reject := vu.Runtime().NewPromise()
-	err := reject(with)
-	if err != nil {
-		panic(err)
-	}
-	return promise
+	return newRejectedPromiseWrapper(vu.Runtime(), with).promise
 }
 
 // promiseThen facilitates instantiating a new promise and defining callbacks for to be executed
@@ -93,6 +138,24 @@ func promiseThen(
 	}
 
 	return newPromise, nil
+}
+
+// markPromiseHandled marks the given promise as handled to prevent unhandled rejection
+// tracking. See https://github.com/dop251/goja/issues/565.
+func markPromiseHandled(rt *sobek.Runtime, p *sobek.Promise) {
+	doNothing := func(sobek.Value) {}
+	if _, err := promiseThen(rt, p, doNothing, doNothing); err != nil {
+		common.Throw(rt, newError(RuntimeError, err.Error()))
+	}
+}
+
+// throwableValue converts an internal error value into a value suitable for rejecting a
+// promise with or throwing, unwrapping [jsError] instances.
+func throwableValue(err any) any {
+	if jsErr, ok := err.(*jsError); ok {
+		return jsErr.Err()
+	}
+	return err
 }
 
 // isNumber returns true if the given sobek.Value holds a number

@@ -455,11 +455,7 @@ func (stream *ReadableStream) close() {
 		common.Throw(stream.vu.Runtime(), newError(AssertionError, "reader is not a ReadableStreamGenericReader"))
 	}
 
-	_, resolveFunc, _ := genericReader.GetClosed()
-	err := resolveFunc(sobek.Undefined())
-	if err != nil {
-		panic(err) // TODO(@mstoykov): propagate as error instead
-	}
+	genericReader.GetClosed().resolveWith(sobek.Undefined())
 
 	// 6. If reader implements ReadableStreamDefaultReader,
 	defaultReader, ok := reader.(*ReadableStreamDefaultReader)
@@ -506,24 +502,11 @@ func (stream *ReadableStream) error(e any) {
 	}
 
 	// 6. Reject reader.[[closedPromise]] with e.
-	var err error
-	promise, _, rejectFunc := genericReader.GetClosed()
-	if jsErr, ok := e.(*jsError); ok {
-		err = rejectFunc(jsErr.Err())
-	} else {
-		err = rejectFunc(e)
-	}
-	if err != nil {
-		panic(err) // TODO(@mstoykov): propagate as error instead
-	}
+	promise := genericReader.GetClosed()
+	promise.rejectWith(e)
 
 	// 7. Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
-	// See https://github.com/dop251/goja/issues/565
-	doNothing := func(sobek.Value) {}
-	_, err = promiseThen(stream.vu.Runtime(), promise, doNothing, doNothing)
-	if err != nil {
-		common.Throw(stream.vu.Runtime(), newError(RuntimeError, err.Error()))
-	}
+	markPromiseHandled(stream.runtime, promise.promise)
 
 	// 8. If reader implements ReadableStreamDefaultReader,
 	defaultReader, ok := reader.(*ReadableStreamDefaultReader)
