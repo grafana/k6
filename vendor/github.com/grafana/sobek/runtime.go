@@ -206,7 +206,8 @@ type Runtime struct {
 	importModuleDynamically ImportModuleDynamicallyCallback
 	evaluationState         *evaluationState
 
-	jobQueue []func()
+	jobQueue        []func()
+	jobQueueRunning bool
 
 	promiseRejectionTracker PromiseRejectionTracker
 	asyncContextTracker     AsyncContextTracker
@@ -2530,7 +2531,10 @@ func (r *Runtime) runWrapped(f func()) (err error) {
 	if ex != nil {
 		err = ex
 	}
-	if len(r.vm.callStack) == 0 {
+	// A JavaScript function entered from a host promise job has no VM call stack, but it is still
+	// nested within the current runtime turn. Let the outer leave() invocation drain jobs queued by
+	// that function so they cannot run reentrantly.
+	if len(r.vm.callStack) == 0 && !r.jobQueueRunning {
 		r.leave()
 	} else {
 		r.vm.clearStack()
@@ -2847,6 +2851,8 @@ func (r *Runtime) getHash() *maphash.Hash {
 // called when the top level function returns normally (i.e. control is passed outside the Runtime).
 func (r *Runtime) leave() {
 	var jobs []func()
+	r.jobQueueRunning = true
+	defer func() { r.jobQueueRunning = false }()
 	for len(r.jobQueue) > 0 {
 		jobs, r.jobQueue = r.jobQueue, jobs[:0]
 		for _, job := range jobs {
@@ -2860,6 +2866,7 @@ func (r *Runtime) leave() {
 // called when the top level function returns (i.e. control is passed outside the Runtime) but it was due to an interrupt
 func (r *Runtime) leaveAbrupt() {
 	r.jobQueue = nil
+	r.jobQueueRunning = false
 	r.ClearInterrupt()
 }
 
