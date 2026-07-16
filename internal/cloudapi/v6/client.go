@@ -27,9 +27,12 @@ type Client struct {
 
 // NewSDKConfiguration builds a *k6cloud.Configuration for a client backed by
 // the vendored k6cloud-openapi SDK, shared by this package and
-// internal/cloudapi/provisioning: the same UserAgent convention, retry
-// policy, and body-reset-on-retry workaround for the SDK's own retry loop.
-func NewSDKConfiguration(host, version, serverDescription string, timeout time.Duration) *k6cloud.Configuration {
+// internal/cloudapi/provisioning: the same UserAgent convention and retry
+// policy. transport lets each caller supply its own http.RoundTripper (e.g.
+// a retry-body-reset workaround) rather than baking one in here.
+func NewSDKConfiguration(
+	host, version, serverDescription string, timeout time.Duration, transport http.RoundTripper,
+) *k6cloud.Configuration {
 	cfg := k6cloud.NewConfiguration()
 	cfg.UserAgent = "k6cloud/" + version
 	cfg.Servers = k6cloud.ServerConfigurations{
@@ -40,11 +43,29 @@ func NewSDKConfiguration(host, version, serverDescription string, timeout time.D
 	}
 	cfg.HTTPClient = &http.Client{
 		Timeout:   timeout,
-		Transport: httputil.BodyResetTransport{Base: http.DefaultTransport},
+		Transport: transport,
 	}
 	cfg.MaxRetries = httputil.MaxRetries
 	cfg.RetryInterval = httputil.RetryInterval
 	return cfg
+}
+
+// bodyResetTransport resets req.Body from GetBody before each round trip.
+// The vendored SDK retries 5xx/429 by re-calling Do on the same request
+// without resetting its Body. After Connection: close the drained body
+// causes "ContentLength=N with Body length 0".
+type bodyResetTransport struct{ base http.RoundTripper }
+
+func (rt *bodyResetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.GetBody == nil {
+		return rt.base.RoundTrip(req)
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, err
+	}
+	req.Body = body
+	return rt.base.RoundTrip(req)
 }
 
 // NewClient return a new client for the cloud API
@@ -53,7 +74,10 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		return nil, fmt.Errorf("token is required to create cloud API client")
 	}
 
-	cfg := NewSDKConfiguration(host, version, "Global k6 Cloud API.", timeout)
+	cfg := NewSDKConfiguration(
+		host, version, "Global k6 Cloud API.", timeout,
+		&bodyResetTransport{base: http.DefaultTransport},
+	)
 
 	c := &Client{
 		apiClient: k6cloud.NewAPIClient(cfg),

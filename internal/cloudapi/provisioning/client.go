@@ -40,7 +40,10 @@ func NewClient(
 		return nil, fmt.Errorf("token is required to create provisioning API client")
 	}
 
-	cfg := v6.NewSDKConfiguration(host, version, "k6 Cloud API (provisioning).", timeout)
+	cfg := v6.NewSDKConfiguration(
+		host, version, "k6 Cloud API (provisioning).", timeout,
+		&bodyResetTransport{base: http.DefaultTransport},
+	)
 
 	v6c, err := v6.NewClient(logger, token, host, version, timeout)
 	if err != nil {
@@ -72,10 +75,28 @@ func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
 }
 
+// bodyResetTransport resets req.Body from GetBody before each round trip.
+// The vendored SDK retries 5xx/429 by re-calling Do on the same request
+// without resetting its Body. After Connection: close the drained body
+// causes "ContentLength=N with Body length 0".
+type bodyResetTransport struct{ base http.RoundTripper }
+
+func (rt *bodyResetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.GetBody == nil {
+		return rt.base.RoundTrip(req)
+	}
+	body, err := req.GetBody()
+	if err != nil {
+		return nil, err
+	}
+	req.Body = body
+	return rt.base.RoundTrip(req)
+}
+
 // doWithRetry executes the given HTTP request, retrying on 5xx/429 status
 // codes and transport errors up to httputil.MaxRetries times (matching the
 // vendored SDK's own retry predicate). On each retry the body is replayed
-// via req.GetBody (reset at the transport layer by httputil.BodyResetTransport,
+// via req.GetBody (reset at the transport layer by bodyResetTransport,
 // which the client's Configuration is built with). 4xx errors other than
 // 429 are NOT retried.
 func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {

@@ -40,30 +40,6 @@ func CloseResponse(res *http.Response, rerr *error) {
 	}
 }
 
-// BodyResetTransport resets req.Body from req.GetBody before every round
-// trip after the first.
-//
-// The vendored k6cloud SDK (and any hand-rolled retry loop built around a
-// plain *http.Client) retries 5xx/429 responses by re-calling Do on the
-// same *http.Request without resetting its Body. After the first attempt
-// drains the body (or the server sends Connection: close), replaying the
-// same request produces "ContentLength=N with Body length 0". Wrapping
-// the transport here fixes it for every retrying caller in one place.
-type BodyResetTransport struct{ Base http.RoundTripper }
-
-// RoundTrip implements http.RoundTripper.
-func (rt BodyResetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.GetBody == nil {
-		return rt.Base.RoundTrip(req)
-	}
-	body, err := req.GetBody()
-	if err != nil {
-		return nil, err
-	}
-	req.Body = body
-	return rt.Base.RoundTrip(req)
-}
-
 // ToInt32 converts v to int32, returning an error if it overflows the
 // int32 range instead of truncating it.
 func ToInt32(v int64) (int32, error) {

@@ -16,7 +16,7 @@ import (
 // If resetBody is non-nil, it's called before every retry attempt (not the
 // first) to rewind a request body that isn't rewound automatically at the
 // transport layer. Pass nil when client's Transport already replays the
-// body itself (e.g. httputil.BodyResetTransport, as used by the SDK-backed
+// body itself (e.g. bodyResetTransport, as used by the SDK-backed
 // *Client.apiClient).
 func doHTTPWithRetry(client *http.Client, req *http.Request, resetBody func() error) (*http.Response, error) {
 	var (

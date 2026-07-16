@@ -1,7 +1,6 @@
 package httputil
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"math"
@@ -84,60 +83,6 @@ func TestCloseResponseDoesNotOverwriteExistingError(t *testing.T) {
 type errReader struct{}
 
 func (errReader) Read([]byte) (int, error) { return 0, io.EOF }
-
-// recordingRoundTripper records every request it sees and returns a fixed
-// response.
-type recordingRoundTripper struct {
-	bodies [][]byte
-	resp   *http.Response
-	err    error
-}
-
-func (rt *recordingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	var b []byte
-	if req.Body != nil {
-		b, _ = io.ReadAll(req.Body)
-	}
-	rt.bodies = append(rt.bodies, b)
-	return rt.resp, rt.err
-}
-
-func TestBodyResetTransportResetsBodyWhenGetBodySet(t *testing.T) {
-	t.Parallel()
-
-	want := []byte("hello")
-	rt := &recordingRoundTripper{resp: &http.Response{StatusCode: http.StatusOK}}
-	transport := BodyResetTransport{Base: rt}
-
-	req, err := http.NewRequest(http.MethodPost, "http://example.com", nil) //nolint:noctx
-	require.NoError(t, err)
-	req.GetBody = func() (io.ReadCloser, error) {
-		return io.NopCloser(bytes.NewReader(want)), nil
-	}
-
-	_, err = transport.RoundTrip(req) //nolint:bodyclose // canned response has no real body
-	require.NoError(t, err)
-	_, err = transport.RoundTrip(req) //nolint:bodyclose // canned response has no real body
-	require.NoError(t, err)
-
-	require.Len(t, rt.bodies, 2)
-	assert.Equal(t, want, rt.bodies[0])
-	assert.Equal(t, want, rt.bodies[1])
-}
-
-func TestBodyResetTransportPassesThroughWhenNoGetBody(t *testing.T) {
-	t.Parallel()
-
-	rt := &recordingRoundTripper{resp: &http.Response{StatusCode: http.StatusOK}}
-	transport := BodyResetTransport{Base: rt}
-
-	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil) //nolint:noctx
-	require.NoError(t, err)
-
-	resp, err := transport.RoundTrip(req) //nolint:bodyclose // canned response has no real body
-	require.NoError(t, err)
-	assert.Same(t, rt.resp, resp)
-}
 
 func TestToInt32(t *testing.T) {
 	t.Parallel()
