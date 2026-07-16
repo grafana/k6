@@ -88,6 +88,9 @@ func (re *Regexp) run(quick bool, textstart int, input []rune, textInfo *matchTe
 			textstart = 0
 		}
 	}
+	if quick && textInfo == nil && re.quickCode != nil {
+		runner.code = re.quickCode
+	}
 
 	return runner.scan(input, textInfo, textstart, quick, re.MatchTimeout)
 }
@@ -115,6 +118,9 @@ func (r *Runner) scan(rt []rune, textInfo *matchText, textstart int, quick bool,
 	r.Runtextstart = textstart
 	r.Runtext = rt
 	r.Runtextend = len(rt)
+	// Some internal callers use quick match tidying while still consuming
+	// capture data (notably replacement). Capture elision is only safe when no
+	// match text metadata was requested.
 
 	stoppos := r.Runtextend
 	bump := 1
@@ -130,6 +136,9 @@ func (r *Runner) scan(rt []rune, textInfo *matchText, textstart int, quick bool,
 	// setup our scanner functions
 	findFirstChar := r.re.findFirstChar
 	execute := r.re.execute
+	if quick && textInfo == nil && r.re.executeQuick != nil {
+		execute = r.re.executeQuick
+	}
 	if findFirstChar == nil {
 		findFirstChar = findFirstCharDefault
 	}
@@ -208,7 +217,9 @@ func (r *Runner) scan(rt []rune, textInfo *matchText, textstart int, quick bool,
 
 func executeDefault(r *Runner) error {
 
-	r.goTo(0)
+	if err := r.goTo(0); err != nil {
+		return err
+	}
 
 	for {
 
@@ -230,7 +241,9 @@ func executeDefault(r *Runner) error {
 			//noop
 
 		case syntax.Goto:
-			r.goTo(r.operand(0))
+			if err := r.goTo(r.operand(0)); err != nil {
+				return err
+			}
 			continue
 
 		case syntax.Testref:
@@ -248,7 +261,9 @@ func executeDefault(r *Runner) error {
 		case syntax.Lazybranch | syntax.Back:
 			r.trackPop()
 			r.textto(r.trackPeek())
-			r.goTo(r.operand(0))
+			if err := r.goTo(r.operand(0)); err != nil {
+				return err
+			}
 			continue
 
 		case syntax.Setmark:
@@ -307,9 +322,11 @@ func executeDefault(r *Runner) error {
 			matched := r.textPos() - r.stackPeek()
 
 			if matched != 0 { // Nonempty match -> loop now
-				r.trackPush2(r.stackPeek(), r.textPos()) // Save old mark, textpos
-				r.stackPush(r.textPos())                 // Make new mark
-				r.goTo(r.operand(0))                     // Loop
+				r.trackPush2(r.stackPeek(), r.textPos())     // Save old mark, textpos
+				r.stackPush(r.textPos())                     // Make new mark
+				if err := r.goTo(r.operand(0)); err != nil { // Loop
+					return err
+				}
 			} else { // Empty match -> straight now
 				r.trackPushNeg1(r.stackPeek()) // Save old mark
 				r.advance(1)                   // Straight
@@ -364,10 +381,12 @@ func executeDefault(r *Runner) error {
 
 			r.trackPopN(2)
 			pos := r.trackPeekN(1)
-			r.trackPushNeg2(r.trackPeek(), 1) // Save old mark, note that we pushed a new mark
-			r.stackPush(pos)                  // Make new mark
-			r.textto(pos)                     // Recall position
-			r.goTo(r.operand(0))              // Loop
+			r.trackPushNeg2(r.trackPeek(), 1)            // Save old mark, note that we pushed a new mark
+			r.stackPush(pos)                             // Make new mark
+			r.textto(pos)                                // Recall position
+			if err := r.goTo(r.operand(0)); err != nil { // Loop
+				return err
+			}
 			continue
 
 		case syntax.Lazybranchmark | syntax.Back2:
@@ -413,9 +432,11 @@ func executeDefault(r *Runner) error {
 				r.trackPushNeg2(mark, count) // Save old mark, count
 				r.advance(2)                 // Straight
 			} else { // Nonempty match -> count+loop now
-				r.trackPush1(mark)                 // remember mark
-				r.stackPush2(r.textPos(), count+1) // Make new mark, incr count
-				r.goTo(r.operand(0))               // Loop
+				r.trackPush1(mark)                           // remember mark
+				r.stackPush2(r.textPos(), count+1)           // Make new mark, incr count
+				if err := r.goTo(r.operand(0)); err != nil { // Loop
+					return err
+				}
 			}
 			continue
 
@@ -452,9 +473,11 @@ func executeDefault(r *Runner) error {
 			count := r.stackPeekN(1)
 
 			if count < 0 { // Negative count -> loop now
-				r.trackPushNeg1(mark)              // Save old mark
-				r.stackPush2(r.textPos(), count+1) // Make new mark, incr count
-				r.goTo(r.operand(0))               // Loop
+				r.trackPushNeg1(mark)                        // Save old mark
+				r.stackPush2(r.textPos(), count+1)           // Make new mark, incr count
+				if err := r.goTo(r.operand(0)); err != nil { // Loop
+					return err
+				}
 			} else { // Nonneg count -> straight now
 				r.trackPush3(mark, count, r.textPos()) // Save mark, count, position
 				r.advance(2)                           // Straight
@@ -472,10 +495,12 @@ func executeDefault(r *Runner) error {
 			textpos := r.trackPeekN(2)
 
 			if r.trackPeekN(1) < r.operand(1) && textpos != mark { // Under limit and not empty match -> loop
-				r.textto(textpos)                        // Recall position
-				r.stackPush2(textpos, r.trackPeekN(1)+1) // Make new mark, incr count
-				r.trackPushNeg1(mark)                    // Save old mark
-				r.goTo(r.operand(0))                     // Loop
+				r.textto(textpos)                            // Recall position
+				r.stackPush2(textpos, r.trackPeekN(1)+1)     // Make new mark, incr count
+				r.trackPushNeg1(mark)                        // Save old mark
+				if err := r.goTo(r.operand(0)); err != nil { // Loop
+					return err
+				}
 				continue
 			} else { // Max loops or empty match -> backtrack
 				r.stackPush2(r.trackPeek(), r.trackPeekN(1)) // Recall old mark, count
@@ -935,18 +960,21 @@ func executeDefault(r *Runner) error {
 		;
 
 		// "break Backward" comes here:
-		r.backtrack()
+		if err := r.backtrack(); err != nil {
+			return err
+		}
 	}
 }
 
 // increase the size of stack and track storage
-func (r *Runner) ensureStorage() {
+func (r *Runner) ensureStorage() error {
 	if r.Runstackpos < r.runtrackcount*4 {
 		doubleIntSlice(&r.runstack, &r.Runstackpos)
 	}
-	if r.Runtrackpos < r.runtrackcount*4 {
-		doubleIntSlice(&r.runtrack, &r.Runtrackpos)
+	if r.Runtrackpos < r.runtrackcount*4 && !r.growTrack() {
+		return ErrBacktrackingStackLimit
 	}
+	return nil
 }
 
 func (r *Runner) ensureStack(plus int) {
@@ -990,14 +1018,17 @@ func (r *Runner) advance(i int) {
 	r.setOperator(r.code.Codes[r.codepos])
 }
 
-func (r *Runner) goTo(newpos int) {
+func (r *Runner) goTo(newpos int) error {
 	// when branching backward or in place, ensure storage
 	if newpos <= r.codepos {
-		r.ensureStorage()
+		if err := r.ensureStorage(); err != nil {
+			return err
+		}
 	}
 
 	r.setOperator(r.code.Codes[newpos])
 	r.codepos = newpos
+	return nil
 }
 
 func (r *Runner) textto(newpos int) {
@@ -1019,6 +1050,26 @@ func (r *Runner) textPos() int {
 // push onto the backtracking stack
 func (r *Runner) trackpos() int {
 	return len(r.runtrack) - r.Runtrackpos
+}
+
+func (r *Runner) growTrack() bool {
+	oldLen := len(r.runtrack)
+	newLen := oldLen * 2
+	if newLen == 0 {
+		newLen = 1
+	}
+	if limit := r.re.optimizations.MaxBacktrackingStackSize; limit >= 0 && newLen > limit {
+		newLen = limit
+	}
+	if newLen <= oldLen {
+		return false
+	}
+
+	newTrack := make([]int, newLen)
+	copy(newTrack[newLen-oldLen:], r.runtrack)
+	r.Runtrackpos += newLen - oldLen
+	r.runtrack = newTrack
+	return true
 }
 
 func (r *Runner) trackPush() {
@@ -1069,7 +1120,7 @@ func (r *Runner) trackPushNeg2(I1, I2 int) {
 	r.runtrack[r.Runtrackpos] = -r.codepos
 }
 
-func (r *Runner) backtrack() {
+func (r *Runner) backtrack() error {
 	newpos := r.runtrack[r.Runtrackpos]
 	r.Runtrackpos++
 
@@ -1090,10 +1141,13 @@ func (r *Runner) backtrack() {
 
 	// When branching backward, ensure storage
 	if newpos < r.codepos {
-		r.ensureStorage()
+		if err := r.ensureStorage(); err != nil {
+			return err
+		}
 	}
 
 	r.codepos = newpos
+	return nil
 }
 
 func (r *Runner) setOperator(op int) {
@@ -1397,7 +1451,8 @@ func shouldUseFindFirstCharOptimized(r *Runner) bool {
 		return false
 	}
 
-	switch r.code.FindOptimizations.FindMode {
+	opts := r.code.FindOptimizations
+	switch opts.FindMode {
 	case syntax.TrailingAnchor_FixedLength_LeftToRight_End,
 		syntax.LeadingString_OrdinalIgnoreCase_LeftToRight,
 		syntax.LeadingStrings_LeftToRight,
@@ -1408,6 +1463,13 @@ func shouldUseFindFirstCharOptimized(r *Runner) bool {
 		syntax.LiteralAfterLoop_LeftToRight,
 		syntax.RequiredLandmarkChain_LeftToRight:
 		return true
+	case syntax.LeadingSet_LeftToRight:
+		// General Unicode sets already have a direct fallback loop below.
+		// Large enumerated sets are also faster through the set's ASCII bitmap
+		// than through the linear IndexOfAny helper.
+		return len(opts.FixedDistanceSets) > 0 &&
+			((len(opts.FixedDistanceSets[0].Chars) > 0 && len(opts.FixedDistanceSets[0].Chars) <= 5) ||
+				opts.FixedDistanceSets[0].Range != nil)
 	default:
 		return false
 	}
@@ -1429,10 +1491,10 @@ func findFirstCharOptimized(r *Runner) (handled bool, found bool) {
 	case syntax.LeadingString_OrdinalIgnoreCase_LeftToRight:
 		return true, findLeadingStringLeftToRight(r, []rune(opts.LeadingPrefix), true)
 	case syntax.LeadingStrings_LeftToRight:
-		return true, findLeadingStringsLeftToRight(r, opts.LeadingPrefixesRunes, false)
+		return true, findLeadingStringsLeftToRight(r, opts.LeadingPrefixesRunes, opts.LeadingPrefixFirstRunes, false)
 	case syntax.LeadingStrings_OrdinalIgnoreCase_LeftToRight:
-		return true, findLeadingStringsLeftToRight(r, opts.LeadingPrefixesRunes, true)
-	case syntax.FixedDistanceSets_LeftToRight:
+		return true, findLeadingStringsLeftToRight(r, opts.LeadingPrefixesRunes, opts.LeadingPrefixFirstRunes, true)
+	case syntax.LeadingSet_LeftToRight, syntax.FixedDistanceSets_LeftToRight:
 		return true, findFixedDistanceSetsLeftToRight(r, opts.FixedDistanceSets)
 	case syntax.FixedDistanceChar_LeftToRight:
 		return true, findFixedDistanceCharLeftToRight(r, opts.FixedDistanceLiteral.C, opts.FixedDistanceLiteral.Distance)
@@ -1487,27 +1549,67 @@ func findLeadingStringLeftToRight(r *Runner, prefix []rune, ignoreCase bool) boo
 	return true
 }
 
-func findLeadingStringsLeftToRight(r *Runner, prefixes [][]rune, ignoreCase bool) bool {
+func findLeadingStringsLeftToRight(r *Runner, prefixes [][]rune, firstRunes []rune, ignoreCase bool) bool {
 	if len(prefixes) == 0 {
 		return false
 	}
 
-	for start := r.Runtextpos; start <= latestPossibleStart(r); start++ {
-		for _, prefix := range prefixes {
-			if ignoreCase {
-				if helpers.StartsWithIgnoreCase(r.Runtext[start:], prefix) {
+	// Unicode ordinal-ignore-case matching has more possible first-rune folds
+	// than a small precomputed set can safely represent. Keep its conservative
+	// position-by-position scan; the common case-sensitive path skips directly
+	// between possible first runes.
+	if ignoreCase || len(firstRunes) == 0 {
+		for start := r.Runtextpos; start <= latestPossibleStart(r); start++ {
+			for _, prefix := range prefixes {
+				if ignoreCase {
+					if helpers.StartsWithIgnoreCase(r.Runtext[start:], prefix) {
+						r.Runtextpos = start
+						return true
+					}
+				} else if helpers.StartsWith(r.Runtext[start:], prefix) {
 					r.Runtextpos = start
 					return true
 				}
-			} else if helpers.StartsWith(r.Runtext[start:], prefix) {
+			}
+		}
+		r.Runtextpos = r.Runtextend
+		return false
+	}
+
+	latest := min(latestPossibleStart(r), r.Runtextend-1)
+	for searchAt := r.Runtextpos; searchAt <= latest; {
+		offset := indexOfAnyRunes(r.Runtext[searchAt:latest+1], firstRunes)
+		if offset < 0 {
+			break
+		}
+		start := searchAt + offset
+		first := r.Runtext[start]
+		for _, prefix := range prefixes {
+			if len(prefix) > 0 && prefix[0] == first && helpers.StartsWith(r.Runtext[start:], prefix) {
 				r.Runtextpos = start
 				return true
 			}
 		}
+		searchAt = start + 1
 	}
 
 	r.Runtextpos = r.Runtextend
 	return false
+}
+
+func indexOfAnyRunes(input, find []rune) int {
+	switch len(find) {
+	case 0:
+		return -1
+	case 1:
+		return helpers.IndexOfAny1(input, find[0])
+	case 2:
+		return helpers.IndexOfAny2(input, find[0], find[1])
+	case 3:
+		return helpers.IndexOfAny3(input, find[0], find[1], find[2])
+	default:
+		return helpers.IndexOfAny(input, find)
+	}
 }
 
 func findFixedDistanceCharLeftToRight(r *Runner, ch rune, distance int) bool {
@@ -1850,6 +1952,9 @@ func (r *Runner) initMatch(textInfo *matchText) {
 	if tracksize < 64 {
 		tracksize = 64
 	}
+	if limit := r.re.optimizations.MaxBacktrackingStackSize; limit >= 0 && tracksize > limit {
+		tracksize = limit
+	}
 	if stacksize < 32 {
 		stacksize = 32
 	}
@@ -2097,6 +2202,7 @@ func (re *Regexp) getRunner() *Runner {
 // putRunner returns a runner to the re's pool cache.
 func (re *Regexp) putRunner(r *Runner) {
 	r.Runtext = nil
+	r.code = re.code
 	if r.runmatch != nil {
 		r.runmatch.text = nil
 	}
@@ -2126,6 +2232,12 @@ func (r *Runner) StackPop() int {
 	r.Runstackpos++
 	// return it
 	return val
+}
+
+// StackDepth returns the number of integer slots currently used by the
+// generated engine's backtracking stack.
+func (r *Runner) StackDepth() int {
+	return len(r.runstack) - r.Runstackpos
 }
 
 func (r *Runner) StackPush(val int) {

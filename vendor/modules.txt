@@ -110,7 +110,7 @@ github.com/chromedp/sysutil
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dlclark/regexp2/v2 v2.2.2
+# github.com/dlclark/regexp2/v2 v2.5.0
 ## explicit; go 1.25
 github.com/dlclark/regexp2/v2
 github.com/dlclark/regexp2/v2/helpers
@@ -170,7 +170,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83
+# github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0
 ## explicit; go 1.24.0
 github.com/google/pprof/profile
 # github.com/google/uuid v1.6.0
@@ -195,6 +195,10 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
+# github.com/grafana/sobek-webapi-encoding v0.0.0-20260716074145-545f24555ef2
+## explicit; go 1.25.0
+github.com/grafana/sobek-webapi-encoding
+github.com/grafana/sobek-webapi-encoding/encoding
 # github.com/grafana/xk6-dashboard-assets v0.1.2
 ## explicit; go 1.24
 github.com/grafana/xk6-dashboard-assets
@@ -486,12 +490,18 @@ golang.org/x/term
 ## explicit; go 1.25.0
 golang.org/x/text/cases
 golang.org/x/text/collate
+golang.org/x/text/encoding
+golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/unicode
 golang.org/x/text/internal
 golang.org/x/text/internal/colltab
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
+golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
+golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi

@@ -36,8 +36,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.1/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46t
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dlclark/regexp2/v2 v2.2.2 h1:MYWvNYw8okuqNhwTYO587EZMiDruVa2vhV6fsGpfya0=
-github.com/dlclark/regexp2/v2 v2.2.2/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
+github.com/dlclark/regexp2/v2 v2.5.0 h1:liNiWIPCvCh5HBcYfsjd+P16AG79fwd6T1Toy2gOtEA=
+github.com/dlclark/regexp2/v2 v2.5.0/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
@@ -86,8 +86,8 @@ github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 h1:z2ogiKUYzX5Is6zr/vP9vJGqPwcdqsWjOt+V8J7+bTc=
-github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83/go.mod h1:MxpfABSjhmINe3F1It9d+8exIHFvUqtLIRCdOGNXqiI=
+github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0 h1:du0WGc8xSKq/++e0cglxhS/mXVqsR7+c7jLEi5Vqduw=
+github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0/go.mod h1:MxpfABSjhmINe3F1It9d+8exIHFvUqtLIRCdOGNXqiI=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
@@ -98,6 +98,8 @@ github.com/grafana/k6provider v0.5.0 h1:SwItWPOMQHfRytezQBKpeXLxjNmcyD/x9PTA28pE
 github.com/grafana/k6provider v0.5.0/go.mod h1:R9WKthnwk96E47m6w/mnC13hhBYTn5iMdP5caFt/t5k=
 github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4 h1:LJ2pEOxFbfUIhrkpROwZ6hLhuCn6e5GSX08v5GFwN/4=
 github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4/go.mod h1:BL/2XROA/Wtlb+zGEhkSdSZiMFIgw+D2ZdDfrbccyVE=
+github.com/grafana/sobek-webapi-encoding v0.0.0-20260716074145-545f24555ef2 h1:gG5MecOFhXXjSSZg8CwwyjQyg7SbZn4mt+65Mhbi6v8=
+github.com/grafana/sobek-webapi-encoding v0.0.0-20260716074145-545f24555ef2/go.mod h1:3vsRDCAbXxmJFMZ+INX556sDirwj2TV/u8DdNzqWtmw=
 github.com/grafana/xk6-dashboard-assets v0.1.2 h1:n2wqytPICn2ZYsKa9HE6GlvFXk+WjByMfT4eM+ms3gE=
 github.com/grafana/xk6-dashboard-assets v0.1.2/go.mod h1:SeoRjvmFF8UhLIFDfvjqqwBtE8MtaIPYIDWqVJZEHDo=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
