@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/sirupsen/logrus"
+
+	"go.k6.io/k6/v2/internal/cloudapi/httputil"
 )
 
 // HTTPClient is a Bearer-authenticated HTTP layer used by the cloud
@@ -34,7 +35,7 @@ func NewHTTPClient(httpClient *http.Client, token, version string, logger logrus
 
 // Do executes the request with Bearer auth, retries on 5xx and
 // transport errors, and decodes the response body into v if non-nil.
-func (p *HTTPClient) Do(req *http.Request, v any) error {
+func (p *HTTPClient) Do(req *http.Request, v any) (err error) {
 	// Ensure GetBody is set so the body can be replayed on retries.
 	if req.Body != nil && req.GetBody == nil {
 		body, err := io.ReadAll(req.Body)
@@ -53,55 +54,33 @@ func (p *HTTPClient) Do(req *http.Request, v any) error {
 	req.Header.Set("Authorization", "Bearer "+p.token)
 	req.Header.Set("User-Agent", "k6cloud/"+p.version)
 
-	var (
-		lastErr  error
-		lastResp *http.Response
-	)
-
-	for attempt := 1; attempt <= MaxRetries; attempt++ {
-		lastResp, lastErr = p.httpClient.Do(req) //nolint:gosec
-		if lastErr != nil {
-			if attempt < MaxRetries {
-				time.Sleep(RetryInterval)
-				if req.GetBody != nil {
-					req.Body, _ = req.GetBody()
-				}
-				continue
-			}
-			break
+	//nolint:bodyclose // closed via httputil.CloseResponse below
+	lastResp, err := doHTTPWithRetry(p.httpClient, req, func() error {
+		if req.GetBody == nil {
+			return nil
 		}
-
-		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
-			_, _ = io.Copy(io.Discard, lastResp.Body)
-			_ = lastResp.Body.Close()
-			time.Sleep(RetryInterval)
-			if req.GetBody != nil {
-				req.Body, _ = req.GetBody()
-			}
-			continue
+		body, getBodyErr := req.GetBody()
+		if getBodyErr != nil {
+			return getBodyErr
 		}
-
-		break
+		req.Body = body
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+	defer httputil.CloseResponse(lastResp, &err)
 
-	if lastErr != nil {
-		return lastErr
-	}
-
-	defer func() {
-		_, _ = io.Copy(io.Discard, lastResp.Body)
-		_ = lastResp.Body.Close()
-	}()
-
-	if err := CheckResponse(lastResp); err != nil {
+	if err = CheckResponse(lastResp); err != nil {
 		return err
 	}
 
 	if v != nil {
-		if err := json.NewDecoder(lastResp.Body).Decode(v); err != nil && !errors.Is(err, io.EOF) {
+		if err = json.NewDecoder(lastResp.Body).Decode(v); err != nil && !errors.Is(err, io.EOF) {
 			return fmt.Errorf("decoding response: %w", err)
 		}
+		err = nil
 	}
 
-	return nil
+	return err
 }

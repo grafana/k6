@@ -13,6 +13,7 @@ import (
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
+	"go.k6.io/k6/v2/internal/cloudapi/httputil"
 	"go.k6.io/k6/v2/lib"
 )
 
@@ -63,8 +64,8 @@ func (c *Client) listProjectsPage(
 		XStackId(c.stackID).
 		Skip(skip).
 		Top(top).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		return nil, err
@@ -88,8 +89,8 @@ func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud
 	res, hr, err := c.apiClient.AuthorizationAPI.
 		Auth(c.authCtx(ctx)).
 		XStackUrl(stackURL).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		return nil, err
@@ -122,8 +123,8 @@ func (c *Client) ValidateOptions(ctx context.Context, projectID int32, opts lib.
 		ValidateOptions(c.authCtx(ctx)).
 		XStackId(c.stackID).
 		ValidateOptionsRequest(req).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		return err
@@ -143,8 +144,8 @@ func (c *Client) CreateOrFindLoadTest(ctx context.Context, projectID int32, name
 		ProjectsLoadTestsCreate(c.authCtx(ctx), projectID).
 		XStackId(c.stackID).
 		Name(name).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		var rerr ResponseError
@@ -199,8 +200,8 @@ func (c *Client) createTest(
 		XStackId(c.stackID).
 		Name(name).
 		Script(archiveReader(arc)).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		return nil, err
@@ -220,8 +221,8 @@ func (c *Client) findTestByName(
 		XStackId(c.stackID).
 		Name(name).
 		Top(1).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		return nil, err
@@ -243,8 +244,8 @@ func (c *Client) updateScript(ctx context.Context, testID int32, arc *lib.Archiv
 		LoadTestsScriptUpdate(c.authCtx(ctx), testID).
 		XStackId(c.stackID).
 		Body(archiveReader(arc)).
-		Execute()
-	defer closeResponse(res, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(res, &err)
 
 	return CheckResponse(res, err)
 }
@@ -260,8 +261,8 @@ func (c *Client) StartTest(ctx context.Context, loadTestID int32) (_ *k6cloud.St
 		LoadTestsStart(c.authCtx(ctx), loadTestID).
 		XStackId(c.stackID).
 		K6IdempotencyKey(hex.EncodeToString(key[:])).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		return nil, err
@@ -278,8 +279,8 @@ func (c *Client) StopTest(ctx context.Context, testRunID int32) (err error) {
 	hr, err := c.apiClient.TestRunsAPI.
 		TestRunsAbort(c.authCtx(ctx), testRunID).
 		XStackId(c.stackID).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	err = CheckResponse(hr, err)
 	var rerr ResponseError
@@ -295,8 +296,8 @@ func (c *Client) FetchTest(ctx context.Context, testRunID int32) (_ *TestProgres
 	res, hr, err := c.apiClient.TestRunsAPI.
 		TestRunsRetrieve(c.authCtx(ctx), testRunID).
 		XStackId(c.stackID).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if err := CheckResponse(hr, err); err != nil {
 		return nil, err
@@ -316,16 +317,6 @@ func (c *Client) FetchTest(ctx context.Context, testRunID int32) (_ *TestProgres
 
 func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
-}
-
-func closeResponse(res *http.Response, rerr *error) {
-	if res == nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, res.Body)
-	if err := res.Body.Close(); err != nil && *rerr == nil {
-		*rerr = err
-	}
 }
 
 func archiveReader(arc *lib.Archive) io.ReadCloser {

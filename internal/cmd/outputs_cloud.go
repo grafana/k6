@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cloudapi/httputil"
 	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/lib"
@@ -36,7 +36,7 @@ const (
 // This method also sets the test run ID in the environment so it can be used later,
 // and applies any Cloud configuration overrides returned by the API.
 //
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,cyclop
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
 	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
@@ -110,21 +110,13 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	logger := gs.Logger.WithFields(logrus.Fields{"output": builtinOutputCloud.String()})
 
-	// Safe int64 → int32 conversion (same pattern as prepCloudTestRun).
-	toInt32 := func(v int64) (int32, error) {
-		if v < math.MinInt32 || v > math.MaxInt32 {
-			return 0, fmt.Errorf("value %d overflows int32", v)
-		}
-		return int32(v), nil
-	}
-
 	// stackID==0 is treated by provisioning.NewClient as "no stack
 	// configured" and the X-Stack-Id header is omitted; this preserves
 	// behavior for callers that did not set K6_CLOUD_STACK_ID.
 	var stackID int32
 	if conf.StackID.Valid {
 		var err error
-		stackID, err = toInt32(conf.StackID.Int64)
+		stackID, err = httputil.ToInt32(conf.StackID.Int64)
 		if err != nil {
 			return err
 		}
@@ -149,7 +141,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		}
 	}
 
-	projectID, err := toInt32(conf.ProjectID.Int64)
+	projectID, err := httputil.ToInt32(conf.ProjectID.Int64)
 	if err != nil {
 		return err
 	}

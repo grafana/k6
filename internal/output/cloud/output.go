@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -18,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/cloudapi/httputil"
 	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/lib"
@@ -503,17 +503,15 @@ func (out *Output) lazyInitProvisioning() error {
 
 	// Lazy-construct the provisioning notifier (used at end-of-test).
 	if out.provisioningNotifier == nil {
-		// Inline overflow check matches cmd_project_list.go:79-80 pattern
-		// (one cast in scope; local closure pattern would be overkill).
 		// stackID==0 is treated by provisioning.NewClient as "no stack
 		// configured" and the X-Stack-Id header is omitted.
 		var stackID int32
 		if out.config.StackID.Valid {
-			v := out.config.StackID.Int64
-			if v < math.MinInt32 || v > math.MaxInt32 {
-				return fmt.Errorf("stack ID %d overflows int32", v)
+			v, err := httputil.ToInt32(out.config.StackID.Int64)
+			if err != nil {
+				return fmt.Errorf("stack ID: %w", err)
 			}
-			stackID = int32(v)
+			stackID = v
 		}
 		c, err := provisioning.NewClient(
 			out.logger,

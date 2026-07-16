@@ -8,12 +8,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
+	"go.k6.io/k6/v2/internal/cloudapi/httputil"
 	v6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 )
 
@@ -79,7 +79,7 @@ type SecretsConfig struct {
 // UploadArchive PUTs pre-serialised archive bytes to the given
 // presigned S3 URL. The URL carries auth in query params, so no
 // Authorization header is set. Retries on 5xx and transport errors.
-func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byte) error {
+func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byte) (err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("creating upload request: %w", err)
@@ -87,14 +87,11 @@ func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byt
 	req.Header.Set("Content-Type", "application/x-tar")
 	req.ContentLength = int64(len(body))
 
-	resp, err := c.doWithRetry(req)
+	resp, err := c.doWithRetry(req) //nolint:bodyclose // closed via httputil.CloseResponse below
 	if err != nil {
 		return fmt.Errorf("uploading archive: %w", err)
 	}
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer httputil.CloseResponse(resp, &err)
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBody, readErr := io.ReadAll(resp.Body)
@@ -187,11 +184,11 @@ func (c *Client) StartLocalExecution(
 		return nil, fmt.Errorf("unmarshalling options for SDK: %w", err)
 	}
 
-	maxVUs, err := toInt32(req.MaxVUs)
+	maxVUs, err := httputil.ToInt32(req.MaxVUs)
 	if err != nil {
 		return nil, fmt.Errorf("max_vus: %w", err)
 	}
-	totalDuration, err := toInt32(req.TotalDuration)
+	totalDuration, err := httputil.ToInt32(req.TotalDuration)
 	if err != nil {
 		return nil, fmt.Errorf("total_duration: %w", err)
 	}
@@ -199,7 +196,7 @@ func (c *Client) StartLocalExecution(
 	sdkReq := k6cloud.NewStartLocalExecutionTestRequest(opts, maxVUs, totalDuration)
 
 	if req.ArchiveSize != nil {
-		v, err := toInt32(*req.ArchiveSize)
+		v, err := httputil.ToInt32(*req.ArchiveSize)
 		if err != nil {
 			return nil, fmt.Errorf("archive_size: %w", err)
 		}
@@ -212,8 +209,8 @@ func (c *Client) StartLocalExecution(
 		StartLocalExecutionTest(c.authCtx(ctx), loadTestID).
 		K6IdempotencyKey(hex.EncodeToString(key[:])).
 		StartLocalExecutionTestRequest(sdkReq).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if hr != nil {
 		if respErr := CheckResponse(hr); respErr != nil {
@@ -263,25 +260,4 @@ func mapStartLocalExecutionResponse(res *k6cloud.StartLocalExecutionTestResponse
 	}
 
 	return resp
-}
-
-// toInt32 safely converts an int64 to int32, returning an error if
-// the value overflows.
-func toInt32(v int64) (int32, error) {
-	if v < math.MinInt32 || v > math.MaxInt32 {
-		return 0, fmt.Errorf("value %d overflows int32", v)
-	}
-	return int32(v), nil
-}
-
-// closeResponse drains and closes an HTTP response body. It mirrors
-// the v6 package's closeResponse helper.
-func closeResponse(res *http.Response, rerr *error) {
-	if res == nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, res.Body)
-	if err := res.Body.Close(); err != nil && *rerr == nil {
-		*rerr = err
-	}
 }

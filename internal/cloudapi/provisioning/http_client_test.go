@@ -101,7 +101,7 @@ func TestHTTPClient_NoRetryOn4xx(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hits.Add(1)
 		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error":"bad input"}`))
+		_, _ = w.Write([]byte(`{"error":{"message":"bad input","code":"BAD_INPUT"}}`))
 	}))
 	defer srv.Close()
 

@@ -8,6 +8,7 @@ import (
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
 	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/cloudapi/httputil"
 )
 
 // notifyError represents a script execution error in the notify
@@ -70,8 +71,8 @@ func (c *Client) NotifyTestRunCompleted(
 	hr, err := c.apiClient.ProvisioningAPI.
 		TestRunsNotify(scopedCtx, testRunID).
 		ScriptExecutionCompletedNotificationApiModel(model).
-		Execute()
-	defer closeResponse(hr, &err)
+		Execute() //nolint:bodyclose // response body is drained and closed via httputil.CloseResponse below
+	defer httputil.CloseResponse(hr, &err)
 
 	if hr != nil {
 		if respErr := CheckResponse(hr); respErr != nil {
