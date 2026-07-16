@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -4024,6 +4025,35 @@ func TestClickInNestedFramesCORS(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, expectedCount, countD)
 	})
+}
+
+func TestPageRouteConcurrentEnableDataRace(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	p := tb.NewPage(nil)
+
+	matcher := func(pattern, url string) (bool, error) {
+		return regexp.MatchString(fmt.Sprintf("http://[^/]*%s", pattern), url)
+	}
+	h := func(rt *common.Route) error { return rt.Continue(common.ContinueOptions{}) }
+
+	// This test is intended to surface a data race under `go test -race`: concurrent first-time registrations
+	// can each observe routes as empty and call updateRequestInterception(true).
+	var wg sync.WaitGroup
+	errCh := make(chan error, 16)
+	for i := range 16 {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errCh <- p.Route(fmt.Sprintf("/api/%d", i), h, matcher)
+		}(i)
+	}
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
 }
 
 func TestPageUnroute(t *testing.T) {

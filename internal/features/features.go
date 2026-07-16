@@ -42,6 +42,7 @@ func (l Lifecycle) String() string {
 // Flags declares every feature flag as a tagged bool field.
 type Flags struct {
 	NativeHistograms bool `lifecycle:"experimental" help:"Use native histograms for trend metrics"`
+	MergeRunTags     bool `lifecycle:"experimental" help:"Merge run tags across config layers instead of replacing"`
 	_                noCopy
 	activated        []string
 }
