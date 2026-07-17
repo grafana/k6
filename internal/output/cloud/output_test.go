@@ -430,6 +430,21 @@ func (m *provisioningNotifierMock) NotifyTestRunCompleted(_ context.Context, tes
 	return nil
 }
 
+// logDrainerMock implements the output's logDrainer for tests. onDrain, when
+// set, runs inside Drain so a test can observe ordering relative to notify.
+type logDrainerMock struct {
+	called  atomic.Bool
+	onDrain func()
+}
+
+func (m *logDrainerMock) Drain(_ context.Context) error {
+	m.called.Store(true)
+	if m.onDrain != nil {
+		m.onDrain()
+	}
+	return nil
+}
+
 func TestOutputStart_ProvisioningMode(t *testing.T) {
 	t.Parallel()
 
@@ -752,5 +767,74 @@ func TestOutputStopWithTestError_PushRefID_NoNotifyNoTestFinished(t *testing.T) 
 		// PushRefID short-circuits: NEITHER notify NOR TestFinished called.
 		assert.False(t, notifierMock.called.Load())
 		assert.False(t, clientMock.testFinishedCalled)
+	})
+}
+
+// TestOutputStopWithTestError_DrainsLogsBeforeNotify locks the ordering fix:
+// the cloud log drainer is flushed before the run is notified complete, so
+// in-run logs land while the run is still open (afterwards the backend
+// rejects late pushes).
+func TestOutputStopWithTestError_DrainsLogsBeforeNotify(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+		drainerMock := &logDrainerMock{
+			onDrain: func() {
+				// Drain must run before notify: the notifier has not been
+				// called yet at drain time.
+				assert.Equal(t, int32(0), notifierMock.callCount.Load(),
+					"Drain must be called before NotifyTestRunCompleted")
+			},
+		}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NullDurationFrom(60 * time.Second),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           drainerMock,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		assert.True(t, drainerMock.called.Load(), "Drain must be called")
+		assert.True(t, notifierMock.called.Load(), "notify must still happen after drain")
+	})
+}
+
+// TestOutputStopWithTestError_NilLogDrainerStillNotifies covers the
+// --out cloud / --no-cloud-logs case: with no drainer set, Stop neither
+// panics nor skips notify.
+func TestOutputStopWithTestError_NilLogDrainerStillNotifies(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NullDurationFrom(60 * time.Second),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           nil,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+		assert.True(t, notifierMock.called.Load())
 	})
 }
