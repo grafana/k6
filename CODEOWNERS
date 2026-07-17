@@ -6,3 +6,6 @@
 # It turned out to be less noisy if the author picks manually every time
 # the best reviewers based on the context of the working area.
 /release\ notes/
+
+# Feature briefs are owned by the maintainers (k6-core) and product.
+/docs/features/ @grafana/k6-core @andrewslotin

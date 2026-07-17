@@ -80,6 +80,7 @@ type NetworkManager struct {
 	eventsWillBeSentMu            sync.RWMutex
 	reqIDToRequestPausedEvent     map[network.RequestID]*fetch.EventRequestPaused
 	eventsPausedMu                sync.RWMutex
+	extraInfoTracker              *extraInfoTracker
 
 	attemptedAuth map[fetch.RequestID]bool
 
@@ -125,6 +126,7 @@ func NewNetworkManager(
 		reqIDToRequest:                make(map[network.RequestID]*Request),
 		reqIDToRequestWillBeSentEvent: make(map[network.RequestID]*network.EventRequestWillBeSent),
 		reqIDToRequestPausedEvent:     make(map[network.RequestID]*fetch.EventRequestPaused),
+		extraInfoTracker:              newExtraInfoTracker(),
 		attemptedAuth:                 make(map[fetch.RequestID]bool),
 		extraHTTPHeaders:              make(map[string]string),
 		networkProfile:                NewNetworkProfile(),
@@ -332,15 +334,22 @@ func handleURLTag(mi eventInterceptor, url string, method string, tags *k6metric
 }
 
 func (m *NetworkManager) handleRequestRedirect(
-	req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime,
+	req *Request, redirectResponse *network.Response, hasExtraInfo bool, timestamp *cdp.MonotonicTime,
 ) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
+	m.extraInfoTracker.processResponse(req.requestID, resp, hasExtraInfo)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
 	req.redirectChain = append(req.redirectChain, req)
 
-	m.emitResponseMetrics(resp, req)
+	// Emit the response metrics once the raw headers are resolved, off the
+	// event goroutine so the wait does not block the goroutine that resolves
+	// them (the redirect's ExtraInfo may still be in flight here).
+	m.wg.Go(func() {
+		resp.WaitForRawHeaders()
+		m.emitResponseMetrics(resp, req)
+	})
 	m.deleteRequestByID(req.requestID)
 
 	/*
@@ -377,8 +386,10 @@ func (m *NetworkManager) initEvents() {
 		cdproto.EventNetworkLoadingFailed,
 		cdproto.EventNetworkLoadingFinished,
 		cdproto.EventNetworkRequestWillBeSent,
+		cdproto.EventNetworkRequestWillBeSentExtraInfo,
 		cdproto.EventNetworkRequestServedFromCache,
 		cdproto.EventNetworkResponseReceived,
+		cdproto.EventNetworkResponseReceivedExtraInfo,
 		cdproto.EventFetchRequestPaused,
 		cdproto.EventFetchAuthRequired,
 	}, chHandler)
@@ -410,10 +421,14 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 			m.onLoadingFinished(ev)
 		case *network.EventRequestWillBeSent:
 			m.onRequestWillBeSent(ev)
+		case *network.EventRequestWillBeSentExtraInfo:
+			m.onRequestWillBeSentExtraInfo(ev)
 		case *network.EventRequestServedFromCache:
 			m.onRequestServedFromCache(ev)
 		case *network.EventResponseReceived:
 			m.onResponseReceived(ev)
+		case *network.EventResponseReceivedExtraInfo:
+			m.onResponseReceivedExtraInfo(ev)
 		case *fetch.EventRequestPaused:
 			m.onRequestPaused(ev)
 		case *fetch.EventAuthRequired:
@@ -434,6 +449,8 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
+	m.extraInfoTracker.loadingFailed(event.RequestID)
+	req.resolveRawHeaders()
 	m.frameManager.requestFailed(req, event.Canceled)
 }
 
@@ -446,6 +463,8 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
+	m.extraInfoTracker.loadingFinished(event.RequestID)
+	req.resolveRawHeaders()
 	m.frameManager.requestFinished(req)
 	m.eventInterceptor.onRequestFinished(req)
 
@@ -453,26 +472,21 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	if isInternalURL(req.url) {
 		return
 	}
-	emitResponseMetrics := func() {
-		req.responseMu.RLock()
-		m.emitResponseMetrics(req.response, req)
-		req.responseMu.RUnlock()
-	}
-	if !req.allowInterception {
-		emitResponseMetrics()
-		return
-	}
-	// When request interception is enabled, we need to process requestPaused messages
-	// from CDP in order to get the response for the request. However, we can't process
-	// them until the request is unblocked. Since we're blocking the NetworkManager
-	// goroutine here, we need to spawn a new goroutine to allow the requestPaused
-	// messages to be processed by the NetworkManager.
-	//
-	// This happens when the main page request redirects before it finishes loading.
-	// So the new redirect request will be blocked until the main page finishes loading.
-	// The main page will wait forever since its subrequest is blocked.
+	// Emit the response metrics in a separate goroutine, once the raw headers
+	// are resolved, so the reported size is computed from a stable source.
+	// This must not run on the NetworkManager event goroutine: waiting for the
+	// raw headers there would block the goroutine that resolves them. Spawning
+	// a goroutine is also required for intercepted requests, so that CDP
+	// requestPaused messages can still be processed while a redirected main
+	// page request waits for its subrequest to finish loading.
 	m.wg.Go(func() {
-		emitResponseMetrics()
+		req.responseMu.RLock()
+		resp := req.response
+		req.responseMu.RUnlock()
+		if resp != nil {
+			resp.WaitForRawHeaders()
+		}
+		m.emitResponseMetrics(resp, req)
 	})
 }
 
@@ -521,7 +535,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	if event.RedirectResponse != nil {
 		req, ok := m.requestFromID(event.RequestID)
 		if ok {
-			m.handleRequestRedirect(req, event.RedirectResponse, event.Timestamp)
+			m.handleRequestRedirect(req, event.RedirectResponse, event.RedirectHasExtraInfo, event.Timestamp)
 			redirectChain = req.redirectChain
 		}
 	} else {
@@ -576,7 +590,13 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	m.reqsMu.Lock()
 	m.reqIDToRequest[event.RequestID] = req
 	m.reqsMu.Unlock()
-	m.emitRequestMetrics(req)
+	// Emit the request metrics once the raw headers are resolved, off the
+	// event goroutine so the wait does not block the goroutine that resolves
+	// them. The metric uses req.wallTime, so the deferral does not skew it.
+	m.wg.Go(func() {
+		req.WaitForRawHeaders()
+		m.emitRequestMetrics(req)
+	})
 	m.frameManager.requestStarted(req)
 
 	m.eventInterceptor.onRequest(req)
@@ -605,6 +625,14 @@ func (m *NetworkManager) onRequestWillBeSent(event *network.EventRequestWillBeSe
 	} else {
 		m.onRequest(event, nil)
 	}
+}
+
+func (m *NetworkManager) onRequestWillBeSentExtraInfo(event *network.EventRequestWillBeSentExtraInfo) {
+	extra := parseExtraHeaders(event.Headers)
+	if len(extra) == 0 {
+		return
+	}
+	m.extraInfoTracker.requestWillBeSentExtraInfo(event.RequestID, extra)
 }
 
 // onRequestPaused can send one of these two CDP events:
@@ -753,6 +781,7 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {
+	m.extraInfoTracker.requestServedFromCache(event.RequestID)
 	req, ok := m.requestFromID(event.RequestID)
 	if ok {
 		req.setLoadedFromCache(true)
@@ -766,6 +795,7 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 		return
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
+	m.extraInfoTracker.processResponse(event.RequestID, resp, event.HasExtraInfo)
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
@@ -773,6 +803,14 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	m.logger.Debugf("FrameManager:onResponseReceived", "rid:%s rurl:%s", event.RequestID, resp.URL())
 
 	m.eventInterceptor.onResponse(resp)
+}
+
+func (m *NetworkManager) onResponseReceivedExtraInfo(event *network.EventResponseReceivedExtraInfo) {
+	extra := parseExtraHeaders(event.Headers)
+	if len(extra) == 0 {
+		return
+	}
+	m.extraInfoTracker.responseReceivedExtraInfo(event.RequestID, extra)
 }
 
 func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {
@@ -1065,4 +1103,41 @@ func (m *NetworkManager) SetCacheEnabled(enabled bool) {
 
 func (m *NetworkManager) wait() {
 	m.wg.Wait()
+}
+
+func parseExtraHeaders(headers network.Headers) map[string][]string {
+	if len(headers) == 0 {
+		return nil
+	}
+	parsed := make(map[string][]string, len(headers))
+	for name, value := range headers {
+		switch v := value.(type) {
+		case string:
+			parsed[name] = splitHeaderValues(v)
+		case []string:
+			parsed[name] = append([]string{}, v...)
+		case []any:
+			values := make([]string, 0, len(v))
+			for _, item := range v {
+				if s, ok := item.(string); ok {
+					values = append(values, s)
+				}
+			}
+			if len(values) > 0 {
+				parsed[name] = values
+			}
+		}
+	}
+	if len(parsed) == 0 {
+		return nil
+	}
+	return parsed
+}
+
+// CDP concatenates duplicate header values with newlines; split to match Playwright.
+func splitHeaderValues(value string) []string {
+	if strings.Contains(value, "\n") {
+		return strings.Split(value, "\n")
+	}
+	return []string{value}
 }

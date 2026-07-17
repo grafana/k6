@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -201,6 +202,9 @@ func parseThresholdAggregationMethod(input string) (string, null.Float, error) {
 		aggregationValue, err := strconv.ParseFloat(trimDelimited("p(", input, ")"), 64)
 		if err != nil {
 			return "", null.Float{}, fmt.Errorf("malformed percentile value; reason: %w", err)
+		}
+		if math.IsNaN(aggregationValue) || aggregationValue < 0 || aggregationValue > 100 {
+			return "", null.Float{}, fmt.Errorf("malformed percentile value, provide a number between 0 and 100")
 		}
 
 		return tokenPercentile, null.FloatFrom(aggregationValue), nil

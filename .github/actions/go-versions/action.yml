@@ -1,0 +1,22 @@
+name: "Go versions"
+description: "Expose the central Go versions (current and N-1) from .github/go-versions.env"
+
+outputs:
+  current:
+    description: "Current Go version (e.g. 1.26.x)."
+    value: ${{ steps.read.outputs.current }}
+  prev:
+    description: "Previous (N-1) Go version (e.g. 1.25.x)."
+    value: ${{ steps.read.outputs.prev }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Read go-versions.env
+      id: read
+      shell: bash
+      run: |
+        set -euo pipefail
+        source "${GITHUB_ACTION_PATH}/../../go-versions.env"
+        echo "current=${GO_VERSION_CURRENT}" >> "$GITHUB_OUTPUT"
+        echo "prev=${GO_VERSION_PREV}" >> "$GITHUB_OUTPUT"

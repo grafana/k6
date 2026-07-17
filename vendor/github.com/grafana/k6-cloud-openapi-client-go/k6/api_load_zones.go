@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -27,7 +27,7 @@ type ApiLoadZonesAllowedProjectsRetrieveRequest struct {
 	ctx        context.Context
 	ApiService *LoadZonesAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -49,7 +49,7 @@ List projects allowed to use a given private load zone.
 	@param id ID of the load zone.
 	@return *ApiLoadZonesAllowedProjectsRetrieveRequest
 */
-func (a *LoadZonesAPIService) LoadZonesAllowedProjectsRetrieve(ctx context.Context, id int32) *ApiLoadZonesAllowedProjectsRetrieveRequest {
+func (a *LoadZonesAPIService) LoadZonesAllowedProjectsRetrieve(ctx context.Context, id int64) *ApiLoadZonesAllowedProjectsRetrieveRequest {
 	return &ApiLoadZonesAllowedProjectsRetrieveRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -185,7 +185,7 @@ type ApiLoadZonesAllowedProjectsUpdateRequest struct {
 	ctx                               context.Context
 	ApiService                        *LoadZonesAPIService
 	xStackId                          *int32
-	id                                int32
+	id                                int64
 	updateAllowedProjectsListApiModel *UpdateAllowedProjectsListApiModel
 }
 
@@ -213,7 +213,7 @@ Update the list of projects allowed to use a given private load zone.
 	@param id ID of the load zone.
 	@return *ApiLoadZonesAllowedProjectsUpdateRequest
 */
-func (a *LoadZonesAPIService) LoadZonesAllowedProjectsUpdate(ctx context.Context, id int32) *ApiLoadZonesAllowedProjectsUpdateRequest {
+func (a *LoadZonesAPIService) LoadZonesAllowedProjectsUpdate(ctx context.Context, id int64) *ApiLoadZonesAllowedProjectsUpdateRequest {
 	return &ApiLoadZonesAllowedProjectsUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -529,7 +529,7 @@ type ApiProjectsAllowedLoadZonesRetrieveRequest struct {
 	ctx        context.Context
 	ApiService *LoadZonesAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -551,7 +551,7 @@ List private load zones that can be used by a given project.
 	@param id ID of the project.
 	@return *ApiProjectsAllowedLoadZonesRetrieveRequest
 */
-func (a *LoadZonesAPIService) ProjectsAllowedLoadZonesRetrieve(ctx context.Context, id int32) *ApiProjectsAllowedLoadZonesRetrieveRequest {
+func (a *LoadZonesAPIService) ProjectsAllowedLoadZonesRetrieve(ctx context.Context, id int64) *ApiProjectsAllowedLoadZonesRetrieveRequest {
 	return &ApiProjectsAllowedLoadZonesRetrieveRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -687,7 +687,7 @@ type ApiProjectsAllowedLoadZonesUpdateRequest struct {
 	ctx                                context.Context
 	ApiService                         *LoadZonesAPIService
 	xStackId                           *int32
-	id                                 int32
+	id                                 int64
 	updateAllowedLoadZonesListApiModel *UpdateAllowedLoadZonesListApiModel
 }
 
@@ -715,7 +715,7 @@ Update the list of private load zones that can be used by a given project.
 	@param id ID of the project.
 	@return *ApiProjectsAllowedLoadZonesUpdateRequest
 */
-func (a *LoadZonesAPIService) ProjectsAllowedLoadZonesUpdate(ctx context.Context, id int32) *ApiProjectsAllowedLoadZonesUpdateRequest {
+func (a *LoadZonesAPIService) ProjectsAllowedLoadZonesUpdate(ctx context.Context, id int64) *ApiProjectsAllowedLoadZonesUpdateRequest {
 	return &ApiProjectsAllowedLoadZonesUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,

@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,9 +22,9 @@ var _ MappedNullable = &AuthenticationResponse{}
 // AuthenticationResponse struct for AuthenticationResponse
 type AuthenticationResponse struct {
 	// The ID of the Grafana stack matching the provided URL.
-	StackId int32 `json:"stack_id"`
+	StackId int64 `json:"stack_id"`
 	// The ID of the default project in the stack.
-	DefaultProjectId     int32 `json:"default_project_id"`
+	DefaultProjectId     int64 `json:"default_project_id"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -34,7 +34,7 @@ type _AuthenticationResponse AuthenticationResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAuthenticationResponse(stackId int32, defaultProjectId int32) *AuthenticationResponse {
+func NewAuthenticationResponse(stackId int64, defaultProjectId int64) *AuthenticationResponse {
 	this := AuthenticationResponse{}
 	this.StackId = stackId
 	this.DefaultProjectId = defaultProjectId
@@ -50,9 +50,9 @@ func NewAuthenticationResponseWithDefaults() *AuthenticationResponse {
 }
 
 // GetStackId returns the StackId field value
-func (o *AuthenticationResponse) GetStackId() int32 {
+func (o *AuthenticationResponse) GetStackId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -61,7 +61,7 @@ func (o *AuthenticationResponse) GetStackId() int32 {
 
 // GetStackIdOk returns a tuple with the StackId field value
 // and a boolean to check if the value has been set.
-func (o *AuthenticationResponse) GetStackIdOk() (*int32, bool) {
+func (o *AuthenticationResponse) GetStackIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -69,14 +69,14 @@ func (o *AuthenticationResponse) GetStackIdOk() (*int32, bool) {
 }
 
 // SetStackId sets field value
-func (o *AuthenticationResponse) SetStackId(v int32) {
+func (o *AuthenticationResponse) SetStackId(v int64) {
 	o.StackId = v
 }
 
 // GetDefaultProjectId returns the DefaultProjectId field value
-func (o *AuthenticationResponse) GetDefaultProjectId() int32 {
+func (o *AuthenticationResponse) GetDefaultProjectId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -85,7 +85,7 @@ func (o *AuthenticationResponse) GetDefaultProjectId() int32 {
 
 // GetDefaultProjectIdOk returns a tuple with the DefaultProjectId field value
 // and a boolean to check if the value has been set.
-func (o *AuthenticationResponse) GetDefaultProjectIdOk() (*int32, bool) {
+func (o *AuthenticationResponse) GetDefaultProjectIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *AuthenticationResponse) GetDefaultProjectIdOk() (*int32, bool) {
 }
 
 // SetDefaultProjectId sets field value
-func (o *AuthenticationResponse) SetDefaultProjectId(v int32) {
+func (o *AuthenticationResponse) SetDefaultProjectId(v int64) {
 	o.DefaultProjectId = v
 }
 

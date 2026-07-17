@@ -62,6 +62,12 @@ type Config struct {
 	// HTTPExporterURLPath sets the target URL path the OpenTelemetry Exporter
 	HTTPExporterURLPath null.String `json:"httpExporterURLPath" envconfig:"K6_OTEL_HTTP_EXPORTER_URL_PATH"`
 
+	// Username is the User for Basic Auth.
+	HTTPUsername null.String `json:"username" envconfig:"K6_OTEL_HTTP_EXPORTER_USERNAME"`
+
+	// Password is the Password for the Basic Auth.
+	HTTPPassword null.String `json:"password" envconfig:"K6_OTEL_HTTP_EXPORTER_PASSWORD"`
+
 	// GRPCExporterEndpoint sets the target endpoint the OpenTelemetry Exporter
 	// will connect to.
 	GRPCExporterEndpoint null.String `json:"grpcExporterEndpoint" envconfig:"K6_OTEL_GRPC_EXPORTER_ENDPOINT"`
@@ -185,6 +191,14 @@ func (cfg Config) Apply(v Config) Config {
 
 	if v.Headers.Valid {
 		cfg.Headers = v.Headers
+	}
+
+	if v.HTTPUsername.Valid {
+		cfg.HTTPUsername = v.HTTPUsername
+	}
+
+	if v.HTTPPassword.Valid {
+		cfg.HTTPPassword = v.HTTPPassword
 	}
 
 	return cfg

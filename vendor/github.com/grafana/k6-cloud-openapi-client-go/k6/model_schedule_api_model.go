@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -23,9 +23,9 @@ var _ MappedNullable = &ScheduleApiModel{}
 // ScheduleApiModel struct for ScheduleApiModel
 type ScheduleApiModel struct {
 	// ID of the schedule.
-	Id int32 `json:"id"`
+	Id int64 `json:"id"`
 	// ID of the test to run.
-	LoadTestId int32 `json:"load_test_id"`
+	LoadTestId int64 `json:"load_test_id"`
 	// The date on which the schedule will start running the test.
 	Starts         time.Time                      `json:"starts"`
 	RecurrenceRule NullableScheduleRecurrenceRule `json:"recurrence_rule"`
@@ -45,7 +45,7 @@ type _ScheduleApiModel ScheduleApiModel
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewScheduleApiModel(id int32, loadTestId int32, starts time.Time, recurrenceRule NullableScheduleRecurrenceRule, cron NullableScheduleCron, deactivated bool, nextRun NullableTime, createdBy NullableString) *ScheduleApiModel {
+func NewScheduleApiModel(id int64, loadTestId int64, starts time.Time, recurrenceRule NullableScheduleRecurrenceRule, cron NullableScheduleCron, deactivated bool, nextRun NullableTime, createdBy NullableString) *ScheduleApiModel {
 	this := ScheduleApiModel{}
 	this.Id = id
 	this.LoadTestId = loadTestId
@@ -67,9 +67,9 @@ func NewScheduleApiModelWithDefaults() *ScheduleApiModel {
 }
 
 // GetId returns the Id field value
-func (o *ScheduleApiModel) GetId() int32 {
+func (o *ScheduleApiModel) GetId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -78,7 +78,7 @@ func (o *ScheduleApiModel) GetId() int32 {
 
 // GetIdOk returns a tuple with the Id field value
 // and a boolean to check if the value has been set.
-func (o *ScheduleApiModel) GetIdOk() (*int32, bool) {
+func (o *ScheduleApiModel) GetIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -86,14 +86,14 @@ func (o *ScheduleApiModel) GetIdOk() (*int32, bool) {
 }
 
 // SetId sets field value
-func (o *ScheduleApiModel) SetId(v int32) {
+func (o *ScheduleApiModel) SetId(v int64) {
 	o.Id = v
 }
 
 // GetLoadTestId returns the LoadTestId field value
-func (o *ScheduleApiModel) GetLoadTestId() int32 {
+func (o *ScheduleApiModel) GetLoadTestId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -102,7 +102,7 @@ func (o *ScheduleApiModel) GetLoadTestId() int32 {
 
 // GetLoadTestIdOk returns a tuple with the LoadTestId field value
 // and a boolean to check if the value has been set.
-func (o *ScheduleApiModel) GetLoadTestIdOk() (*int32, bool) {
+func (o *ScheduleApiModel) GetLoadTestIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -110,7 +110,7 @@ func (o *ScheduleApiModel) GetLoadTestIdOk() (*int32, bool) {
 }
 
 // SetLoadTestId sets field value
-func (o *ScheduleApiModel) SetLoadTestId(v int32) {
+func (o *ScheduleApiModel) SetLoadTestId(v int64) {
 	o.LoadTestId = v
 }
 

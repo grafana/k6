@@ -1356,7 +1356,9 @@ func (p *Page) Referrer() string {
 func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) error {
 	p.logger.Debugf("Page:Route", "sid:%v path:%s", p.sessionID(), path)
 
-	if !p.hasRoutes() {
+	p.routesMu.Lock()
+	defer p.routesMu.Unlock()
+	if len(p.routes) == 0 {
 		err := p.mainFrameSession.updateRequestInterception(true)
 		if err != nil {
 			return err
@@ -1369,8 +1371,6 @@ func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) erro
 	}
 
 	routeHandler := NewRouteHandler(path, cb, matcher)
-	p.routesMu.Lock()
-	defer p.routesMu.Unlock()
 	// Append new route at the beginning of the slice as, when several routes match the given pattern,
 	// they will run in the opposite order to their registration.
 	p.routes = append([]*RouteHandler{routeHandler}, p.routes...)

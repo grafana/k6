@@ -51,8 +51,8 @@ func TestValidateToken(t *testing.T) {
 		resp, err := client.ValidateToken(t.Context(), "https://stack.grafana.net")
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		assert.Equal(t, int32(123), resp.StackId)
-		assert.Equal(t, int32(456), resp.DefaultProjectId)
+		assert.Equal(t, int64(123), resp.StackId)
+		assert.Equal(t, int64(456), resp.DefaultProjectId)
 	})
 
 	t.Run("unauthorized token should fail", func(t *testing.T) {
@@ -148,6 +148,56 @@ func TestListProjects(t *testing.T) {
 	assert.Equal(t, Project{ID: 2, Name: "My project", IsDefault: false}, projects[1])
 }
 
+func TestListLoadTests(t *testing.T) {
+	t.Parallel()
+
+	loadTest := func(id int32, name string) map[string]any {
+		return map[string]any{
+			"id":                   id,
+			"project_id":           42,
+			"name":                 name,
+			"baseline_test_run_id": nil,
+			"created":              "2025-01-01T00:00:00Z",
+			"updated":              "2025-01-01T00:00:00Z",
+		}
+	}
+
+	var requests atomic.Int32
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/cloud/v6/projects/42/load_tests", r.URL.Path)
+		assert.Equal(t, "1000", r.URL.Query().Get("$top"))
+
+		switch requests.Add(1) {
+		case 1:
+			assert.Equal(t, "0", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value":     []any{loadTest(1, "checkout-flow")},
+				"@nextLink": "https://api.k6.io/cloud/v6/projects/42/load_tests?$skip=1000&$top=1000",
+			})
+		case 2:
+			assert.Equal(t, "1000", r.URL.Query().Get("$skip"))
+			writeJSON(t, w, http.StatusOK, map[string]any{
+				"value": []any{loadTest(2, "api-smoke")},
+			})
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+
+	tests, err := client.ListLoadTests(t.Context(), 42)
+	require.NoError(t, err)
+	require.Len(t, tests, 2)
+	assert.Equal(t, int32(2), requests.Load())
+	assert.Equal(t, LoadTest{
+		ID:        1,
+		ProjectID: 42,
+		Name:      "checkout-flow",
+		Created:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		Updated:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+	}, tests[0])
+	assert.Equal(t, int64(2), tests[1].ID)
+}
+
 func TestRetryWithConnectionClose(t *testing.T) {
 	t.Parallel()
 
@@ -169,7 +219,7 @@ func TestRetryWithConnectionClose(t *testing.T) {
 
 	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "1.0", 5*time.Second)
 	require.NoError(t, err)
-	client.SetStackID(1)
+	require.NoError(t, client.SetStackID(1))
 
 	opts := lib.Options{VUs: null.IntFrom(10)}
 	require.NoError(t, client.ValidateOptions(t.Context(), 1, opts))
@@ -190,7 +240,7 @@ func TestValidateOptions(t *testing.T) {
 
 	var body struct {
 		Options   json.RawMessage `json:"options"`
-		ProjectID int32           `json:"project_id"`
+		ProjectID int64           `json:"project_id"`
 	}
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
@@ -208,7 +258,7 @@ func TestValidateOptions(t *testing.T) {
 	want, err := json.Marshal(opts)
 	require.NoError(t, err)
 	assert.JSONEq(t, string(want), string(body.Options))
-	assert.Equal(t, int32(42), body.ProjectID)
+	assert.Equal(t, int64(42), body.ProjectID)
 }
 
 func TestUploadTest(t *testing.T) {
@@ -309,7 +359,7 @@ func TestStartTest(t *testing.T) {
 	res := k6cloud.NewStartLoadTestResponseWithDefaults()
 	res.SetId(7)
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
-	res.SetResultDetails(map[string]any{})
+	res.SetResultDetails(*k6cloud.NewResultDetailsApiModel(""))
 	res.SetOptions(map[string]any{})
 
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -369,7 +419,7 @@ func TestFetchTest(t *testing.T) {
 	res.SetExecutionDuration(want.ExecutionDuration)
 	res.SetStatusHistory(ToStatusModel(want.StatusHistory))
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{*k6cloud.NewDistributionZoneApiModelWithDefaults()})
-	res.SetResultDetails(map[string]any{"foo": "bar"})
+	res.SetResultDetails(k6cloud.ResultDetailsApiModelAsTestRunApiModelResultDetails(k6cloud.NewResultDetailsApiModel("failed")))
 	res.SetOptions(map[string]any{"vus": 10})
 
 	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -390,7 +440,7 @@ func newTestClient(t *testing.T, handler http.Handler) *Client {
 
 	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "1.0", 5*time.Second)
 	require.NoError(t, err)
-	client.SetStackID(1)
+	require.NoError(t, client.SetStackID(1))
 
 	return client
 }

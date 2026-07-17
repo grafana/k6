@@ -52,15 +52,16 @@ func newMetricsClient(c metricsHTTPClient, testRunID string) (*metricsClient, er
 	}, nil
 }
 
-// Push the provided metrics for the given test run ID.
-func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
+// Push the provided metrics for the given test run ID. The context cancels the
+// underlying HTTP request so a stuck push cannot block k6 shutdown.
+func (mc *metricsClient) push(ctx context.Context, samples *pbcloud.MetricSet) error {
 	b, err := newRequestBody(samples)
 	if err != nil {
 		return err
 	}
 
 	req, err := http.NewRequestWithContext(
-		context.Background(), http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
+		ctx, http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
 	if err != nil {
 		return err
 	}

@@ -76,7 +76,8 @@ func NewReadableStreamDefaultControllerObject(controller *ReadableStreamDefaultC
 
 	// Exposing the properties of the [ReadableStreamController] interface
 	if err := setReadOnlyPropertyOf(obj, objName, "constructor", rt.ToValue(func() sobek.Value {
-		return rt.ToValue(&ReadableStreamDefaultController{})
+		throw(rt, newTypeError(rt, "ReadableStreamDefaultController is not constructable"))
+		return sobek.Undefined()
 	})); err != nil {
 		return nil, err
 	}

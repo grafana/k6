@@ -9,7 +9,7 @@ package api
 // esbuild will automatically generate a directory listing page with links for
 // each file in the directory. If there is a build configured that generates
 // output files, those output files are not written to disk but are instead
-// "overlayed" virtually on top of the real file system. The server responds to
+// "overlaid" virtually on top of the real file system. The server responds to
 // HTTP requests for output files from the build with the latest in-memory
 // build results.
 
@@ -152,6 +152,14 @@ func (h *apiHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 			maybeWriteResponseBody([]byte(fmt.Sprintf("403 - Forbidden: The host %q is not allowed", req.Host)))
 			return
 		}
+	}
+
+	// All requests containing Windows-style path separators are invalid
+	if strings.ContainsRune(req.URL.Path, '\\') {
+		go h.notifyRequest(time.Since(start), req, http.StatusBadRequest)
+		res.WriteHeader(http.StatusBadRequest)
+		maybeWriteResponseBody([]byte("400 - Bad Request"))
+		return
 	}
 
 	// Special-case the esbuild event stream

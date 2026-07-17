@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,11 +22,13 @@ var _ MappedNullable = &ValidateOptionsRequest{}
 // ValidateOptionsRequest struct for ValidateOptionsRequest
 type ValidateOptionsRequest struct {
 	// ID of a project where the test belongs.
-	ProjectId NullableInt32 `json:"project_id,omitempty"`
+	ProjectId NullableInt64 `json:"project_id,omitempty"`
 	// k6 script options object to validate.
 	Options Options `json:"options"`
 	// Version of k6 and extensions to validate, as a map of dependency name to dependency version constraint.
 	K6Dependencies map[string]string `json:"k6_dependencies,omitempty"`
+	// Identifier of the k6 version used to run the test.
+	K6Version NullableInt32 `json:"k6_version,omitempty"`
 	// Whether the test is being executed locally.
 	IsLocalExecution     *bool `json:"is_local_execution,omitempty"`
 	AdditionalProperties map[string]interface{}
@@ -57,9 +59,9 @@ func NewValidateOptionsRequestWithDefaults() *ValidateOptionsRequest {
 }
 
 // GetProjectId returns the ProjectId field value if set, zero value otherwise (both if not set or set to explicit null).
-func (o *ValidateOptionsRequest) GetProjectId() int32 {
+func (o *ValidateOptionsRequest) GetProjectId() int64 {
 	if o == nil || IsNil(o.ProjectId.Get()) {
-		var ret int32
+		var ret int64
 		return ret
 	}
 	return *o.ProjectId.Get()
@@ -68,7 +70,7 @@ func (o *ValidateOptionsRequest) GetProjectId() int32 {
 // GetProjectIdOk returns a tuple with the ProjectId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *ValidateOptionsRequest) GetProjectIdOk() (*int32, bool) {
+func (o *ValidateOptionsRequest) GetProjectIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -84,8 +86,8 @@ func (o *ValidateOptionsRequest) HasProjectId() bool {
 	return false
 }
 
-// SetProjectId gets a reference to the given NullableInt32 and assigns it to the ProjectId field.
-func (o *ValidateOptionsRequest) SetProjectId(v int32) {
+// SetProjectId gets a reference to the given NullableInt64 and assigns it to the ProjectId field.
+func (o *ValidateOptionsRequest) SetProjectId(v int64) {
 	o.ProjectId.Set(&v)
 }
 
@@ -155,6 +157,49 @@ func (o *ValidateOptionsRequest) SetK6Dependencies(v map[string]string) {
 	o.K6Dependencies = v
 }
 
+// GetK6Version returns the K6Version field value if set, zero value otherwise (both if not set or set to explicit null).
+func (o *ValidateOptionsRequest) GetK6Version() int32 {
+	if o == nil || IsNil(o.K6Version.Get()) {
+		var ret int32
+		return ret
+	}
+	return *o.K6Version.Get()
+}
+
+// GetK6VersionOk returns a tuple with the K6Version field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+// NOTE: If the value is an explicit nil, `nil, true` will be returned
+func (o *ValidateOptionsRequest) GetK6VersionOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.K6Version.Get(), o.K6Version.IsSet()
+}
+
+// HasK6Version returns a boolean if a field has been set.
+func (o *ValidateOptionsRequest) HasK6Version() bool {
+	if o != nil && o.K6Version.IsSet() {
+		return true
+	}
+
+	return false
+}
+
+// SetK6Version gets a reference to the given NullableInt32 and assigns it to the K6Version field.
+func (o *ValidateOptionsRequest) SetK6Version(v int32) {
+	o.K6Version.Set(&v)
+}
+
+// SetK6VersionNil sets the value for K6Version to be an explicit nil
+func (o *ValidateOptionsRequest) SetK6VersionNil() {
+	o.K6Version.Set(nil)
+}
+
+// UnsetK6Version ensures that no value is present for K6Version, not even an explicit nil
+func (o *ValidateOptionsRequest) UnsetK6Version() {
+	o.K6Version.Unset()
+}
+
 // GetIsLocalExecution returns the IsLocalExecution field value if set, zero value otherwise.
 func (o *ValidateOptionsRequest) GetIsLocalExecution() bool {
 	if o == nil || IsNil(o.IsLocalExecution) {
@@ -203,6 +248,9 @@ func (o ValidateOptionsRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize["options"] = o.Options
 	if !IsNil(o.K6Dependencies) {
 		toSerialize["k6_dependencies"] = o.K6Dependencies
+	}
+	if o.K6Version.IsSet() {
+		toSerialize["k6_version"] = o.K6Version.Get()
 	}
 	if !IsNil(o.IsLocalExecution) {
 		toSerialize["is_local_execution"] = o.IsLocalExecution
@@ -253,6 +301,7 @@ func (o *ValidateOptionsRequest) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "project_id")
 		delete(additionalProperties, "options")
 		delete(additionalProperties, "k6_dependencies")
+		delete(additionalProperties, "k6_version")
 		delete(additionalProperties, "is_local_execution")
 		o.AdditionalProperties = additionalProperties
 	}

@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -315,7 +316,7 @@ func TestOutputFlushTicks(t *testing.T) {
 		//
 		// The second request unblocks.
 		var requestsCount int64
-		flusherMock := func() {
+		flusherMock := func(context.Context) {
 			updated := atomic.AddInt64(&requestsCount, 1)
 			if updated == 2 {
 				close(done)
@@ -329,7 +330,7 @@ func TestOutputFlushTicks(t *testing.T) {
 		}
 		o.config.MetricPushInterval = types.NullDurationFrom(100 * time.Millisecond) // loop
 		o.flushing = flusherFunc(flusherMock)
-		o.runPeriodicFlush()
+		o.runPeriodicFlush(t.Context())
 
 		select {
 		case <-time.After(5 * time.Second):
@@ -352,13 +353,13 @@ func TestOutputFlushWorkersStop(t *testing.T) {
 		o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 		once := sync.Once{}
-		flusherMock := func() {
+		flusherMock := func(context.Context) {
 			// it asserts that flushers are set and the flush is invoked
 			once.Do(func() { close(o.stop) })
 		}
 
 		o.flushing = flusherFunc(flusherMock)
-		o.runPeriodicFlush()
+		o.runPeriodicFlush(t.Context())
 
 		// it asserts that all flushers exit
 		done := make(chan struct{})
@@ -384,13 +385,13 @@ func TestOutputFlushWorkersAbort(t *testing.T) {
 		o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 		once := sync.Once{}
-		flusherMock := func() {
+		flusherMock := func(context.Context) {
 			// it asserts that flushers are set and the flush func is invoked
 			once.Do(func() { close(o.abort) })
 		}
 
 		o.flushing = flusherFunc(flusherMock)
-		o.runPeriodicFlush()
+		o.runPeriodicFlush(t.Context())
 
 		// it asserts that all flushers exit
 		done := make(chan struct{})
@@ -416,7 +417,7 @@ func TestOutputFlushRequestMetadatasConcurrently(t *testing.T) {
 		//
 		// The second request unblocks.
 		var requestsCount int64
-		flusherMock := func() {
+		flusherMock := func(context.Context) {
 			updated := atomic.AddInt64(&requestsCount, 1)
 			if updated == 2 {
 				close(done)
@@ -431,8 +432,8 @@ func TestOutputFlushRequestMetadatasConcurrently(t *testing.T) {
 		}
 		o.config.TracesPushConcurrency = null.IntFrom(2)
 		o.config.TracesPushInterval = types.NullDurationFrom(1) // loop
-		o.requestMetadatasFlusher = flusherFunc(flusherMock)
-		o.runFlushRequestMetadatas()
+		o.requestMetadatasFlusher = requestMetadatasFlusherFunc(flusherMock)
+		o.runFlushRequestMetadatas(t.Context())
 
 		select {
 		case <-time.After(5 * time.Second):
@@ -455,13 +456,13 @@ func TestOutputFlushRequestMetadatasStop(t *testing.T) {
 		o.config.TracesPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 		once := sync.Once{}
-		flusherMock := func() {
+		flusherMock := func(context.Context) {
 			// it asserts that flushers are set and the flush is invoked
 			once.Do(func() { close(o.stop) })
 		}
 
-		o.requestMetadatasFlusher = flusherFunc(flusherMock)
-		o.runFlushRequestMetadatas()
+		o.requestMetadatasFlusher = requestMetadatasFlusherFunc(flusherMock)
+		o.runFlushRequestMetadatas(t.Context())
 
 		// it asserts that all flushers exit
 		done := make(chan struct{})
@@ -487,13 +488,13 @@ func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
 		o.config.TracesPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 		once := sync.Once{}
-		flusherMock := func() {
+		flusherMock := func(context.Context) {
 			// it asserts that flushers are set and the flush func is invoked
 			once.Do(func() { close(o.abort) })
 		}
 
-		o.requestMetadatasFlusher = flusherFunc(flusherMock)
-		o.runFlushRequestMetadatas()
+		o.requestMetadatasFlusher = requestMetadatasFlusherFunc(flusherMock)
+		o.runFlushRequestMetadatas(t.Context())
 
 		// it asserts that all flushers exit
 		done := make(chan struct{})
@@ -509,14 +510,56 @@ func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
 	})
 }
 
-type flusherFunc func()
+func TestOutputStopCancelsStuckFlush(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		o := Output{
+			logger: testutils.NewLogger(t),
+			stop:   make(chan struct{}),
+			abort:  make(chan struct{}),
+		}
+		o.config.MetricPushInterval = types.NullDurationFrom(time.Millisecond)
 
-func (ff flusherFunc) Flush() error {
-	return ff.flush()
+		// A flush that only returns once its context is canceled mimics an
+		// upload stuck on an unresponsive connection.
+		inflight := make(chan struct{})
+		var once sync.Once
+		o.flushing = flusherFunc(func(ctx context.Context) {
+			once.Do(func() { close(inflight) })
+			<-ctx.Done()
+		})
+
+		flushCtx, cancel := context.WithCancel(context.Background())
+		o.cancelFlush = cancel
+		o.runPeriodicFlush(flushCtx)
+
+		<-inflight // a periodic flush is now stuck mid-upload
+
+		stopped := make(chan struct{})
+		go func() {
+			defer close(stopped)
+			_ = o.StopWithTestError(nil)
+		}()
+
+		select {
+		case <-stopped:
+		case <-time.After(time.Minute):
+			t.Fatal("StopWithTestError hung on a stuck flush (production hang reproduced)")
+		}
+	})
 }
 
-func (ff flusherFunc) flush() error {
-	ff()
+type flusherFunc func(context.Context)
+
+func (ff flusherFunc) flush(ctx context.Context) error {
+	ff(ctx)
+	return nil
+}
+
+type requestMetadatasFlusherFunc func(context.Context)
+
+func (ff requestMetadatasFlusherFunc) Flush(ctx context.Context) error {
+	ff(ctx)
 	return nil
 }
 

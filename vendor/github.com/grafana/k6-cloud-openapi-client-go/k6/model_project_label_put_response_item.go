@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,7 +22,7 @@ var _ MappedNullable = &ProjectLabelPutResponseItem{}
 // ProjectLabelPutResponseItem Single project label in PUT response
 type ProjectLabelPutResponseItem struct {
 	// Label key ID.
-	KeyId int32 `json:"key_id"`
+	KeyId int64 `json:"key_id"`
 	// Label key name.
 	Key string `json:"key"`
 	// Label value.
@@ -36,7 +36,7 @@ type _ProjectLabelPutResponseItem ProjectLabelPutResponseItem
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewProjectLabelPutResponseItem(keyId int32, key string, value string) *ProjectLabelPutResponseItem {
+func NewProjectLabelPutResponseItem(keyId int64, key string, value string) *ProjectLabelPutResponseItem {
 	this := ProjectLabelPutResponseItem{}
 	this.KeyId = keyId
 	this.Key = key
@@ -53,9 +53,9 @@ func NewProjectLabelPutResponseItemWithDefaults() *ProjectLabelPutResponseItem {
 }
 
 // GetKeyId returns the KeyId field value
-func (o *ProjectLabelPutResponseItem) GetKeyId() int32 {
+func (o *ProjectLabelPutResponseItem) GetKeyId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -64,7 +64,7 @@ func (o *ProjectLabelPutResponseItem) GetKeyId() int32 {
 
 // GetKeyIdOk returns a tuple with the KeyId field value
 // and a boolean to check if the value has been set.
-func (o *ProjectLabelPutResponseItem) GetKeyIdOk() (*int32, bool) {
+func (o *ProjectLabelPutResponseItem) GetKeyIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -72,7 +72,7 @@ func (o *ProjectLabelPutResponseItem) GetKeyIdOk() (*int32, bool) {
 }
 
 // SetKeyId sets field value
-func (o *ProjectLabelPutResponseItem) SetKeyId(v int32) {
+func (o *ProjectLabelPutResponseItem) SetKeyId(v int64) {
 	o.KeyId = v
 }
 

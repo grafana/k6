@@ -20,6 +20,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 	maps := mapping{
 		"allHeaders": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
+				r.WaitForRawHeaders()
 				return r.AllHeaders(), nil
 			})
 		},
@@ -47,6 +48,7 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 		},
 		"headerValue": func(name string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
+				r.WaitForRawHeaders()
 				v, ok := r.HeaderValue(name)
 				if !ok {
 					return nil, nil
@@ -56,12 +58,14 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 		},
 		"headerValues": func(name string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
+				r.WaitForRawHeaders()
 				return r.HeaderValues(name), nil
 			})
 		},
 		"headers": r.Headers,
 		"headersArray": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
+				r.WaitForRawHeaders()
 				return r.HeadersArray(), nil
 			})
 		},

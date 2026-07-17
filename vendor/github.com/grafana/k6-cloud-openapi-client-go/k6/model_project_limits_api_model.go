@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,7 +22,7 @@ var _ MappedNullable = &ProjectLimitsApiModel{}
 // ProjectLimitsApiModel struct for ProjectLimitsApiModel
 type ProjectLimitsApiModel struct {
 	// ID of the related project.
-	ProjectId int32 `json:"project_id"`
+	ProjectId int64 `json:"project_id"`
 	// Max amount of virtual user hours (VUH) used per one calendar month.
 	VuhMaxPerMonth NullableInt32 `json:"vuh_max_per_month"`
 	// Max number of concurrent virtual users (VUs) used in one test.
@@ -40,7 +40,7 @@ type _ProjectLimitsApiModel ProjectLimitsApiModel
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewProjectLimitsApiModel(projectId int32, vuhMaxPerMonth NullableInt32, vuMaxPerTest NullableInt32, vuBrowserMaxPerTest NullableInt32, durationMaxPerTest NullableInt32) *ProjectLimitsApiModel {
+func NewProjectLimitsApiModel(projectId int64, vuhMaxPerMonth NullableInt32, vuMaxPerTest NullableInt32, vuBrowserMaxPerTest NullableInt32, durationMaxPerTest NullableInt32) *ProjectLimitsApiModel {
 	this := ProjectLimitsApiModel{}
 	this.ProjectId = projectId
 	this.VuhMaxPerMonth = vuhMaxPerMonth
@@ -59,9 +59,9 @@ func NewProjectLimitsApiModelWithDefaults() *ProjectLimitsApiModel {
 }
 
 // GetProjectId returns the ProjectId field value
-func (o *ProjectLimitsApiModel) GetProjectId() int32 {
+func (o *ProjectLimitsApiModel) GetProjectId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -70,7 +70,7 @@ func (o *ProjectLimitsApiModel) GetProjectId() int32 {
 
 // GetProjectIdOk returns a tuple with the ProjectId field value
 // and a boolean to check if the value has been set.
-func (o *ProjectLimitsApiModel) GetProjectIdOk() (*int32, bool) {
+func (o *ProjectLimitsApiModel) GetProjectIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -78,7 +78,7 @@ func (o *ProjectLimitsApiModel) GetProjectIdOk() (*int32, bool) {
 }
 
 // SetProjectId sets field value
-func (o *ProjectLimitsApiModel) SetProjectId(v int32) {
+func (o *ProjectLimitsApiModel) SetProjectId(v int64) {
 	o.ProjectId = v
 }
 

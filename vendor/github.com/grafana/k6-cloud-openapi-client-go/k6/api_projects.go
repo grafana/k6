@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -409,7 +409,7 @@ type ApiProjectsDestroyRequest struct {
 	ctx        context.Context
 	ApiService *ProjectsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -431,7 +431,7 @@ Delete a project.
 	@param id ID of the project.
 	@return *ApiProjectsDestroyRequest
 */
-func (a *ProjectsAPIService) ProjectsDestroy(ctx context.Context, id int32) *ApiProjectsDestroyRequest {
+func (a *ProjectsAPIService) ProjectsDestroy(ctx context.Context, id int64) *ApiProjectsDestroyRequest {
 	return &ApiProjectsDestroyRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -566,7 +566,7 @@ type ApiProjectsLimitsPartialUpdateRequest struct {
 	ctx                       context.Context
 	ApiService                *ProjectsAPIService
 	xStackId                  *int32
-	id                        int32
+	id                        int64
 	patchProjectLimitsRequest *PatchProjectLimitsRequest
 }
 
@@ -596,7 +596,7 @@ Set a limit to `null` to remove it.
 	@param id ID of the project.
 	@return *ApiProjectsLimitsPartialUpdateRequest
 */
-func (a *ProjectsAPIService) ProjectsLimitsPartialUpdate(ctx context.Context, id int32) *ApiProjectsLimitsPartialUpdateRequest {
+func (a *ProjectsAPIService) ProjectsLimitsPartialUpdate(ctx context.Context, id int64) *ApiProjectsLimitsPartialUpdateRequest {
 	return &ApiProjectsLimitsPartialUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -733,7 +733,7 @@ type ApiProjectsLimitsRetrieveRequest struct {
 	ctx        context.Context
 	ApiService *ProjectsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -755,7 +755,7 @@ Fetch limits for a project.
 	@param id ID of the project.
 	@return *ApiProjectsLimitsRetrieveRequest
 */
-func (a *ProjectsAPIService) ProjectsLimitsRetrieve(ctx context.Context, id int32) *ApiProjectsLimitsRetrieveRequest {
+func (a *ProjectsAPIService) ProjectsLimitsRetrieve(ctx context.Context, id int64) *ApiProjectsLimitsRetrieveRequest {
 	return &ApiProjectsLimitsRetrieveRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -1108,7 +1108,7 @@ type ApiProjectsPartialUpdateRequest struct {
 	ctx                  context.Context
 	ApiService           *ProjectsAPIService
 	xStackId             *int32
-	id                   int32
+	id                   int64
 	patchProjectApiModel *PatchProjectApiModel
 }
 
@@ -1136,7 +1136,7 @@ Update a project.
 	@param id ID of the project.
 	@return *ApiProjectsPartialUpdateRequest
 */
-func (a *ProjectsAPIService) ProjectsPartialUpdate(ctx context.Context, id int32) *ApiProjectsPartialUpdateRequest {
+func (a *ProjectsAPIService) ProjectsPartialUpdate(ctx context.Context, id int64) *ApiProjectsPartialUpdateRequest {
 	return &ApiProjectsPartialUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -1287,7 +1287,7 @@ type ApiProjectsRetrieveRequest struct {
 	ctx        context.Context
 	ApiService *ProjectsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -1309,7 +1309,7 @@ Retrieve a single project.
 	@param id ID of the project.
 	@return *ApiProjectsRetrieveRequest
 */
-func (a *ProjectsAPIService) ProjectsRetrieve(ctx context.Context, id int32) *ApiProjectsRetrieveRequest {
+func (a *ProjectsAPIService) ProjectsRetrieve(ctx context.Context, id int64) *ApiProjectsRetrieveRequest {
 	return &ApiProjectsRetrieveRequest{
 		ApiService: a,
 		ctx:        ctx,

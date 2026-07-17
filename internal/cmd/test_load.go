@@ -544,7 +544,8 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	}
 
 	gs.Logger.Debug("Consolidating config layers...")
-	consolidatedConfig, err := getConsolidatedConfig(gs, cliConfig, lt.initRunner.GetOptions())
+	consolidatedConfig, err := getConsolidatedConfig(
+		gs, cliConfig, lt.initRunner.GetOptions(), lt.preInitState.FeatureFlags)
 	if err != nil {
 		return nil, err
 	}

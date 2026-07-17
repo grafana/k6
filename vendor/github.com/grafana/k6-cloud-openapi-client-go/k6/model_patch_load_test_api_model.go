@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,9 +22,15 @@ var _ MappedNullable = &PatchLoadTestApiModel{}
 type PatchLoadTestApiModel struct {
 	// Unique name of the test within the project.
 	Name *string `json:"name,omitempty"`
-	// ID of a baseline test run used for results comparison.
-	BaselineTestRunId NullableInt32 `json:"baseline_test_run_id,omitempty"`
+	// ID of a baseline test run used for results comparison. Deprecated: baselines are being replaced by the star/unstar test run APIs and this field is scheduled for removal on 2026-09-01.
+	// Deprecated
+	BaselineTestRunId NullableInt64 `json:"baseline_test_run_id,omitempty"`
+	// Identifier of the k6 version used to run the test.
+	K6Version            NullableInt32 `json:"k6_version,omitempty"`
+	AdditionalProperties map[string]interface{}
 }
+
+type _PatchLoadTestApiModel PatchLoadTestApiModel
 
 // NewPatchLoadTestApiModel instantiates a new PatchLoadTestApiModel object
 // This constructor will assign default values to properties that have it defined,
@@ -76,9 +82,10 @@ func (o *PatchLoadTestApiModel) SetName(v string) {
 }
 
 // GetBaselineTestRunId returns the BaselineTestRunId field value if set, zero value otherwise (both if not set or set to explicit null).
-func (o *PatchLoadTestApiModel) GetBaselineTestRunId() int32 {
+// Deprecated
+func (o *PatchLoadTestApiModel) GetBaselineTestRunId() int64 {
 	if o == nil || IsNil(o.BaselineTestRunId.Get()) {
-		var ret int32
+		var ret int64
 		return ret
 	}
 	return *o.BaselineTestRunId.Get()
@@ -87,7 +94,8 @@ func (o *PatchLoadTestApiModel) GetBaselineTestRunId() int32 {
 // GetBaselineTestRunIdOk returns a tuple with the BaselineTestRunId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *PatchLoadTestApiModel) GetBaselineTestRunIdOk() (*int32, bool) {
+// Deprecated
+func (o *PatchLoadTestApiModel) GetBaselineTestRunIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -103,8 +111,9 @@ func (o *PatchLoadTestApiModel) HasBaselineTestRunId() bool {
 	return false
 }
 
-// SetBaselineTestRunId gets a reference to the given NullableInt32 and assigns it to the BaselineTestRunId field.
-func (o *PatchLoadTestApiModel) SetBaselineTestRunId(v int32) {
+// SetBaselineTestRunId gets a reference to the given NullableInt64 and assigns it to the BaselineTestRunId field.
+// Deprecated
+func (o *PatchLoadTestApiModel) SetBaselineTestRunId(v int64) {
 	o.BaselineTestRunId.Set(&v)
 }
 
@@ -116,6 +125,49 @@ func (o *PatchLoadTestApiModel) SetBaselineTestRunIdNil() {
 // UnsetBaselineTestRunId ensures that no value is present for BaselineTestRunId, not even an explicit nil
 func (o *PatchLoadTestApiModel) UnsetBaselineTestRunId() {
 	o.BaselineTestRunId.Unset()
+}
+
+// GetK6Version returns the K6Version field value if set, zero value otherwise (both if not set or set to explicit null).
+func (o *PatchLoadTestApiModel) GetK6Version() int32 {
+	if o == nil || IsNil(o.K6Version.Get()) {
+		var ret int32
+		return ret
+	}
+	return *o.K6Version.Get()
+}
+
+// GetK6VersionOk returns a tuple with the K6Version field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+// NOTE: If the value is an explicit nil, `nil, true` will be returned
+func (o *PatchLoadTestApiModel) GetK6VersionOk() (*int32, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.K6Version.Get(), o.K6Version.IsSet()
+}
+
+// HasK6Version returns a boolean if a field has been set.
+func (o *PatchLoadTestApiModel) HasK6Version() bool {
+	if o != nil && o.K6Version.IsSet() {
+		return true
+	}
+
+	return false
+}
+
+// SetK6Version gets a reference to the given NullableInt32 and assigns it to the K6Version field.
+func (o *PatchLoadTestApiModel) SetK6Version(v int32) {
+	o.K6Version.Set(&v)
+}
+
+// SetK6VersionNil sets the value for K6Version to be an explicit nil
+func (o *PatchLoadTestApiModel) SetK6VersionNil() {
+	o.K6Version.Set(nil)
+}
+
+// UnsetK6Version ensures that no value is present for K6Version, not even an explicit nil
+func (o *PatchLoadTestApiModel) UnsetK6Version() {
+	o.K6Version.Unset()
 }
 
 func (o PatchLoadTestApiModel) MarshalJSON() ([]byte, error) {
@@ -134,7 +186,38 @@ func (o PatchLoadTestApiModel) ToMap() (map[string]interface{}, error) {
 	if o.BaselineTestRunId.IsSet() {
 		toSerialize["baseline_test_run_id"] = o.BaselineTestRunId.Get()
 	}
+	if o.K6Version.IsSet() {
+		toSerialize["k6_version"] = o.K6Version.Get()
+	}
+
+	for key, value := range o.AdditionalProperties {
+		toSerialize[key] = value
+	}
+
 	return toSerialize, nil
+}
+
+func (o *PatchLoadTestApiModel) UnmarshalJSON(data []byte) (err error) {
+	varPatchLoadTestApiModel := _PatchLoadTestApiModel{}
+
+	err = json.Unmarshal(data, &varPatchLoadTestApiModel)
+
+	if err != nil {
+		return err
+	}
+
+	*o = PatchLoadTestApiModel(varPatchLoadTestApiModel)
+
+	additionalProperties := make(map[string]interface{})
+
+	if err = json.Unmarshal(data, &additionalProperties); err == nil {
+		delete(additionalProperties, "name")
+		delete(additionalProperties, "baseline_test_run_id")
+		delete(additionalProperties, "k6_version")
+		o.AdditionalProperties = additionalProperties
+	}
+
+	return err
 }
 
 type NullablePatchLoadTestApiModel struct {

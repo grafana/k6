@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,7 +22,7 @@ var _ MappedNullable = &AllowedProjectApiModel{}
 // AllowedProjectApiModel struct for AllowedProjectApiModel
 type AllowedProjectApiModel struct {
 	// ID of the project.
-	Id int32 `json:"id"`
+	Id int64 `json:"id"`
 	// Name of the project.
 	Name                 string `json:"name"`
 	AdditionalProperties map[string]interface{}
@@ -34,7 +34,7 @@ type _AllowedProjectApiModel AllowedProjectApiModel
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAllowedProjectApiModel(id int32, name string) *AllowedProjectApiModel {
+func NewAllowedProjectApiModel(id int64, name string) *AllowedProjectApiModel {
 	this := AllowedProjectApiModel{}
 	this.Id = id
 	this.Name = name
@@ -50,9 +50,9 @@ func NewAllowedProjectApiModelWithDefaults() *AllowedProjectApiModel {
 }
 
 // GetId returns the Id field value
-func (o *AllowedProjectApiModel) GetId() int32 {
+func (o *AllowedProjectApiModel) GetId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -61,7 +61,7 @@ func (o *AllowedProjectApiModel) GetId() int32 {
 
 // GetIdOk returns a tuple with the Id field value
 // and a boolean to check if the value has been set.
-func (o *AllowedProjectApiModel) GetIdOk() (*int32, bool) {
+func (o *AllowedProjectApiModel) GetIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -69,7 +69,7 @@ func (o *AllowedProjectApiModel) GetIdOk() (*int32, bool) {
 }
 
 // SetId sets field value
-func (o *AllowedProjectApiModel) SetId(v int32) {
+func (o *AllowedProjectApiModel) SetId(v int64) {
 	o.Id = v
 }
 
