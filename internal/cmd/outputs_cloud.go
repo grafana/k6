@@ -18,6 +18,7 @@ import (
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
+	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
@@ -100,6 +101,11 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	if conf.PushRefID.Valid && conf.PushRefID.String != "" {
 		test.preInitState.RuntimeOptions.Env[testRunIDKey] = conf.PushRefID.String
 		gs.Logger.Debug("using PushRefID, skipping CreateTestRun")
+		// Externally-provisioned run: the logs config and token are already
+		// on conf from the environment. The run id is the PushRefID.
+		if gs.CloudLogPusher != nil {
+			gs.CloudLogPusher.SetConfig(logPusherConfig(conf, conf.PushRefID.String))
+		}
 		return nil
 	}
 
@@ -196,6 +202,13 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 			Endpoint:     result.RuntimeConfig.Secrets.Endpoint,
 			ResponsePath: result.RuntimeConfig.Secrets.ResponsePath,
 		})
+	}
+
+	// Configure the log pusher for the self-provisioned run. The run id is
+	// the provisioning result's TestRunID.
+	if gs.CloudLogPusher != nil {
+		gs.CloudLogPusher.SetConfig(
+			logPusherConfig(conf, strconv.FormatInt(int64(result.TestRunID), 10)))
 	}
 
 	// Serialise overridden Config back into the collectors map (existing pattern).
@@ -311,5 +324,52 @@ func buildConfigFromRuntimeConfig(
 	// expv2 has no min-samples aggregation knob; adding one would
 	// require changes to output/cloud/expv2/{collect.go, flush.go}.
 
+	// logs.push_url (string) → LogsPushURL
+	if v := rc.Logs.PushURL; v != "" {
+		cfg.LogsPushURL = null.StringFrom(v)
+	}
+	// logs.level (string) → LogsLevel
+	if v := rc.Logs.Level; v != "" {
+		cfg.LogsLevel = null.StringFrom(v)
+	}
+	// logs.limit (int32) → LogsLimit
+	if v := rc.Logs.Limit; v != 0 {
+		cfg.LogsLimit = null.IntFrom(int64(v))
+	}
+	// logs.push_period_seconds (string) → LogsPushPeriod (NullDuration)
+	if v := rc.Logs.PushPeriodSeconds; v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.LogsPushPeriod = types.NewNullDuration(d, true)
+		} else {
+			logger.WithError(err).WithField("field", "push_period_seconds").
+				Warn("invalid duration in runtime_config; using default")
+		}
+	}
+	// logs.message_max_size (int32) → LogsMessageMaxSize
+	if v := rc.Logs.MessageMaxSize; v != 0 {
+		cfg.LogsMessageMaxSize = null.IntFrom(int64(v))
+	}
+	// logs.allowed_labels ([]string) → LogsAllowedLabels
+	if v := rc.Logs.AllowedLabels; len(v) > 0 {
+		cfg.LogsAllowedLabels = v
+	}
+
 	return cfg
+}
+
+// logPusherConfig translates the resolved cloudapi.Config log-push fields
+// into the cloud log pusher's config. testRunID is the run identifier used
+// as the required test_run_id stream label: result.TestRunID in the
+// self-provisioned flow, PushRefID in the externally-provisioned flow.
+func logPusherConfig(conf cloudapi.Config, testRunID string) cloudlog.Config {
+	return cloudlog.Config{
+		PushURL:       conf.LogsPushURL.String,
+		Token:         conf.TestRunToken.String,
+		TestRunID:     testRunID,
+		Level:         conf.LogsLevel.String,
+		Limit:         int(conf.LogsLimit.Int64),
+		PushPeriod:    conf.LogsPushPeriod.TimeDuration(),
+		MsgMaxSize:    int(conf.LogsMessageMaxSize.Int64),
+		AllowedLabels: conf.LogsAllowedLabels,
+	}
 }
