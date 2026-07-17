@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -276,4 +278,126 @@ func TestPusher_DrainContextTimeout(t *testing.T) {
 	cancel()
 
 	require.ErrorIs(t, p.Drain(ctx), context.Canceled)
+}
+
+// TestPusher_FiltersBelowConfiguredLevel locks the backend-level directive:
+// with Level "info" the pusher pushes info/warn/error entries but filters out
+// the less-severe debug entry, even though the loki hook's Fire enqueues
+// unconditionally. Entries reach the backend via the periodic push.
+func TestPusher_FiltersBelowConfiguredLevel(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu   sync.Mutex
+		body strings.Builder
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		mu.Lock()
+		body.Write(b)
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	p := New(testutils.NewLogger(t))
+	p.SetConfig(Config{
+		PushURL:    srv.URL,
+		Token:      "tok",
+		TestRunID:  "run-lvl",
+		Level:      "info",
+		PushPeriod: 20 * time.Millisecond,
+	})
+
+	// Fired debug-first, so by the time the others are pushed the debug entry
+	// has already been through the forward path (and been filtered).
+	for _, e := range []*logrus.Entry{
+		{Time: time.Now(), Level: logrus.DebugLevel, Message: "msg-debug"},
+		{Time: time.Now(), Level: logrus.InfoLevel, Message: "msg-info"},
+		{Time: time.Now(), Level: logrus.WarnLevel, Message: "msg-warn"},
+		{Time: time.Now(), Level: logrus.ErrorLevel, Message: "msg-error"},
+	} {
+		require.NoError(t, p.Fire(e))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	listenDone := make(chan struct{})
+	go func() {
+		p.Listen(ctx)
+		close(listenDone)
+	}()
+
+	got := func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		return body.String()
+	}
+
+	// The info/warn/error entries (at or above the configured level) are pushed.
+	require.Eventually(t, func() bool {
+		b := got()
+		return strings.Contains(b, "msg-info") &&
+			strings.Contains(b, "msg-warn") &&
+			strings.Contains(b, "msg-error")
+	}, 2*time.Second, 10*time.Millisecond, "info/warn/error entries were not pushed")
+
+	// The debug entry is below the configured level, so it is never pushed.
+	assert.NotContains(t, got(), "msg-debug")
+
+	cancel()
+	select {
+	case <-listenDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Listen did not return after ctx was cancelled")
+	}
+}
+
+// TestPusher_EmptyLevelKeepsAll is the variant: an unset Level keeps all
+// levels, so even a debug entry is pushed.
+func TestPusher_EmptyLevelKeepsAll(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu   sync.Mutex
+		body strings.Builder
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		mu.Lock()
+		body.Write(b)
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	p := New(testutils.NewLogger(t))
+	p.SetConfig(Config{
+		PushURL:    srv.URL,
+		Token:      "tok",
+		TestRunID:  "run-empty",
+		Level:      "", // unset => keep all levels
+		PushPeriod: 20 * time.Millisecond,
+	})
+
+	require.NoError(t, p.Fire(&logrus.Entry{Time: time.Now(), Level: logrus.DebugLevel, Message: "msg-debug"}))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	listenDone := make(chan struct{})
+	go func() {
+		p.Listen(ctx)
+		close(listenDone)
+	}()
+
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return strings.Contains(body.String(), "msg-debug")
+	}, 2*time.Second, 10*time.Millisecond, "debug entry was not pushed with empty level")
+
+	cancel()
+	select {
+	case <-listenDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Listen did not return after ctx was cancelled")
+	}
 }
