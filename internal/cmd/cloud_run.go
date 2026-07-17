@@ -34,6 +34,9 @@ type cmdCloudRun struct {
 	// noCloudSecrets stores the state of the --no-cloud-secrets flag.
 	noCloudSecrets bool
 
+	// noCloudLogs stores the state of the --no-cloud-logs flag.
+	noCloudLogs bool
+
 	// runCmd holds an instance of the k6 run command that we store
 	// in order to be able to call its run method to support
 	// the --local-execution flag mode.
@@ -132,6 +135,13 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	if c.noCloudLogs {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("the --no-cloud-logs flag can only be used in conjunction with the --local-execution flag"),
+			exitcodes.InvalidConfig,
+		)
+	}
+
 	return c.deprecatedCloudCmd.preRun(cmd, args)
 }
 
@@ -191,6 +201,12 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		"no-cloud-secrets",
 		c.noCloudSecrets,
 		"only when using the local-execution mode, don't automatically configure the cloud secret source",
+	)
+	flags.BoolVar(
+		&c.noCloudLogs,
+		"no-cloud-logs",
+		c.noCloudLogs,
+		"only when using the local-execution mode, don't push logs to the cloud",
 	)
 	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 
