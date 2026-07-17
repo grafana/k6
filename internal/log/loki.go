@@ -47,24 +47,51 @@ func getDefaultLoki() *lokiHook {
 	}
 }
 
-// LokiFromConfigLine returns a new logrus.Hook
-// that pushes logrus.Entrys to loki and is configured
-// through the provided line.
-func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHook, error) {
+// LokiHookOptions configures a loki push hook built by NewLokiHook.
+// Zero-valued fields take the built-in defaults.
+type LokiHookOptions struct {
+	Addr          string        // default http://127.0.0.1:3100/loki/api/v1/push
+	PushPeriod    time.Duration // default 1s
+	Limit         int           // default 100
+	MsgMaxSize    int           // default 1MB
+	Level         string        // "" => all levels; else parseLevels
+	AllowedLabels []string
+	Labels        [][2]string // static labels (e.g. test_run_id)
+	Headers       [][2]string // e.g. Authorization: Bearer <token>
+	Profile       bool
+}
+
+// NewLokiHook returns a new AsyncHook that pushes logrus.Entrys to loki,
+// configured from opts. Zero-valued opts fields take the built-in defaults.
+func NewLokiHook(fallbackLogger logrus.FieldLogger, opts LokiHookOptions) (AsyncHook, error) {
 	h := getDefaultLoki()
 	h.fallbackLogger = fallbackLogger
 
-	if line != "loki" {
-		logOutput, _, _ := strings.Cut(line, "=")
-		if logOutput != "loki" {
-			return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
-		}
-
-		err := h.parseArgs(line)
+	if opts.Addr != "" {
+		h.addr = opts.Addr
+	}
+	if opts.PushPeriod != 0 {
+		h.pushPeriod = opts.PushPeriod
+	}
+	if opts.Limit != 0 {
+		h.limit = opts.Limit
+	}
+	if opts.MsgMaxSize != 0 {
+		h.msgMaxSize = opts.MsgMaxSize
+	}
+	if opts.Level != "" {
+		levels, err := parseLevels(opts.Level)
 		if err != nil {
 			return nil, err
 		}
+		h.levels = levels
 	}
+	if opts.AllowedLabels != nil {
+		h.allowedLabels = opts.AllowedLabels
+	}
+	h.labels = append(h.labels, opts.Labels...)
+	h.headers = append(h.headers, opts.Headers...)
+	h.profile = opts.Profile
 
 	h.droppedLabels = make(map[string]string, 2+len(h.labels))
 	h.droppedLabels["level"] = logrus.WarnLevel.String()
@@ -74,10 +101,31 @@ func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHo
 
 	h.droppedMsg = h.filterLabels(h.droppedLabels, h.droppedMsg)
 	h.client = &http.Client{Timeout: h.pushPeriod}
+
 	return h, nil
 }
 
-func (h *lokiHook) parseArgs(line string) error {
+// LokiFromConfigLine returns a new logrus.Hook
+// that pushes logrus.Entrys to loki and is configured
+// through the provided line.
+func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHook, error) {
+	var opts LokiHookOptions
+
+	if line != "loki" {
+		logOutput, _, _ := strings.Cut(line, "=")
+		if logOutput != "loki" {
+			return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
+		}
+
+		if err := opts.parseArgs(line); err != nil {
+			return nil, err
+		}
+	}
+
+	return NewLokiHook(fallbackLogger, opts)
+}
+
+func (opts *LokiHookOptions) parseArgs(line string) error {
 	tokens, err := strvals.Parse(line)
 	if err != nil {
 		return fmt.Errorf("error while parsing loki configuration %w", err)
@@ -90,46 +138,41 @@ func (h *lokiHook) parseArgs(line string) error {
 		var err error
 		switch key {
 		case "loki":
-			h.addr = value
+			opts.Addr = value
 		case "pushPeriod":
-			h.pushPeriod, err = time.ParseDuration(value)
+			opts.PushPeriod, err = time.ParseDuration(value)
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki pushPeriod %w", err)
 			}
 		case "profile":
-			h.profile = true
+			opts.Profile = true
 		case "limit":
-			h.limit, err = strconv.Atoi(value)
+			opts.Limit, err = strconv.Atoi(value)
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki limit as a number %w", err)
 			}
-			if h.limit < 1 {
-				return fmt.Errorf("loki limit needs to be a positive number, is %d", h.limit)
+			if opts.Limit < 1 {
+				return fmt.Errorf("loki limit needs to be a positive number, is %d", opts.Limit)
 			}
 		case "msgMaxSize":
-			h.msgMaxSize, err = strconv.Atoi(value)
+			opts.MsgMaxSize, err = strconv.Atoi(value)
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
 			}
-			if h.msgMaxSize < 1 {
-				return fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", h.msgMaxSize)
+			if opts.MsgMaxSize < 1 {
+				return fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", opts.MsgMaxSize)
 			}
 		case "level":
-			h.levels, err = parseLevels(value)
-			if err != nil {
-				return err
-			}
+			opts.Level = value
 		case "allowedLabels":
-			h.allowedLabels = strings.Split(value, ",")
+			opts.AllowedLabels = strings.Split(value, ",")
 		default:
 			if after, ok := strings.CutPrefix(key, "label."); ok {
-				labelKey := after
-				h.labels = append(h.labels, [2]string{labelKey, value})
+				opts.Labels = append(opts.Labels, [2]string{after, value})
 
 				continue
 			} else if after, ok := strings.CutPrefix(key, "header."); ok {
-				headerKey := after
-				h.headers = append(h.headers, [2]string{headerKey, value})
+				opts.Headers = append(opts.Headers, [2]string{after, value})
 
 				continue
 			}
