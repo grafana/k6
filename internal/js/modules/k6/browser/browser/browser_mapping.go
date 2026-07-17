@@ -8,13 +8,18 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 )
 
-// mapBrowser to the JS module.
+// browserProvider is a function that provides a browser instance.
+type browserProvider func() (*common.Browser, error)
+
+// mapBrowser to the JS module API using the provider to get the browser instance.
+// This lets the same mapping serve both the managed browser and a browser
+// obtained via chromium.connectOverCDP, since they share the same API.
 //
 //nolint:gocognit
-func mapBrowser(vu moduleVU) mapping {
+func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 	return mapping{
 		"context": func() (mapping, error) {
-			b, err := vu.browser()
+			b, err := browser()
 			if err != nil {
 				return nil, err
 			}
@@ -22,7 +27,7 @@ func mapBrowser(vu moduleVU) mapping {
 		},
 		"closeContext": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
-				b, err := vu.browser()
+				b, err := browser()
 				if err != nil {
 					return nil, err
 				}
@@ -30,7 +35,7 @@ func mapBrowser(vu moduleVU) mapping {
 			})
 		},
 		"isConnected": func() (bool, error) {
-			b, err := vu.browser()
+			b, err := browser()
 			if err != nil {
 				return false, err
 			}
@@ -42,7 +47,7 @@ func mapBrowser(vu moduleVU) mapping {
 				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
-				b, err := vu.browser()
+				b, err := browser()
 				if err != nil {
 					return nil, err
 				}
@@ -58,14 +63,14 @@ func mapBrowser(vu moduleVU) mapping {
 			}), nil
 		},
 		"userAgent": func() (string, error) {
-			b, err := vu.browser()
+			b, err := browser()
 			if err != nil {
 				return "", err
 			}
 			return b.UserAgent(), nil
 		},
 		"version": func() (string, error) {
-			b, err := vu.browser()
+			b, err := browser()
 			if err != nil {
 				return "", err
 			}
@@ -77,7 +82,7 @@ func mapBrowser(vu moduleVU) mapping {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
-				b, err := vu.browser()
+				b, err := browser()
 				if err != nil {
 					return nil, err
 				}

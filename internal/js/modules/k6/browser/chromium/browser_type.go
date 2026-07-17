@@ -51,6 +51,26 @@ func NewBrowserType(vu k6modules.VU) *BrowserType {
 	}
 }
 
+// Clone returns a new BrowserType that reuses the receiver's already
+// initialized, thread-safe fields (vu, hooks, k6Metrics, envLookupper) but
+// gets its own randSrc and Ctx.
+//
+// This exists, so callers that need a fresh BrowserType per operation (e.g.,
+// concurrent ConnectOverCDP calls in the same iteration) don't have to go
+// through NewBrowserType, which calls vu.InitEnv() and therefore only works
+// during the script init scope, not during an iteration.
+// Sharing a single BrowserType across concurrent operations instead would race
+// on randSrc (used in initContext) and on the Ctx field (written in Connect).
+func (b *BrowserType) Clone() *BrowserType {
+	return &BrowserType{
+		vu:           b.vu,
+		hooks:        b.hooks,
+		k6Metrics:    b.k6Metrics,
+		randSrc:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
+		envLookupper: b.envLookupper,
+	}
+}
+
 func (b *BrowserType) init(
 	ctx context.Context, isRemoteBrowser bool,
 ) (context.Context, *common.BrowserOptions, *log.Logger, error) {
@@ -90,6 +110,35 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 	ctx = common.WithHooks(ctx, b.hooks)
 	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
 	return ctx
+}
+
+// ConnectOverCDP attaches the k6 browser to an existing, user-managed browser
+// over CDP, without requiring scenario browser options.
+//
+// The passed context must be the context the caller wants to control both the
+// connection and the browser lifetime; when it is canceled (iteration ends),
+// the connection is torn down.
+func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*common.Browser, error) {
+	ctx = b.initContext(ctx)
+
+	logger, err := makeLogger(ctx, b.envLookupper)
+	if err != nil {
+		return nil, fmt.Errorf("setting up logger: %w", err)
+	}
+
+	opts := common.NewRemoteBrowserOptions()
+	ctx = common.WithBrowserOptions(ctx, opts)
+
+	bp, err := b.connect(ctx, ctx, wsEndpoint, opts, logger)
+	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: opts.Timeout,
+		}
+		return nil, fmt.Errorf("%w", err)
+	}
+
+	return bp, nil
 }
 
 // Connect attaches k6 browser to an existing browser instance.
