@@ -244,7 +244,8 @@ func TestOutput(t *testing.T) {
 }
 
 func TestOutputHTTPBasicAuthWithoutHeaders(t *testing.T) {
-	t.Parallel()
+	t.Setenv("OTEL_EXPORTER_OTLP_HEADERS", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_METRICS_HEADERS", "")
 
 	authHeader := make(chan string, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -280,7 +281,8 @@ func TestOutputHTTPBasicAuthWithoutHeaders(t *testing.T) {
 }
 
 func TestOutputDoesNotSendHTTPBasicAuthOverGRPC(t *testing.T) {
-	t.Parallel()
+	t.Setenv("OTEL_EXPORTER_OTLP_HEADERS", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_METRICS_HEADERS", "")
 
 	server, err := newGRPCServer()
 	require.NoError(t, err)
