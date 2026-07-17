@@ -18,6 +18,7 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	metricpb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 
 	"go.k6.io/k6/v2/internal/lib/testutils"
@@ -79,8 +80,9 @@ func (s *httpMetricsServer) Endpoint() string { return s.server.Listener.Addr().
 
 type grpcMetricsServer struct {
 	baseServer
-	server   *grpc.Server
-	listener net.Listener
+	server              *grpc.Server
+	listener            net.Listener
+	authorizationHeader chan string
 }
 
 func newGRPCServer() (*grpcMetricsServer, error) {
@@ -90,13 +92,15 @@ func newGRPCServer() (*grpcMetricsServer, error) {
 	}
 
 	s := &grpcMetricsServer{
-		server:   grpc.NewServer(),
-		listener: listener,
+		server:              grpc.NewServer(),
+		listener:            listener,
+		authorizationHeader: make(chan string, 1),
 	}
 
 	collectormetrics.RegisterMetricsServiceServer(s.server, &grpcMetricsHandler{
 		UnimplementedMetricsServiceServer: collectormetrics.UnimplementedMetricsServiceServer{},
 		baseServer:                        &s.baseServer,
+		authorizationHeader:               s.authorizationHeader,
 	})
 	return s, nil
 }
@@ -129,10 +133,20 @@ func (s *grpcMetricsServer) Endpoint() string { return s.listener.Addr().String(
 
 type grpcMetricsHandler struct {
 	collectormetrics.UnimplementedMetricsServiceServer
-	baseServer *baseServer
+	baseServer          *baseServer
+	authorizationHeader chan<- string
 }
 
-func (h *grpcMetricsHandler) Export(_ context.Context, req *collectormetrics.ExportMetricsServiceRequest) (*collectormetrics.ExportMetricsServiceResponse, error) {
+func (h *grpcMetricsHandler) Export(ctx context.Context, req *collectormetrics.ExportMetricsServiceRequest) (*collectormetrics.ExportMetricsServiceResponse, error) {
+	var authorization string
+	if values := metadata.ValueFromIncomingContext(ctx, "authorization"); len(values) > 0 {
+		authorization = values[0]
+	}
+	select {
+	case h.authorizationHeader <- authorization:
+	default:
+	}
+
 	data, err := proto.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
@@ -260,6 +274,32 @@ func TestOutputHTTPBasicAuthWithoutHeaders(t *testing.T) {
 	case header := <-authHeader:
 		expected := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:password"))
 		require.Equal(t, expected, header)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for metrics export")
+	}
+}
+
+func TestOutputDoesNotSendHTTPBasicAuthOverGRPC(t *testing.T) {
+	t.Parallel()
+
+	server, err := newGRPCServer()
+	require.NoError(t, err)
+	require.NoError(t, server.Start())
+	defer server.Stop()
+
+	config := createTestConfig("grpc", server.Endpoint())
+	config["K6_OTEL_HTTP_EXPORTER_USERNAME"] = "user"
+	config["K6_OTEL_HTTP_EXPORTER_PASSWORD"] = "password"
+
+	registry := metrics.NewRegistry()
+	o := setupOutput(t, config)
+	sample := createTestSample(t, registry, metrics.Counter, 1)
+	o.AddMetricSamples([]metrics.SampleContainer{metrics.Samples([]metrics.Sample{sample})})
+	require.NoError(t, o.Stop())
+
+	select {
+	case header := <-server.authorizationHeader:
+		require.Empty(t, header)
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for metrics export")
 	}
