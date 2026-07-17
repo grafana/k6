@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/internal/event"
+	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/internal/ui/console"
 	"go.k6.io/k6/v2/internal/usage"
@@ -90,6 +91,7 @@ type GlobalState struct {
 
 	SecretsManager    *secretsource.Manager
 	CloudSecretSource *cloudsecrets.SecretSource
+	CloudLogPusher    *cloudlog.Pusher
 	Usage             *usage.Usage
 	TestStatus        *lib.TestStatus
 }

@@ -155,6 +155,11 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			cliArgs:            []string{"--no-cloud-secrets"},
 			wantStderrContains: "the --no-cloud-secrets flag can only be used in conjunction with the --local-execution flag",
 		},
+		{
+			name:               "using --no-cloud-logs without --local-execution should fail",
+			cliArgs:            []string{"--no-cloud-logs"},
+			wantStderrContains: "the --no-cloud-logs flag can only be used in conjunction with the --local-execution flag",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -523,6 +528,103 @@ export default function() {};`
 
 	// --no-cloud-secrets must prevent the cloud source from being registered.
 	assert.Nil(t, ts.CloudSecretSource, "cloud secret source should not be registered when --no-cloud-secrets is set")
+}
+
+func TestCloudRunLocalExecutionCloudLogPusher(t *testing.T) {
+	t.Parallel()
+
+	script := `
+export const options = {
+  cloud: {
+      name: 'Test cloud logs',
+      projectID: 123456,
+  },
+};
+export default function() {};`
+
+	t.Run("registers the pusher for --local-execution", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.NotNil(t, ts.CloudLogPusher,
+			"cloud log pusher should be registered for k6 cloud run --local-execution")
+	})
+
+	t.Run("does not register the pusher with --no-cloud-logs", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--no-cloud-logs"})
+		setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Nil(t, ts.CloudLogPusher,
+			"cloud log pusher should not be registered when --no-cloud-logs is set")
+	})
+
+	t.Run("does not register the pusher for non-local-execution", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
+		ts.CmdArgs = []string{"k6", "run", "test.js"}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Nil(t, ts.CloudLogPusher,
+			"cloud log pusher should not be registered for a non-local-execution run")
+	})
+}
+
+// setupLocalExecutionProvMock wires a provisioning mock server for a
+// k6 cloud run --local-execution flow and points ts at it. It mirrors the
+// handlers used by TestCloudRunLocalExecutionNoCloudSecrets.
+func setupLocalExecutionProvMock(t *testing.T, ts *GlobalTestState) {
+	t.Helper()
+
+	srv := provtest.NewServer(t)
+
+	srv.HandleCreateLoadTest(123456, func(w http.ResponseWriter, _ *http.Request) {
+		res := k6cloud.NewLoadTestApiModelWithDefaults()
+		res.SetId(provtest.DefaultLoadTestID)
+		writeProvJSON(w, http.StatusCreated, res)
+	})
+
+	srv.HandleStartLocalExecution(provtest.DefaultLoadTestID, func(w http.ResponseWriter, _ *http.Request) {
+		resp := provtest.DefaultStartLocalExecutionResponse()
+		uploadURL := srv.URL + provtest.PresignedUploadPath
+		resp.SetArchiveUploadUrl(uploadURL)
+		resp.SetTestRunDetailsPageUrl(fmt.Sprintf("%s/runs/%d", srv.URL, provtest.DefaultTestRunID))
+		rc := resp.GetRuntimeConfig()
+		m := rc.GetMetrics()
+		m.SetPushUrl(srv.URL + "/v1/metrics")
+		rc.SetMetrics(m)
+		resp.SetRuntimeConfig(rc)
+		writeProvJSON(w, http.StatusOK, resp)
+	})
+
+	srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusInitializing},
+	})
+
+	srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv.Mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
