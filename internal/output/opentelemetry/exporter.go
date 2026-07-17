@@ -41,6 +41,9 @@ func getExporter(cfg Config) (metric.Exporter, error) {
 
 	// if at least valid user was configured, use basic auth
 	if cfg.HTTPUsername.Valid {
+		if headers == nil {
+			headers = make(map[string]string)
+		}
 		auth := []byte(cfg.HTTPUsername.String + ":" + cfg.HTTPPassword.String)
 		headers["Authorization"] = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(auth))
 	}

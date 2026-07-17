@@ -2,6 +2,7 @@ package opentelemetry
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net"
@@ -225,6 +226,42 @@ func TestOutput(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestOutputHTTPBasicAuthWithoutHeaders(t *testing.T) {
+	t.Parallel()
+
+	authHeader := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/metrics" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		select {
+		case authHeader <- r.Header.Get("Authorization"):
+		default:
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	config := createTestConfig("http", server.Listener.Addr().String())
+	config["K6_OTEL_HTTP_EXPORTER_USERNAME"] = "user"
+	config["K6_OTEL_HTTP_EXPORTER_PASSWORD"] = "password"
+
+	registry := metrics.NewRegistry()
+	o := setupOutput(t, config)
+	sample := createTestSample(t, registry, metrics.Counter, 1)
+	o.AddMetricSamples([]metrics.SampleContainer{metrics.Samples([]metrics.Sample{sample})})
+	require.NoError(t, o.Stop())
+
+	select {
+	case header := <-authHeader:
+		expected := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:password"))
+		require.Equal(t, expected, header)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for metrics export")
 	}
 }
 
