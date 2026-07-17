@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -28,7 +28,7 @@ type ApiLoadTestsDestroyRequest struct {
 	ctx        context.Context
 	ApiService *LoadTestsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -50,7 +50,7 @@ Delete a load test.
 	@param id ID of the load test.
 	@return *ApiLoadTestsDestroyRequest
 */
-func (a *LoadTestsAPIService) LoadTestsDestroy(ctx context.Context, id int32) *ApiLoadTestsDestroyRequest {
+func (a *LoadTestsAPIService) LoadTestsDestroy(ctx context.Context, id int64) *ApiLoadTestsDestroyRequest {
 	return &ApiLoadTestsDestroyRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -392,7 +392,7 @@ type ApiLoadTestsMoveRequest struct {
 	ctx                  context.Context
 	ApiService           *LoadTestsAPIService
 	xStackId             *int32
-	id                   int32
+	id                   int64
 	moveLoadTestApiModel *MoveLoadTestApiModel
 }
 
@@ -421,7 +421,7 @@ All respective test runs will be also moved to the new project.
 	@param id ID of the load test.
 	@return *ApiLoadTestsMoveRequest
 */
-func (a *LoadTestsAPIService) LoadTestsMove(ctx context.Context, id int32) *ApiLoadTestsMoveRequest {
+func (a *LoadTestsAPIService) LoadTestsMove(ctx context.Context, id int64) *ApiLoadTestsMoveRequest {
 	return &ApiLoadTestsMoveRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -572,7 +572,7 @@ type ApiLoadTestsPartialUpdateRequest struct {
 	ctx                   context.Context
 	ApiService            *LoadTestsAPIService
 	xStackId              *int32
-	id                    int32
+	id                    int64
 	patchLoadTestApiModel *PatchLoadTestApiModel
 }
 
@@ -600,7 +600,7 @@ Update a load test.
 	@param id ID of the load test.
 	@return *ApiLoadTestsPartialUpdateRequest
 */
-func (a *LoadTestsAPIService) LoadTestsPartialUpdate(ctx context.Context, id int32) *ApiLoadTestsPartialUpdateRequest {
+func (a *LoadTestsAPIService) LoadTestsPartialUpdate(ctx context.Context, id int64) *ApiLoadTestsPartialUpdateRequest {
 	return &ApiLoadTestsPartialUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -748,7 +748,7 @@ type ApiLoadTestsRetrieveRequest struct {
 	ctx        context.Context
 	ApiService *LoadTestsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -770,7 +770,7 @@ Fetch a single load test.
 	@param id ID of the load test.
 	@return *ApiLoadTestsRetrieveRequest
 */
-func (a *LoadTestsAPIService) LoadTestsRetrieve(ctx context.Context, id int32) *ApiLoadTestsRetrieveRequest {
+func (a *LoadTestsAPIService) LoadTestsRetrieve(ctx context.Context, id int64) *ApiLoadTestsRetrieveRequest {
 	return &ApiLoadTestsRetrieveRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -906,7 +906,7 @@ type ApiLoadTestsScriptRetrieveRequest struct {
 	ctx        context.Context
 	ApiService *LoadTestsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -931,7 +931,7 @@ the type is identified by the request content type.
 	@param id ID of the load test.
 	@return *ApiLoadTestsScriptRetrieveRequest
 */
-func (a *LoadTestsAPIService) LoadTestsScriptRetrieve(ctx context.Context, id int32) *ApiLoadTestsScriptRetrieveRequest {
+func (a *LoadTestsAPIService) LoadTestsScriptRetrieve(ctx context.Context, id int64) *ApiLoadTestsScriptRetrieveRequest {
 	return &ApiLoadTestsScriptRetrieveRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -1078,7 +1078,7 @@ type ApiLoadTestsScriptUpdateRequest struct {
 	ctx        context.Context
 	ApiService *LoadTestsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 	body       io.ReadCloser
 }
 
@@ -1110,7 +1110,7 @@ is assumed to be a JavaScript file.
 	@param id ID of the load test.
 	@return *ApiLoadTestsScriptUpdateRequest
 */
-func (a *LoadTestsAPIService) LoadTestsScriptUpdate(ctx context.Context, id int32) *ApiLoadTestsScriptUpdateRequest {
+func (a *LoadTestsAPIService) LoadTestsScriptUpdate(ctx context.Context, id int64) *ApiLoadTestsScriptUpdateRequest {
 	return &ApiLoadTestsScriptUpdateRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -1247,7 +1247,7 @@ type ApiLoadTestsStartRequest struct {
 	ctx              context.Context
 	ApiService       *LoadTestsAPIService
 	xStackId         *int32
-	id               int32
+	id               int64
 	k6IdempotencyKey *string
 }
 
@@ -1276,7 +1276,7 @@ Start a test in Grafana Cloud.
 	@param id ID of the load test.
 	@return *ApiLoadTestsStartRequest
 */
-func (a *LoadTestsAPIService) LoadTestsStart(ctx context.Context, id int32) *ApiLoadTestsStartRequest {
+func (a *LoadTestsAPIService) LoadTestsStart(ctx context.Context, id int64) *ApiLoadTestsStartRequest {
 	return &ApiLoadTestsStartRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -1415,9 +1415,10 @@ type ApiProjectsLoadTestsCreateRequest struct {
 	ctx        context.Context
 	ApiService *LoadTestsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 	name       *string
 	script     io.ReadCloser
+	k6Version  *int32
 }
 
 // Numeric ID of the Grafana stack representing the request scope. - If the API is called with a *Personal API token*, the user must be a member of the specified stack. - If the API is called with a *Grafana Stack API token*, the value must be the ID of the corresponding stack.
@@ -1438,6 +1439,12 @@ func (r *ApiProjectsLoadTestsCreateRequest) Script(script io.ReadCloser) *ApiPro
 	return r
 }
 
+// Identifier of the k6 version used to run the test.
+func (r *ApiProjectsLoadTestsCreateRequest) K6Version(k6Version int32) *ApiProjectsLoadTestsCreateRequest {
+	r.k6Version = &k6Version
+	return r
+}
+
 func (r *ApiProjectsLoadTestsCreateRequest) Execute() (*LoadTestApiModel, *http.Response, error) {
 	return r.ApiService.ProjectsLoadTestsCreateExecute(r)
 }
@@ -1455,7 +1462,7 @@ is assumed to be a JavaScript file.
 	@param id ID of the project.
 	@return *ApiProjectsLoadTestsCreateRequest
 */
-func (a *LoadTestsAPIService) ProjectsLoadTestsCreate(ctx context.Context, id int32) *ApiProjectsLoadTestsCreateRequest {
+func (a *LoadTestsAPIService) ProjectsLoadTestsCreate(ctx context.Context, id int64) *ApiProjectsLoadTestsCreateRequest {
 	return &ApiProjectsLoadTestsCreateRequest{
 		ApiService: a,
 		ctx:        ctx,
@@ -1538,6 +1545,9 @@ func (a *LoadTestsAPIService) ProjectsLoadTestsCreateExecute(r *ApiProjectsLoadT
 		}
 		scriptLocalVarFile.Close()
 		formFiles = append(formFiles, formFile{fileBytes: scriptLocalVarFileBytes, fileName: scriptLocalVarFileName, formFileName: scriptLocalVarFormFileName})
+	}
+	if r.k6Version != nil {
+		parameterAddToHeaderOrQuery(localVarFormParams, "k6_version", r.k6Version, "", "")
 	}
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
@@ -1645,7 +1655,7 @@ type ApiProjectsLoadTestsRetrieveRequest struct {
 	ctx        context.Context
 	ApiService *LoadTestsAPIService
 	xStackId   *int32
-	id         int32
+	id         int64
 	count      *bool
 	orderby    *string
 	skip       *int32
@@ -1702,7 +1712,7 @@ List load tests in a project.
 	@param id ID of the project.
 	@return *ApiProjectsLoadTestsRetrieveRequest
 */
-func (a *LoadTestsAPIService) ProjectsLoadTestsRetrieve(ctx context.Context, id int32) *ApiProjectsLoadTestsRetrieveRequest {
+func (a *LoadTestsAPIService) ProjectsLoadTestsRetrieve(ctx context.Context, id int64) *ApiProjectsLoadTestsRetrieveRequest {
 	return &ApiProjectsLoadTestsRetrieveRequest{
 		ApiService: a,
 		ctx:        ctx,

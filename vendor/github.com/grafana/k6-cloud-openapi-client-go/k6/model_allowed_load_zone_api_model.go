@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,11 +22,17 @@ var _ MappedNullable = &AllowedLoadZoneApiModel{}
 // AllowedLoadZoneApiModel struct for AllowedLoadZoneApiModel
 type AllowedLoadZoneApiModel struct {
 	// ID of the load zone.
-	Id int32 `json:"id"`
+	Id int64 `json:"id"`
 	// Name of the load zone.
 	Name string `json:"name"`
 	// ID used to identify the load zone in the k6 scripts.
-	K6LoadZoneId         string `json:"k6_load_zone_id"`
+	K6LoadZoneId string `json:"k6_load_zone_id"`
+	// Whether the load zone can be used to start tests.
+	Available bool `json:"available"`
+	// Custom load runner image. Only set for private load zones.
+	CustomLoadRunnerImage NullableString `json:"custom_load_runner_image"`
+	// Whether the load zone is public or private.
+	Public               bool `json:"public"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -36,11 +42,14 @@ type _AllowedLoadZoneApiModel AllowedLoadZoneApiModel
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAllowedLoadZoneApiModel(id int32, name string, k6LoadZoneId string) *AllowedLoadZoneApiModel {
+func NewAllowedLoadZoneApiModel(id int64, name string, k6LoadZoneId string, available bool, customLoadRunnerImage NullableString, public bool) *AllowedLoadZoneApiModel {
 	this := AllowedLoadZoneApiModel{}
 	this.Id = id
 	this.Name = name
 	this.K6LoadZoneId = k6LoadZoneId
+	this.Available = available
+	this.CustomLoadRunnerImage = customLoadRunnerImage
+	this.Public = public
 	return &this
 }
 
@@ -53,9 +62,9 @@ func NewAllowedLoadZoneApiModelWithDefaults() *AllowedLoadZoneApiModel {
 }
 
 // GetId returns the Id field value
-func (o *AllowedLoadZoneApiModel) GetId() int32 {
+func (o *AllowedLoadZoneApiModel) GetId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -64,7 +73,7 @@ func (o *AllowedLoadZoneApiModel) GetId() int32 {
 
 // GetIdOk returns a tuple with the Id field value
 // and a boolean to check if the value has been set.
-func (o *AllowedLoadZoneApiModel) GetIdOk() (*int32, bool) {
+func (o *AllowedLoadZoneApiModel) GetIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -72,7 +81,7 @@ func (o *AllowedLoadZoneApiModel) GetIdOk() (*int32, bool) {
 }
 
 // SetId sets field value
-func (o *AllowedLoadZoneApiModel) SetId(v int32) {
+func (o *AllowedLoadZoneApiModel) SetId(v int64) {
 	o.Id = v
 }
 
@@ -124,6 +133,80 @@ func (o *AllowedLoadZoneApiModel) SetK6LoadZoneId(v string) {
 	o.K6LoadZoneId = v
 }
 
+// GetAvailable returns the Available field value
+func (o *AllowedLoadZoneApiModel) GetAvailable() bool {
+	if o == nil {
+		var ret bool
+		return ret
+	}
+
+	return o.Available
+}
+
+// GetAvailableOk returns a tuple with the Available field value
+// and a boolean to check if the value has been set.
+func (o *AllowedLoadZoneApiModel) GetAvailableOk() (*bool, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.Available, true
+}
+
+// SetAvailable sets field value
+func (o *AllowedLoadZoneApiModel) SetAvailable(v bool) {
+	o.Available = v
+}
+
+// GetCustomLoadRunnerImage returns the CustomLoadRunnerImage field value
+// If the value is explicit nil, the zero value for string will be returned
+func (o *AllowedLoadZoneApiModel) GetCustomLoadRunnerImage() string {
+	if o == nil || o.CustomLoadRunnerImage.Get() == nil {
+		var ret string
+		return ret
+	}
+
+	return *o.CustomLoadRunnerImage.Get()
+}
+
+// GetCustomLoadRunnerImageOk returns a tuple with the CustomLoadRunnerImage field value
+// and a boolean to check if the value has been set.
+// NOTE: If the value is an explicit nil, `nil, true` will be returned
+func (o *AllowedLoadZoneApiModel) GetCustomLoadRunnerImageOk() (*string, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return o.CustomLoadRunnerImage.Get(), o.CustomLoadRunnerImage.IsSet()
+}
+
+// SetCustomLoadRunnerImage sets field value
+func (o *AllowedLoadZoneApiModel) SetCustomLoadRunnerImage(v string) {
+	o.CustomLoadRunnerImage.Set(&v)
+}
+
+// GetPublic returns the Public field value
+func (o *AllowedLoadZoneApiModel) GetPublic() bool {
+	if o == nil {
+		var ret bool
+		return ret
+	}
+
+	return o.Public
+}
+
+// GetPublicOk returns a tuple with the Public field value
+// and a boolean to check if the value has been set.
+func (o *AllowedLoadZoneApiModel) GetPublicOk() (*bool, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.Public, true
+}
+
+// SetPublic sets field value
+func (o *AllowedLoadZoneApiModel) SetPublic(v bool) {
+	o.Public = v
+}
+
 func (o AllowedLoadZoneApiModel) MarshalJSON() ([]byte, error) {
 	toSerialize, err := o.ToMap()
 	if err != nil {
@@ -137,6 +220,9 @@ func (o AllowedLoadZoneApiModel) ToMap() (map[string]interface{}, error) {
 	toSerialize["id"] = o.Id
 	toSerialize["name"] = o.Name
 	toSerialize["k6_load_zone_id"] = o.K6LoadZoneId
+	toSerialize["available"] = o.Available
+	toSerialize["custom_load_runner_image"] = o.CustomLoadRunnerImage.Get()
+	toSerialize["public"] = o.Public
 
 	for key, value := range o.AdditionalProperties {
 		toSerialize[key] = value
@@ -153,6 +239,9 @@ func (o *AllowedLoadZoneApiModel) UnmarshalJSON(data []byte) (err error) {
 		"id",
 		"name",
 		"k6_load_zone_id",
+		"available",
+		"custom_load_runner_image",
+		"public",
 	}
 
 	allProperties := make(map[string]interface{})
@@ -185,6 +274,9 @@ func (o *AllowedLoadZoneApiModel) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "id")
 		delete(additionalProperties, "name")
 		delete(additionalProperties, "k6_load_zone_id")
+		delete(additionalProperties, "available")
+		delete(additionalProperties, "custom_load_runner_image")
+		delete(additionalProperties, "public")
 		o.AdditionalProperties = additionalProperties
 	}
 

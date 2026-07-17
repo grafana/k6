@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 
@@ -18,9 +19,18 @@ import (
 
 // Project is a Grafana Cloud k6 project.
 type Project struct {
-	ID        int32  `json:"id"`
+	ID        int64  `json:"id"`
 	Name      string `json:"name"`
 	IsDefault bool   `json:"is_default"`
+}
+
+// LoadTest is a Grafana Cloud k6 load test.
+type LoadTest struct {
+	ID        int64     `json:"id"`
+	ProjectID int64     `json:"project_id"`
+	Name      string    `json:"name"`
+	Created   time.Time `json:"created"`
+	Updated   time.Time `json:"updated"`
 }
 
 // ListProjects retrieves the list of projects for the configured stack.
@@ -76,6 +86,61 @@ func (c *Client) listProjectsPage(
 	return res, nil
 }
 
+// ListLoadTests retrieves the list of load tests in the given project.
+func (c *Client) ListLoadTests(ctx context.Context, projectID int64) ([]LoadTest, error) {
+	const pageSize int32 = 1000
+
+	tests := []LoadTest{}
+	var skip int32
+
+	for {
+		res, err := c.listLoadTestsPage(ctx, projectID, skip, pageSize)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, test := range res.Value {
+			tests = append(tests, LoadTest{
+				ID:        test.Id,
+				ProjectID: test.ProjectId,
+				Name:      test.Name,
+				Created:   test.Created,
+				Updated:   test.Updated,
+			})
+		}
+
+		if res.NextLink == nil || *res.NextLink == "" {
+			return tests, nil
+		}
+
+		if len(res.Value) == 0 {
+			return nil, errors.New("received empty load tests page with next link")
+		}
+		skip += pageSize
+	}
+}
+
+func (c *Client) listLoadTestsPage(
+	ctx context.Context, projectID int64, skip, top int32,
+) (*k6cloud.LoadTestListResponse, error) {
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ProjectsLoadTestsRetrieve(c.authCtx(ctx), projectID).
+		XStackId(c.stackID).
+		Skip(skip).
+		Top(top).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	return res, nil
+}
+
 // ValidateToken validates the cloud authentication token.
 func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud.AuthenticationResponse, err error) {
 	if stackURL == "" {
@@ -102,7 +167,7 @@ func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud
 }
 
 // ValidateOptions validates cloud test options.
-func (c *Client) ValidateOptions(ctx context.Context, projectID int32, opts lib.Options) (err error) {
+func (c *Client) ValidateOptions(ctx context.Context, projectID int64, opts lib.Options) (err error) {
 	// Round-trip [lib.Options] through JSON so every script option
 	// reaches the backend via [k6cloud.Options.AdditionalProperties].
 	buf, err := json.Marshal(opts)
@@ -137,7 +202,7 @@ func (c *Client) ValidateOptions(ctx context.Context, projectID int32, opts lib.
 
 // UploadTest creates or updates a cloud load test's script.
 func (c *Client) UploadTest(
-	ctx context.Context, name string, projectID int32, arc *lib.Archive,
+	ctx context.Context, name string, projectID int64, arc *lib.Archive,
 ) (*k6cloud.LoadTestApiModel, error) {
 	lt, err := c.createTest(ctx, name, projectID, arc)
 	if err == nil {
@@ -163,7 +228,7 @@ func (c *Client) UploadTest(
 
 // createTest creates a new cloud load test in the given project.
 func (c *Client) createTest(
-	ctx context.Context, name string, projectID int32, arc *lib.Archive,
+	ctx context.Context, name string, projectID int64, arc *lib.Archive,
 ) (_ *k6cloud.LoadTestApiModel, err error) {
 	res, hr, err := c.apiClient.LoadTestsAPI.
 		ProjectsLoadTestsCreate(c.authCtx(ctx), projectID).
@@ -184,7 +249,7 @@ func (c *Client) createTest(
 }
 
 func (c *Client) findTestByName(
-	ctx context.Context, projectID int32, name string,
+	ctx context.Context, projectID int64, name string,
 ) (_ *k6cloud.LoadTestApiModel, err error) {
 	res, hr, err := c.apiClient.LoadTestsAPI.
 		ProjectsLoadTestsRetrieve(c.authCtx(ctx), projectID).
@@ -209,7 +274,7 @@ func (c *Client) findTestByName(
 	return &tests[0], nil
 }
 
-func (c *Client) updateScript(ctx context.Context, testID int32, arc *lib.Archive) (err error) {
+func (c *Client) updateScript(ctx context.Context, testID int64, arc *lib.Archive) (err error) {
 	res, err := c.apiClient.LoadTestsAPI.
 		LoadTestsScriptUpdate(c.authCtx(ctx), testID).
 		XStackId(c.stackID).
@@ -221,7 +286,7 @@ func (c *Client) updateScript(ctx context.Context, testID int32, arc *lib.Archiv
 }
 
 // StartTest starts a cloud load test run.
-func (c *Client) StartTest(ctx context.Context, loadTestID int32) (_ *k6cloud.StartLoadTestResponse, err error) {
+func (c *Client) StartTest(ctx context.Context, loadTestID int64) (_ *k6cloud.StartLoadTestResponse, err error) {
 	var key [8]byte
 	if _, err := rand.Read(key[:]); err != nil {
 		return nil, err
@@ -245,7 +310,7 @@ func (c *Client) StartTest(ctx context.Context, loadTestID int32) (_ *k6cloud.St
 }
 
 // StopTest aborts a running cloud test run.
-func (c *Client) StopTest(ctx context.Context, testRunID int32) (err error) {
+func (c *Client) StopTest(ctx context.Context, testRunID int64) (err error) {
 	hr, err := c.apiClient.TestRunsAPI.
 		TestRunsAbort(c.authCtx(ctx), testRunID).
 		XStackId(c.stackID).
@@ -262,7 +327,7 @@ func (c *Client) StopTest(ctx context.Context, testRunID int32) (err error) {
 }
 
 // FetchTest fetches the current progress of a cloud test run.
-func (c *Client) FetchTest(ctx context.Context, testRunID int32) (_ *TestProgress, err error) {
+func (c *Client) FetchTest(ctx context.Context, testRunID int64) (_ *TestProgress, err error) {
 	res, hr, err := c.apiClient.TestRunsAPI.
 		TestRunsRetrieve(c.authCtx(ctx), testRunID).
 		XStackId(c.stackID).
