@@ -166,6 +166,27 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 		return
 	}
 
+	// The loki hook's Fire enqueues unconditionally (its Levels() dispatch is
+	// bypassed on the forward path), so filter by the configured level here,
+	// where the level is known. logrus orders levels by severity (lower =
+	// more severe), so an entry passes iff it is at least as severe as the
+	// configured level: e.Level <= minLevel. An unset level keeps all.
+	minLevel := logrus.TraceLevel // "" => keep all levels
+	if c.Level != "" {
+		if lvl, err := logrus.ParseLevel(c.Level); err == nil {
+			minLevel = lvl
+		} else if p.fallbackLogger != nil {
+			p.fallbackLogger.WithField("level", c.Level).
+				Warn("invalid cloud log level; pushing all levels")
+		}
+	}
+
+	forward := func(e *logrus.Entry) {
+		if e.Level <= minLevel {
+			_ = lokiHook.Fire(e)
+		}
+	}
+
 	// The loki hook runs on its own context so the final flush is triggered
 	// only after buffered entries have been forwarded (see finish), not
 	// concurrently with the forwarding.
@@ -184,7 +205,7 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 		for {
 			select {
 			case e := <-p.buf:
-				_ = lokiHook.Fire(e)
+				forward(e)
 			default:
 				lokiCancel()
 				<-lokiDone
@@ -199,7 +220,7 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 	for {
 		select {
 		case e := <-p.buf:
-			_ = lokiHook.Fire(e)
+			forward(e)
 		case <-p.drainCh:
 			finish()
 			return
