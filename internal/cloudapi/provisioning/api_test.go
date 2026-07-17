@@ -91,6 +91,14 @@ func TestStartLocalExecution(t *testing.T) {
 	require.NotNil(t, got.RuntimeConfig.Metrics.MaxSamplesPerPackage)
 	assert.Equal(t, int32(2000), *got.RuntimeConfig.Metrics.MaxSamplesPerPackage)
 
+	// Logs config.
+	assert.Equal(t, "https://logs.k6.io", got.RuntimeConfig.Logs.PushURL)
+	assert.Equal(t, "info", got.RuntimeConfig.Logs.Level)
+	assert.Equal(t, int32(900), got.RuntimeConfig.Logs.Limit)
+	assert.Equal(t, "3s", got.RuntimeConfig.Logs.PushPeriodSeconds)
+	assert.Equal(t, int32(10000), got.RuntimeConfig.Logs.MessageMaxSize)
+	assert.Equal(t, []string{"lz", "level"}, got.RuntimeConfig.Logs.AllowedLabels)
+
 	// --- Request assertions ---
 	assert.Equal(t, http.MethodPost, method)
 	assert.Equal(t, "/provisioning/v1/load_tests/456/start_local_execution", path)

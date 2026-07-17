@@ -55,6 +55,7 @@ type RuntimeConfig struct {
 	Metrics      MetricsConfig
 	TestRunToken string
 	Secrets      SecretsConfig
+	Logs         LogsConfig
 }
 
 // MetricsConfig holds the metrics push configuration from the
@@ -74,6 +75,17 @@ type MetricsConfig struct {
 type SecretsConfig struct {
 	Endpoint     string
 	ResponsePath string
+}
+
+// LogsConfig holds the log-push configuration from the provisioning
+// API's runtime_config.logs object.
+type LogsConfig struct {
+	PushURL           string
+	Level             string
+	Limit             int32
+	PushPeriodSeconds string
+	MessageMaxSize    int32
+	AllowedLabels     []string
 }
 
 // UploadArchive PUTs pre-serialised archive bytes to the given
@@ -236,6 +248,7 @@ func mapStartLocalExecutionResponse(res *k6cloud.StartLocalExecutionTestResponse
 	rc := res.GetRuntimeConfig()
 	m := rc.GetMetrics()
 	s := rc.GetSecrets()
+	l := rc.GetLogs()
 
 	resp := &StartLocalExecutionResponse{
 		TestRunID:             res.GetTestRunId(),
@@ -254,6 +267,14 @@ func mapStartLocalExecutionResponse(res *k6cloud.StartLocalExecutionTestResponse
 			Secrets: SecretsConfig{
 				Endpoint:     s.GetEndpoint(),
 				ResponsePath: s.GetResponsePath(),
+			},
+			Logs: LogsConfig{
+				PushURL:           l.GetPushUrl(),
+				Level:             l.GetLevel(),
+				Limit:             l.GetLimit(),
+				PushPeriodSeconds: l.GetPushPeriodSeconds(),
+				MessageMaxSize:    l.GetMessageMaxSize(),
+				AllowedLabels:     l.GetAllowedLabels(),
 			},
 		},
 	}
