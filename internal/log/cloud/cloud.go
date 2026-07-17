@@ -57,6 +57,9 @@ type Pusher struct {
 	readyOnce      sync.Once
 	buf            chan *logrus.Entry
 	dropped        atomic.Int64
+	drainCh        chan struct{} // closed once by Drain to request a final flush
+	drainOnce      sync.Once
+	doneCh         chan struct{} // closed by Listen on return, signalling Drain
 }
 
 // Compile-time check that Pusher is usable as a logrus async hook.
@@ -68,6 +71,8 @@ func New(fallbackLogger logrus.FieldLogger) *Pusher {
 		fallbackLogger: fallbackLogger,
 		ready:          make(chan struct{}),
 		buf:            make(chan *logrus.Entry, bufferCap),
+		drainCh:        make(chan struct{}),
+		doneCh:         make(chan struct{}),
 	}
 }
 
@@ -103,12 +108,39 @@ func (p *Pusher) Fire(entry *logrus.Entry) error {
 	return nil
 }
 
+// Drain flushes buffered logs to the backend and returns once the flush has
+// completed (or ctx is done). It is safe to call when unconfigured (a no-op)
+// and idempotent. Best-effort: entries still in flight inside the loki hook's
+// channel at flush time may not be sent (see the package notes).
+func (p *Pusher) Drain(ctx context.Context) error {
+	select {
+	case <-p.ready:
+	default:
+		return nil // never configured => nothing to flush
+	}
+	p.drainOnce.Do(func() { close(p.drainCh) })
+	select {
+	case <-p.doneCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // Listen blocks until SetConfig has configured the Pusher or ctx is done. If
 // ctx fires first (e.g. --no-cloud-logs or an early exit) it returns without
 // pushing. Once configured it builds the loki hook and forwards buffered and
-// subsequent entries to it, stopping when ctx is cancelled. It returns only
-// after the loki hook's own final flush has completed.
-func (p *Pusher) Listen(ctx context.Context) {
+// subsequent entries to it. A Drain request or a ctx cancel both forward the
+// buffered entries and trigger the loki hook's synchronous final flush; Listen
+// returns only after that flush has completed. It always closes doneCh on
+// return, so a concurrent Drain never blocks.
+//
+// The loki hook deliberately runs on its own background-derived context (not
+// ctx) so its final flush is triggered only after buffered entries have been
+// forwarded; hence the contextcheck exception.
+func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
+	defer close(p.doneCh)
+
 	select {
 	case <-p.ready:
 	case <-ctx.Done():
@@ -134,23 +166,45 @@ func (p *Pusher) Listen(ctx context.Context) {
 		return
 	}
 
+	// The loki hook runs on its own context so the final flush is triggered
+	// only after buffered entries have been forwarded (see finish), not
+	// concurrently with the forwarding.
+	lokiCtx, lokiCancel := context.WithCancel(context.Background())
 	lokiDone := make(chan struct{})
 	go func() {
-		lokiHook.Listen(ctx)
+		lokiHook.Listen(lokiCtx)
 		close(lokiDone)
 	}()
 
-	// Single consumer of buf, forwarding to the loki hook (the single
-	// producer stays Fire). lokiHook.Fire is a blocking send, so once ctx is
-	// cancelled we must stop forwarding: the loki hook's Listen has exited and
-	// no longer drains its channel. Wait for its final flush before returning
-	// so callers (loggersWg) don't tear down mid-flush.
+	// finish forwards everything currently buffered, then cancels the loki
+	// hook so it runs its synchronous final flush, and waits for that to
+	// complete. lokiHook.Fire is a blocking send, so forwarding must happen
+	// while the loki hook is still draining its channel (before lokiCancel).
+	finish := func() {
+		for {
+			select {
+			case e := <-p.buf:
+				_ = lokiHook.Fire(e)
+			default:
+				lokiCancel()
+				<-lokiDone
+				return
+			}
+		}
+	}
+
+	// Single consumer of buf, forwarding to the loki hook (the single producer
+	// stays Fire). A drain request or ctx cancel both run finish, then return;
+	// after a drain the later logger-shutdown ctx cancel is a no-op.
 	for {
 		select {
 		case e := <-p.buf:
 			_ = lokiHook.Fire(e)
+		case <-p.drainCh:
+			finish()
+			return
 		case <-ctx.Done():
-			<-lokiDone
+			finish()
 			return
 		}
 	}

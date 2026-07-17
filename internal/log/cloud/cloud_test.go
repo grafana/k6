@@ -179,3 +179,101 @@ func TestPusher_TestRunIDLabelKept(t *testing.T) {
 	cancel()
 	<-listenDone
 }
+
+// TestPusher_Drain covers the pre-notify drain: after entries are pushed while
+// the run is open, Drain returns without hanging, drives Listen to return even
+// though ctx was never cancelled, and is idempotent on a second call.
+func TestPusher_Drain(t *testing.T) {
+	t.Parallel()
+
+	type received struct {
+		body string
+		auth string
+	}
+	recvCh := make(chan received, 8)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		select {
+		case recvCh <- received{body: string(b), auth: req.Header.Get("Authorization")}:
+		default:
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	p := New(testutils.NewLogger(t))
+	p.SetConfig(Config{
+		PushURL:    srv.URL,
+		Token:      "drain-token",
+		TestRunID:  "run-drain",
+		PushPeriod: 20 * time.Millisecond,
+	})
+
+	for _, msg := range []string{"entry-a", "entry-b", "entry-c"} {
+		require.NoError(t, p.Fire(&logrus.Entry{Time: time.Now(), Level: logrus.InfoLevel, Message: msg}))
+	}
+
+	// ctx stays alive for the whole test: shutdown must be driven by Drain,
+	// not by a ctx cancel.
+	ctx := t.Context()
+	listenDone := make(chan struct{})
+	go func() {
+		p.Listen(ctx)
+		close(listenDone)
+	}()
+
+	// Entries reach the backend via the periodic push while the run is open,
+	// carrying the bearer token and the required test_run_id label.
+	var got received
+	select {
+	case got = <-recvCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no push received from the pusher")
+	}
+	assert.Equal(t, "Bearer drain-token", got.auth)
+	assert.Contains(t, got.body, `"test_run_id":"run-drain"`)
+
+	// Drain returns once the flush has completed; it must not hang.
+	require.NoError(t, p.Drain(context.Background()))
+
+	// Drain drove Listen to return, even though ctx was never cancelled.
+	select {
+	case <-listenDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Listen did not return after Drain")
+	}
+
+	// Idempotent: a second Drain returns nil immediately.
+	require.NoError(t, p.Drain(context.Background()))
+}
+
+// TestPusher_DrainUnconfigured covers the --out cloud / --no-cloud-logs case:
+// without SetConfig, Drain is a no-op that returns nil immediately and makes
+// no HTTP request.
+func TestPusher_DrainUnconfigured(t *testing.T) {
+	t.Parallel()
+
+	p := New(testutils.NewLogger(t))
+	require.NoError(t, p.Fire(&logrus.Entry{Time: time.Now(), Level: logrus.InfoLevel, Message: "buffered"}))
+
+	require.NoError(t, p.Drain(context.Background()))
+}
+
+// TestPusher_DrainContextTimeout locks Drain's ctx contract: when the flush
+// cannot complete (here Listen is never started, so doneCh never closes), a
+// done ctx unblocks Drain with the ctx error rather than blocking forever.
+func TestPusher_DrainContextTimeout(t *testing.T) {
+	t.Parallel()
+
+	p := New(testutils.NewLogger(t))
+	p.SetConfig(Config{
+		PushURL:   "http://127.0.0.1:0",
+		Token:     "tok",
+		TestRunID: "run",
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	require.ErrorIs(t, p.Drain(ctx), context.Canceled)
+}
