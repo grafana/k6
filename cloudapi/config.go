@@ -54,6 +54,17 @@ type Config struct {
 	// no test run id, and we may still need an identifier to correlate all the things.
 	PushRefID null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 
+	// Log-push configuration for `k6 cloud run --local-execution`. Supplied
+	// by the provisioning API's runtime_config.logs (self-provisioned) or
+	// by an external orchestrator via env (externally-provisioned). Consumed
+	// by cmd to configure the cloud log pusher; env-only, not serialised.
+	LogsPushURL        null.String        `json:"-" envconfig:"K6_CLOUD_LOGS_PUSH_URL"`
+	LogsLevel          null.String        `json:"-" envconfig:"K6_CLOUD_LOGS_LEVEL"`
+	LogsLimit          null.Int           `json:"-" envconfig:"K6_CLOUD_LOGS_LIMIT"`
+	LogsPushPeriod     types.NullDuration `json:"-" envconfig:"K6_CLOUD_LOGS_PUSH_PERIOD"`
+	LogsMessageMaxSize null.Int           `json:"-" envconfig:"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE"`
+	LogsAllowedLabels  []string           `json:"-" envconfig:"K6_CLOUD_LOGS_ALLOWED_LABELS"`
+
 	// Defines the max allowed number of time series in a single batch.
 	MaxTimeSeriesInBatch null.Int `json:"maxTimeSeriesInBatch" envconfig:"K6_CLOUD_MAX_TIME_SERIES_IN_BATCH"`
 
@@ -155,6 +166,24 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.PushRefID.Valid {
 		c.PushRefID = cfg.PushRefID
+	}
+	if cfg.LogsPushURL.Valid {
+		c.LogsPushURL = cfg.LogsPushURL
+	}
+	if cfg.LogsLevel.Valid {
+		c.LogsLevel = cfg.LogsLevel
+	}
+	if cfg.LogsLimit.Valid {
+		c.LogsLimit = cfg.LogsLimit
+	}
+	if cfg.LogsPushPeriod.Valid {
+		c.LogsPushPeriod = cfg.LogsPushPeriod
+	}
+	if cfg.LogsMessageMaxSize.Valid {
+		c.LogsMessageMaxSize = cfg.LogsMessageMaxSize
+	}
+	if len(cfg.LogsAllowedLabels) > 0 {
+		c.LogsAllowedLabels = cfg.LogsAllowedLabels
 	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL
