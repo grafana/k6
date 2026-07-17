@@ -178,6 +178,13 @@ func createOutputs(
 			}
 		}
 
+		// Give the cloud output the local-execution log pusher so it flushes
+		// buffered logs before notifying the run complete. Guard the concrete
+		// nil before it becomes an interface, to avoid a typed-nil drainer.
+		if co, ok := out.(*cloud.Output); ok && gs.CloudLogPusher != nil {
+			co.SetLogDrainer(gs.CloudLogPusher)
+		}
+
 		result = append(result, out)
 	}
 
