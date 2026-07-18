@@ -1,6 +1,8 @@
 package streams
 
 import (
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -210,4 +212,74 @@ return writer.ready.then(
 `)
 
 	require.Equal(t, "ready rejected with boom", result.String())
+}
+
+func TestWritableStreamImmediateSinkQueueDrainingIsIterative(t *testing.T) {
+	t.Parallel()
+
+	rt := newStreamsRuntime(t)
+	writeCount := 0
+	maxProcessWriteDepth := 0
+	require.NoError(t, rt.VU.Runtime().Set("__recordWrite", func() {
+		writeCount++
+
+		pcs := make([]uintptr, 2048)
+		n := runtime.Callers(0, pcs)
+		frames := runtime.CallersFrames(pcs[:n])
+		depth := 0
+		for {
+			frame, more := frames.Next()
+			if strings.Contains(frame.Function, "(*WritableStreamDefaultController).processWrite") {
+				depth++
+			}
+			if !more {
+				break
+			}
+		}
+		maxProcessWriteDepth = max(maxProcessWriteDepth, depth)
+	}))
+
+	_, err := rt.RunOnEventLoop(`
+const stream = new WritableStream({
+  write() {
+    __recordWrite();
+  },
+});
+const writer = stream.getWriter();
+
+for (let i = 0; i < 1000; i++) {
+  writer.write(i);
+}
+`)
+	require.NoError(t, err)
+
+	require.Equal(t, 1000, writeCount)
+	require.LessOrEqual(t, maxProcessWriteDepth, 1)
+}
+
+func TestWritableStreamImmediateSinkPromiseReactionOrder(t *testing.T) {
+	t.Parallel()
+
+	result := runStreamPromiseScript(t, `
+const events = [];
+const stream = new WritableStream({
+  write(chunk) {
+    events.push("sink:" + chunk);
+  },
+});
+const writer = stream.getWriter();
+const writes = [];
+
+for (let i = 0; i < 3; i++) {
+  const write = writer.write(i);
+  write.then(() => events.push("write:" + i));
+  writes.push(write);
+}
+
+await Promise.all(writes);
+
+return JSON.stringify(events);
+`)
+
+	require.Equal(t, `["sink:0","sink:1","write:0","sink:2","write:1","write:2"]`, result.String())
 }

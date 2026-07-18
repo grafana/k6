@@ -53,7 +53,7 @@ type WritableStream struct {
 	// withTransaction).
 	txDepth int
 
-	// txQueue holds promise settlements deferred until the current transaction completes.
+	// txQueue holds work deferred until the current transaction completes.
 	txQueue []func()
 
 	runtime *sobek.Runtime
@@ -92,7 +92,7 @@ type pendingAbortRequest struct {
 }
 
 // withTransaction runs fn, and then, once the outermost transaction completes, flushes any
-// promise settlements that were deferred via settle() during fn.
+// work deferred via runOrEnqueue() during fn.
 //
 // This is necessary because, in the k6/Sobek event loop, resolving or rejecting a promise
 // from Go runs its reactions synchronously. The Streams specification, on the other hand,
@@ -105,17 +105,17 @@ func (stream *WritableStream) withTransaction(fn func()) {
 	defer func() {
 		stream.txDepth--
 		if stream.txDepth == 0 {
-			stream.drainSettlements()
+			stream.drainTransactionQueue()
 		}
 	}()
 
 	fn()
 }
 
-// drainSettlements runs the deferred promise settlements in FIFO order.
-func (stream *WritableStream) drainSettlements() {
-	// Keep the depth elevated while draining, so that any settlements scheduled by reactions
-	// are appended to the queue and processed in order, rather than recursively.
+// drainTransactionQueue runs deferred work in FIFO order.
+func (stream *WritableStream) drainTransactionQueue() {
+	// Keep the depth elevated while draining, so that work scheduled by reactions is appended
+	// to the queue and processed in order, rather than recursively.
 	stream.txDepth++
 	for len(stream.txQueue) > 0 {
 		settle := stream.txQueue[0]
@@ -125,14 +125,20 @@ func (stream *WritableStream) drainSettlements() {
 	stream.txDepth--
 }
 
-// settle schedules a promise settlement. If a transaction is active, the settlement is
-// deferred until the transaction completes; otherwise, it runs immediately.
-func (stream *WritableStream) settle(fn func()) {
+// runOrEnqueue runs fn immediately unless a transaction is active, in which case it defers fn
+// until the transaction queue is drained.
+func (stream *WritableStream) runOrEnqueue(fn func()) {
 	if stream.txDepth == 0 {
 		fn()
 		return
 	}
 	stream.txQueue = append(stream.txQueue, fn)
+}
+
+// settle schedules a promise settlement. If a transaction is active, the settlement is
+// deferred until the transaction completes; otherwise, it runs immediately.
+func (stream *WritableStream) settle(fn func()) {
+	stream.runOrEnqueue(fn)
 }
 
 func (stream *WritableStream) resolvePromise(promise *promiseWrapper, value any) {

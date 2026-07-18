@@ -379,7 +379,9 @@ func (controller *WritableStreamDefaultController) processWrite(chunk sobek.Valu
 				}
 
 				// 4.6. Perform ! WritableStreamDefaultControllerAdvanceQueueIfNeeded(controller).
-				controller.advanceQueueIfNeeded()
+				// Defer it behind pending settlements so an immediately fulfilled sink cannot
+				// recursively advance the queue.
+				stream.runOrEnqueue(controller.advanceQueueIfNeeded)
 			})
 		},
 		// 5. Upon rejection of sinkWritePromise with reason,
