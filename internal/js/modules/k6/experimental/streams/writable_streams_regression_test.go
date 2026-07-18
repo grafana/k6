@@ -229,7 +229,7 @@ func TestWritableStreamImmediateSinkQueueDrainingIsIterative(t *testing.T) {
 		depth := 0
 		for {
 			frame, more := frames.Next()
-			if strings.Contains(frame.Function, "(*WritableStreamDefaultController).processWrite") {
+			if strings.HasSuffix(frame.Function, "(*WritableStreamDefaultController).processWrite") {
 				depth++
 			}
 			if !more {
