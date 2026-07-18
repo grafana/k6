@@ -1,9 +1,6 @@
 package streams
 
 import (
-	"os"
-	"os/exec"
-	"runtime/debug"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -216,28 +213,29 @@ return writer.ready.then(
 }
 
 func TestWritableStreamImmediateSinkQueueDrainingIsIterative(t *testing.T) {
-	const helperEnv = "K6_WRITABLE_STREAM_STACK_HELPER"
-
-	if os.Getenv(helperEnv) != "1" {
-		cmd := exec.Command(os.Args[0], "-test.run=^TestWritableStreamImmediateSinkQueueDrainingIsIterative$")
-		cmd.Env = append(os.Environ(), helperEnv+"=1")
-		output, err := cmd.CombinedOutput()
-		require.NoErrorf(t, err, "helper process failed:\n%s", output)
-		return
-	}
-
-	debug.SetMaxStack(8 << 20)
+	t.Parallel()
 
 	rt := newStreamsRuntime(t)
 	writeCount := 0
-	require.NoError(t, rt.VU.Runtime().Set("__recordWrite", func() { writeCount++ }))
+	maxTransactionDepth := 0
+	streamFound := true
+	require.NoError(t, rt.VU.Runtime().Set("__recordWrite", func() {
+		writeCount++
+		stream := writableStreamFromValue(rt.VU.Runtime(), rt.VU.Runtime().Get("__streamUnderTest"))
+		if stream == nil {
+			streamFound = false
+			return
+		}
+		maxTransactionDepth = max(maxTransactionDepth, stream.txDepth)
+	}))
+
 	_, err := rt.RunOnEventLoop(`
-const stream = new WritableStream({
+globalThis.__streamUnderTest = new WritableStream({
   write() {
     __recordWrite();
   },
 });
-const writer = stream.getWriter();
+const writer = __streamUnderTest.getWriter();
 
 for (let i = 0; i < 10000; i++) {
   writer.write(i);
@@ -246,6 +244,8 @@ for (let i = 0; i < 10000; i++) {
 	require.NoError(t, err)
 
 	require.Equal(t, 10000, writeCount)
+	require.True(t, streamFound)
+	require.LessOrEqual(t, maxTransactionDepth, 1)
 }
 
 func TestWritableStreamImmediateSinkPromiseReactionOrder(t *testing.T) {
