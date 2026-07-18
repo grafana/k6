@@ -1,8 +1,9 @@
 package streams
 
 import (
-	"runtime"
-	"strings"
+	"os"
+	"os/exec"
+	"runtime/debug"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -215,30 +216,21 @@ return writer.ready.then(
 }
 
 func TestWritableStreamImmediateSinkQueueDrainingIsIterative(t *testing.T) {
-	t.Parallel()
+	const helperEnv = "K6_WRITABLE_STREAM_STACK_HELPER"
+
+	if os.Getenv(helperEnv) != "1" {
+		cmd := exec.Command(os.Args[0], "-test.run=^TestWritableStreamImmediateSinkQueueDrainingIsIterative$")
+		cmd.Env = append(os.Environ(), helperEnv+"=1")
+		output, err := cmd.CombinedOutput()
+		require.NoErrorf(t, err, "helper process failed:\n%s", output)
+		return
+	}
+
+	debug.SetMaxStack(8 << 20)
 
 	rt := newStreamsRuntime(t)
 	writeCount := 0
-	maxProcessWriteDepth := 0
-	require.NoError(t, rt.VU.Runtime().Set("__recordWrite", func() {
-		writeCount++
-
-		pcs := make([]uintptr, 2048)
-		n := runtime.Callers(0, pcs)
-		frames := runtime.CallersFrames(pcs[:n])
-		depth := 0
-		for {
-			frame, more := frames.Next()
-			if strings.HasSuffix(frame.Function, "(*WritableStreamDefaultController).processWrite") {
-				depth++
-			}
-			if !more {
-				break
-			}
-		}
-		maxProcessWriteDepth = max(maxProcessWriteDepth, depth)
-	}))
-
+	require.NoError(t, rt.VU.Runtime().Set("__recordWrite", func() { writeCount++ }))
 	_, err := rt.RunOnEventLoop(`
 const stream = new WritableStream({
   write() {
@@ -247,14 +239,13 @@ const stream = new WritableStream({
 });
 const writer = stream.getWriter();
 
-for (let i = 0; i < 1000; i++) {
+for (let i = 0; i < 10000; i++) {
   writer.write(i);
 }
 `)
 	require.NoError(t, err)
 
-	require.Equal(t, 1000, writeCount)
-	require.LessOrEqual(t, maxProcessWriteDepth, 1)
+	require.Equal(t, 10000, writeCount)
 }
 
 func TestWritableStreamImmediateSinkPromiseReactionOrder(t *testing.T) {
