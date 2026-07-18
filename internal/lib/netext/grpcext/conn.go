@@ -16,7 +16,6 @@ import (
 	"go.k6.io/k6/v2/metrics"
 
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
-	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -179,7 +178,7 @@ func (c *Conn) Invoke(
 	marshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: c.types}
 
 	if err != nil {
-		response.Status, response.Error = convertInvokeError(err, trailer, c.types)
+		response.Status, response.Error = convertInvokeError(err, c.types)
 	}
 
 	if resp != nil && !req.DiscardResponseMessage {
@@ -243,21 +242,11 @@ func (r combinedResolver) FindExtensionByNumber(
 }
 
 // convertInvokeError converts a gRPC invocation error into a status code and
-// a JSON-serializable error map. It reads the grpc-status-details-bin trailer
-// to populate rich error details when present and the status code matches.
-func convertInvokeError(err error, trailer metadata.MD, userTypes *protoregistry.Types) (codes.Code, map[string]any) {
+// a JSON-serializable error map. Rich error details from the
+// grpc-status-details-bin trailer are already parsed by grpc-go on the client
+// side, so status.Convert(err) carries them.
+func convertInvokeError(err error, userTypes *protoregistry.Types) (codes.Code, map[string]any) {
 	sterr := status.Convert(err)
-
-	// grpc-status-details-bin carries a google.rpc.Status protobuf with rich error details.
-	// Only use it when the status code matches to avoid inconsistent state.
-	if detailsBin := trailer.Get("grpc-status-details-bin"); len(detailsBin) > 0 {
-		statusProto := &spb.Status{}
-		if unmarshalErr := proto.Unmarshal([]byte(detailsBin[0]), statusProto); unmarshalErr == nil {
-			if statusProto.Code == int32(sterr.Code()) { //nolint:gosec // gRPC codes are 0-16, always within int32 range
-				sterr = status.FromProto(statusProto)
-			}
-		}
-	}
 
 	// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
 	// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
@@ -273,6 +262,7 @@ func convertInvokeError(err error, trailer metadata.MD, userTypes *protoregistry
 		return sterr.Code(), map[string]any{
 			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
 			"message": sterr.Message(),
+			"details": []any{},
 		}
 	}
 	errMsg := make(map[string]any)
@@ -280,6 +270,7 @@ func convertInvokeError(err error, trailer metadata.MD, userTypes *protoregistry
 		return sterr.Code(), map[string]any{
 			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
 			"message": sterr.Message(),
+			"details": []any{},
 		}
 	}
 	return sterr.Code(), errMsg

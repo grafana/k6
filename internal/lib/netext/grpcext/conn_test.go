@@ -16,12 +16,13 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
+
+const sayHelloMethod = "/hello.HelloService/SayHello"
 
 type healthcheckmock func(in *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, opts ...grpc.CallOption) error
 
@@ -118,7 +119,7 @@ func TestInvoke(t *testing.T) {
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
+		Method:           sayHelloMethod,
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
@@ -182,7 +183,7 @@ func TestInvokeReturnError(t *testing.T) {
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
+		Method:           sayHelloMethod,
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
@@ -350,23 +351,15 @@ func TestInvokeWithStatusDetails(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	detailsBin, err := proto.Marshal(st.Proto())
-	require.NoError(t, err)
-
-	helloReply := func(_, _ *dynamicpb.Message, opts ...grpc.CallOption) error {
-		for _, opt := range opts {
-			if trailerOpt, ok := opt.(grpc.TrailerCallOption); ok {
-				*trailerOpt.TrailerAddr = metadata.MD{
-					"grpc-status-details-bin": []string{string(detailsBin)},
-				}
-			}
-		}
-		return status.Error(codes.InvalidArgument, "invalid request")
+	// grpc-go parses the grpc-status-details-bin trailer on the client side,
+	// so the error returned by Invoke already carries the details.
+	helloReply := func(_, _ *dynamicpb.Message, _ ...grpc.CallOption) error {
+		return st.Err()
 	}
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
+		Method:           sayHelloMethod,
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
@@ -397,77 +390,6 @@ func TestInvokeWithStatusDetails(t *testing.T) {
 	assert.Equal(t, "too_short", meta["issue"])
 }
 
-func TestInvokeWithCorruptStatusDetailsBin(t *testing.T) {
-	t.Parallel()
-
-	// Corrupt bytes in the trailer must not crash or alter the error response.
-	helloReply := func(_, _ *dynamicpb.Message, opts ...grpc.CallOption) error {
-		for _, opt := range opts {
-			if trailerOpt, ok := opt.(grpc.TrailerCallOption); ok {
-				*trailerOpt.TrailerAddr = metadata.MD{
-					"grpc-status-details-bin": []string{"not valid protobuf"},
-				}
-			}
-		}
-		return status.Error(codes.Internal, "something went wrong")
-	}
-
-	c := Conn{raw: invokemock(helloReply)}
-	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
-		MethodDescriptor: methodFromProto("SayHello"),
-		Message:          []byte(`{"greeting":"text request"}`),
-		Metadata:         metadata.New(nil),
-	}
-	res, err := c.Invoke(context.Background(), r)
-	require.NoError(t, err)
-
-	// Should fall back to the plain error, not panic or return nothing.
-	assert.Equal(t, codes.Internal, res.Status)
-	errMap, ok := res.Error.(map[string]any)
-	require.True(t, ok, "error should be a map")
-	assert.Equal(t, "something went wrong", errMap["message"])
-}
-
-func TestInvokeWithStatusDetailsCodeMismatch(t *testing.T) {
-	t.Parallel()
-
-	// When the code in grpc-status-details-bin doesn't match the actual error code,
-	// the details trailer should be ignored to avoid exposing inconsistent state.
-	detailsBin, err := proto.Marshal(status.New(codes.Internal, "internal error").Proto())
-	require.NoError(t, err)
-
-	helloReply := func(_, _ *dynamicpb.Message, opts ...grpc.CallOption) error {
-		for _, opt := range opts {
-			if trailerOpt, ok := opt.(grpc.TrailerCallOption); ok {
-				*trailerOpt.TrailerAddr = metadata.MD{
-					"grpc-status-details-bin": []string{string(detailsBin)},
-				}
-			}
-		}
-		return status.Error(codes.InvalidArgument, "invalid request")
-	}
-
-	c := Conn{raw: invokemock(helloReply)}
-	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
-		MethodDescriptor: methodFromProto("SayHello"),
-		Message:          []byte(`{"greeting":"text request"}`),
-		Metadata:         metadata.New(nil),
-	}
-	res, err := c.Invoke(context.Background(), r)
-	require.NoError(t, err)
-
-	assert.Equal(t, codes.InvalidArgument, res.Status)
-
-	errMap, ok := res.Error.(map[string]any)
-	require.True(t, ok, "error should be a map")
-
-	if details, ok := errMap["details"]; ok {
-		assert.Empty(t, details, "details should be empty when codes don't match")
-	}
-}
-
 func TestInvokeWithoutStatusDetails(t *testing.T) {
 	t.Parallel()
 
@@ -477,7 +399,7 @@ func TestInvokeWithoutStatusDetails(t *testing.T) {
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
+		Method:           sayHelloMethod,
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
@@ -491,7 +413,7 @@ func TestInvokeWithoutStatusDetails(t *testing.T) {
 	errMap, ok := res.Error.(map[string]any)
 	require.True(t, ok, "error should be a map")
 
-	if details, ok := errMap["details"]; ok {
-		assert.Empty(t, details, "details should be empty when not provided")
-	}
+	details, ok := errMap["details"]
+	require.True(t, ok, "details key should always be present")
+	assert.Empty(t, details, "details should be empty when not provided")
 }
