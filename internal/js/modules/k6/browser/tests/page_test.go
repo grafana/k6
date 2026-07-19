@@ -3053,6 +3053,76 @@ func TestPageOnResponseAllHeadersRedirectChain(t *testing.T) {
 	}
 }
 
+// TestPageOnResponseAllHeadersCachedFinalAfterRedirect reproduces Chromium's
+// cached-final redirect sequence from puppeteer/puppeteer#9965. The first
+// navigation primes the target in cache. The second navigation receives a live
+// redirect with Set-Cookie, then resolves its final hop from cache.
+func TestPageOnResponseAllHeadersCachedFinalAfterRedirect(t *testing.T) {
+	tb := newTestBrowser(t, withHTTPServer())
+
+	var cachedTargetHits atomic.Int32
+	tb.withHandler("/cached-final", func(w http.ResponseWriter, _ *http.Request) {
+		cachedTargetHits.Add(1)
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Header().Set("Content-Type", "text/html")
+		_, err := fmt.Fprint(w, "<html><body>cached final</body></html>")
+		require.NoError(t, err)
+	})
+	tb.withHandler("/redirect-to-cached-final", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Set-Cookie", "redirect_only=1; Path=/")
+		http.Redirect(w, r, tb.url("/cached-final")+"#from-redirect", http.StatusFound)
+	})
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		await page.goto('%s', {waitUntil: 'networkidle'});
+
+		const responses = [];
+		page.on('response', async (response) => {
+			const headers = await response.allHeaders();
+			responses.push({
+				url: response.url(),
+				status: response.status(),
+				setCookie: headers['set-cookie'] || '',
+			});
+		});
+
+		await page.goto('%s', {waitUntil: 'networkidle'});
+		await page.close();
+		return JSON.stringify(responses);
+	`, tb.url("/cached-final"), tb.url("/redirect-to-cached-final"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	var responses []struct {
+		URL       string `json:"url"`
+		Status    int64  `json:"status"`
+		SetCookie string `json:"setCookie"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &responses))
+
+	require.Equal(t, int32(1), cachedTargetHits.Load(),
+		"the final target must be served from cache on the second navigation")
+	var redirectCookie, cachedFinalCookie string
+	for _, response := range responses {
+		switch {
+		case strings.Contains(response.URL, "/redirect-to-cached-final"):
+			redirectCookie = response.SetCookie
+		case strings.Contains(response.URL, "/cached-final"):
+			cachedFinalCookie = response.SetCookie
+		}
+	}
+	assert.Contains(t, redirectCookie, "redirect_only=1",
+		"the live redirect must receive its own raw Set-Cookie header")
+	assert.Empty(t, cachedFinalCookie,
+		"the cached final response must not inherit the redirect's raw Set-Cookie header")
+}
+
 // TestPageOnRequestFinished tests that the requestfinished event fires when requests complete successfully.
 func TestPageOnRequestFinished(t *testing.T) {
 	t.Parallel()
