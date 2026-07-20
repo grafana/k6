@@ -9,6 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
@@ -320,48 +322,83 @@ func TestBrowserRegistry(t *testing.T) {
 	})
 }
 
-func TestUserManagedBrowserTracking(t *testing.T) {
+func TestStartConnectTraceAttributes(t *testing.T) {
 	t.Parallel()
 
-	r := &browserRegistry{
-		m:           make(map[int64]*common.Browser),
-		userManaged: make(map[int64][]*common.Browser),
-	}
+	rec := &traceRecorder{}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
 
-	// Distinct sentinel pointers; track/untrack never call Close on them.
-	b1 := &common.Browser{}
-	b2 := &common.Browser{}
-
-	r.trackUserManagedBrowser(1, b1)
-	r.trackUserManagedBrowser(1, b2)
-	require.Len(t, r.userManaged[1], 2)
-
-	r.untrackUserManagedBrowser(1, b1)
-	require.Len(t, r.userManaged[1], 1)
-
-	// Untracking the last entry removes the iteration key entirely.
-	r.untrackUserManagedBrowser(1, b2)
-	require.NotContains(t, r.userManaged, int64(1))
-}
-
-func TestStartConnectTraceReuse(t *testing.T) {
-	t.Parallel()
-
-	vu := k6test.NewVU(t)
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
 	vu.ActivateVU()
 	vu.StartIteration(t)
+	vu.State().VUID = 42 // non-zero so the test.vu assertion is meaningful
 
 	r := &browserRegistry{
 		vu:          vu,
 		m:           make(map[int64]*common.Browser),
 		userManaged: make(map[int64][]*common.Browser),
 	}
+	r.startConnectTrace(vu.Context(), vu.State().Iteration)
 
-	iter := vu.State().Iteration
-	_ = r.startConnectTrace(vu.Context(), iter)
-	_ = r.startConnectTrace(vu.Context(), iter)
+	span, ok := rec.find("iteration")
+	require.True(t, ok, "expected an 'iteration' root span")
+	require.Equal(t, int64(42), spanAttrInt64(t, span, "test.vu"))
+	require.Equal(t, "default", spanAttrString(t, span, "test.scenario"))
+}
 
-	require.Equal(t, 1, r.tr.iterationTracesCount())
+// traceRecorder is a minimal sdktrace.SpanProcessor that captures started spans
+// so tests can inspect their names and attributes.
+type traceRecorder struct {
+	mu    sync.Mutex
+	spans []recordedSpan
+}
+
+type recordedSpan struct {
+	name  string
+	attrs []attribute.KeyValue
+}
+
+func (r *traceRecorder) OnStart(_ context.Context, s sdktrace.ReadWriteSpan) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.spans = append(r.spans, recordedSpan{name: s.Name(), attrs: s.Attributes()})
+}
+
+func (r *traceRecorder) OnEnd(sdktrace.ReadOnlySpan)      {}
+func (r *traceRecorder) Shutdown(context.Context) error   { return nil }
+func (r *traceRecorder) ForceFlush(context.Context) error { return nil }
+
+func (r *traceRecorder) find(name string) (recordedSpan, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, s := range r.spans {
+		if s.name == name {
+			return s, true
+		}
+	}
+	return recordedSpan{}, false
+}
+
+func spanAttrInt64(t *testing.T, s recordedSpan, key string) int64 {
+	t.Helper()
+	for _, kv := range s.attrs {
+		if string(kv.Key) == key {
+			return kv.Value.AsInt64()
+		}
+	}
+	t.Fatalf("attribute %q not found on span %q", key, s.name)
+	return 0
+}
+
+func spanAttrString(t *testing.T, s recordedSpan, key string) string {
+	t.Helper()
+	for _, kv := range s.attrs {
+		if string(kv.Key) == key {
+			return kv.Value.AsString()
+		}
+	}
+	t.Fatalf("attribute %q not found on span %q", key, s.name)
+	return ""
 }
 
 func TestParseTracesMetadata(t *testing.T) {

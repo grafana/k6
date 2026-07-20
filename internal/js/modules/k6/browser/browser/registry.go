@@ -506,7 +506,13 @@ func (r *browserRegistry) startConnectTrace(vuCtx context.Context, iter int64) c
 	tracerCtx := common.WithTracer(vuCtx, r.tr.tracer)
 	// startIterationTrace already reuses an existing span for the same
 	// iteration, so a repeat connect does not create a second root span.
-	return r.tr.startIterationTrace(tracerCtx, k6event.IterData{Iteration: iter})
+	// Fill in the VU and scenario so connect-only iteration spans carry the
+	// same test.vu/test.scenario attributes as the managed IterStart path.
+	return r.tr.startIterationTrace(tracerCtx, k6event.IterData{
+		Iteration:    iter,
+		VUID:         r.vu.State().VUID,
+		ScenarioName: k6ext.GetScenarioName(vuCtx),
+	})
 }
 
 func (r *browserRegistry) stopTracesRegistry() {
