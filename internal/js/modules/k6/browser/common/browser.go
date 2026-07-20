@@ -656,12 +656,17 @@ func (b *Browser) Close() {
 	b.conn.Close()
 }
 
-// waitForPagesToDetach waits, up to timeout, for the browser's pages to drain to
-// zero. Closing pages triggers Target.detachedFromTarget events; a page leaves
-// b.pages only once its event has been received and processed. Waiting for that
-// therefore ensures in-flight CDP messages are delivered before the connection
-// is closed. It's a bounded, event-driven alternative to waiting on a process
-// exit, which a remote browser doesn't have.
+// waitForPagesToDetach waits, up to timeout, for the browser's own pages to
+// drain to zero. Closing pages triggers Target.detachedFromTarget events; a
+// page leaves b.pages only once its event has been received and processed.
+//
+// This is a barrier on our own targets' teardown, NOT on the connection going
+// quiet: a remote browser we don't own keeps emitting unsolicited events right
+// up to conn.Close(), and those may still be dropped. That's harmless for us
+// (we've decided we're done), but the guarantee is only "our page detaches are
+// processed", not "all in-flight messages are delivered". It's a bounded,
+// event-driven alternative to waiting on a process exit, which a remote browser
+// doesn't have.
 func (b *Browser) waitForPagesToDetach(timeout time.Duration) {
 	ticker := time.NewTicker(20 * time.Millisecond)
 	defer ticker.Stop()
@@ -670,6 +675,9 @@ func (b *Browser) waitForPagesToDetach(timeout time.Duration) {
 	for len(b.getPages()) > 0 {
 		select {
 		case <-deadline:
+			b.logger.Debugf("Browser:Close",
+				"timed out after %s waiting for %d page(s) to detach; closing anyway",
+				timeout, len(b.getPages()))
 			return
 		case <-ticker.C:
 		}
