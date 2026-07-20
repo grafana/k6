@@ -625,15 +625,19 @@ func (b *Browser) Close() {
 		}
 	}
 
-	// A remote browser has no local process to wait for or kill: processDone is
-	// never closed for a NewRemoteBrowserProcess, so waiting here would always
-	// hit the timeout and add ~1s to every remote close. The unconditional
-	// conn.Close() below drives the teardown instead.
-	if !b.browserOpts.isRemoteBrowser {
-		// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
-		// processed, and for the process to exit gracefully. Otherwise, kill it
-		// forcefully after the timeout.
-		timeout := time.Second
+	// Wait for outstanding teardown to drain before closing the connection, so
+	// in-flight CDP messages (e.g. Target.detachedFromTarget) are delivered
+	// rather than dropped by an early WebSocket close.
+	timeout := time.Second
+	if b.browserOpts.isRemoteBrowser {
+		// A remote browser has no local process to wait on, so waiting on
+		// processDone would always hit the full timeout. Instead, wait, up to the
+		// timeout, for our targets' detach events to be delivered — observed as
+		// the pages draining to zero — then close.
+		b.waitForPagesToDetach(timeout)
+	} else {
+		// Wait for the process to exit gracefully; otherwise kill it forcefully
+		// after the timeout.
 		select {
 		case <-b.browserProc.processDone:
 		case <-time.After(timeout):
@@ -650,6 +654,26 @@ func (b *Browser) Close() {
 	// for sure when that has finished. This will error writing to the socket,
 	// but we ignore it.
 	b.conn.Close()
+}
+
+// waitForPagesToDetach waits, up to timeout, for the browser's pages to drain to
+// zero. Closing pages triggers Target.detachedFromTarget events; a page leaves
+// b.pages only once its event has been received and processed. Waiting for that
+// therefore ensures in-flight CDP messages are delivered before the connection
+// is closed. It's a bounded, event-driven alternative to waiting on a process
+// exit, which a remote browser doesn't have.
+func (b *Browser) waitForPagesToDetach(timeout time.Duration) {
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+
+	deadline := time.After(timeout)
+	for len(b.getPages()) > 0 {
+		select {
+		case <-deadline:
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // CloseContext is a short-cut function to close the current browser's context.
