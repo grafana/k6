@@ -15,55 +15,41 @@ import (
 	"go.k6.io/k6/v2/internal/output/cloud/expv2/pbcloud"
 )
 
-// metricsHTTPClient is the minimal HTTP transport contract used by
-// metricsClient post-construction. The legacy URL-deriving constructor
-// requires the extended metricsHTTPClientWithBaseURL; the explicit-URL
-// constructor (added later) takes only this smaller interface.
+// metricsHTTPClient is the HTTP transport contract used by metricsClient.
 type metricsHTTPClient interface {
 	Do(req *http.Request, v any) error
-}
-
-// metricsHTTPClientWithBaseURL extends metricsHTTPClient with BaseURL,
-// used by newMetricsClient to derive the metrics push URL from the host.
-type metricsHTTPClientWithBaseURL interface {
-	metricsHTTPClient
-	BaseURL() string
 }
 
 // metricsClient is a Protobuf over HTTP client for sending
 // the collected metrics from the Cloud output
 // to the remote service.
 type metricsClient struct {
-	httpClient metricsHTTPClient // was: metricsHTTPClientWithBaseURL
+	httpClient metricsHTTPClient
 	url        string
 }
 
-// newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c metricsHTTPClientWithBaseURL, testRunID string) (*metricsClient, error) {
-	// The cloudapi.Client works across different versions of the API, the test
-	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
-	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
-	// to be able to replace it with the correct one.
-	// A versioned client would be better but it would require a breaking change
-	// and considering that other services (e.g. k6-operator) depend on it,
-	// we want to stabilize the API before.
-	u := c.BaseURL()
-	if !strings.HasSuffix(u, "/v1") {
-		return nil, errors.New("a /v1 suffix is expected in the Cloud service's BaseURL path")
+// deriveMetricsURL builds the v2 metrics-ingestion URL from the Cloud
+// service base URL, used when no explicit push URL was provided.
+//
+// The cloudapi.Client works across different versions of the API: test
+// lifecycle management is under /v1 while metrics ingestion is /v2.
+// The client has /v1 hard-coded, so we trim it and replace with /v2.
+// A versioned client would be better but it would require a breaking
+// change, and other services (e.g. k6-operator) depend on it, so we want
+// to stabilize the API first.
+func deriveMetricsURL(baseURL, testRunID string) (string, error) {
+	if !strings.HasSuffix(baseURL, "/v1") {
+		return "", errors.New("a /v1 suffix is expected in the Cloud service's BaseURL path")
 	}
 	if testRunID == "" {
-		return nil, errors.New("TestRunID of the test is required")
+		return "", errors.New("TestRunID of the test is required")
 	}
-	return &metricsClient{
-		httpClient: c,
-		url:        strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID,
-	}, nil
+	return strings.TrimSuffix(baseURL, "/v1") + "/v2/metrics/" + testRunID, nil
 }
 
-// newMetricsClientWithURL builds a metricsClient with an explicit push
-// URL and a smaller metricsHTTPClient (no BaseURL derivation). Used by
-// the provisioning-mode metrics push, where the URL is returned by the
-// API and not derived from a host.
+// newMetricsClientWithURL builds a metricsClient with an explicit push URL.
+// It is the single metricsClient constructor: callers that need the
+// host-derived URL compute it via deriveMetricsURL first.
 func newMetricsClientWithURL(c metricsHTTPClient, url string) (*metricsClient, error) {
 	if url == "" {
 		return nil, errors.New("metrics push URL is required")

@@ -122,12 +122,26 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	var mc *metricsClient
-	if o.metricsHTTPClient != nil && o.metricsURL != "" {
-		mc, err = newMetricsClientWithURL(o.metricsHTTPClient, o.metricsURL)
-	} else {
-		mc, err = newMetricsClient(o.cloudClient, o.testRunID)
+	// The metrics client always pushes to an explicit URL. In provisioning
+	// mode both the HTTP client and URL are injected via the setters;
+	// otherwise we derive the legacy /v2/metrics/<testRunID> URL from the
+	// cloud client. The two must be set together — one without the other is
+	// a misconfiguration rather than a silent fallback.
+	switch {
+	case o.metricsHTTPClient != nil && o.metricsURL != "":
+		// Both injected (provisioning mode); use as-is.
+	case o.metricsHTTPClient == nil && o.metricsURL == "":
+		o.metricsURL, err = deriveMetricsURL(o.cloudClient.BaseURL(), o.testRunID)
+		if err != nil {
+			return fmt.Errorf("failed to derive the metrics push URL: %w", err)
+		}
+		o.metricsHTTPClient = o.cloudClient
+	default:
+		return errors.New("metrics push client misconfigured: " +
+			"metricsHTTPClient and metricsURL must be set together")
 	}
+
+	mc, err := newMetricsClientWithURL(o.metricsHTTPClient, o.metricsURL)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}

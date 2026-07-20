@@ -38,7 +38,9 @@ func TestMetricsClientPush(t *testing.T) {
 	defer ts.Close()
 
 	c := cloudapi.NewClient(nil, "fake-token", ts.URL, "k6cloud/v0.4", 1*time.Second)
-	mc, err := newMetricsClient(c, "test-ref-id")
+	url, err := deriveMetricsURL(c.BaseURL(), "test-ref-id")
+	require.NoError(t, err)
+	mc, err := newMetricsClientWithURL(c, url)
 	require.NoError(t, err)
 
 	mset := pbcloud.MetricSet{}
@@ -51,33 +53,18 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	t.Parallel()
 
 	// Use a mock that returns immediately without HTTP - no server, no retries.
-	mock := &mockMetricsHTTPClientWithBaseURL{
+	mock := &mockMetricsHTTPClient{
 		doErr: errors.New("500 Internal Server Error"),
 	}
-	mc, err := newMetricsClient(mock, "test-ref-id")
+	mc, err := newMetricsClientWithURL(mock, "http://test/v2/metrics/test-ref-id")
 	require.NoError(t, err)
 
 	err = mc.push(t.Context(), nil)
 	assert.ErrorContains(t, err, "500 Internal Server Error")
 }
 
-// mockMetricsHTTPClientWithBaseURL implements metricsHTTPClientWithBaseURL for tests.
+// mockMetricsHTTPClient implements the metricsHTTPClient interface for tests.
 // It returns immediately without making HTTP requests.
-type mockMetricsHTTPClientWithBaseURL struct {
-	doErr error
-}
-
-func (m *mockMetricsHTTPClientWithBaseURL) Do(_ *http.Request, _ any) error {
-	return m.doErr
-}
-
-func (m *mockMetricsHTTPClientWithBaseURL) BaseURL() string {
-	return "http://test/v1"
-}
-
-// mockMetricsHTTPClient implements only the smaller metricsHTTPClient
-// interface (Do-only, no BaseURL). Used to verify that the explicit-URL
-// constructor does not require the extended interface.
 type mockMetricsHTTPClient struct {
 	doErr error
 }
@@ -103,4 +90,28 @@ func TestNewMetricsClientWithURL_EmptyURLReturnsError(t *testing.T) {
 	_, err := newMetricsClientWithURL(stub, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "metrics push URL is required")
+}
+
+func TestDeriveMetricsURL(t *testing.T) {
+	t.Parallel()
+
+	url, err := deriveMetricsURL("https://ingest.example/v1", "12345")
+	require.NoError(t, err)
+	assert.Equal(t, "https://ingest.example/v2/metrics/12345", url)
+}
+
+func TestDeriveMetricsURL_MissingV1Suffix(t *testing.T) {
+	t.Parallel()
+
+	_, err := deriveMetricsURL("https://ingest.example", "12345")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "/v1 suffix")
+}
+
+func TestDeriveMetricsURL_EmptyTestRunID(t *testing.T) {
+	t.Parallel()
+
+	_, err := deriveMetricsURL("https://ingest.example/v1", "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "TestRunID")
 }
