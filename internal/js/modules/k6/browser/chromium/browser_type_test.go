@@ -35,6 +35,40 @@ func TestBrowserTypeInitParsesEnvWithoutScenario(t *testing.T) {
 	require.NotNil(t, opts)
 }
 
+// TestValidateWSEndpoint pins the fast-fail validation for connectOverCDP
+// endpoints.
+func TestValidateWSEndpoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		endpoint string
+		wantErr  string // substring; empty means the endpoint must be accepted
+	}{
+		{"valid ws", "ws://localhost:9222", ""},
+		{"valid wss with path", "wss://example.com/devtools/browser/abc", ""},
+		{"empty", "", "cannot be empty"},
+		{"blank", "   ", "cannot be empty"},
+		{"wrong scheme", "http://localhost:9222", "scheme must be ws or wss"},
+		{"missing scheme", "localhost:9222", "scheme must be ws or wss"},
+		{"no host with path", "ws:///devtools/browser/id", "host is missing"},
+		{"opaque no host", "ws:localhost:9222", "host is missing"},
+		{"port only no host", "ws://:9222", "host is missing"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateWSEndpoint(tc.endpoint)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
+
 func TestBrowserTypePrepareFlags(t *testing.T) {
 	t.Parallel()
 

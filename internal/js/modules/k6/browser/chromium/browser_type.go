@@ -148,21 +148,28 @@ func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*c
 }
 
 // validateWSEndpoint returns an error if wsEndpoint is not a usable CDP
-// WebSocket URL, catching common mistakes (an empty value, a non-ws scheme)
-// before we attempt to connect.
+// WebSocket URL, catching common mistakes (an empty value, a non-ws scheme,
+// a missing host, etc.) before we attempt to connect.
 func validateWSEndpoint(wsEndpoint string) error {
 	if strings.TrimSpace(wsEndpoint) == "" {
 		return errors.New("WebSocket endpoint cannot be empty")
 	}
+
 	u, err := url.Parse(wsEndpoint)
 	if err != nil {
 		return fmt.Errorf("invalid WebSocket endpoint %q: %w", wsEndpoint, err)
 	}
+
 	if u.Scheme != "ws" && u.Scheme != "wss" {
 		return fmt.Errorf(
 			"invalid WebSocket endpoint %q: scheme must be ws or wss, got %q", wsEndpoint, u.Scheme,
 		)
 	}
+
+	if u.Hostname() == "" {
+		return fmt.Errorf("invalid WebSocket endpoint %q: host is missing", wsEndpoint)
+	}
+
 	return nil
 }
 
