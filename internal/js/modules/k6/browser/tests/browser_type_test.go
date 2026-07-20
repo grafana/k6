@@ -52,6 +52,45 @@ func TestBrowserTypeConnectOverCDP(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestBrowserTypeConnectOverCDPValidation(t *testing.T) {
+	t.Parallel()
+
+	// Invalid endpoints must fail immediately, before any connection attempt,
+	// so no test browser is needed.
+	vu := k6test.NewVU(t)
+	bt := chromium.NewBrowserType(vu)
+	vu.ActivateVU()
+
+	for _, wsEndpoint := range []string{
+		"",                      // empty (e.g. an undefined value or failed lookup)
+		"   ",                   // blank
+		"http://localhost:9222", // wrong scheme
+		"localhost:9222",        // missing ws/wss scheme
+	} {
+		_, err := bt.ConnectOverCDP(context.Background(), wsEndpoint)
+		require.Errorf(t, err, "endpoint %q should be rejected", wsEndpoint)
+	}
+}
+
+// TestChromiumConnectOverCDPAppliesBrowserTimeout verifies that ConnectOverCDP
+// parses browser options from the environment. E.g., with K6_BROWSER_TIMEOUT=1ms
+// a browser operation (e.g., NewPage) must time out.
+func TestChromiumConnectOverCDPAppliesBrowserTimeout(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	vu := k6test.NewVU(t, env.ConstLookup(env.BrowserGlobalTimeout, "1ms"))
+	bt := chromium.NewBrowserType(vu)
+	vu.ActivateVU()
+
+	b, err := bt.ConnectOverCDP(context.Background(), tb.wsURL)
+	require.NoError(t, err)
+	t.Cleanup(b.Close)
+
+	_, err = b.NewPage(nil)
+	require.Error(t, err, "NewPage should time out with K6_BROWSER_TIMEOUT=1ms")
+}
+
 // setupChromiumVU builds a VU with the browser module's chromium object bound
 // to the "chromium" global and an iteration started, ready to run
 // connectOverCDP scripts via RunAsync.

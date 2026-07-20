@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand" // nosemgrep: math-random-used // This is used to generate id for easier debugging
+	"net/url"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -119,26 +120,50 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 // connection and the browser lifetime; when it is canceled (iteration ends),
 // the connection is torn down.
 func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*common.Browser, error) {
-	ctx = b.initContext(ctx)
-
-	logger, err := makeLogger(ctx, b.envLookupper)
-	if err != nil {
-		return nil, fmt.Errorf("setting up logger: %w", err)
+	// Validate wsEndpoint up front so an empty or malformed value
+	// fails fast with a clear error, instead of a confusing lower-level
+	// connection error.
+	if err := validateWSEndpoint(wsEndpoint); err != nil {
+		return nil, err
 	}
 
-	opts := common.NewRemoteBrowserOptions()
-	ctx = common.WithBrowserOptions(ctx, opts)
+	// Go through init (like Connect) so browser options are parsed from the
+	// environment (K6_BROWSER_TIMEOUT, K6_BROWSER_DEBUG, the log category
+	// filter, ...), instead of using the hardcoded defaults.
+	ctx, browserOpts, logger, err := b.init(ctx, true)
+	if err != nil {
+		return nil, fmt.Errorf("initializing browser type: %w", err)
+	}
 
-	bp, err := b.connect(ctx, ctx, wsEndpoint, opts, logger)
+	bp, err := b.connect(ctx, ctx, wsEndpoint, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
-			Timeout: opts.Timeout,
+			Timeout: browserOpts.Timeout,
 		}
 		return nil, fmt.Errorf("%w", err)
 	}
 
 	return bp, nil
+}
+
+// validateWSEndpoint returns an error if wsEndpoint is not a usable CDP
+// WebSocket URL, catching common mistakes (an empty value, a non-ws scheme)
+// before we attempt to connect.
+func validateWSEndpoint(wsEndpoint string) error {
+	if strings.TrimSpace(wsEndpoint) == "" {
+		return errors.New("WebSocket endpoint cannot be empty")
+	}
+	u, err := url.Parse(wsEndpoint)
+	if err != nil {
+		return fmt.Errorf("invalid WebSocket endpoint %q: %w", wsEndpoint, err)
+	}
+	if u.Scheme != "ws" && u.Scheme != "wss" {
+		return fmt.Errorf(
+			"invalid WebSocket endpoint %q: scheme must be ws or wss, got %q", wsEndpoint, u.Scheme,
+		)
+	}
+	return nil
 }
 
 // Connect attaches k6 browser to an existing browser instance.
