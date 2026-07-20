@@ -35,9 +35,10 @@ type StartLocalExecutionRequest struct {
 	// TotalDuration is the total test duration in seconds.
 	TotalDuration int64
 
-	// ArchiveSize is the archive file size in bytes, or nil when
-	// --no-archive-upload is set (sent as explicit JSON null).
-	ArchiveSize *int64
+	// ArchiveSize is the archive file size in bytes, or 0 when there is
+	// no archive (--no-archive-upload); 0 is sent as explicit JSON null.
+	// A real archive is never empty, so 0 unambiguously means "no archive".
+	ArchiveSize int64
 }
 
 // StartLocalExecutionResponse holds the fields returned by the
@@ -198,8 +199,8 @@ func (c *Client) StartLocalExecution(
 
 	sdkReq := k6cloud.NewStartLocalExecutionTestRequest(opts, maxVUs, totalDuration)
 
-	if req.ArchiveSize != nil {
-		v, err := toInt32(*req.ArchiveSize)
+	if req.ArchiveSize > 0 {
+		v, err := toInt32(req.ArchiveSize)
 		if err != nil {
 			return nil, fmt.Errorf("archive_size: %w", err)
 		}

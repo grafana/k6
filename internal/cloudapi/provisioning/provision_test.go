@@ -282,6 +282,54 @@ func TestProvisionLocalExecution_409ConflictPropagatesToFindByName(t *testing.T)
 	assert.Equal(t, "test-run-token-abc", result.RuntimeConfig.TestRunToken)
 }
 
+func TestProvisionLocalExecution_ArchivePresentButNoUploadURL(t *testing.T) {
+	t.Parallel()
+
+	srv := provtest.NewServer(t)
+
+	srv.HandleCreateLoadTest(testProjectID, func(w http.ResponseWriter, _ *http.Request) {
+		writeCreateResponse(w)
+	})
+
+	// start_local_execution returns no archive upload URL (null).
+	srv.HandleStartLocalExecution(testLoadTestID, func(w http.ResponseWriter, _ *http.Request) {
+		resp := provtest.DefaultStartLocalExecutionResponse()
+		resp.SetTestRunId(testTestRunID)
+		resp.ArchiveUploadUrl = *k6cloud.NewNullableString(nil)
+		resp.SetTestRunDetailsPageUrl(fmt.Sprintf("https://app.k6.io/runs/%d", testTestRunID))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		require.NoError(t, json.NewEncoder(w).Encode(resp))
+	})
+
+	// The upload endpoint must not be hit when no URL is returned.
+	srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("archive upload must not be attempted when no upload URL is returned")
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv.HandleFetchTestRun(testTestRunID, []v6.TestProgress{
+		{Status: v6.StatusInitializing},
+	})
+
+	client, err := NewClient(testutils.NewLogger(t), "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
+	require.NoError(t, err)
+
+	// Archive provided but API returns no upload URL: provisioning should
+	// still succeed (a warning is logged) and skip the upload.
+	result, err := client.ProvisionLocalExecution(t.Context(), ProvisionParams{
+		Name:          "my-test",
+		ProjectID:     testProjectID,
+		MaxVUs:        50,
+		TotalDuration: 630,
+		Options:       json.RawMessage(`{"vus":10}`),
+		Archive:       newTestArchive(t),
+		PollInterval:  time.Microsecond,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, testTestRunID, result.TestRunID)
+}
+
 func TestProvisionLocalExecution_ErrorAtCreate(t *testing.T) {
 	t.Parallel()
 

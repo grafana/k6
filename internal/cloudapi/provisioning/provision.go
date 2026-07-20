@@ -65,7 +65,7 @@ func (c *Client) ProvisionLocalExecution(
 	// start_local_execution body. The same buffer is reused for
 	// the S3 upload to avoid a second serialisation.
 	var (
-		archiveSize  *int64
+		archiveSize  int64
 		archiveBytes []byte
 	)
 	if params.Archive != nil {
@@ -73,8 +73,7 @@ func (c *Client) ProvisionLocalExecution(
 		if err := params.Archive.Write(&buf); err != nil {
 			return nil, fmt.Errorf("serialising archive: %w", err)
 		}
-		sz := int64(buf.Len())
-		archiveSize = &sz
+		archiveSize = int64(buf.Len())
 		archiveBytes = buf.Bytes()
 	}
 
@@ -90,10 +89,15 @@ func (c *Client) ProvisionLocalExecution(
 		return nil, fmt.Errorf("start local execution: %w", err)
 	}
 
-	if params.Archive != nil && sleResp.ArchiveUploadURL != nil {
+	switch {
+	case params.Archive != nil && sleResp.ArchiveUploadURL != nil:
 		if err := c.UploadArchive(ctx, *sleResp.ArchiveUploadURL, archiveBytes); err != nil {
 			return nil, fmt.Errorf("upload archive: %w", err)
 		}
+	case params.Archive != nil && sleResp.ArchiveUploadURL == nil:
+		// We had an archive to upload but the API returned no upload URL;
+		// proceed without uploading rather than failing the run.
+		c.logger.Warn("archive present but provisioning API returned no upload URL; skipping archive upload")
 	}
 
 	// Always poll: the backend may queue the test run regardless of

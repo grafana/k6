@@ -63,7 +63,7 @@ func TestStartLocalExecution(t *testing.T) {
 		Options:       opts,
 		MaxVUs:        50,
 		TotalDuration: 630,
-		ArchiveSize:   &archiveSize,
+		ArchiveSize:   archiveSize,
 	}
 
 	got, err := client.StartLocalExecution(t.Context(), provtest.DefaultLoadTestID, req)
@@ -139,7 +139,7 @@ func TestStartLocalExecution_NoArchive_ArchiveSizeNull(t *testing.T) {
 		Options:       json.RawMessage(`{"vus":1}`),
 		MaxVUs:        1,
 		TotalDuration: 60,
-		ArchiveSize:   nil, // no archive
+		ArchiveSize:   0, // no archive
 	}
 
 	_, err = client.StartLocalExecution(t.Context(), provtest.DefaultLoadTestID, req)
@@ -180,7 +180,7 @@ func TestStartLocalExecution_5xxRetried(t *testing.T) {
 		Options:       json.RawMessage(`{"vus":1}`),
 		MaxVUs:        1,
 		TotalDuration: 60,
-		ArchiveSize:   nil,
+		ArchiveSize:   0,
 	}
 
 	got, err := client.StartLocalExecution(t.Context(), provtest.DefaultLoadTestID, req)
@@ -311,7 +311,7 @@ func TestStartLocalExecution_4xxNotRetried(t *testing.T) {
 		Options:       json.RawMessage(`{"vus":1}`),
 		MaxVUs:        1,
 		TotalDuration: 60,
-		ArchiveSize:   nil,
+		ArchiveSize:   0,
 	}
 
 	_, err = client.StartLocalExecution(t.Context(), provtest.DefaultLoadTestID, req)
