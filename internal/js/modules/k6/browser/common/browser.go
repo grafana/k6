@@ -701,6 +701,9 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	_, span := TraceAPICall(b.vuCtx, "", "browser.newContext")
 	defer span.End()
 
+	if b.closing.Load() {
+		return nil, spanRecordErrorf(span, "browser has been closed")
+	}
 	if b.context != nil {
 		return nil, spanRecordErrorf(span, "existing browser context must be closed before creating a new one")
 	}

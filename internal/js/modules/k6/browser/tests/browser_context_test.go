@@ -1094,3 +1094,27 @@ func TestBrowserContextBrowserNoCloseForManaged(t *testing.T) {
 	`)
 	require.NoError(t, err)
 }
+
+// TestChromiumConnectOverCDPUseAfterClose verifies that using a connectOverCDP
+// browser after close() gives a clear "browser has been closed" error.
+func TestChromiumConnectOverCDPUseAfterClose(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	vu := setupChromiumVU(t)
+
+	_, err := vu.RunAsync(t, `
+		const b = await chromium.connectOverCDP("%s");
+		await b.close();
+		let msg = "";
+		try {
+			await b.newPage();
+		} catch (e) {
+			msg = String(e);
+		}
+		if (!msg.includes("browser has been closed")) {
+			throw new Error("expected 'browser has been closed', got: " + msg);
+		}
+	`, tb.wsURL)
+	require.NoError(t, err)
+}
