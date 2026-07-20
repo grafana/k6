@@ -624,15 +624,22 @@ func (b *Browser) Close() {
 			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
 	}
-	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
-	// processed, and for the process to exit gracefully. Otherwise kill it
-	// forcefully after the timeout.
-	timeout := time.Second
-	select {
-	case <-b.browserProc.processDone:
-	case <-time.After(timeout):
-		b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
-		b.browserProc.Terminate()
+
+	// A remote browser has no local process to wait for or kill: processDone is
+	// never closed for a NewRemoteBrowserProcess, so waiting here would always
+	// hit the timeout and add ~1s to every remote close. The unconditional
+	// conn.Close() below drives the teardown instead.
+	if !b.browserOpts.isRemoteBrowser {
+		// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
+		// processed, and for the process to exit gracefully. Otherwise, kill it
+		// forcefully after the timeout.
+		timeout := time.Second
+		select {
+		case <-b.browserProc.processDone:
+		case <-time.After(timeout):
+			b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
+			b.browserProc.Terminate()
+		}
 	}
 	// This is unintuitive, since the process exited, so the connection would've
 	// been closed as well. The reason we still call conn.Close() here is to
