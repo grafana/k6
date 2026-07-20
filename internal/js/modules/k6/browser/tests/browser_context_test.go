@@ -1032,19 +1032,19 @@ func TestChromiumConnectOverCDPContextBrowserOwner(t *testing.T) {
 	tb := newTestBrowser(t)
 	vu := setupChromiumVU(t) // StartIteration also builds a managed browser
 
+	// context().browser() must be the connectOverCDP browser that owns the
+	// context, so closing that browser disconnects the one reached via
+	// context().browser() (isConnected() flips synchronously on close).
 	_, err := vu.RunAsync(t, `
 		const b = await chromium.connectOverCDP("%s");
 		const p = await b.newPage();
-		globalThis.__owner = p.context().browser();
+		const owner = p.context().browser();
 		await b.close();
+		if (owner.isConnected()) {
+			throw new Error("context().browser() should be the connectOverCDP browser, disconnected after close");
+		}
 	`, tb.wsURL)
 	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		v := vu.RunPromise(t, "return globalThis.__owner.isConnected();")
-		return !v.Result().ToBoolean()
-	}, 3*time.Second, 100*time.Millisecond,
-		"context().browser() should be the connectOverCDP browser and report disconnected after close")
 }
 
 // TestChromiumConnectOverCDPContextBrowserExposesClose verifies that a
@@ -1063,16 +1063,12 @@ func TestChromiumConnectOverCDPContextBrowserExposesClose(t *testing.T) {
 		if (typeof owner.close !== "function") {
 			throw new Error("expected close() on connectOverCDP browser via context().browser()");
 		}
-		globalThis.__owner = owner;
 		await owner.close(); // close via context().browser()
+		if (owner.isConnected()) {
+			throw new Error("close() via context().browser() should disconnect the browser");
+		}
 	`, tb.wsURL)
 	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		v := vu.RunPromise(t, "return globalThis.__owner.isConnected();")
-		return !v.Result().ToBoolean()
-	}, 3*time.Second, 100*time.Millisecond,
-		"close() via context().browser() should disconnect the connectOverCDP browser")
 }
 
 // TestBrowserContextBrowserNoCloseForManaged verifies that a managed browser
