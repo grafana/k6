@@ -73,7 +73,7 @@ func (b *BrowserType) Clone() *BrowserType {
 }
 
 func (b *BrowserType) init(
-	ctx context.Context, isRemoteBrowser bool,
+	ctx context.Context, isRemoteBrowser bool, scenarioOpts map[string]any,
 ) (context.Context, *common.BrowserOptions, *log.Logger, error) {
 	ctx = b.initContext(ctx)
 
@@ -89,8 +89,7 @@ func (b *BrowserType) init(
 		browserOpts = common.NewLocalBrowserOptions()
 	}
 
-	opts := k6ext.GetScenarioOpts(b.vu.Context(), b.vu)
-	if err = browserOpts.Parse(ctx, logger, opts, b.envLookupper); err != nil {
+	if err = browserOpts.Parse(ctx, logger, scenarioOpts, b.envLookupper); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing browser options: %w", err)
 	}
 	ctx = common.WithBrowserOptions(ctx, browserOpts)
@@ -127,10 +126,11 @@ func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*c
 		return nil, err
 	}
 
-	// Go through init (like Connect) so browser options are parsed from the
-	// environment (K6_BROWSER_TIMEOUT, K6_BROWSER_DEBUG, the log category
-	// filter, ...), instead of using the hardcoded defaults.
-	ctx, browserOpts, logger, err := b.init(ctx, true)
+	// Parse browser options from the environment (K6_BROWSER_TIMEOUT,
+	// K6_BROWSER_DEBUG, the log category filter, ...) like Connect does. Pass a
+	// fixed chromium type instead of scenario options: connectOverCDP works
+	// without a browser scenario, and Parse requires the type to be set.
+	ctx, browserOpts, logger, err := b.init(ctx, true, map[string]any{"type": "chromium"})
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
@@ -178,7 +178,7 @@ func validateWSEndpoint(wsEndpoint string) error {
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
 // the events which allows the connection to close.
 func (b *BrowserType) Connect(ctx, vuCtx context.Context, wsEndpoint string) (*common.Browser, error) {
-	vuCtx, browserOpts, logger, err := b.init(vuCtx, true)
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, true, k6ext.GetScenarioOpts(b.vu.Context(), b.vu))
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
@@ -244,7 +244,7 @@ func (b *BrowserType) link(
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
 // the events which allows the chromium subprocess to shutdown.
 func (b *BrowserType) Launch(ctx, vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
-	vuCtx, browserOpts, logger, err := b.init(vuCtx, false)
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, false, k6ext.GetScenarioOpts(b.vu.Context(), b.vu))
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}
