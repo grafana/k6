@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 
@@ -317,6 +318,50 @@ func TestBrowserRegistry(t *testing.T) {
 		// Verify there are no browsers left
 		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
+}
+
+func TestUserManagedBrowserTracking(t *testing.T) {
+	t.Parallel()
+
+	r := &browserRegistry{
+		m:           make(map[int64]*common.Browser),
+		userManaged: make(map[int64][]*common.Browser),
+	}
+
+	// Distinct sentinel pointers; track/untrack never call Close on them.
+	b1 := &common.Browser{}
+	b2 := &common.Browser{}
+
+	r.trackUserManagedBrowser(1, b1)
+	r.trackUserManagedBrowser(1, b2)
+	require.Len(t, r.userManaged[1], 2)
+
+	r.untrackUserManagedBrowser(1, b1)
+	require.Len(t, r.userManaged[1], 1)
+
+	// Untracking the last entry removes the iteration key entirely.
+	r.untrackUserManagedBrowser(1, b2)
+	require.NotContains(t, r.userManaged, int64(1))
+}
+
+func TestStartConnectTraceReuse(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+	vu.StartIteration(t)
+
+	r := &browserRegistry{
+		vu:          vu,
+		m:           make(map[int64]*common.Browser),
+		userManaged: make(map[int64][]*common.Browser),
+	}
+
+	iter := vu.State().Iteration
+	_ = r.startConnectTrace(vu.Context(), iter)
+	_ = r.startConnectTrace(vu.Context(), iter)
+
+	require.Equal(t, 1, r.tr.iterationTracesCount())
 }
 
 func TestParseTracesMetadata(t *testing.T) {

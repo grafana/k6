@@ -31,20 +31,9 @@ func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
 				// Register for guaranteed cleanup at IterEnd / Exit.
 				vu.trackUserManagedBrowser(iter, b)
 
-				m := mapBrowser(vu, func() (*common.Browser, error) {
+				return mapBrowser(vu, func() (*common.Browser, error) {
 					return b, nil
-				})
-
-				// User-managed browsers expose close() for optional early release.
-				// It untracks first, so the IterEnd sweep does not double-close.
-				m["close"] = func() *sobek.Promise {
-					return promise(vu, func() (any, error) {
-						vu.untrackUserManagedBrowser(iter, b)
-						b.Close()
-						return nil, nil
-					})
-				}
-				return m, nil
+				}), nil
 			})
 		},
 	}

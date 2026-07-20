@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -451,6 +452,21 @@ func (r *browserRegistry) untrackUserManagedBrowser(iter int64, b *common.Browse
 	if len(r.userManaged[iter]) == 0 {
 		delete(r.userManaged, iter)
 	}
+}
+
+// userManagedIter returns the iteration a user-managed browser is tracked under
+// and whether it is tracked at all. It's used to decide whether a browser
+// mapping should expose close() (only user-managed browsers do).
+func (r *browserRegistry) userManagedIter(b *common.Browser) (int64, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for iter, browsers := range r.userManaged {
+		if slices.Contains(browsers, b) {
+			return iter, true
+		}
+	}
+	return 0, false
 }
 
 // closeUserManaged gracefully closes and removes all user-managed browsers for iter.
