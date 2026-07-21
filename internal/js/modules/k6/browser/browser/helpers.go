@@ -149,34 +149,29 @@ func awaitHandlerResult(rt *sobek.Runtime, retVal sobek.Value, result chan<- err
 		result <- nil
 		return
 	}
-	switch p.State() {
-	case sobek.PromiseStatePending:
-		pObj := retVal.ToObject(rt)
-		thenFn, ok := sobek.AssertFunction(pObj.Get("then"))
-		if !ok {
-			result <- fmt.Errorf("page.on handler returned a non-thenable value")
-			return
-		}
-		onFulfilled := rt.ToValue(func(sobek.Value) { result <- nil })
-		onRejected := rt.ToValue(func(v sobek.Value) {
-			if err, ok := v.Export().(error); ok {
-				result <- err
-			} else {
-				result <- fmt.Errorf("%v", v)
-			}
-		})
-		if _, err := thenFn(retVal, onFulfilled, onRejected); err != nil {
-			result <- err
-		}
-	case sobek.PromiseStateRejected:
-		v := p.Result()
+	if p.State() == sobek.PromiseStateFulfilled {
+		result <- nil
+		return
+	}
+	// For both pending and already-rejected Promises, attach .then/.catch so
+	// Sobek marks the promise as handled (preventing unhandled rejection tracking)
+	// and so the outcome is routed through the callbacks in both cases.
+	pObj := retVal.ToObject(rt)
+	thenFn, ok := sobek.AssertFunction(pObj.Get("then"))
+	if !ok {
+		result <- fmt.Errorf("page.on handler returned a non-thenable value")
+		return
+	}
+	onFulfilled := rt.ToValue(func(sobek.Value) { result <- nil })
+	onRejected := rt.ToValue(func(v sobek.Value) {
 		if err, ok := v.Export().(error); ok {
 			result <- err
 		} else {
 			result <- fmt.Errorf("%v", v)
 		}
-	default: // PromiseStateFulfilled
-		result <- nil
+	})
+	if _, err := thenFn(retVal, onFulfilled, onRejected); err != nil {
+		result <- err
 	}
 }
 
