@@ -23,6 +23,7 @@ require (
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716094638-49089b6e624d
 	github.com/grafana/k6provider v0.5.0
 	github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4
+	github.com/grafana/sobek-webapi-encoding v0.1.0
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc

@@ -1033,6 +1033,55 @@ func TestGlobalTimers(t *testing.T) {
 	}
 }
 
+func TestGlobalTextEncoding(t *testing.T) {
+	t.Parallel()
+	data := `
+		const text = "Hello, 世界 👋";
+		const encoded = new TextEncoder().encode(text);
+		if (!(encoded instanceof Uint8Array)) {
+			throw new Error("TextEncoder.encode() did not return a Uint8Array");
+		}
+
+		const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+		if (!decoder.fatal || !decoder.ignoreBOM) {
+			throw new Error("TextDecoder options were not applied");
+		}
+		if (decoder.decode(encoded) !== text) {
+			throw new Error("text encoding round trip failed");
+		}
+
+		let threwTypeError = false;
+		try {
+			decoder.decode(new Uint8Array([0xff]));
+		} catch (error) {
+			threwTypeError = error instanceof TypeError;
+		}
+		if (!threwTypeError) {
+			throw new Error("fatal TextDecoder did not throw a TypeError");
+		}
+
+		export default function() {}
+	`
+
+	b1, err := getSimpleBundle(t, "/script.js", data)
+	require.NoError(t, err)
+	logger := testutils.NewLogger(t)
+
+	b2, err := getSimpleBundleFromArchive(t, b1.makeArchive(), logger)
+	require.NoError(t, err)
+
+	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
+	for name, b := range bundles {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			for _, vuID := range []uint64{1, 2} {
+				_, err := b.Instantiate(context.Background(), vuID)
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestTopLevelAwaitErrors(t *testing.T) {
 	t.Parallel()
 	data := `
