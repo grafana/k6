@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-// HTTPClient is a Bearer-authenticated HTTP layer used by the cloud
-// Output's expv2 metrics push when in provisioning mode. Signs
-// requests with the scoped test_run_token, retries on 5xx and
-// transport errors, decodes JSON responses into a caller-provided
-// struct. It implements only Do — not BaseURL — because the metrics
-// URL is set explicitly by the caller (no client-side derivation).
+// HTTPClient is the scoped-token Bearer HTTP layer injected into the
+// cloud Output's expv2 metrics push (and the notify call) when running
+// in provisioning mode. It signs requests with the scoped
+// test_run_token, retries on 5xx and transport errors via the shared
+// doWithRetry helper, and decodes JSON responses into a caller-provided
+// struct. Unlike Client, it drives no provisioning/v6 orchestration and
+// implements only Do — not BaseURL — because the metrics URL is set
+// explicitly by the caller (no client-side derivation).
 type HTTPClient struct {
 	httpClient *http.Client
 	token      string // scoped test_run_token
@@ -53,52 +54,22 @@ func (p *HTTPClient) Do(req *http.Request, v any) error {
 	req.Header.Set("Authorization", "Bearer "+p.token)
 	req.Header.Set("User-Agent", "k6cloud/"+p.version)
 
-	var (
-		lastErr  error
-		lastResp *http.Response
-	)
-
-	for attempt := 1; attempt <= MaxRetries; attempt++ {
-		lastResp, lastErr = p.httpClient.Do(req) //nolint:gosec
-		if lastErr != nil {
-			if attempt < MaxRetries {
-				time.Sleep(RetryInterval)
-				if req.GetBody != nil {
-					req.Body, _ = req.GetBody()
-				}
-				continue
-			}
-			break
-		}
-
-		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
-			_, _ = io.Copy(io.Discard, lastResp.Body)
-			_ = lastResp.Body.Close()
-			time.Sleep(RetryInterval)
-			if req.GetBody != nil {
-				req.Body, _ = req.GetBody()
-			}
-			continue
-		}
-
-		break
-	}
-
-	if lastErr != nil {
-		return lastErr
+	resp, err := doWithRetry(p.httpClient, req)
+	if err != nil {
+		return err
 	}
 
 	defer func() {
-		_, _ = io.Copy(io.Discard, lastResp.Body)
-		_ = lastResp.Body.Close()
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
 	}()
 
-	if err := CheckResponse(lastResp); err != nil {
+	if err := CheckResponse(resp); err != nil {
 		return err
 	}
 
 	if v != nil {
-		if err := json.NewDecoder(lastResp.Body).Decode(v); err != nil && !errors.Is(err, io.EOF) {
+		if err := json.NewDecoder(resp.Body).Decode(v); err != nil && !errors.Is(err, io.EOF) {
 			return fmt.Errorf("decoding response: %w", err)
 		}
 	}

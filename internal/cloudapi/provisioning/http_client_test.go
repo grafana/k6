@@ -2,12 +2,14 @@ package provisioning
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -115,6 +117,42 @@ func TestHTTPClient_NoRetryOn4xx(t *testing.T) {
 	assert.Contains(t, err.Error(), "400")
 	assert.Contains(t, err.Error(), "bad input")
 	assert.Equal(t, int32(1), hits.Load())
+}
+
+func TestHTTPClient_ContextCancelStopsRetryWait(t *testing.T) {
+	t.Parallel()
+
+	// Server always fails with 5xx so the client enters the retry wait.
+	hit := make(chan struct{}, 10)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit <- struct{}{}
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	c := NewHTTPClient(srv.Client(), "tok", "v0.1.0", testutils.NewLogger(t))
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL, nil)
+	require.NoError(t, err)
+
+	// Cancel as soon as the first attempt reaches the server, so the
+	// retry wait (RetryInterval) is interrupted by the cancellation.
+	go func() {
+		<-hit
+		cancel()
+	}()
+
+	start := time.Now()
+	err = c.Do(req, nil)
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Less(t, elapsed, RetryInterval,
+		"cancellation should interrupt the retry wait instead of sleeping the full interval")
 }
 
 func TestHTTPClient_RequestBodyReplayedOnRetry(t *testing.T) {

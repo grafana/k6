@@ -21,7 +21,13 @@ const (
 	MaxRetries = 3
 )
 
-// Client handles communication with the provisioning and v6 cloud APIs.
+// Client orchestrates the provisioning and v6 cloud APIs for a
+// local-execution test run: creating/finding the load test, starting the
+// run, uploading the archive, polling for readiness, and posting the
+// completion notification. It wraps a k6cloud.APIClient for the
+// provisioning endpoints and an embedded v6.Client for test-run status
+// queries. It is distinct from HTTPClient, which is the scoped-token
+// Bearer HTTP layer injected into the expv2 metrics push.
 type Client struct {
 	apiClient *k6cloud.APIClient
 	v6Client  *v6.Client
@@ -93,13 +99,19 @@ func (c *Client) authCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k6cloud.ContextAccessToken, c.token)
 }
 
-// doWithRetry executes the given HTTP request, retrying on 5xx status
-// codes and transport errors up to MaxRetries times. The request body
-// is reset from req.GetBody before each attempt so a retried request
-// with a body is not sent empty. 4xx errors are NOT retried.
+// doWithRetry executes the request via the provisioning Client's HTTP
+// client. It is a thin wrapper around the package-level doWithRetry; see
+// that function for the retry semantics.
 func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
-	httpClient := c.apiClient.GetConfig().HTTPClient
+	return doWithRetry(c.apiClient.GetConfig().HTTPClient, req)
+}
 
+// doWithRetry runs req through httpClient, retrying on 5xx responses and
+// transport errors up to MaxRetries times, resetting the body from
+// req.GetBody before each attempt so a retried request with a body is not
+// sent empty. The retry wait honours req.Context() so a cancelled request
+// stops waiting promptly. 4xx responses are NOT retried.
+func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, error) {
 	var (
 		lastErr  error
 		lastResp *http.Response
@@ -119,7 +131,11 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 		lastResp, lastErr = httpClient.Do(req) //nolint:gosec
 		if lastErr != nil {
 			if attempt < MaxRetries {
-				time.Sleep(RetryInterval)
+				select {
+				case <-time.After(RetryInterval):
+				case <-req.Context().Done():
+					return lastResp, req.Context().Err()
+				}
 				continue
 			}
 			break
@@ -128,7 +144,11 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
 			_, _ = io.Copy(io.Discard, lastResp.Body)
 			_ = lastResp.Body.Close()
-			time.Sleep(RetryInterval)
+			select {
+			case <-time.After(RetryInterval):
+			case <-req.Context().Done():
+				return lastResp, req.Context().Err()
+			}
 			continue
 		}
 
