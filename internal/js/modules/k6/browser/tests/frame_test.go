@@ -94,13 +94,13 @@ func TestPageOnDialogAccept(t *testing.T) {
 		WaitUntil: common.LifecycleEventNetworkIdle,
 		Timeout:   common.DefaultTimeout,
 	}
-	_, err = p.Goto(tb.staticURL("dialog.html?dialogType=alert"), opts)
+	_, err = p.Goto(tb.staticURL("dialog.html?dialogType=confirm"), opts)
 	require.NoError(t, err)
 
 	result, ok, err := p.TextContent("#textField", common.NewFrameTextContentOptions(p.MainFrame().Timeout()))
 	require.NoError(t, err)
 	require.True(t, ok)
-	assert.EqualValues(t, "alert dismissed", result)
+	assert.EqualValues(t, "confirm accepted", result)
 }
 
 func TestPageOnDialogDismiss(t *testing.T) {
