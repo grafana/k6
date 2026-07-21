@@ -53,9 +53,7 @@ type ProvisionResult struct {
 // ProvisionLocalExecution orchestrates the full local-execution
 // provisioning flow: CreateOrFindLoadTest → StartLocalExecution →
 // optional UploadArchive → WaitForTestRunReady.
-func (c *Client) ProvisionLocalExecution(
-	ctx context.Context, params ProvisionParams,
-) (*ProvisionResult, error) {
+func (c *Client) ProvisionLocalExecution(ctx context.Context, params ProvisionParams) (*ProvisionResult, error) {
 	loadTestID, err := c.v6Client.CreateOrFindLoadTest(ctx, params.ProjectID, params.Name)
 	if err != nil {
 		return nil, fmt.Errorf("create or find load test: %w", err)
@@ -100,11 +98,6 @@ func (c *Client) ProvisionLocalExecution(
 		c.logger.Warn("archive present but provisioning API returned no upload URL; skipping archive upload")
 	}
 
-	// Always poll: the backend may queue the test run regardless of
-	// whether an archive was uploaded. archive_size=null signals no
-	// archive is expected, so the backend skips waiting for upload and
-	// goes straight to validation, but the test run may still be queued
-	// before becoming ready.
 	if err := c.WaitForTestRunReady(ctx, sleResp.TestRunID, params.PollInterval); err != nil {
 		return nil, fmt.Errorf("wait for test run ready: %w", err)
 	}
