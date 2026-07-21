@@ -1,3 +1,4 @@
+//go:build gofuzz
 // +build gofuzz
 
 package syntax
@@ -5,7 +6,7 @@ package syntax
 // Fuzz is the input point for go-fuzz
 func Fuzz(data []byte) int {
 	sdata := string(data)
-	tree, err := Parse(sdata, RegexOptions(0))
+	tree, err := Parse(sdata, ParseOptions{})
 	if err != nil {
 		return 0
 	}

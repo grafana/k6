@@ -571,7 +571,7 @@ func (s *scope) addBinding(offset int) *binding {
 func (s *scope) bindNameLexical(name unistring.String, unique bool, offset int) (*binding, bool) {
 	if b := s.boundNames[name]; b != nil {
 		if unique {
-			s.c.throwSyntaxError(offset, "Identifier '%s' has already been declared", name)
+			s.c.throwSyntaxErrorf(offset, "Identifier '%s' has already been declared", name)
 		}
 		return b, false
 	}
@@ -1077,7 +1077,7 @@ func (c *compiler) compileLocalExportEntry(entry exportEntry) {
 	b, ok := c.scope.boundNames[name]
 	if !ok {
 		if entry.localName != "default" {
-			c.throwSyntaxError(entry.offset, "exporting unknown binding: %q", name)
+			c.throwSyntaxErrorf(entry.offset, "exporting unknown binding: %q", name)
 		}
 		b, _ = c.scope.bindName(name)
 	}
@@ -1367,7 +1367,7 @@ func (c *compiler) createBindings(target ast.Expression, createIdBinding func(na
 			case *ast.PropertyKeyed:
 				c.createBindings(prop.Value, createIdBinding)
 			default:
-				c.throwSyntaxError(int(target.Idx0()-1), "unsupported property type in ObjectPattern: %T", prop)
+				c.throwSyntaxErrorf(int(target.Idx0()-1), "unsupported property type in ObjectPattern: %T", prop)
 			}
 		}
 		if target.Rest != nil {
@@ -1385,7 +1385,7 @@ func (c *compiler) createBindings(target ast.Expression, createIdBinding func(na
 	case *ast.AssignExpression:
 		c.createBindings(target.Left, createIdBinding)
 	default:
-		c.throwSyntaxError(int(target.Idx0()-1), "unsupported binding target: %T", target)
+		c.throwSyntaxErrorf(int(target.Idx0()-1), "unsupported binding target: %T", target)
 	}
 }
 
@@ -1428,7 +1428,7 @@ func (c *compiler) createLexicalIdBindingFuncBody(name unistring.String, isConst
 	parentBinding := paramScope.boundNames[name]
 	if parentBinding != nil {
 		if parentBinding != calleeBinding && (name != "arguments" || !paramScope.argsNeeded) {
-			c.throwSyntaxError(offset, "Identifier '%s' has already been declared", name)
+			c.throwSyntaxErrorf(offset, "Identifier '%s' has already been declared", name)
 		}
 	}
 	b, _ := c.scope.bindNameLexical(name, true, offset)
@@ -1541,7 +1541,17 @@ func (c *compiler) emit(instructions ...instruction) {
 	c.p.code = append(c.p.code, instructions...)
 }
 
-func (c *compiler) throwSyntaxError(offset int, format string, args ...interface{}) {
+func (c *compiler) throwSyntaxError(offset int, msg string) {
+	panic(&CompilerSyntaxError{
+		CompilerError: CompilerError{
+			File:    c.p.src,
+			Offset:  offset,
+			Message: msg,
+		},
+	})
+}
+
+func (c *compiler) throwSyntaxErrorf(offset int, format string, args ...interface{}) {
 	panic(&CompilerSyntaxError{
 		CompilerError: CompilerError{
 			File:    c.p.src,
@@ -1623,7 +1633,7 @@ func (c *compiler) compileStatementDummy(statement ast.Statement) {
 
 func (c *compiler) assert(cond bool, offset int, msg string, args ...interface{}) {
 	if !cond {
-		c.throwSyntaxError(offset, "Compiler bug: "+msg, args...)
+		c.throwSyntaxErrorf(offset, "Compiler bug: "+msg, args...)
 	}
 }
 
@@ -1690,7 +1700,7 @@ func (s *classScope) declarePrivateId(name unistring.String, kind ast.PropertyKi
 				}
 			}
 		}
-		s.c.throwSyntaxError(offset, "Identifier '#%s' has already been declared", name)
+		s.c.throwSyntaxErrorf(offset, "Identifier '#%s' has already been declared", name)
 		panic("unreachable")
 	}
 	var env *privateEnvRegistry
@@ -1749,6 +1759,6 @@ func (c *compiler) resolvePrivateName(name unistring.String, offset int) (*resol
 			}
 		}
 	}
-	c.throwSyntaxError(offset, "Private field '#%s' must be declared in an enclosing class", name)
+	c.throwSyntaxErrorf(offset, "Private field '#%s' must be declared in an enclosing class", name)
 	panic("unreachable")
 }

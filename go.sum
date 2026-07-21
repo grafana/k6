@@ -36,8 +36,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.1/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46t
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dlclark/regexp2 v1.12.0 h1:0j4c5qQmnC6XOWNjP3PIXURXN2gWx76rd3KvgdPkCz8=
-github.com/dlclark/regexp2 v1.12.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
+github.com/dlclark/regexp2/v2 v2.2.2 h1:MYWvNYw8okuqNhwTYO587EZMiDruVa2vhV6fsGpfya0=
+github.com/dlclark/regexp2/v2 v2.2.2/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
@@ -63,6 +63,8 @@ github.com/go-sourcemap/sourcemap v2.1.4+incompatible h1:a+iTbH5auLKxaNwQFg0B+TC
 github.com/go-sourcemap/sourcemap v2.1.4+incompatible/go.mod h1:F8jJfvm2KbVjc5NqelyYJmf/v5J0dwNLS2mL4sNA1Jg=
 github.com/go-stack/stack v1.8.0/go.mod h1:v0f6uXyyMGvRgIKkXu+yp6POWl0qKG85gN/melR3HDY=
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
+github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=
+github.com/goccy/go-yaml v1.19.2/go.mod h1:XBurs7gK8ATbW4ZPGKgcbrY1Br56PdM69F7LkFRi1kA=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfUlaOkMMuAQtPIUF8ecWP5IEl/CR7VP2Q=
 github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
@@ -94,8 +96,8 @@ github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716094638-49089b6e62
 github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716094638-49089b6e624d/go.mod h1:RhZGBq6e90zSi0EME83c6S1qkOzD8pP0MNETqieWX0k=
 github.com/grafana/k6provider v0.5.0 h1:SwItWPOMQHfRytezQBKpeXLxjNmcyD/x9PTA28pEbwg=
 github.com/grafana/k6provider v0.5.0/go.mod h1:R9WKthnwk96E47m6w/mnC13hhBYTn5iMdP5caFt/t5k=
-github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b h1:mM/qn1luOrRZHT3G+405JMdCx4mGxeLKpOkVBa5+lFw=
-github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b/go.mod h1:8pB+ag4SAbqtDxh1LNTeUI62/5f8mmEACImwbDHoUC0=
+github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4 h1:LJ2pEOxFbfUIhrkpROwZ6hLhuCn6e5GSX08v5GFwN/4=
+github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4/go.mod h1:BL/2XROA/Wtlb+zGEhkSdSZiMFIgw+D2ZdDfrbccyVE=
 github.com/grafana/xk6-dashboard-assets v0.1.2 h1:n2wqytPICn2ZYsKa9HE6GlvFXk+WjByMfT4eM+ms3gE=
 github.com/grafana/xk6-dashboard-assets v0.1.2/go.mod h1:SeoRjvmFF8UhLIFDfvjqqwBtE8MtaIPYIDWqVJZEHDo=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=

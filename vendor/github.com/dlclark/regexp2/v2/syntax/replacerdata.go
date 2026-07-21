@@ -19,8 +19,8 @@ const (
 	replaceWholeString  = -4
 )
 
-//ErrReplacementError is a general error during parsing the replacement text
-var ErrReplacementError = errors.New("Replacement pattern error.")
+// ErrReplacementError is a general error during parsing the replacement text
+var ErrReplacementError = errors.New("replacement pattern error")
 
 // NewReplacerData will populate a reusable replacer data struct based on the given replacement string
 // and the capture group data from a regexp
@@ -37,7 +37,7 @@ func NewReplacerData(rep string, caps map[int]int, capsize int, capnames map[str
 		return nil, err
 	}
 
-	if concat.t != ntConcatenate {
+	if concat.T != NtConcatenate {
 		panic(ErrReplacementError)
 	}
 
@@ -47,21 +47,21 @@ func NewReplacerData(rep string, caps map[int]int, capsize int, capnames map[str
 		rules   []int
 	)
 
-	for _, child := range concat.children {
-		switch child.t {
-		case ntMulti:
+	for _, child := range concat.Children {
+		switch child.T {
+		case NtMulti:
 			child.writeStrToBuf(sb)
 
-		case ntOne:
-			sb.WriteRune(child.ch)
+		case NtOne:
+			sb.WriteRune(child.Ch)
 
-		case ntRef:
+		case NtRef:
 			if sb.Len() > 0 {
 				rules = append(rules, len(strings))
 				strings = append(strings, sb.String())
 				sb.Reset()
 			}
-			slot := child.m
+			slot := child.M
 
 			if len(caps) > 0 && slot >= 0 {
 				slot = caps[slot]
