@@ -73,9 +73,11 @@ func TestAwaitHandlerResultRejectedPromise(t *testing.T) {
 	rt.SetPromiseRejectionTracker(func(*sobek.Promise, sobek.PromiseRejectionOperation) {})
 	v, err := rt.RunString(`Promise.reject(new Error("boom"))`)
 	require.NoError(t, err)
-	// Already-rejected Promise: awaitHandlerResult sends error immediately.
+	// Already-rejected Promise: awaitHandlerResult attaches .then/.catch so Sobek
+	// marks it handled; the callback fires after a microtask flush.
 	result := make(chan error, 1)
 	awaitHandlerResult(rt, v, result)
+	_, _ = rt.RunString("undefined") // flush microtasks
 	select {
 	case err := <-result:
 		require.Error(t, err)
