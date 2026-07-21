@@ -803,19 +803,40 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 		tq := vu.get(ctx, p.TargetID())
 
 		return p.On(eventName, func(event common.PageEvent) error {
-			wait := queueTask(ctx, tq, func() (sobek.Value, error) {
-				_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
-				if err != nil {
-					return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
-				}
-				return nil, nil
-			})
-			if pageEvent.wait {
-				if _, err := wait(); errors.Is(err, context.Canceled) {
-					return errors.New("iteration ended before page.on handler completed executing")
-				}
+			if !pageEvent.wait {
+				// Fire-and-forget: queue the handler but don't block on it.
+				queueTask(ctx, tq, func() (sobek.Value, error) {
+					_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
+					if err != nil {
+						return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+					}
+					return nil, nil
+				})
+				return nil
 			}
-			return nil
+
+			// For wait events, block until the handler fully completes —
+			// including any asynchronous work if the handler is async and
+			// returns a Promise. Without this, async handlers that defer
+			// dialog.accept/dismiss past the first await would race against
+			// the auto-dismiss fallback in frame_session.
+			result := make(chan error, 1)
+			tq.Queue(func() error {
+				rt := vu.Runtime()
+				retVal, err := handle(sobek.Undefined(), rt.ToValue(pageEvent.mapp(vu, event)))
+				if err != nil {
+					result <- fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+					return nil
+				}
+				awaitHandlerResult(rt, retVal, result)
+				return nil
+			})
+			select {
+			case err := <-result:
+				return err
+			case <-ctx.Done():
+				return errors.New("iteration ended before page.on handler completed executing")
+			}
 		})
 	}
 }
