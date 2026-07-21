@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,7 +35,7 @@ const (
 // This method also sets the test run ID in the environment so it can be used later,
 // and applies any Cloud configuration overrides returned by the API.
 //
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
 	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
@@ -110,29 +109,11 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	logger := gs.Logger.WithFields(logrus.Fields{"output": builtinOutputCloud.String()})
 
-	// Safe int64 → int32 conversion (same pattern as prepCloudTestRun).
-	toInt32 := func(v int64) (int32, error) {
-		if v < math.MinInt32 || v > math.MaxInt32 {
-			return 0, fmt.Errorf("value %d overflows int32", v)
-		}
-		return int32(v), nil
-	}
-
-	// stackID==0 is treated by provisioning.NewClient as "no stack
-	// configured" and the X-Stack-Id header is omitted; this preserves
-	// behavior for callers that did not set K6_CLOUD_STACK_ID.
-	var stackID int32
-	if conf.StackID.Valid {
-		var err error
-		stackID, err = toInt32(conf.StackID.Int64)
-		if err != nil {
-			return err
-		}
-	}
-
+	// The stack ID is required (checkCloudLogin enforces it) and passed as
+	// int64; provisioning.NewClient handles the int32 boundary internally.
 	provClient, err := provisioning.NewClient(
 		logger, conf.Token.String, conf.Hostv6.String, build.Version,
-		stackID,
+		conf.StackID.Int64,
 		conf.Timeout.TimeDuration(),
 	)
 	if err != nil {

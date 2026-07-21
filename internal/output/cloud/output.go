@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -501,24 +500,14 @@ func (out *Output) lazyInitProvisioning() error {
 
 	// Lazy-construct the provisioning notifier (used at end-of-test).
 	if out.provisioningNotifier == nil {
-		// Inline overflow check matches cmd_project_list.go:79-80 pattern
-		// (one cast in scope; local closure pattern would be overkill).
-		// stackID==0 is treated by provisioning.NewClient as "no stack
-		// configured" and the X-Stack-Id header is omitted.
-		var stackID int32
-		if out.config.StackID.Valid {
-			v := out.config.StackID.Int64
-			if v < math.MinInt32 || v > math.MaxInt32 {
-				return fmt.Errorf("stack ID %d overflows int32", v)
-			}
-			stackID = int32(v)
-		}
+		// The stack ID is required and passed as int64; provisioning.NewClient
+		// enforces the int32 X-Stack-Id boundary internally.
 		c, err := provisioning.NewClient(
 			out.logger,
 			out.config.Token.String, // long-lived k6 token (NOT scoped)
 			out.config.Hostv6.String,
 			build.Version,
-			stackID,
+			out.config.StackID.Int64,
 			out.config.Timeout.TimeDuration(),
 		)
 		if err != nil {

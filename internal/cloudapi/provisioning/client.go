@@ -26,7 +26,7 @@ type Client struct {
 	apiClient *k6cloud.APIClient
 	v6Client  *v6.Client
 	token     string
-	stackID   int32
+	stackID   int64
 	host      string
 	version   string
 
@@ -36,12 +36,11 @@ type Client struct {
 // NewClient returns a new provisioning Client. It internally constructs
 // both a k6cloud.APIClient (for provisioning endpoints) and a v6.Client
 // (for v6 operations like FetchTest). The stackID identifies the
-// Grafana Cloud stack; a value of 0 means no stack is configured and
-// stack-scoped requests will be issued without the X-Stack-Id header.
+// Grafana Cloud stack and is required for the stack-scoped requests.
 func NewClient(
 	logger logrus.FieldLogger,
 	token, host, version string,
-	stackID int32,
+	stackID int64,
 	timeout time.Duration,
 ) (*Client, error) {
 	if token == "" {
@@ -77,17 +76,15 @@ func NewClient(
 		version:   version,
 		logger:    logger,
 	}
-	if stackID != 0 {
-		// Configure the X-Stack-Id default header so that all
-		// provisioning API requests include it.
-		c.apiClient.GetConfig().DefaultHeader["X-Stack-Id"] = strconv.FormatInt(int64(stackID), 10)
-		// Propagate the stack ID to the embedded v6 client so
-		// CreateOrFindLoadTest sends the correct X-Stack-Id header.
-		// stackID is already int32, so the widening never overflows.
-		if err := c.v6Client.SetStackID(int64(stackID)); err != nil {
-			return nil, err
-		}
+	// Propagate the stack ID to the embedded v6 client. v6.SetStackID
+	// validates that it fits the int32 the SDK's X-Stack-Id requires —
+	// that is the single place the int32 boundary is enforced.
+	if err := c.v6Client.SetStackID(stackID); err != nil {
+		return nil, err
 	}
+	// The provisioning endpoints carry the stack ID as a decimal-string
+	// default header, so no int32 narrowing is needed here.
+	c.apiClient.GetConfig().DefaultHeader["X-Stack-Id"] = strconv.FormatInt(stackID, 10)
 	return c, nil
 }
 

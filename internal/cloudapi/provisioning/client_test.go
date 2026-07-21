@@ -16,7 +16,7 @@ func TestNewClient(t *testing.T) {
 	token := "test-token"
 	host := "https://api.k6.io"
 	version := "0.1.0"
-	stackID := int32(123)
+	stackID := int64(123)
 	timeout := 30 * time.Second
 
 	c, err := NewClient(logger, token, host, version, stackID, timeout)
