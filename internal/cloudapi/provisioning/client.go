@@ -11,14 +11,8 @@ import (
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/v2/internal/cloudapi/clientcfg"
 	v6 "go.k6.io/k6/v2/internal/cloudapi/v6"
-)
-
-const (
-	// RetryInterval is the default cloud request retry interval.
-	RetryInterval = 500 * time.Millisecond
-	// MaxRetries specifies max retry attempts.
-	MaxRetries = 3
 )
 
 // Client orchestrates the provisioning and v6 cloud APIs for a
@@ -53,20 +47,7 @@ func NewClient(
 		return nil, fmt.Errorf("token is required to create provisioning API client")
 	}
 
-	cfg := k6cloud.NewConfiguration()
-	cfg.UserAgent = "k6cloud/" + version
-	cfg.Servers = k6cloud.ServerConfigurations{
-		{
-			URL:         host,
-			Description: "k6 Cloud API (provisioning).",
-		},
-	}
-	cfg.HTTPClient = &http.Client{
-		Timeout:   timeout,
-		Transport: http.DefaultTransport,
-	}
-	cfg.MaxRetries = MaxRetries
-	cfg.RetryInterval = RetryInterval
+	cfg := clientcfg.New(host, version, "k6 Cloud API (provisioning).", timeout)
 
 	v6c, err := v6.NewClient(logger, token, host, version, timeout)
 	if err != nil {
@@ -107,17 +88,17 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 }
 
 // doWithRetry runs req through httpClient, retrying on 5xx responses and
-// transport errors up to MaxRetries times, resetting the body from
-// req.GetBody before each attempt so a retried request with a body is not
-// sent empty. The retry wait honours req.Context() so a cancelled request
-// stops waiting promptly. 4xx responses are NOT retried.
+// transport errors up to clientcfg.MaxRetries times, resetting the body
+// from req.GetBody before each attempt so a retried request with a body is
+// not sent empty. The retry wait honours req.Context() so a cancelled
+// request stops waiting promptly. 4xx responses are NOT retried.
 func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, error) {
 	var (
 		lastErr  error
 		lastResp *http.Response
 	)
 
-	for attempt := 1; attempt <= MaxRetries; attempt++ {
+	for attempt := 1; attempt <= clientcfg.MaxRetries; attempt++ {
 		// The vendored SDK resets the body on its own internal retries,
 		// but this direct Do loop must do it itself.
 		if req.GetBody != nil {
@@ -130,9 +111,9 @@ func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, er
 
 		lastResp, lastErr = httpClient.Do(req) //nolint:gosec
 		if lastErr != nil {
-			if attempt < MaxRetries {
+			if attempt < clientcfg.MaxRetries {
 				select {
-				case <-time.After(RetryInterval):
+				case <-time.After(clientcfg.RetryInterval):
 				case <-req.Context().Done():
 					return lastResp, req.Context().Err()
 				}
@@ -141,11 +122,11 @@ func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, er
 			break
 		}
 
-		if lastResp.StatusCode >= 500 && attempt < MaxRetries {
+		if lastResp.StatusCode >= 500 && attempt < clientcfg.MaxRetries {
 			_, _ = io.Copy(io.Discard, lastResp.Body)
 			_ = lastResp.Body.Close()
 			select {
-			case <-time.After(RetryInterval):
+			case <-time.After(clientcfg.RetryInterval):
 			case <-req.Context().Done():
 				return lastResp, req.Context().Err()
 			}

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/internal/cloudapi/clientcfg"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 )
 
@@ -151,7 +152,7 @@ func TestHTTPClient_ContextCancelStopsRetryWait(t *testing.T) {
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.Canceled)
-	assert.Less(t, elapsed, RetryInterval,
+	assert.Less(t, elapsed, clientcfg.RetryInterval,
 		"cancellation should interrupt the retry wait instead of sleeping the full interval")
 }
 
