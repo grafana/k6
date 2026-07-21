@@ -223,7 +223,9 @@ func (c *Client) CreateOrFindLoadTest(ctx context.Context, projectID int64, name
 		return 0, err
 	}
 	if res == nil {
-		return 0, errUnknown
+		// The SDK getters return zero values on a nil receiver, so guard
+		// against silently producing a bogus 0 id and report it clearly.
+		return 0, errors.New("unexpected nil response from CreateOrFindLoadTest")
 	}
 
 	return res.GetId(), nil
