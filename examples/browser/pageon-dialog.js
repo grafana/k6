@@ -21,17 +21,23 @@ export default async function () {
   const page = await browser.newPage();
 
   try {
-    await page.goto('https://www.selenium.dev/selenium/web/alerts.html');
+    await page.setContent(`
+      <html>
+        <body>
+          <button id="alert-btn" onclick="alert('hello from k6 browser')">Show alert</button>
+        </body>
+      </html>
+    `);
 
     page.on('dialog', async (dialog) => {
       check(dialog, {
         'dialog type is alert': (d) => d.type() === 'alert',
-        'dialog has message': (d) => d.message().length > 0,
+        'dialog message is correct': (d) => d.message() === 'hello from k6 browser',
       });
       await dialog.accept();
     });
 
-    await page.locator('#alert').click();
+    await page.locator('#alert-btn').click();
   } finally {
     await page.close();
   }
