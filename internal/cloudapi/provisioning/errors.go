@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 var errUnknown = errors.New("an error occurred communicating with the provisioning API")
@@ -29,6 +31,12 @@ func CheckResponse(resp *http.Response) error {
 
 	if c := resp.StatusCode; c >= 200 && c <= 299 {
 		return nil
+	}
+
+	// Classify 401/403 to the shared sentinels so provisioning reports
+	// auth failures consistently with the v1 and v6 clients.
+	if classified := httperr.ClassifyStatus(resp.StatusCode); classified != nil {
+		return classified
 	}
 
 	data, err := io.ReadAll(resp.Body)
