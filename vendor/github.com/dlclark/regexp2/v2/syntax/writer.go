@@ -4,51 +4,34 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"slices"
 )
 
 func Write(tree *RegexTree) (*Code, error) {
-	w := newWriter(nil)
+	w := writer{
+		intStack:   make([]int, 0, 32),
+		emitted:    make([]int, 2),
+		stringhash: make(map[string]int),
+		sethash:    make(map[string]int),
+	}
+
 	code, err := w.codeFromTree(tree)
-	if err != nil {
-		return nil, err
-	}
 
-	if slices.Contains(code.CaptureSlotInUse, false) {
-		quickWriter := newWriter(code.CaptureSlotInUse)
-		quickCode, err := quickWriter.codeFromTree(tree)
-		if err != nil {
-			return nil, err
-		}
-		code.QuickCodes = quickCode.Codes
-	}
-	return code, nil
-}
-
-func newWriter(quickCaptureSlots []bool) writer {
-	return writer{
-		intStack:          make([]int, 0, 32),
-		emitted:           make([]int, 2),
-		stringhash:        make(map[string]int),
-		sethash:           make(map[string]int),
-		quickCaptureSlots: quickCaptureSlots,
-	}
+	return code, err
 }
 
 type writer struct {
 	emitted []int
 
-	intStack          []int
-	curpos            int
-	stringhash        map[string]int
-	stringtable       [][]rune
-	sethash           map[string]int
-	settable          []*CharSet
-	counting          bool
-	count             int
-	trackcount        int
-	caps              map[int]int
-	quickCaptureSlots []bool
+	intStack    []int
+	curpos      int
+	stringhash  map[string]int
+	stringtable [][]rune
+	sethash     map[string]int
+	settable    []*CharSet
+	counting    bool
+	count       int
+	trackcount  int
+	caps        map[int]int
 }
 
 const (
@@ -137,9 +120,6 @@ func (w *writer) codeFromTree(tree *RegexTree) (*Code, error) {
 
 		w.counting = false
 	}
-	if w.quickCaptureSlots != nil {
-		return &Code{Codes: w.emitted, TrackCount: w.trackcount}, nil
-	}
 
 	fcPrefix := getFirstCharsPrefix(tree)
 	prefix := getPrefix(tree)
@@ -164,7 +144,6 @@ func (w *writer) codeFromTree(tree *RegexTree) (*Code, error) {
 		TrackCount:        w.trackcount,
 		Caps:              w.caps,
 		Capsize:           capsize,
-		CaptureSlotInUse:  captureSlotsInUse(w.emitted, capsize),
 		FcPrefix:          fcPrefix,
 		BmPrefix:          bmPrefix,
 		Anchors:           getAnchors(tree),
@@ -302,14 +281,10 @@ func (w *writer) emitFragment(nodetype NodeType, node *RegexNode, curIndex int) 
 	case NtGroup | BeforeChild, NtGroup | AfterChild:
 
 	case NtCapture | BeforeChild:
-		if w.emitCapture(node) {
-			w.emit(Setmark)
-		}
+		w.emit(Setmark)
 
 	case NtCapture | AfterChild:
-		if w.emitCapture(node) {
-			w.emit2(Capturemark, w.mapCapnum(node.M), w.mapCapnum(node.N))
-		}
+		w.emit2(Capturemark, w.mapCapnum(node.M), w.mapCapnum(node.N))
 
 	case NtPosLook | BeforeChild:
 		// NOTE: the following line causes lookahead/lookbehind to be
@@ -389,17 +364,6 @@ func (w *writer) emitFragment(nodetype NodeType, node *RegexNode, curIndex int) 
 	}
 
 	return nil
-}
-
-func (w *writer) emitCapture(node *RegexNode) bool {
-	if w.quickCaptureSlots == nil {
-		return true
-	}
-	capnum, uncapnum := w.mapCapnum(node.M), w.mapCapnum(node.N)
-	if uncapnum != -1 {
-		return true
-	}
-	return capnum >= 0 && (capnum >= len(w.quickCaptureSlots) || w.quickCaptureSlots[capnum])
 }
 
 // To avoid recursion, we use a simple integer stack.

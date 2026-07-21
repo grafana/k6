@@ -1680,12 +1680,6 @@ func (n *RegexNode) reduceConcatenationWithAdjacentStrings() {
 // Nested repeaters just get multiplied with each other if they're not
 // too lumpy
 func (n *RegexNode) reduceRep() *RegexNode {
-	// Repeating a literal empty expression has no observable effect. In addition to
-	// being unnecessary, retaining the loop would require one backtracking frame per
-	// mandatory iteration even though no input is consumed.
-	if len(n.Children) == 1 && n.Children[0].T == NtEmpty {
-		return n.Children[0]
-	}
 
 	u := n
 	t := n.T

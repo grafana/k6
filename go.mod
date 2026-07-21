@@ -23,7 +23,7 @@ require (
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716094638-49089b6e624d
 	github.com/grafana/k6provider v0.5.0
 	github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4
-	github.com/grafana/sobek-webapi-encoding v0.0.0-20260716074145-545f24555ef2
+	github.com/grafana/sobek-webapi-encoding v0.1.0
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
@@ -77,10 +77,10 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dlclark/regexp2/v2 v2.5.0 // indirect
+	github.com/dlclark/regexp2/v2 v2.2.2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0 // indirect
+	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect

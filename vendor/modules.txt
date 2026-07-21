@@ -110,7 +110,7 @@ github.com/chromedp/sysutil
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dlclark/regexp2/v2 v2.5.0
+# github.com/dlclark/regexp2/v2 v2.2.2
 ## explicit; go 1.25
 github.com/dlclark/regexp2/v2
 github.com/dlclark/regexp2/v2/helpers
@@ -170,7 +170,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/google/pprof v0.0.0-20260709232956-b9395ee17fa0
+# github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83
 ## explicit; go 1.24.0
 github.com/google/pprof/profile
 # github.com/google/uuid v1.6.0
@@ -195,7 +195,7 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/sobek-webapi-encoding v0.0.0-20260716074145-545f24555ef2
+# github.com/grafana/sobek-webapi-encoding v0.1.0
 ## explicit; go 1.25.0
 github.com/grafana/sobek-webapi-encoding
 github.com/grafana/sobek-webapi-encoding/encoding

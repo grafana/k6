@@ -5,7 +5,6 @@ var (
 	DefaultUnmarshalOptions = None
 	// DefaultOptimizationOptions controls the default memory/performance trade-offs used by Compile.
 	DefaultOptimizationOptions = OptimizationOptions{
-		MaxBacktrackingStackSize:     100000,
 		MaxCachedRuneBufferLength:    256 << 10,
 		MaxCachedReplaceBufferLength: 256 << 10,
 		MaxCachedReplacerDataEntries: 16,
@@ -37,17 +36,13 @@ const (
 	Unicode    RegexOptions = 0x0400 // "u"
 )
 
-// OptimizationOptions controls runtime limits, optional caches, and compile-time fast paths.
+// OptimizationOptions controls optional runtime caches and compile-time fast paths.
 //
-// For MaxBacktrackingStackSize, negative values allow unbounded growth.
 // For replacement data cache size fields, 0 disables persistent retention and
 // -1 means unbounded. For pooled buffer cache size fields, 0 disables pooling
 // and -1 allows all built-in size classes.
 // Defaults are intentionally bounded so Compile is safe for mixed-cardinality inputs.
 type OptimizationOptions struct {
-	// MaxBacktrackingStackSize limits the number of integer slots used by a match's backtracking stack.
-	// Negative values disable the limit.
-	MaxBacktrackingStackSize int
 	// MaxCachedRuneBufferLength limits retained string-to-rune buffers in the shared size-classed pool.
 	MaxCachedRuneBufferLength int
 	// MaxCachedReplaceBufferLength limits retained replacement output buffers in the shared size-classed pool.
@@ -103,14 +98,6 @@ func newCompileConfig(options []CompileOption) compileConfig {
 		}
 	}
 	return c
-}
-
-// OptionMaxBacktrackingStackSize limits the number of integer slots used by a match's backtracking stack.
-// Negative values disable the limit. A match that exceeds the limit returns ErrBacktrackingStackLimit.
-func OptionMaxBacktrackingStackSize(n int) CompileOption {
-	return compileOptionFunc(func(c *compileConfig) {
-		c.optimizations.MaxBacktrackingStackSize = n
-	})
 }
 
 // OptionMaxCachedRuneBufferLength limits retained string-to-rune buffers in the shared size-classed pool.
