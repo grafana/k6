@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -23,11 +23,11 @@ var _ MappedNullable = &StartLoadTestResponse{}
 // StartLoadTestResponse struct for StartLoadTestResponse
 type StartLoadTestResponse struct {
 	// ID of the test run.
-	Id int32 `json:"id"`
+	Id int64 `json:"id"`
 	// ID of the parent test.
-	TestId int32 `json:"test_id"`
+	TestId int64 `json:"test_id"`
 	// ID of the parent project.
-	ProjectId int32 `json:"project_id"`
+	ProjectId int64 `json:"project_id"`
 	// Email of the user who started the test if started with a user token.
 	StartedBy NullableString `json:"started_by"`
 	// Date and time when the test run was started.
@@ -48,9 +48,8 @@ type StartLoadTestResponse struct {
 	// List of the load zones configured for the test and the corresponding distribution percentages.
 	Distribution []DistributionZoneApiModel `json:"distribution"`
 	// Test run result. `passed` if there were no issues, `failed` if thresholds were breached, `error` if the execution was not completed.
-	Result NullableString `json:"result"`
-	// Additional information about the test run result.
-	ResultDetails map[string]interface{} `json:"result_details"`
+	Result        NullableString                `json:"result"`
+	ResultDetails NullableResultDetailsApiModel `json:"result_details"`
 	// The original options object if available.
 	Options map[string]interface{} `json:"options"`
 	// The requested version of k6 and extensions that was part of the script/archive.
@@ -65,6 +64,8 @@ type StartLoadTestResponse struct {
 	EstimatedDuration NullableInt32 `json:"estimated_duration"`
 	// The real billable duration of the test run in seconds.
 	ExecutionDuration int32 `json:"execution_duration"`
+	// Whether the test run is starred for quick access.
+	IsStarred bool `json:"is_starred"`
 	// URL to the Grafana web app test run page.
 	TestRunDetailsPageUrl string `json:"test_run_details_page_url"`
 	AdditionalProperties  map[string]interface{}
@@ -76,7 +77,7 @@ type _StartLoadTestResponse StartLoadTestResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewStartLoadTestResponse(id int32, testId int32, projectId int32, startedBy NullableString, created time.Time, ended NullableTime, note string, retentionExpiry NullableTime, cost NullableTestCostApiModel, status string, statusDetails StatusApiModel, statusHistory []StatusApiModel, distribution []DistributionZoneApiModel, result NullableString, resultDetails map[string]interface{}, options map[string]interface{}, k6Dependencies map[string]string, k6Versions map[string]string, maxVus NullableInt32, maxBrowserVus NullableInt32, estimatedDuration NullableInt32, executionDuration int32, testRunDetailsPageUrl string) *StartLoadTestResponse {
+func NewStartLoadTestResponse(id int64, testId int64, projectId int64, startedBy NullableString, created time.Time, ended NullableTime, note string, retentionExpiry NullableTime, cost NullableTestCostApiModel, status string, statusDetails StatusApiModel, statusHistory []StatusApiModel, distribution []DistributionZoneApiModel, result NullableString, resultDetails NullableResultDetailsApiModel, options map[string]interface{}, k6Dependencies map[string]string, k6Versions map[string]string, maxVus NullableInt32, maxBrowserVus NullableInt32, estimatedDuration NullableInt32, executionDuration int32, isStarred bool, testRunDetailsPageUrl string) *StartLoadTestResponse {
 	this := StartLoadTestResponse{}
 	this.Id = id
 	this.TestId = testId
@@ -100,6 +101,7 @@ func NewStartLoadTestResponse(id int32, testId int32, projectId int32, startedBy
 	this.MaxBrowserVus = maxBrowserVus
 	this.EstimatedDuration = estimatedDuration
 	this.ExecutionDuration = executionDuration
+	this.IsStarred = isStarred
 	this.TestRunDetailsPageUrl = testRunDetailsPageUrl
 	return &this
 }
@@ -113,9 +115,9 @@ func NewStartLoadTestResponseWithDefaults() *StartLoadTestResponse {
 }
 
 // GetId returns the Id field value
-func (o *StartLoadTestResponse) GetId() int32 {
+func (o *StartLoadTestResponse) GetId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -124,7 +126,7 @@ func (o *StartLoadTestResponse) GetId() int32 {
 
 // GetIdOk returns a tuple with the Id field value
 // and a boolean to check if the value has been set.
-func (o *StartLoadTestResponse) GetIdOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -132,14 +134,14 @@ func (o *StartLoadTestResponse) GetIdOk() (*int32, bool) {
 }
 
 // SetId sets field value
-func (o *StartLoadTestResponse) SetId(v int32) {
+func (o *StartLoadTestResponse) SetId(v int64) {
 	o.Id = v
 }
 
 // GetTestId returns the TestId field value
-func (o *StartLoadTestResponse) GetTestId() int32 {
+func (o *StartLoadTestResponse) GetTestId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -148,7 +150,7 @@ func (o *StartLoadTestResponse) GetTestId() int32 {
 
 // GetTestIdOk returns a tuple with the TestId field value
 // and a boolean to check if the value has been set.
-func (o *StartLoadTestResponse) GetTestIdOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetTestIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -156,14 +158,14 @@ func (o *StartLoadTestResponse) GetTestIdOk() (*int32, bool) {
 }
 
 // SetTestId sets field value
-func (o *StartLoadTestResponse) SetTestId(v int32) {
+func (o *StartLoadTestResponse) SetTestId(v int64) {
 	o.TestId = v
 }
 
 // GetProjectId returns the ProjectId field value
-func (o *StartLoadTestResponse) GetProjectId() int32 {
+func (o *StartLoadTestResponse) GetProjectId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -172,7 +174,7 @@ func (o *StartLoadTestResponse) GetProjectId() int32 {
 
 // GetProjectIdOk returns a tuple with the ProjectId field value
 // and a boolean to check if the value has been set.
-func (o *StartLoadTestResponse) GetProjectIdOk() (*int32, bool) {
+func (o *StartLoadTestResponse) GetProjectIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -180,7 +182,7 @@ func (o *StartLoadTestResponse) GetProjectIdOk() (*int32, bool) {
 }
 
 // SetProjectId sets field value
-func (o *StartLoadTestResponse) SetProjectId(v int32) {
+func (o *StartLoadTestResponse) SetProjectId(v int64) {
 	o.ProjectId = v
 }
 
@@ -461,29 +463,29 @@ func (o *StartLoadTestResponse) SetResult(v string) {
 }
 
 // GetResultDetails returns the ResultDetails field value
-// If the value is explicit nil, the zero value for map[string]interface{} will be returned
-func (o *StartLoadTestResponse) GetResultDetails() map[string]interface{} {
-	if o == nil {
-		var ret map[string]interface{}
+// If the value is explicit nil, the zero value for ResultDetailsApiModel will be returned
+func (o *StartLoadTestResponse) GetResultDetails() ResultDetailsApiModel {
+	if o == nil || o.ResultDetails.Get() == nil {
+		var ret ResultDetailsApiModel
 		return ret
 	}
 
-	return o.ResultDetails
+	return *o.ResultDetails.Get()
 }
 
 // GetResultDetailsOk returns a tuple with the ResultDetails field value
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *StartLoadTestResponse) GetResultDetailsOk() (map[string]interface{}, bool) {
-	if o == nil || IsNil(o.ResultDetails) {
-		return map[string]interface{}{}, false
+func (o *StartLoadTestResponse) GetResultDetailsOk() (*ResultDetailsApiModel, bool) {
+	if o == nil {
+		return nil, false
 	}
-	return o.ResultDetails, true
+	return o.ResultDetails.Get(), o.ResultDetails.IsSet()
 }
 
 // SetResultDetails sets field value
-func (o *StartLoadTestResponse) SetResultDetails(v map[string]interface{}) {
-	o.ResultDetails = v
+func (o *StartLoadTestResponse) SetResultDetails(v ResultDetailsApiModel) {
+	o.ResultDetails.Set(&v)
 }
 
 // GetOptions returns the Options field value
@@ -662,6 +664,30 @@ func (o *StartLoadTestResponse) SetExecutionDuration(v int32) {
 	o.ExecutionDuration = v
 }
 
+// GetIsStarred returns the IsStarred field value
+func (o *StartLoadTestResponse) GetIsStarred() bool {
+	if o == nil {
+		var ret bool
+		return ret
+	}
+
+	return o.IsStarred
+}
+
+// GetIsStarredOk returns a tuple with the IsStarred field value
+// and a boolean to check if the value has been set.
+func (o *StartLoadTestResponse) GetIsStarredOk() (*bool, bool) {
+	if o == nil {
+		return nil, false
+	}
+	return &o.IsStarred, true
+}
+
+// SetIsStarred sets field value
+func (o *StartLoadTestResponse) SetIsStarred(v bool) {
+	o.IsStarred = v
+}
+
 // GetTestRunDetailsPageUrl returns the TestRunDetailsPageUrl field value
 func (o *StartLoadTestResponse) GetTestRunDetailsPageUrl() string {
 	if o == nil {
@@ -712,9 +738,7 @@ func (o StartLoadTestResponse) ToMap() (map[string]interface{}, error) {
 		toSerialize["distribution"] = o.Distribution
 	}
 	toSerialize["result"] = o.Result.Get()
-	if o.ResultDetails != nil {
-		toSerialize["result_details"] = o.ResultDetails
-	}
+	toSerialize["result_details"] = o.ResultDetails.Get()
 	if o.Options != nil {
 		toSerialize["options"] = o.Options
 	}
@@ -724,6 +748,7 @@ func (o StartLoadTestResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize["max_browser_vus"] = o.MaxBrowserVus.Get()
 	toSerialize["estimated_duration"] = o.EstimatedDuration.Get()
 	toSerialize["execution_duration"] = o.ExecutionDuration
+	toSerialize["is_starred"] = o.IsStarred
 	toSerialize["test_run_details_page_url"] = o.TestRunDetailsPageUrl
 
 	for key, value := range o.AdditionalProperties {
@@ -760,6 +785,7 @@ func (o *StartLoadTestResponse) UnmarshalJSON(data []byte) (err error) {
 		"max_browser_vus",
 		"estimated_duration",
 		"execution_duration",
+		"is_starred",
 		"test_run_details_page_url",
 	}
 
@@ -812,6 +838,7 @@ func (o *StartLoadTestResponse) UnmarshalJSON(data []byte) (err error) {
 		delete(additionalProperties, "max_browser_vus")
 		delete(additionalProperties, "estimated_duration")
 		delete(additionalProperties, "execution_duration")
+		delete(additionalProperties, "is_starred")
 		delete(additionalProperties, "test_run_details_page_url")
 		o.AdditionalProperties = additionalProperties
 	}

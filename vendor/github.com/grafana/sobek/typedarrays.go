@@ -132,8 +132,8 @@ func (a *uint8Array) toRaw(v Value) uint64 {
 }
 
 func (a *uint8Array) ptr(idx int) *uint8 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*uint8)(unsafe.Pointer(uintptr(p) + uintptr(idx)))
+	p := unsafe.SliceData(*a)
+	return (*uint8)(unsafe.Add(unsafe.Pointer(p), idx))
 }
 
 func (a *uint8Array) get(idx int) Value {
@@ -169,7 +169,7 @@ func (a *uint8Array) typeMatch(v Value) bool {
 }
 
 func (a *uint8Array) export(offset int, length int) interface{} {
-	return ([]uint8)(*a)[offset : offset+length : offset+length]
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 func (a *uint8Array) exportType() reflect.Type {
@@ -181,8 +181,8 @@ func (a *uint8ClampedArray) toRaw(v Value) uint64 {
 }
 
 func (a *uint8ClampedArray) ptr(idx int) *uint8 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*uint8)(unsafe.Pointer(uintptr(p) + uintptr(idx)))
+	p := unsafe.SliceData(*a)
+	return (*uint8)(unsafe.Add(unsafe.Pointer(p), idx))
 }
 
 func (a *uint8ClampedArray) get(idx int) Value {
@@ -218,7 +218,7 @@ func (a *uint8ClampedArray) typeMatch(v Value) bool {
 }
 
 func (a *uint8ClampedArray) export(offset int, length int) interface{} {
-	return ([]uint8)(*a)[offset : offset+length : offset+length]
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 func (a *uint8ClampedArray) exportType() reflect.Type {
@@ -226,8 +226,8 @@ func (a *uint8ClampedArray) exportType() reflect.Type {
 }
 
 func (a *int8Array) ptr(idx int) *int8 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*int8)(unsafe.Pointer(uintptr(p) + uintptr(idx)))
+	p := unsafe.SliceData(*a)
+	return (*int8)(unsafe.Add(unsafe.Pointer(p), idx))
 }
 
 func (a *int8Array) get(idx int) Value {
@@ -267,12 +267,7 @@ func (a *int8Array) typeMatch(v Value) bool {
 }
 
 func (a *int8Array) export(offset int, length int) interface{} {
-	var res []int8
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeInt8Array = reflect.TypeOf(([]int8)(nil))
@@ -286,8 +281,8 @@ func (a *uint16Array) toRaw(v Value) uint64 {
 }
 
 func (a *uint16Array) ptr(idx int) *uint16 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*uint16)(unsafe.Pointer(uintptr(p) + uintptr(idx)*2))
+	p := unsafe.SliceData(*a)
+	return (*uint16)(unsafe.Add(unsafe.Pointer(p), idx*2))
 }
 
 func (a *uint16Array) get(idx int) Value {
@@ -325,12 +320,7 @@ func (a *uint16Array) typeMatch(v Value) bool {
 var typeUint16Array = reflect.TypeOf(([]uint16)(nil))
 
 func (a *uint16Array) export(offset int, length int) interface{} {
-	var res []uint16
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*2
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 func (a *uint16Array) exportType() reflect.Type {
@@ -338,8 +328,8 @@ func (a *uint16Array) exportType() reflect.Type {
 }
 
 func (a *int16Array) ptr(idx int) *int16 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*int16)(unsafe.Pointer(uintptr(p) + uintptr(idx)*2))
+	p := unsafe.SliceData(*a)
+	return (*int16)(unsafe.Add(unsafe.Pointer(p), idx*2))
 }
 
 func (a *int16Array) get(idx int) Value {
@@ -379,12 +369,7 @@ func (a *int16Array) typeMatch(v Value) bool {
 }
 
 func (a *int16Array) export(offset int, length int) interface{} {
-	var res []int16
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*2
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeInt16Array = reflect.TypeOf(([]int16)(nil))
@@ -394,8 +379,8 @@ func (a *int16Array) exportType() reflect.Type {
 }
 
 func (a *uint32Array) ptr(idx int) *uint32 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*uint32)(unsafe.Pointer(uintptr(p) + uintptr(idx)*4))
+	p := unsafe.SliceData(*a)
+	return (*uint32)(unsafe.Add(unsafe.Pointer(p), idx*4))
 }
 
 func (a *uint32Array) get(idx int) Value {
@@ -435,12 +420,7 @@ func (a *uint32Array) typeMatch(v Value) bool {
 }
 
 func (a *uint32Array) export(offset int, length int) interface{} {
-	var res []uint32
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*4
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeUint32Array = reflect.TypeOf(([]uint32)(nil))
@@ -450,8 +430,8 @@ func (a *uint32Array) exportType() reflect.Type {
 }
 
 func (a *int32Array) ptr(idx int) *int32 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*int32)(unsafe.Pointer(uintptr(p) + uintptr(idx)*4))
+	p := unsafe.SliceData(*a)
+	return (*int32)(unsafe.Add(unsafe.Pointer(p), idx*4))
 }
 
 func (a *int32Array) get(idx int) Value {
@@ -491,12 +471,7 @@ func (a *int32Array) typeMatch(v Value) bool {
 }
 
 func (a *int32Array) export(offset int, length int) interface{} {
-	var res []int32
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*4
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeInt32Array = reflect.TypeOf(([]int32)(nil))
@@ -506,8 +481,8 @@ func (a *int32Array) exportType() reflect.Type {
 }
 
 func (a *float32Array) ptr(idx int) *float32 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*float32)(unsafe.Pointer(uintptr(p) + uintptr(idx)*4))
+	p := unsafe.SliceData(*a)
+	return (*float32)(unsafe.Add(unsafe.Pointer(p), idx*4))
 }
 
 func (a *float32Array) get(idx int) Value {
@@ -562,12 +537,7 @@ func (a *float32Array) typeMatch(v Value) bool {
 }
 
 func (a *float32Array) export(offset int, length int) interface{} {
-	var res []float32
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*4
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeFloat32Array = reflect.TypeOf(([]float32)(nil))
@@ -577,8 +547,8 @@ func (a *float32Array) exportType() reflect.Type {
 }
 
 func (a *float64Array) ptr(idx int) *float64 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*float64)(unsafe.Pointer(uintptr(p) + uintptr(idx)*8))
+	p := unsafe.SliceData(*a)
+	return (*float64)(unsafe.Add(unsafe.Pointer(p), idx*8))
 }
 
 func (a *float64Array) get(idx int) Value {
@@ -619,12 +589,7 @@ func (a *float64Array) typeMatch(v Value) bool {
 }
 
 func (a *float64Array) export(offset int, length int) interface{} {
-	var res []float64
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*8
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeFloat64Array = reflect.TypeOf(([]float64)(nil))
@@ -638,8 +603,8 @@ func (a *bigInt64Array) toRaw(value Value) uint64 {
 }
 
 func (a *bigInt64Array) ptr(idx int) *int64 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*int64)(unsafe.Pointer(uintptr(p) + uintptr(idx)*8))
+	p := unsafe.SliceData(*a)
+	return (*int64)(unsafe.Add(unsafe.Pointer(p), idx*8))
 }
 
 func (a *bigInt64Array) get(idx int) Value {
@@ -688,12 +653,7 @@ func (a *bigInt64Array) typeMatch(v Value) bool {
 }
 
 func (a *bigInt64Array) export(offset int, length int) interface{} {
-	var res []int64
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*8
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeBigInt64Array = reflect.TypeOf(([]int64)(nil))
@@ -707,8 +667,8 @@ func (a *bigUint64Array) toRaw(value Value) uint64 {
 }
 
 func (a *bigUint64Array) ptr(idx int) *uint64 {
-	p := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(a)).Data)
-	return (*uint64)(unsafe.Pointer(uintptr(p) + uintptr(idx)*8))
+	p := unsafe.SliceData(*a)
+	return (*uint64)(unsafe.Add(unsafe.Pointer(p), idx*8))
 }
 
 func (a *bigUint64Array) get(idx int) Value {
@@ -749,12 +709,7 @@ func (a *bigUint64Array) typeMatch(v Value) bool {
 }
 
 func (a *bigUint64Array) export(offset int, length int) interface{} {
-	var res []uint64
-	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&res))
-	sliceHeader.Data = (*reflect.SliceHeader)(unsafe.Pointer(a)).Data + uintptr(offset)*8
-	sliceHeader.Len = length
-	sliceHeader.Cap = length
-	return res
+	return unsafe.Slice(a.ptr(offset), length)
 }
 
 var typeBigUint64Array = reflect.TypeOf(([]uint64)(nil))
@@ -1087,7 +1042,7 @@ func (r *Runtime) newBigUint64ArrayObject(buf *arrayBufferObject, offset, length
 func (o *dataViewObject) getIdxAndByteOrder(getIdx int, littleEndianVal Value, size int) (int, byteOrder) {
 	o.viewedArrayBuf.ensureNotDetached(true)
 	if getIdx+size > o.byteLen {
-		panic(o.val.runtime.newError(o.val.runtime.getRangeError(), "Index %d is out of bounds", getIdx))
+		panic(o.val.runtime.newErrorf(o.val.runtime.getRangeError(), "Index %d is out of bounds", getIdx))
 	}
 	getIdx += o.byteOffset
 	var bo byteOrder

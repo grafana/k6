@@ -59,16 +59,18 @@ func encodeBlockBetterGo(dst, src []byte) (d int) {
 	// Initialize the hash tables.
 	const (
 		// Long hash matches.
-		lTableBits    = 17
-		maxLTableSize = 1 << lTableBits
+		lTableBits    = betterLongTableBits
+		maxLTableSize = betterLongTableSize
 
 		// Short hash matches.
-		sTableBits    = 14
-		maxSTableSize = 1 << sTableBits
+		sTableBits    = betterShortTableBits
+		maxSTableSize = betterShortTableSize
 	)
 
-	var lTable [maxLTableSize]uint32
-	var sTable [maxSTableSize]uint32
+	tbl := getBetterTables()
+	lTable := &tbl.lTable
+	sTable := &tbl.sTable
+	defer betterTablePool.Put(tbl)
 
 	// Bail if we can't compress to at least this.
 	dstLimit := len(src) - len(src)>>5 - 6
@@ -317,16 +319,18 @@ func encodeBlockBetterSnappyGo(dst, src []byte) (d int) {
 	// Initialize the hash tables.
 	const (
 		// Long hash matches.
-		lTableBits    = 16
-		maxLTableSize = 1 << lTableBits
+		lTableBits    = betterSnappyLongTableBits
+		maxLTableSize = betterSnappyLongTableSize
 
 		// Short hash matches.
-		sTableBits    = 14
-		maxSTableSize = 1 << sTableBits
+		sTableBits    = betterShortTableBits
+		maxSTableSize = betterShortTableSize
 	)
 
-	var lTable [maxLTableSize]uint32
-	var sTable [maxSTableSize]uint32
+	tbl := getBetterSnappyTables()
+	lTable := &tbl.lTable
+	sTable := &tbl.sTable
+	defer betterSnappyTablePool.Put(tbl)
 
 	// Bail if we can't compress to at least this.
 	dstLimit := len(src) - len(src)>>5 - 6
@@ -902,12 +906,12 @@ func encodeBlockBetterDict(dst, src []byte, dict *Dict) (d int) {
 	// Initialize the hash tables.
 	const (
 		// Long hash matches.
-		lTableBits    = 17
-		maxLTableSize = 1 << lTableBits
+		lTableBits    = betterLongTableBits
+		maxLTableSize = betterLongTableSize
 
 		// Short hash matches.
-		sTableBits    = 14
-		maxSTableSize = 1 << sTableBits
+		sTableBits    = betterShortTableBits
+		maxSTableSize = betterShortTableSize
 
 		maxAhead = 8 // maximum bytes ahead without checking sLimit
 
@@ -921,8 +925,10 @@ func encodeBlockBetterDict(dst, src []byte, dict *Dict) (d int) {
 
 	dict.initBetter()
 
-	var lTable [maxLTableSize]uint32
-	var sTable [maxSTableSize]uint32
+	tbl := getBetterTables()
+	lTable := &tbl.lTable
+	sTable := &tbl.sTable
+	defer betterTablePool.Put(tbl)
 
 	// Bail if we can't compress to at least this.
 	dstLimit := len(src) - len(src)>>5 - 6
