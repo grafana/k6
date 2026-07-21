@@ -129,7 +129,7 @@ func TestPageOnDialogDismiss(t *testing.T) {
 	assert.EqualValues(t, "confirm dismissed", result)
 }
 
-func TestPageOnDialogAutoDissmissWhenHandlerDoesNotHandle(t *testing.T) {
+func TestPageOnDialogAutoDismissWhenHandlerDoesNotHandle(t *testing.T) {
 	t.Parallel()
 
 	var (
