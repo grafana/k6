@@ -285,6 +285,36 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
 
+	t.Run("remote_scenario_skips_managed_browser", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			vu              = k6test.NewVU(t)
+			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+		)
+
+		vu.ActivateVU()
+
+		// Mark the scenario as remote: k6 must not build a managed browser, since
+		// the script connects to an existing one at runtime via connectOverCDP.
+		vu.StateField.Options.Scenarios["default"].GetScenarioOptions().Browser["remote"] = true
+
+		vu.StartIteration(t, k6test.WithIteration(0))
+
+		// No managed browser was built (nothing was launched/connected)...
+		assert.Equal(t, 0, browserRegistry.browserCount())
+		// ...but it is still a browser iteration, so the iteration trace was
+		// started; a connectOverCDP browser parents under it.
+		require.NotNil(t, browserRegistry.tr)
+		assert.Equal(t, 1, browserRegistry.tr.iterationTracesCount())
+
+		vu.EndIteration(t, k6test.WithIteration(0))
+
+		// The iteration trace was ended and nothing is left behind.
+		assert.Equal(t, 0, browserRegistry.browserCount())
+		assert.Equal(t, 0, browserRegistry.tr.iterationTracesCount())
+	})
+
 	// This test ensures that the chromium browser's lifecycle is not controlled
 	// by the vu context.
 	t.Run("dont_close_browser_on_vu_context_close", func(t *testing.T) {

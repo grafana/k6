@@ -2,6 +2,12 @@ import { chromium } from 'k6/browser';
 
 // Connect to an external CDP browser with a URL computed at runtime.
 //
+// This variant gates chromium.connectOverCDP behind a browser scenario with
+// options.browser.remote set to true. Declaring the scenario keeps the browser
+// inside k6's managed model (iteration lifecycle, tracing), and `remote: true`
+// tells k6 NOT to launch or connect a managed browser for the VU — the script
+// connects to an existing one itself.
+//
 // For instance, you could fetch that URL from your browser provider's API,
 // in setup(), and pass it to the iterations:
 //
@@ -23,6 +29,22 @@ import { chromium } from 'k6/browser';
 //
 // Note this is different from K6_BROWSER_WS_URL, which covers a different path where
 // k6 users can provide the ws URL via an env var, not computed at runtime.
+
+export const options = {
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      options: {
+        browser: {
+          type: 'chromium',
+          // Required for chromium.connectOverCDP: k6 will not launch a browser;
+          // the script connects to an existing one at runtime.
+          remote: true,
+        },
+      },
+    },
+  },
+};
 
 export default async function () {
   const browser = await chromium.connectOverCDP(__ENV.CDP_WS_URL);

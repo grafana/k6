@@ -1003,14 +1003,10 @@ func TestChromiumConnectOverCDPContextBrowserPlain(t *testing.T) {
 
 	tb := newTestBrowser(t)
 
-	// No StartIteration, so the managed-browser registry stays empty (as in a
-	// script with no options.browser).
-	vu := k6test.NewVU(t)
-	mod := browser.New().NewModuleInstance(vu)
-	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
-	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
-	vu.ActivateVU()
-	vu.SetVar(t, "chromium", jsMod.Chromium)
+	// A remote scenario builds no managed browser, so the registry stays empty
+	// (as with the old plain, no-managed-browser case) and context().browser()
+	// must resolve to the connectOverCDP browser.
+	vu := setupChromiumVU(t)
 
 	_, err := vu.RunAsync(t, `
 		const b = await chromium.connectOverCDP("%s");
@@ -1022,15 +1018,14 @@ func TestChromiumConnectOverCDPContextBrowserPlain(t *testing.T) {
 }
 
 // TestChromiumConnectOverCDPContextBrowserOwner covers the silent wrong-browser
-// case: with a managed browser also present, context().browser() must return the
-// connectOverCDP browser that owns the context, not the managed one. Closing the
-// connectOverCDP browser must therefore disconnect the browser reached via
-// context().browser().
+// case: context().browser() must return the connectOverCDP browser that owns
+// the context. Closing the connectOverCDP browser must therefore disconnect the
+// browser reached via context().browser().
 func TestChromiumConnectOverCDPContextBrowserOwner(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t)
-	vu := setupChromiumVU(t) // StartIteration also builds a managed browser
+	vu := setupChromiumVU(t) // remote scenario: no managed browser is built
 
 	// context().browser() must be the connectOverCDP browser that owns the
 	// context, so closing that browser disconnects the one reached via

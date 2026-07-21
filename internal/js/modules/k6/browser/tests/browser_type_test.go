@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -94,6 +95,9 @@ func TestChromiumConnectOverCDPAppliesBrowserTimeout(t *testing.T) {
 // setupChromiumVU builds a VU with the browser module's chromium object bound
 // to the "chromium" global and an iteration started, ready to run
 // connectOverCDP scripts via RunAsync.
+//
+// It marks the scenario as remote (options.browser.remote), which is required
+// for chromium.connectOverCDP and tells k6 not to launch a managed browser.
 func setupChromiumVU(t *testing.T, opts ...any) *k6test.VU {
 	t.Helper()
 
@@ -103,10 +107,40 @@ func setupChromiumVU(t *testing.T, opts ...any) *k6test.VU {
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
 	vu.ActivateVU()
+	// Gate: connectOverCDP requires options.browser.remote to be set.
+	vu.StateField.Options.Scenarios["default"].GetScenarioOptions().Browser["remote"] = true
 	vu.StartIteration(t)
 	vu.SetVar(t, "chromium", jsMod.Chromium)
 
 	return vu
+}
+
+// TestChromiumConnectOverCDPRequiresRemote verifies the gate: without
+// options.browser.remote set, chromium.connectOverCDP is rejected up front,
+// before any connection attempt (so no test browser is needed).
+func TestChromiumConnectOverCDPRequiresRemote(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	mod := browser.New().NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+
+	vu.ActivateVU()
+	// Intentionally do NOT set options.browser.remote.
+	vu.StartIteration(t)
+	vu.SetVar(t, "chromium", jsMod.Chromium)
+
+	p := vu.RunPromise(t, `
+		try {
+			await chromium.connectOverCDP("ws://localhost:9222");
+			return "NO_REJECTION";
+		} catch (e) {
+			return String(e);
+		}
+	`)
+	require.Equal(t, sobek.PromiseStateFulfilled, p.State())
+	require.Contains(t, p.Result().String(), "options.browser.remote")
 }
 
 func TestChromiumConnectOverCDP(t *testing.T) {

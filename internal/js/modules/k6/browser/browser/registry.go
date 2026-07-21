@@ -267,20 +267,20 @@ func (r *browserRegistry) handleIterEvents(
 	)
 
 	for e := range eventsCh {
-		// If the browser module is imported, NewModuleInstance runs for every VU, so
-		// this registry subscribes to iteration events for every VU. At VU init we
-		// cannot tell which scenario a VU belongs to (state is nil), so we cannot
-		// subscribe selectively; we also cannot unsubscribe later, since a VU may be
-		// reused by a later scenario that does use the browser.
+		// If the browser module is imported, NewModuleInstance runs for every VU,
+		// so this registry subscribes to iteration events for every VU. At VU init
+		// we cannot tell which scenario a VU belongs to (state is nil), so we
+		// cannot subscribe selectively; we also cannot unsubscribe later, since a
+		// VU may be reused by a later scenario that does use the browser.
 		//
-		// This handler used to skip non-browser iterations entirely (an early
-		// `continue` when !isBrowserIter), because only managed browser scenarios had
-		// anything to clean up. That is no longer safe: chromium.connectOverCDP lets a
-		// script create a browser in any iteration, without options.browser. So we now
-		// process every iteration event and gate only the managed-browser work
-		// (buildFn on IterStart, deleteBrowser on IterEnd) behind isBrowserIter below;
-		// the user-managed-browser sweep (closeUserManaged) and endIterationTrace run
-		// unconditionally on IterEnd.
+		// Only browser scenarios (options.browser.type set) have anything to do
+		// here, so skip everything else. chromium.connectOverCDP requires a browser
+		// scenario with options.browser.remote set to true (see isRemoteScenario),
+		// so its iterations are always browser iterations and are not skipped.
+		if !isBrowserIter(r.vu) {
+			e.Done()
+			continue
+		}
 
 		// The context in the VU is not thread safe. It can
 		// be safely accessed during an iteration but not
@@ -297,29 +297,29 @@ func (r *browserRegistry) handleIterEvents(
 			continue
 		}
 
-		browserIter := isBrowserIter(r.vu)
-
 		switch e.Type {
 		case k6event.IterStart:
-			// Managed browsers are only built for browser scenarios. Connected
-			// (connectOverCDP) browsers are built lazily at connection time, so
-			// there is nothing to do at IterStart for them.
-			if !browserIter {
-				break
-			}
-
 			// Because VU.State is nil when browser registry is initialized,
 			// we have to initialize traces registry on the first VU iteration
 			// so we can get access to the k6 TracerProvider.
 			r.initTracesRegistry()
 
 			// Wrap the tracer into the VU context to make it accessible for the
-			// other components during the iteration that inherit the VU context.
+			// other components during the iteration that inherit the VU context,
+			// and start the iteration root span. A connectOverCDP browser connected
+			// later in this iteration parents under this span.
 			//
 			// All browser APIs should work with the vu context, and allow the
 			// k6 iteration control its lifecycle.
 			tracerCtx := common.WithTracer(r.vu.Context(), r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
+
+			// A remote scenario (options.browser.remote) connects to an existing
+			// browser at runtime via chromium.connectOverCDP, so k6 must not build
+			// a managed browser here.
+			if isRemoteScenario(r.vu) {
+				break
+			}
 
 			b, err := r.buildFn(ctx, tracedCtx)
 			if err != nil {
@@ -332,16 +332,12 @@ func (r *browserRegistry) handleIterEvents(
 			}
 			r.setBrowser(data.Iteration, b)
 		case k6event.IterEnd:
-			// Always sweep user-managed browsers and end any iteration trace,
-			// even for non-browser iterations (connectOverCDP runs in
-			// iterations without options.browser).
-			if browserIter {
-				r.deleteBrowser(data.Iteration)
-			}
+			// Close the managed browser (a no-op for a remote scenario, which
+			// never built one), sweep any user-managed connectOverCDP browsers,
+			// and end the iteration trace.
+			r.deleteBrowser(data.Iteration)
 			r.closeUserManaged(data.Iteration)
-			if r.tr != nil {
-				r.tr.endIterationTrace(data.Iteration)
-			}
+			r.tr.endIterationTrace(data.Iteration)
 		default:
 			r.vu.State().Logger.Warnf("received unexpected event type: %v", e.Type)
 		}
@@ -528,6 +524,16 @@ func isBrowserIter(vu k6modules.VU) bool {
 	opts := k6ext.GetScenarioOpts(vu.Context(), vu)
 	_, ok := opts["type"] // Check if browser type option is set
 	return ok
+}
+
+// isRemoteScenario reports whether the VU's browser scenario requests a remote
+// (self-connected) browser, i.e. options.browser.remote is true. In that case
+// k6 does not launch or connect a managed browser; the script connects to an
+// existing browser at runtime via chromium.connectOverCDP.
+func isRemoteScenario(vu k6modules.VU) bool {
+	opts := k6ext.GetScenarioOpts(vu.Context(), vu)
+	remote, _ := opts["remote"].(bool)
+	return remote
 }
 
 // trace represents a traces registry entry which holds the

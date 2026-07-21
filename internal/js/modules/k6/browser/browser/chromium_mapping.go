@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
@@ -14,6 +15,17 @@ func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
 	return mapping{
 		"connectOverCDP": func(wsEndpoint string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
+				// connectOverCDP is gated behind options.browser.remote: true. This
+				// keeps it inside k6's browser-scenario model (managed iteration
+				// lifecycle, tracing) and tells k6 not to launch a managed browser
+				// for this VU (see the IterStart handling in the registry).
+				if !isRemoteScenario(vu) {
+					return nil, errors.New(
+						"chromium.connectOverCDP requires a browser scenario with " +
+							"options.browser.remote set to true",
+					)
+				}
+
 				iter := vu.State().Iteration
 
 				// Clone the BrowserType for this call so concurrent
