@@ -490,8 +490,24 @@ func TestOutputStart_ProvisioningMode(t *testing.T) {
 	require.True(t, ok, "expected versionedOutput to be *cloudv2.Output")
 	assert.NotNil(t, expv2Out)
 
-	// Clean up: stop the output.
+	// Feed a sample so the stop-time flush exercises the metrics-push path,
+	// and confirm it goes through the injected metricsPusher rather than a
+	// real HTTP client.
+	r := metrics.NewRegistry()
+	m := r.MustNewMetric("test_metric", metrics.Counter)
+	out.AddMetricSamples([]metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{Metric: m, Tags: r.RootTagSet()},
+			Time:       time.Now(),
+			Value:      1.0,
+		},
+	})
+
+	// Stop force-flushes the queued samples.
 	require.NoError(t, out.StopWithTestError(nil))
+
+	assert.Positive(t, pusherMock.doCalls.Load(),
+		"queued metrics should be pushed through the injected metricsPusher")
 }
 
 // TestOutputStart_PushRefIDStillTakesPrecedence locks in cloud-Output
