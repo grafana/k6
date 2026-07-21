@@ -81,7 +81,7 @@ func escapeConsoleControlChars(msg string) string {
 			escaped.WriteString(`\v`)
 		default:
 			if r < ' ' || r == 0x7f || (r >= 0x80 && r <= 0x9f) {
-				escaped.WriteString(fmt.Sprintf(`\x%02x`, r))
+				fmt.Fprintf(&escaped, `\x%02x`, r)
 				continue
 			}
 			escaped.WriteRune(r)
