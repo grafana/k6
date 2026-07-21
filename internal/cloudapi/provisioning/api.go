@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -225,7 +226,10 @@ func (c *Client) StartLocalExecution(
 		return nil, err
 	}
 	if res == nil {
-		return nil, errUnknown
+		// Should not happen once the status/error checks above pass, but
+		// the SDK getters return zero values on a nil receiver, so guard
+		// against silently producing an empty result and report it clearly.
+		return nil, errors.New("unexpected nil response from start_local_execution")
 	}
 
 	return mapStartLocalExecutionResponse(res), nil
