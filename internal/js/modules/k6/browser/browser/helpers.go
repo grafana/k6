@@ -133,8 +133,9 @@ func queueTask[T any](
 
 // awaitHandlerResult checks whether retVal is a pending Promise. If so, it
 // attaches .then/.catch callbacks that write the outcome to result when the
-// Promise settles. If retVal is not a Promise (or is already settled), it
-// writes to result immediately.
+// Promise settles. If retVal is not a Promise or is already fulfilled, it
+// writes to result immediately; rejected Promises are handled through the
+// rejection callback.
 //
 // Must be called from the event-loop goroutine (e.g., inside a tq.Queue task)
 // so that the .then/.catch callbacks are registered while the runtime is in a
