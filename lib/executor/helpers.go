@@ -134,7 +134,9 @@ func getIterationRunner(
 //     that will also cancel these contexts, thus the "general abort" case is
 //     handled transparently.
 func getDurationContexts(parentCtx context.Context, regularDuration, gracefulStop time.Duration) (
-	startTime time.Time, maxDurationCtx, regDurationCtx context.Context, maxDurationCancel func(), regDurationCancel func(),
+	startTime time.Time,
+	maxDurationCtx, regDurationCtx context.Context,
+	maxDurationCancel func(), regDurationCancel func(),
 ) {
 	startTime = time.Now()
 	maxEndTime := startTime.Add(regularDuration + gracefulStop)
