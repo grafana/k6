@@ -1,7 +1,7 @@
 buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1 h1:FlXwksX9wjddXoyW88Jw3tz1DEGbXBSGZW6fg0frZ0M=
 buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1/go.mod h1:mwDA6SccUlW4ebUkJTpKoHZzCrLFh/WI48oQRvUTGAA=
-buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1 h1:OyFGRpH4F78kDv9OdkRyzfrBnnJO97nYCP5dIfkOzDk=
-buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1/go.mod h1:6rM4oiNLtvSABJBFC+GReCtGUaWLYwhsadnb9FgJ/2k=
+buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260707164124-2360da55afce.1 h1:M4YtW8f34aXlYH7qlusABkaxVkhn3n6gOVjATbhqVfQ=
+buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260707164124-2360da55afce.1/go.mod h1:6rM4oiNLtvSABJBFC+GReCtGUaWLYwhsadnb9FgJ/2k=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 github.com/Azure/go-ntlmssp v0.1.1 h1:l+FM/EEMb0U9QZE7mKNEDw5Mu3mFiaa2GKOoTSsNDPw=
 github.com/Azure/go-ntlmssp v0.1.1/go.mod h1:NYqdhxd/8aAct/s4qSYZEerdPuH1liG2/X9DiVTbhpk=
