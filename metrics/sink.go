@@ -90,7 +90,7 @@ func (g *GaugeSink) IsEmpty() bool { return !g.minSet }
 // Add a single sample to the sink
 func (g *GaugeSink) Add(s Sample) {
 	g.Value = s.Value
-	if s.Value > g.Max {
+	if s.Value > g.Max || !g.minSet {
 		g.Max = s.Value
 	}
 	if s.Value < g.Min || !g.minSet {
