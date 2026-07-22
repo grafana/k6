@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -37,6 +38,8 @@ export async function messages() {
 
   try {
     await page.goto('https://quickpizza.grafana.com/my_messages.php', { waitUntil: 'networkidle' });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }
@@ -47,6 +50,8 @@ export async function news() {
 
   try {
     await page.goto('https://quickpizza.grafana.com/news.php', { waitUntil: 'networkidle' });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

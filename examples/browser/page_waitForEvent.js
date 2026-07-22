@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -40,6 +41,8 @@ export default async function() {
 
     const response = await responsePromise;
     console.log(`Response received: ${response.url()}`);
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

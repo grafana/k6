@@ -1,5 +1,5 @@
 import { browser } from 'k6/browser';
-import { check } from 'k6';
+import { check, fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -65,6 +65,8 @@ export default async function () {
       'found heading inside iframe': (text) => text === 'Inside iframe',
     });
 
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }
