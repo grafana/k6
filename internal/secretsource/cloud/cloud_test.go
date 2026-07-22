@@ -49,6 +49,32 @@ func TestCloudSecretsRequiresConfig(t *testing.T) {
 	require.Contains(t, err.Error(), "cloud secrets not configured")
 }
 
+// TestCloudSecretsNotConfiguredMessage verifies the "not configured" error adapts to context:
+// the reuse-specific guidance appears only when K6_CLOUD_PUSH_REF_ID is set, otherwise the
+// generic 'k6 cloud run --local-execution' message is used.
+func TestCloudSecretsNotConfiguredMessage(t *testing.T) {
+	t.Parallel()
+
+	// Without K6_CLOUD_PUSH_REF_ID: generic guidance.
+	generic, err := New(makeParams())
+	require.NoError(t, err)
+	_, err = generic.Get("test-key")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "Make sure you're using 'k6 cloud run --local-execution'")
+	require.NotContains(t, err.Error(), "K6_CLOUD_PUSH_REF_ID")
+
+	// With K6_CLOUD_PUSH_REF_ID: reuse-specific guidance.
+	params := makeParams()
+	params.Environment = map[string]string{"K6_CLOUD_PUSH_REF_ID": "12345"}
+	reused, err := New(params)
+	require.NoError(t, err)
+	_, err = reused.Get("test-key")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "K6_CLOUD_PUSH_REF_ID")
+	require.Contains(t, err.Error(), "K6_CLOUD_SECRETS_TOKEN")
+	require.NotContains(t, err.Error(), "Make sure you're using 'k6 cloud run --local-execution'")
+}
+
 // TestCloudSecretsDescription verifies the extension is registered with the expected description.
 func TestCloudSecretsDescription(t *testing.T) {
 	t.Parallel()
