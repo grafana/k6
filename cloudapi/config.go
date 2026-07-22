@@ -34,6 +34,20 @@ type Config struct {
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
+	// MetricsPushURL is the explicit URL to push metrics to, returned by
+	// the provisioning API's start_local_execution endpoint. When set, the
+	// cloud Output uses this URL instead of deriving one from Host. Set
+	// programmatically by `cmd/outputs_cloud.go` for the
+	// `k6 cloud run --local-execution` provisioning flow; never set via
+	// env vars or user-facing config.
+	MetricsPushURL null.String `json:"metricsPushURL"`
+
+	// TestRunToken is the scoped test-run token returned by the
+	// provisioning API's start_local_execution endpoint. When set, the
+	// cloud Output uses it as the Bearer token for metrics push and notify.
+	// Set programmatically; never set via env vars or user-facing config.
+	TestRunToken null.String `json:"testRunToken"`
+
 	// PushRefID is the identifier used by k6 Cloud to correlate all the things that
 	// belong to the same test run/execution. Currently, it is equivalent to the test run id.
 	// But, in the future, or in future solutions (e.g. Synthetic Monitoring), there might be
@@ -104,7 +118,7 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 //
-//nolint:cyclop,gocognit
+//nolint:cyclop,funlen,gocognit
 func (c Config) Apply(cfg Config) Config {
 	if cfg.StackID.Valid {
 		c.StackID = cfg.StackID
@@ -132,6 +146,12 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.LogsTailURL.Valid && cfg.LogsTailURL.String != "" {
 		c.LogsTailURL = cfg.LogsTailURL
+	}
+	if cfg.MetricsPushURL.Valid {
+		c.MetricsPushURL = cfg.MetricsPushURL
+	}
+	if cfg.TestRunToken.Valid {
+		c.TestRunToken = cfg.TestRunToken
 	}
 	if cfg.PushRefID.Valid {
 		c.PushRefID = cfg.PushRefID
