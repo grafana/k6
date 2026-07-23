@@ -23,9 +23,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// stopFlushTimeout bounds how long shutdown waits on in-flight uploads before
+// canceling them, so a stalled upload can't keep the process from exiting.
+const stopFlushTimeout = 15 * time.Second
+
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
-	flush() error
+	flush(ctx context.Context) error
 }
 
 // Output sends result data to the k6 Cloud service.
@@ -44,6 +48,9 @@ type Output struct {
 	requestMetadatasCollector insightsOutput.RequestMetadatasCollector
 	requestMetadatasFlusher   insightsOutput.RequestMetadatasFlusher
 
+	metricsHTTPClient metricsHTTPClient // optional override
+	metricsURL        string            // optional override
+
 	// wg tracks background goroutines
 	wg sync.WaitGroup
 
@@ -54,6 +61,9 @@ type Output struct {
 	abort        chan struct{}
 	abortOnce    sync.Once
 	testStopFunc func(error)
+
+	// cancelFlush interrupts in-flight uploads when shutdown can no longer wait.
+	cancelFlush context.CancelFunc
 }
 
 // New creates a new cloud output.
@@ -78,6 +88,19 @@ func (o *Output) SetTestRunID(id string) {
 	o.testRunID = id
 }
 
+// SetMetricsHTTPClient injects a metricsHTTPClient for metric pushes.
+// Used by the provisioning-mode flow to provide a Bearer-authenticated
+// HTTP layer.
+func (o *Output) SetMetricsHTTPClient(c metricsHTTPClient) {
+	o.metricsHTTPClient = c
+}
+
+// SetMetricsURL injects an explicit metrics push URL. Used by the
+// provisioning-mode flow where the URL comes from the API.
+func (o *Output) SetMetricsURL(url string) {
+	o.metricsURL = url
+}
+
 // SetTestRunStopCallback receives the function that
 // that stops the engine when it is called.
 // It should be called on critical errors.
@@ -99,7 +122,26 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.testRunID)
+	// The metrics client always pushes to an explicit URL. In provisioning
+	// mode both the HTTP client and URL are injected via the setters;
+	// otherwise we derive the legacy /v2/metrics/<testRunID> URL from the
+	// cloud client. The two must be set together — one without the other is
+	// a misconfiguration rather than a silent fallback.
+	switch {
+	case o.metricsHTTPClient != nil && o.metricsURL != "":
+		// Both injected (provisioning mode); use as-is.
+	case o.metricsHTTPClient == nil && o.metricsURL == "":
+		o.metricsURL, err = deriveMetricsURL(o.cloudClient.BaseURL(), o.testRunID)
+		if err != nil {
+			return fmt.Errorf("failed to derive the metrics push URL: %w", err)
+		}
+		o.metricsHTTPClient = o.cloudClient
+	default:
+		return errors.New("metrics push client misconfigured: " +
+			"metricsHTTPClient and metricsURL must be set together")
+	}
+
+	mc, err := newMetricsClientWithURL(o.metricsHTTPClient, o.metricsURL)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}
@@ -116,7 +158,10 @@ func (o *Output) Start() error {
 		batchPushConcurrency: int(o.config.MetricPushConcurrency.Int64),
 	}
 
-	o.runPeriodicFlush()
+	flushCtx, cancelFlush := context.WithCancel(context.Background())
+	o.cancelFlush = cancelFlush
+
+	o.runPeriodicFlush(flushCtx)
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
 	if insightsOutput.Enabled(o.config) {
@@ -139,7 +184,7 @@ func (o *Output) Start() error {
 
 		o.insightsClient = insightsClient
 		o.requestMetadatasFlusher = insightsOutput.NewFlusher(insightsClient, o.requestMetadatasCollector)
-		o.runFlushRequestMetadatas()
+		o.runFlushRequestMetadatas(flushCtx)
 	}
 
 	o.logger.WithField("config", printableConfig(o.config)).Debug("Started!")
@@ -152,8 +197,25 @@ func (o *Output) StopWithTestError(_ error) error {
 	o.logger.Debug("Stopping...")
 	defer o.logger.Debug("Stopped!")
 
+	defer o.cancelFlush()
+
 	close(o.stop)
-	o.wg.Wait()
+
+	// Wait for the background flushers, but don't let a stuck upload pin the
+	// process: once the budget is spent, cancel any in-flight push so wg.Wait
+	// returns, and skip the final flush since the connection is unhealthy.
+	flushersDone := make(chan struct{})
+	go func() {
+		o.wg.Wait()
+		close(flushersDone)
+	}()
+	select {
+	case <-flushersDone:
+	case <-time.After(stopFlushTimeout):
+		o.cancelFlush()
+		<-flushersDone
+		return nil
+	}
 
 	select {
 	case <-o.abort:
@@ -166,11 +228,14 @@ func (o *Output) StopWithTestError(_ error) error {
 	// wait period.
 	o.collector.DropExpiringDelay()
 	o.collectSamples()
-	o.flushMetrics()
+
+	stopCtx, cancel := context.WithTimeout(context.Background(), stopFlushTimeout)
+	defer cancel()
+	o.flushMetrics(stopCtx)
 
 	// Flush all the remaining request metadatas.
 	if insightsOutput.Enabled(o.config) {
-		o.flushRequestMetadatas()
+		o.flushRequestMetadatas(stopCtx)
 		if err := o.insightsClient.Close(); err != nil {
 			o.logger.WithError(err).Error("Failed to close the insights client")
 		}
@@ -179,7 +244,7 @@ func (o *Output) StopWithTestError(_ error) error {
 	return nil
 }
 
-func (o *Output) runPeriodicFlush() {
+func (o *Output) runPeriodicFlush(ctx context.Context) {
 	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
 	o.wg.Add(1)
@@ -193,7 +258,7 @@ func (o *Output) runPeriodicFlush() {
 		for {
 			select {
 			case <-t.C:
-				o.flushMetrics()
+				o.flushMetrics(ctx)
 			case <-o.stop:
 				return
 			case <-o.abort:
@@ -254,10 +319,10 @@ func (o *Output) collectSamples() {
 }
 
 // flushMetrics receives a set of metric samples.
-func (o *Output) flushMetrics() {
+func (o *Output) flushMetrics(ctx context.Context) {
 	start := time.Now()
 
-	err := o.flushing.flush()
+	err := o.flushing.flush(ctx)
 	if err != nil {
 		o.handleFlushError(err)
 		return
@@ -266,7 +331,7 @@ func (o *Output) flushMetrics() {
 	o.logger.WithField("t", time.Since(start)).Trace("Successfully flushed buffered samples to the cloud")
 }
 
-func (o *Output) runFlushRequestMetadatas() {
+func (o *Output) runFlushRequestMetadatas(ctx context.Context) {
 	t := time.NewTicker(o.config.TracesPushInterval.TimeDuration())
 
 	for i := int64(0); i < o.config.TracesPushConcurrency.Int64; i++ {
@@ -276,7 +341,7 @@ func (o *Output) runFlushRequestMetadatas() {
 			for {
 				select {
 				case <-t.C:
-					o.flushRequestMetadatas()
+					o.flushRequestMetadatas(ctx)
 				case <-o.stop:
 					return
 				case <-o.abort:
@@ -288,10 +353,10 @@ func (o *Output) runFlushRequestMetadatas() {
 }
 
 // flushRequestMetadatas periodically flushes traces collected in RequestMetadatasCollector using flusher.
-func (o *Output) flushRequestMetadatas() {
+func (o *Output) flushRequestMetadatas(ctx context.Context) {
 	start := time.Now()
 
-	err := o.requestMetadatasFlusher.Flush()
+	err := o.requestMetadatasFlusher.Flush(ctx)
 	if err != nil {
 		o.logger.WithError(err).WithField("t", time.Since(start)).Error("Failed to push trace samples to the cloud")
 

@@ -2076,10 +2076,8 @@ const (
 	ErrorTypeKey = attribute.Key("error.type")
 )
 
-var (
-	// A fallback error value to be used when the instrumentation doesn't define a custom value
-	ErrorTypeOther = ErrorTypeKey.String("_OTHER")
-)
+// A fallback error value to be used when the instrumentation doesn't define a custom value
+var ErrorTypeOther = ErrorTypeKey.String("_OTHER")
 
 // The shared attributes used to report a single exception associated with a
 // span or log.

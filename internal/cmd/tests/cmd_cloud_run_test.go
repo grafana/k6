@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,13 +8,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
+	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/v2/cloudapi"
 	"go.k6.io/k6/v2/errext/exitcodes"
+	provtest "go.k6.io/k6/v2/internal/cloudapi/provisioning/test"
+	v6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/internal/lib/testutils"
@@ -172,7 +174,7 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 func TestCloudRunLocalExecution(t *testing.T) {
 	t.Parallel()
 
-	t.Run("should upload the test archive with a multipart request as a default", func(t *testing.T) {
+	t.Run("should upload the test archive via presigned S3 URL as a default", func(t *testing.T) {
 		t.Parallel()
 
 		script := `
@@ -187,42 +189,90 @@ export default function() {};`
 
 		ts := makeTestState(t, script, []string{"--local-execution"})
 
-		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			// When using the local execution mode, the test archive should be uploaded to the cloud
-			// as a multipart request.
-			formData, err := parseMultipartRequest(req)
-			require.NoError(t, err, "expected a correctly formed multipart request")
-			assert.Contains(t, formData, "name")
-			assert.Equal(t, "Hello k6 Cloud!", formData["name"])
-			assert.Contains(t, formData, "project_id")
-			assert.Equal(t, "123456", formData["project_id"])
-			assert.Contains(t, formData, "file")
-			assert.NotEmpty(t, formData["file"])
+		srv := provtest.NewServer(t)
 
-			resp.WriteHeader(http.StatusOK)
-			_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"test_run_token": "mock-test-run-token",
-			"secrets_config": {
-				"endpoint": "https://mock-secrets.example.com/{key}",
-				"response_path": "plaintext"
-			},
-			"config": {
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			}
-		}`)
-			assert.NoError(t, err)
+		// v6 CreateOrFindLoadTest: POST /cloud/v6/projects/{projectID}/load_tests
+		srv.HandleCreateLoadTest(123456, func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, http.MethodPost, r.Method)
+			res := k6cloud.NewLoadTestApiModelWithDefaults()
+			res.SetId(provtest.DefaultLoadTestID)
+			writeProvJSON(w, http.StatusCreated, res)
 		})
 
-		srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+		// start_local_execution: check request body and return response
+		var startCalled atomic.Bool
+		srv.HandleStartLocalExecution(provtest.DefaultLoadTestID, func(w http.ResponseWriter, r *http.Request) {
+			startCalled.Store(true)
+
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+
+			var payload map[string]any
+			require.NoError(t, json.Unmarshal(body, &payload))
+
+			// Verify options field is present and contains resolved lib.Options
+			assert.Contains(t, payload, "options")
+
+			// Verify archive_size > 0
+			assert.Contains(t, payload, "archive_size")
+			archiveSize, ok := payload["archive_size"].(float64)
+			assert.True(t, ok, "archive_size should be a number")
+			assert.Greater(t, archiveSize, float64(0), "archive_size should be > 0")
+
+			resp := provtest.DefaultStartLocalExecutionResponse()
+			// Override URLs to point to the test server
+			uploadURL := srv.URL + provtest.PresignedUploadPath
+			resp.SetArchiveUploadUrl(uploadURL)
+			resp.SetTestRunDetailsPageUrl(fmt.Sprintf("%s/runs/%d", srv.URL, provtest.DefaultTestRunID))
+			// Override metrics push URL to point to the test server
+			rc := resp.GetRuntimeConfig()
+			m := rc.GetMetrics()
+			m.SetPushUrl(srv.URL + "/v1/metrics")
+			rc.SetMetrics(m)
+			resp.SetRuntimeConfig(rc)
+			writeProvJSON(w, http.StatusOK, resp)
+		})
+
+		// presigned archive upload
+		var archiveUploaded atomic.Bool
+		srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, r *http.Request) {
+			archiveUploaded.Store(true)
+			body, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			assert.Greater(t, len(body), 0, "archive upload body should not be empty")
+			assert.Equal(t, "application/x-tar", r.Header.Get("Content-Type"))
+			w.WriteHeader(http.StatusOK)
+		})
+
+		// v6 FetchTestRun: return "initializing" immediately
+		srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+			{Status: v6.StatusInitializing},
+		})
+
+		// notify: verify it's called
+		var notifyCalled atomic.Bool
+		srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+			notifyCalled.Store(true)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		// catch-all for metrics pushes and other calls
+		srv.Mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: local")
-		assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
+		assert.Contains(t, stdout, fmt.Sprintf("output: cloud (%s/runs/%d)", srv.URL, provtest.DefaultTestRunID))
+		assert.True(t, startCalled.Load(), "start_local_execution should have been called")
+		assert.True(t, archiveUploaded.Load(), "archive should have been uploaded via presigned URL")
+		assert.True(t, notifyCalled.Load(), "notify should have been called at test end")
 	})
 
 	t.Run("does not upload the archive when --no-archive-upload is provided", func(t *testing.T) {
@@ -240,44 +290,67 @@ export default function() {};`
 
 		ts := makeTestState(t, script, []string{"--local-execution", "--no-archive-upload"})
 
-		testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			body, err := io.ReadAll(req.Body)
+		srv := provtest.NewServer(t)
+
+		srv.HandleCreateLoadTest(123456, func(w http.ResponseWriter, _ *http.Request) {
+			res := k6cloud.NewLoadTestApiModelWithDefaults()
+			res.SetId(provtest.DefaultLoadTestID)
+			writeProvJSON(w, http.StatusCreated, res)
+		})
+
+		// start_local_execution: verify archive_size is null
+		srv.HandleStartLocalExecution(provtest.DefaultLoadTestID, func(w http.ResponseWriter, r *http.Request) {
+			body, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 
 			var payload map[string]any
-			err = json.Unmarshal(body, &payload)
-			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(body, &payload))
 
-			assert.Contains(t, payload, "name")
-			assert.Equal(t, "Hello k6 Cloud!", payload["name"])
-			assert.Contains(t, payload, "project_id")
-			assert.Equal(t, float64(123456), payload["project_id"])
-			assert.NotContains(t, payload, "file")
+			// archive_size should be explicitly null (Go JSON unmarshals null as nil)
+			assert.Contains(t, payload, "archive_size")
+			assert.Nil(t, payload["archive_size"], "archive_size should be null when --no-archive-upload is provided")
 
-			resp.WriteHeader(http.StatusOK)
-			_, err = fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"test_run_token": "mock-test-run-token",
-			"secrets_config": {
-				"endpoint": "https://mock-secrets.example.com/{key}",
-				"response_path": "plaintext"
-			},
-			"config": {
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			}
-		}`)
-			assert.NoError(t, err)
+			resp := provtest.DefaultStartLocalExecutionResponse()
+			// No upload URL when --no-archive-upload is set
+			resp.ArchiveUploadUrl.Unset()
+			resp.SetTestRunDetailsPageUrl(fmt.Sprintf("%s/runs/%d", srv.URL, provtest.DefaultTestRunID))
+			rc := resp.GetRuntimeConfig()
+			m := rc.GetMetrics()
+			m.SetPushUrl(srv.URL + "/v1/metrics")
+			rc.SetMetrics(m)
+			resp.SetRuntimeConfig(rc)
+			writeProvJSON(w, http.StatusOK, resp)
 		})
 
-		srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+		// Archive upload should NOT be called
+		var archiveUploaded atomic.Bool
+		srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, _ *http.Request) {
+			archiveUploaded.Store(true)
+			w.WriteHeader(http.StatusOK)
+		})
+
+		srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+			{Status: v6.StatusInitializing},
+		})
+
+		srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		srv.Mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: local")
-		assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
+		assert.Contains(t, stdout, fmt.Sprintf("output: cloud (%s/runs/%d)", srv.URL, provtest.DefaultTestRunID))
+		assert.False(t, archiveUploaded.Load(), "archive should NOT have been uploaded when --no-archive-upload is set")
 	})
 
 	t.Run("the script can read the test run id to the environment", func(t *testing.T) {
@@ -297,17 +370,53 @@ export default function() {
 
 		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
 
-		const testRunID = 1337
-		srv := getCloudTestEndChecker(t, testRunID, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+		srv := provtest.NewServer(t)
+
+		srv.HandleCreateLoadTest(123456, func(w http.ResponseWriter, _ *http.Request) {
+			res := k6cloud.NewLoadTestApiModelWithDefaults()
+			res.SetId(provtest.DefaultLoadTestID)
+			writeProvJSON(w, http.StatusCreated, res)
+		})
+
+		srv.HandleStartLocalExecution(provtest.DefaultLoadTestID, func(w http.ResponseWriter, _ *http.Request) {
+			resp := provtest.DefaultStartLocalExecutionResponse()
+			uploadURL := srv.URL + provtest.PresignedUploadPath
+			resp.SetArchiveUploadUrl(uploadURL)
+			resp.SetTestRunDetailsPageUrl(fmt.Sprintf("%s/runs/%d", srv.URL, provtest.DefaultTestRunID))
+			rc := resp.GetRuntimeConfig()
+			m := rc.GetMetrics()
+			m.SetPushUrl(srv.URL + "/v1/metrics")
+			rc.SetMetrics(m)
+			resp.SetRuntimeConfig(rc)
+			writeProvJSON(w, http.StatusOK, resp)
+		})
+
+		srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+			{Status: v6.StatusInitializing},
+		})
+
+		srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
+		srv.Mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
+
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: local")
-		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
-		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
+		assert.Contains(t, stdout, fmt.Sprintf("output: cloud (%s/runs/%d)", srv.URL, provtest.DefaultTestRunID))
+		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(int(provtest.DefaultTestRunID)))
 	})
 
 	t.Run("reuses existing test run when K6_CLOUD_PUSH_REF_ID is set", func(t *testing.T) {
@@ -334,9 +443,16 @@ export default function() {
 			"POST ^/v1/tests$": http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 				require.Fail(t, "CreateTestRun must not be called when K6_CLOUD_PUSH_REF_ID is set")
 			}),
+			"POST ^/provisioning/v1/": http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				require.Fail(t, "provisioning API must not be called when K6_CLOUD_PUSH_REF_ID is set")
+			}),
+			"POST ^/cloud/v6/projects/": http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				require.Fail(t, "v6 load_tests API must not be called when K6_CLOUD_PUSH_REF_ID is set")
+			}),
 		})
 		t.Cleanup(srv.Close)
 		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -363,24 +479,45 @@ export default function() {};`
 
 	ts := makeTestState(t, script, []string{"--local-execution", "--no-cloud-secrets"})
 
-	testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
-		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprint(resp, `{
-			"reference_id": "1337",
-			"test_run_token": "mock-test-run-token",
-			"secrets_config": {
-				"endpoint": "https://mock-secrets.example.com/{key}",
-				"response_path": "plaintext"
-			},
-			"config": {
-				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
-			}
-		}`)
-		assert.NoError(t, err)
+	srv := provtest.NewServer(t)
+
+	srv.HandleCreateLoadTest(123456, func(w http.ResponseWriter, _ *http.Request) {
+		res := k6cloud.NewLoadTestApiModelWithDefaults()
+		res.SetId(provtest.DefaultLoadTestID)
+		writeProvJSON(w, http.StatusCreated, res)
 	})
 
-	srv := getCloudTestEndChecker(t, 1337, testServerHandlerFunc, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	srv.HandleStartLocalExecution(provtest.DefaultLoadTestID, func(w http.ResponseWriter, _ *http.Request) {
+		resp := provtest.DefaultStartLocalExecutionResponse()
+		uploadURL := srv.URL + provtest.PresignedUploadPath
+		resp.SetArchiveUploadUrl(uploadURL)
+		resp.SetTestRunDetailsPageUrl(fmt.Sprintf("%s/runs/%d", srv.URL, provtest.DefaultTestRunID))
+		rc := resp.GetRuntimeConfig()
+		m := rc.GetMetrics()
+		m.SetPushUrl(srv.URL + "/v1/metrics")
+		rc.SetMetrics(m)
+		resp.SetRuntimeConfig(rc)
+		writeProvJSON(w, http.StatusOK, resp)
+	})
+
+	srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusInitializing},
+	})
+
+	srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv.Mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -402,36 +539,10 @@ func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestS
 	return ts
 }
 
-func parseMultipartRequest(r *http.Request) (map[string]string, error) {
-	// Parse the multipart form data
-	reader, err := r.MultipartReader()
-	if err != nil {
-		return nil, err
+func writeProvJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		panic(fmt.Errorf("writeProvJSON: encoding JSON: %w", err))
 	}
-
-	// Initialize a map to store the parsed form data
-	formData := make(map[string]string)
-
-	// Iterate through the parts
-	for {
-		part, nextErr := reader.NextPart()
-		if nextErr == io.EOF {
-			break
-		}
-		if nextErr != nil {
-			return nil, err
-		}
-
-		// Read the part content
-		buf := new(bytes.Buffer)
-		_, err = io.Copy(buf, part)
-		if err != nil {
-			return nil, err
-		}
-
-		// Store the part content in the map
-		formData[part.FormName()] = buf.String()
-	}
-
-	return formData, nil
 }

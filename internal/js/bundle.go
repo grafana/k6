@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
+	sobekencoding "github.com/grafana/sobek-webapi-encoding"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/errext"
@@ -392,14 +393,19 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 }
 
 // registerGlobals registers the globals for the runtime.
-// e.g. timers and webcrypto.
+// e.g. timers, webcrypto, and encoding.
 func registerGlobals(vuImpl *moduleVUImpl) error {
 	err := timers.SetupGlobally(vuImpl)
 	if err != nil {
 		return err
 	}
 
-	return webcrypto.SetupGlobally(vuImpl)
+	err = webcrypto.SetupGlobally(vuImpl)
+	if err != nil {
+		return err
+	}
+
+	return sobekencoding.RegisterGlobally(vuImpl.runtime)
 }
 
 func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.FieldLogger) error {

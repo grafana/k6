@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,6 +29,8 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const cloudRunAuthPrefix = "Running cloud tests requires auth settings"
+
 var (
 	errCloudAuth = errors.New( //nolint:staticcheck // user-facing error message, capitalization is intentional
 		"Run `k6 cloud login` to authenticate, or check the docs for other options at" +
@@ -36,12 +38,22 @@ var (
 	)
 	errMissingToken   = errors.New("access token not configured")
 	errMissingStackID = errors.New("stack ID not configured")
+
+	// errNoProjectConfigured is returned by cloud sub-commands that require a
+	// concrete project to operate on when none can be resolved from the flags,
+	// the environment, or the logged-in configuration.
+	errNoProjectConfigured = errors.New(
+		"no project specified. Use --project-id, set K6_CLOUD_PROJECT_ID, or run `k6 cloud login` to set a default project",
+	)
 )
 
 // checkCloudLogin verifies that both a token and a stack are configured.
 // Together they represent a complete Grafana Cloud login.
 func checkCloudLogin(conf cloudapi.Config) error {
-	const prefix = "Running cloud tests requires auth settings"
+	return checkCloudLoginFor(conf, cloudRunAuthPrefix)
+}
+
+func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 	if !conf.Token.Valid || conf.Token.String == "" {
 		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingToken, errCloudAuth)
 	}
@@ -196,7 +208,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
-		testURL := fmt.Sprintf("%s/a/k6-app/tests/%d", strings.TrimSuffix(cloudConfig.StackURL.String, "/"), loadTest.GetId())
+		testURL, err := resolveCloudTestURL(cloudConfig.StackURL.String, loadTest.GetId())
+		if err != nil {
+			return err
+		}
 		printExecutionDescription(
 			c.gs, "cloud", test.sourceRootPath, testURL, test.derivedConfig, et, executionPlan, nil,
 		)
@@ -279,7 +294,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	ticker := time.NewTicker(time.Millisecond * 2000)
 	if c.showCloudLogs {
-		refID := strconv.FormatInt(int64(testRunID), 10)
+		refID := strconv.FormatInt(testRunID, 10)
 		go func() {
 			logger.Debug("Connecting to cloud logs server...")
 			if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
@@ -426,6 +441,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	projectCmd := getCmdCloudProject(c)
 	cloudCmd.AddCommand(projectCmd)
 
+	testCmd := getCmdCloudTest(c)
+	cloudCmd.AddCommand(testCmd)
+
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
 
@@ -444,33 +462,18 @@ func prepCloudTestRun(
 	ctx context.Context, gs *state.GlobalState,
 	client *cloudapiv6.Client,
 	cloudConfig *cloudapi.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
-) (int32, error) {
-	toInt32 := func(v int64) (int32, error) {
-		if v < math.MinInt32 || v > math.MaxInt32 {
-			return 0, fmt.Errorf("value %d overflows int32", v)
-		}
-		return int32(v), nil
-	}
-
-	stackID, err := toInt32(cloudConfig.StackID.Int64)
-	if err != nil {
+) (int64, error) {
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
 		return 0, err
 	}
-	client.SetStackID(stackID)
 
-	projectID, err := toInt32(cloudConfig.ProjectID.Int64)
-	if err != nil {
-		return 0, err
-	}
+	projectID := cloudConfig.ProjectID.Int64
 
 	if projectID == 0 {
 		if err := resolveAndSetProjectID(gs, cloudConfig, tmpCloudConfig, arc); err != nil {
 			return 0, err
 		}
-		projectID, err = toInt32(cloudConfig.ProjectID.Int64)
-		if err != nil {
-			return 0, err
-		}
+		projectID = cloudConfig.ProjectID.Int64
 	}
 
 	if err := client.ValidateOptions(ctx, projectID, arc.Options); err != nil {
@@ -529,4 +532,13 @@ func resolveAndSetProjectID(
 		cloudConfig.ProjectID = null.IntFrom(projectID)
 	}
 	return nil
+}
+
+func resolveCloudTestURL(stackURL string, testID int64) (string, error) {
+	u, err := url.Parse(stackURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid stack URL: %w", err)
+	}
+
+	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(testID, 10)).String(), nil
 }

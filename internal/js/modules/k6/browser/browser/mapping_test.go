@@ -579,6 +579,7 @@ type locatorAPI interface { //nolint:interfacebloat
 	IsDisabled(opts sobek.Value) (bool, error)
 	IsVisible(opts sobek.Value) (bool, error)
 	IsHidden(opts sobek.Value) (bool, error)
+	IsInViewport(opts sobek.Value) (bool, error)
 	Fill(value string, opts sobek.Value) error
 	Filter(opts *common.LocatorFilterOptions) *common.Locator
 	First() *common.Locator

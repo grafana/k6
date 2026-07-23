@@ -2170,6 +2170,35 @@ class InjectedScript {
     return isVisible(element);
   }
 
+  // isInViewport reports whether the element intersects the viewport by at
+  // least the given ratio. A ratio of 0 means any visible pixel counts. The
+  // measurement is taken with an IntersectionObserver so that scrollable
+  // containers, CSS transforms and clipping are accounted for, mirroring
+  // Playwright's behaviour rather than naive bounding box math.
+  async isInViewport(node, ratio) {
+    const element = this._retarget(node, "no-follow-label");
+    if (!element || !element.isConnected) {
+      return "error:notconnected";
+    }
+    const visibleRatio = await this.viewportRatio(element);
+    return visibleRatio > 0 && visibleRatio > ratio - 1e-9;
+  }
+
+  // viewportRatio resolves with the ratio of the element that intersects the
+  // viewport, as reported by an IntersectionObserver.
+  viewportRatio(element) {
+    return new Promise((resolve) => {
+      const observer = new IntersectionObserver((entries) => {
+        resolve(entries[0].intersectionRatio);
+        observer.disconnect();
+      });
+      observer.observe(element);
+      // Firefox doesn't call the IntersectionObserver callback unless there
+      // are rafs.
+      requestAnimationFrame(() => {});
+    });
+  }
+
   parentElementOrShadowHost(element) {
     if (element.parentElement) {
       return element.parentElement;

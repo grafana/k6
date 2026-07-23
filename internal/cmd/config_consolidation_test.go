@@ -11,6 +11,7 @@ import (
 
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/executor"
 	"go.k6.io/k6/v2/lib/fsext"
@@ -105,11 +106,12 @@ func getFS(files []file) fsext.Fs {
 }
 
 type opts struct {
-	cli    []string
-	env    []string
-	runner *lib.Options
-	fs     fsext.Fs
-	cmds   []string
+	cli      []string
+	env      []string
+	runner   *lib.Options
+	fs       fsext.Fs
+	cmds     []string
+	features *features.Flags
 }
 
 // exp contains the different events or errors we expect our test case to trigger.
@@ -349,6 +351,66 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 				assert.Equal(t, exp, c.RunTags)
 			},
 		},
+		// merge-run-tags off: each layer that sets tags replaces the previous one wholesale.
+		{
+			opts{
+				fs:     defaultConfig(`{"tags": {"file_only": "f", "shared": "from-file"}}`),
+				runner: &lib.Options{RunTags: map[string]string{"script_only": "s", "shared": "from-script"}},
+				env:    []string{"K6_TAGS=env_only:e,shared:from-env"},
+				cli:    []string{"--tag", "cli_only=c", "--tag", "shared=from-cli"},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, map[string]string{
+					"cli_only": "c",
+					"shared":   "from-cli",
+				}, c.RunTags)
+			},
+		},
+		// merge-run-tags on: every layer contributes; higher-priority wins on key collision.
+		// Precedence: file < script < env < CLI.
+		{
+			opts{
+				fs:       defaultConfig(`{"tags": {"file_only": "f", "shared": "from-file"}}`),
+				runner:   &lib.Options{RunTags: map[string]string{"script_only": "s", "shared": "from-script"}},
+				env:      []string{"K6_TAGS=env_only:e,shared:from-env"},
+				cli:      []string{"--tag", "cli_only=c", "--tag", "shared=from-cli"},
+				features: &features.Flags{MergeRunTags: true},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, map[string]string{
+					"file_only":   "f",
+					"script_only": "s",
+					"env_only":    "e",
+					"cli_only":    "c",
+					"shared":      "from-cli",
+				}, c.RunTags)
+			},
+		},
+		// merge-run-tags on with only file + CLI tags (the original PR scenario).
+		{
+			opts{
+				fs:       defaultConfig(`{"tags": {"codeTagKey": "codeTagValue"}}`),
+				cli:      []string{"--tag", "clitagkey=clitagvalue"},
+				features: &features.Flags{MergeRunTags: true},
+			},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Equal(t, map[string]string{
+					"codeTagKey": "codeTagValue",
+					"clitagkey":  "clitagvalue",
+				}, c.RunTags)
+			},
+		},
+		// merge-run-tags on with no tags anywhere: result stays nil.
+		{
+			opts{features: &features.Flags{MergeRunTags: true}},
+			exp{},
+			func(t *testing.T, c Config) {
+				assert.Nil(t, c.RunTags)
+			},
+		},
 
 		// Test summary trend stats
 		{opts{}, exp{}, func(t *testing.T, c Config) {
@@ -544,7 +606,7 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	if testCase.options.runner != nil {
 		opts = *testCase.options.runner
 	}
-	consolidatedConfig, err := getConsolidatedConfig(ts.GlobalState, cliConf, opts)
+	consolidatedConfig, err := getConsolidatedConfig(ts.GlobalState, cliConf, opts, testCase.options.features)
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return

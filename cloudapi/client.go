@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 const (
@@ -110,7 +111,14 @@ func (c *Client) Do(req *http.Request, v any) error {
 		retry, err := c.do(req, v, i)
 
 		if retry {
-			time.Sleep(c.retryInterval)
+			// Wait before retrying, but give up as soon as the request's
+			// context is done so a canceled or timed-out call returns at once
+			// instead of sleeping through the remaining attempts.
+			select {
+			case <-req.Context().Done():
+				return req.Context().Err()
+			case <-time.After(c.retryInterval):
+			}
 			if req.GetBody != nil {
 				req.Body, _ = req.GetBody()
 			}
@@ -197,11 +205,8 @@ func CheckResponse(r *http.Response) error {
 		Error ResponseError `json:"error"`
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
-		if r.StatusCode == http.StatusUnauthorized {
-			return errNotAuthenticated
-		}
-		if r.StatusCode == http.StatusForbidden {
-			return errNotAuthorized
+		if classified := httperr.ClassifyStatus(r.StatusCode); classified != nil {
+			return classified
 		}
 		return fmt.Errorf(
 			"unexpected HTTP error from %s: %d %s",

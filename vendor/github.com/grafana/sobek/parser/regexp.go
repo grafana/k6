@@ -175,8 +175,14 @@ func (self *_RegExp_parser) scanGroup() {
 				self.error(false, "re2: Invalid (%s) <lookahead>", self.str[self.chrOffset:self.chrOffset+2])
 				return
 			case ch == '<':
-				self.error(false, "re2: Invalid (%s) <lookbehind>", self.str[self.chrOffset:self.chrOffset+2])
-				return
+				if len(str) > 2 && (str[2] == '=' || str[2] == '!') {
+					self.error(false, "re2: Invalid (%s) <lookbehind>", self.str[self.chrOffset:self.chrOffset+2])
+					return
+				}
+				self.pass()         // ?
+				self.writeByte('P') // older Go versions compatibility
+				self.pass()         // <
+				self.scanGroupName()
 			case ch != ':':
 				self.error(true, "Invalid group")
 				return
@@ -207,6 +213,24 @@ func (self *_RegExp_parser) scanGroup() {
 	}
 	if self.chr != ')' {
 		self.error(true, "Unterminated group")
+		return
+	}
+	self.pass()
+}
+
+func (self *_RegExp_parser) scanGroupName() {
+	supported := true
+	if !(self.chr >= 'a' && self.chr <= 'z' || self.chr >= 'A' && self.chr <= 'Z' && self.chr == '_') {
+		supported = false
+	}
+	for self.chr != -1 && self.chr != '>' {
+		if !(self.chr >= 'a' && self.chr <= 'z' || self.chr >= 'A' && self.chr <= 'Z' && self.chr == '_' || self.chr >= '0' && self.chr <= '9') {
+			supported = false
+		}
+		self.pass()
+	}
+	if !supported {
+		self.error(false, "Unsupported group name")
 		return
 	}
 	self.pass()
@@ -366,6 +390,10 @@ func (self *_RegExp_parser) scanEscape(inClass bool) {
 			self.writeString("[^" + WhitespaceChars + "]")
 		}
 		self.read()
+		return
+	case 'k':
+		// The rules are too complicated to implement here, so we pass it on to regexp2
+		self.error(false, "named group back-reference")
 		return
 	default:
 		// $ is an identifier character, so we have to have

@@ -1,7 +1,14 @@
+// Copyright 2024 Joshua J Baker. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
+//
+// https://github.com/tidwall/gjson
+
 // Package gjson provides searching for json strings.
 package gjson
 
 import (
+	"iter"
 	"strconv"
 	"strings"
 	"time"
@@ -3600,4 +3607,44 @@ func modDig(json, arg string) string {
 	}
 	out = append(out, ']')
 	return string(out)
+}
+
+// All iterates over a json result.
+// This works identically to ForEach, but allows modern Go loops:
+//
+//	for key, value := range res.All() {
+//		fmt.Printf("%s %s\n", key, value)
+//	}
+func (t Result) All() iter.Seq2[Result, Result] {
+	return func(yield func(Result, Result) bool) {
+		t.ForEach(yield)
+	}
+}
+
+// Keys iterates over a json result.
+// This works identically to ForEach, but allows modern Go loops:
+//
+//	for key := range res.Keys() {
+//		fmt.Printf("%s\n", key)
+//	}
+func (t Result) Keys() iter.Seq[Result] {
+	return func(yield func(Result) bool) {
+		t.ForEach(func(key, _ Result) bool {
+			return yield(key)
+		})
+	}
+}
+
+// Values iterates over a json result.
+// This works identically to ForEach, but allows modern Go loops:
+//
+//	for value := range res.Values() {
+//		fmt.Printf("%s\n", value)
+//	}
+func (t Result) Values() iter.Seq[Result] {
+	return func(yield func(Result) bool) {
+		t.ForEach(func(_, value Result) bool {
+			return yield(value)
+		})
+	}
 }

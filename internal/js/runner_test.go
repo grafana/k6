@@ -1441,13 +1441,13 @@ func TestVUIntegrationCookiesReset(t *testing.T) {
 				var url = "HTTPBIN_URL";
 				var preRes = http.get(url + "/cookies");
 				if (preRes.status != 200) { throw new Error("wrong status (pre): " + preRes.status); }
-				if (preRes.json().k1 || preRes.json().k2) {
+				if (preRes.json().cookies.k1 || preRes.json().cookies.k2) {
 					throw new Error("cookies persisted: " + preRes.body);
 				}
 
 				var res = http.get(url + "/cookies/set?k2=v2&k1=v1");
 				if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-				if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+				if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
 					throw new Error("wrong cookies: " + res.body);
 				}
 			}
@@ -1486,7 +1486,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 				if (__ITER == 0) {
 					var res = http.get(url + "/cookies/set?k2=v2&k1=v1");
 					if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+					if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
 						throw new Error("wrong cookies: " + res.body);
 					}
 				}
@@ -1494,7 +1494,7 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 				if (__ITER == 1) {
 					var res = http.get(url + "/cookies");
 					if (res.status != 200) { throw new Error("wrong status (pre): " + res.status); }
-					if (res.json().k1 != "v1" || res.json().k2 != "v2") {
+					if (res.json().cookies.k1 != "v1" || res.json().cookies.k2 != "v2") {
 						throw new Error("wrong cookies: " + res.body);
 					}
 				}
