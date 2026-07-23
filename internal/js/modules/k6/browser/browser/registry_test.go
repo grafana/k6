@@ -9,7 +9,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 
@@ -282,6 +285,36 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
 
+	t.Run("remote_scenario_skips_managed_browser", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			vu              = k6test.NewVU(t)
+			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+		)
+
+		vu.ActivateVU()
+
+		// Mark the scenario as remote: k6 must not build a managed browser, since
+		// the script connects to an existing one at runtime via connectOverCDP.
+		vu.StateField.Options.Scenarios["default"].GetScenarioOptions().Browser["remote"] = true
+
+		vu.StartIteration(t, k6test.WithIteration(0))
+
+		// No managed browser was built (nothing was launched/connected)...
+		assert.Equal(t, 0, browserRegistry.browserCount())
+		// ...but it is still a browser iteration, so the iteration trace was
+		// started; a connectOverCDP browser parents under it.
+		require.NotNil(t, browserRegistry.tr)
+		assert.Equal(t, 1, browserRegistry.tr.iterationTracesCount())
+
+		vu.EndIteration(t, k6test.WithIteration(0))
+
+		// The iteration trace was ended and nothing is left behind.
+		assert.Equal(t, 0, browserRegistry.browserCount())
+		assert.Equal(t, 0, browserRegistry.tr.iterationTracesCount())
+	})
+
 	// This test ensures that the chromium browser's lifecycle is not controlled
 	// by the vu context.
 	t.Run("dont_close_browser_on_vu_context_close", func(t *testing.T) {
@@ -317,6 +350,121 @@ func TestBrowserRegistry(t *testing.T) {
 		// Verify there are no browsers left
 		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
+
+	// IterEnd must be a no-op for a non-browser iteration that never called
+	// chromium.connectOverCDP: nothing was built (IterStart is skipped), nothing
+	// is tracked in userManaged, and the traces registry was never initialized.
+	// This locks in the `if r.tr != nil` guard and the unconditional
+	// closeUserManaged sweep on IterEnd — without them, IterEnd would panic here.
+	t.Run("iterend_noop_on_bare_non_browser_iter", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			vu              = k6test.NewVU(t)
+			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+		)
+
+		vu.ActivateVU()
+
+		// Unset the browser type option so this represents a non-browser VU.
+		delete(vu.StateField.Options.Scenarios["default"].GetScenarioOptions().Browser, "type")
+
+		vu.StartIteration(t, k6test.WithIteration(0))
+
+		// Nothing built and no traces registry: IterStart is skipped entirely for
+		// a non-browser iter, and connectOverCDP (which would init the registry)
+		// was never called.
+		require.Equal(t, 0, browserRegistry.browserCount())
+		require.Nil(t, browserRegistry.tr, "traces registry must not be initialized for a bare non-browser iter")
+
+		// The regression under test: IterEnd reaches closeUserManaged (nothing
+		// tracked) and the trace guard (r.tr is nil). Neither may panic.
+		require.NotPanics(t, func() {
+			vu.EndIteration(t, k6test.WithIteration(0))
+		})
+
+		require.Equal(t, 0, browserRegistry.browserCount())
+		require.Nil(t, browserRegistry.tr, "traces registry must remain uninitialized after IterEnd")
+	})
+}
+
+func TestStartConnectTraceAttributes(t *testing.T) {
+	t.Parallel()
+
+	rec := &traceRecorder{}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
+
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+	vu.ActivateVU()
+	vu.StartIteration(t)
+	vu.State().VUID = 42 // non-zero so the test.vu assertion is meaningful
+
+	r := &browserRegistry{
+		vu:          vu,
+		m:           make(map[int64]*common.Browser),
+		userManaged: make(map[int64][]*common.Browser),
+	}
+	r.startConnectTrace(vu.Context(), vu.State().Iteration)
+
+	span, ok := rec.find("iteration")
+	require.True(t, ok, "expected an 'iteration' root span")
+	require.Equal(t, int64(42), spanAttrInt64(t, span, "test.vu"))
+	require.Equal(t, "default", spanAttrString(t, span, "test.scenario"))
+}
+
+// traceRecorder is a minimal sdktrace.SpanProcessor that captures started spans
+// so tests can inspect their names and attributes.
+type traceRecorder struct {
+	mu    sync.Mutex
+	spans []recordedSpan
+}
+
+type recordedSpan struct {
+	name  string
+	attrs []attribute.KeyValue
+}
+
+func (r *traceRecorder) OnStart(_ context.Context, s sdktrace.ReadWriteSpan) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.spans = append(r.spans, recordedSpan{name: s.Name(), attrs: s.Attributes()})
+}
+
+func (r *traceRecorder) OnEnd(sdktrace.ReadOnlySpan)      {}
+func (r *traceRecorder) Shutdown(context.Context) error   { return nil }
+func (r *traceRecorder) ForceFlush(context.Context) error { return nil }
+
+func (r *traceRecorder) find(name string) (recordedSpan, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, s := range r.spans {
+		if s.name == name {
+			return s, true
+		}
+	}
+	return recordedSpan{}, false
+}
+
+func spanAttrInt64(t *testing.T, s recordedSpan, key string) int64 {
+	t.Helper()
+	for _, kv := range s.attrs {
+		if string(kv.Key) == key {
+			return kv.Value.AsInt64()
+		}
+	}
+	t.Fatalf("attribute %q not found on span %q", key, s.name)
+	return 0
+}
+
+func spanAttrString(t *testing.T, s recordedSpan, key string) string {
+	t.Helper()
+	for _, kv := range s.attrs {
+		if string(kv.Key) == key {
+			return kv.Value.AsString()
+		}
+	}
+	t.Fatalf("attribute %q not found on span %q", key, s.name)
+	return ""
 }
 
 func TestParseTracesMetadata(t *testing.T) {
