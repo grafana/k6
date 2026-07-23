@@ -181,7 +181,11 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 	switch sinkImpl := sink.(type) {
 	case *CounterSink:
 		ts.sinked["count"] = sinkImpl.Value
-		ts.sinked["rate"] = sinkImpl.Value / (float64(duration) / float64(time.Second))
+		// Guard against a zero duration, matching CounterSink.Rate, so the rate
+		// does not become +Inf and make a "rate" threshold spuriously fail.
+		if duration > 0 {
+			ts.sinked["rate"] = sinkImpl.Value / (float64(duration) / float64(time.Second))
+		}
 	case *GaugeSink:
 		ts.sinked["value"] = sinkImpl.Value
 	case *TrendSink:

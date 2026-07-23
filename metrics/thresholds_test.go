@@ -687,6 +687,18 @@ func TestThresholdsRun(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			// A zero duration must not turn the counter's rate into +Inf. CounterSink.Rate
+			// guards against this, so a "rate" threshold has to behave the same way here.
+			name: "Running a counter rate threshold with zero duration does not divide by zero",
+			args: args{
+				sink:                 &CounterSink{Value: 1234.5},
+				thresholdExpressions: []string{"rate<100"},
+				duration:             0,
+			},
+			want:    true,
+			wantErr: false,
+		},
+		{
 			name: "Running threshold on trend sink with no values and passing med statement succeeds",
 			args: args{
 				sink:                 getTrendSink(),
