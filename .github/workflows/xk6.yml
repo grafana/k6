@@ -71,9 +71,11 @@ jobs:
           echo "COMMIT_ID=$COMMIT_ID"
           cd .github/workflows/xk6-tests
           go install go.k6.io/xk6/cmd/xk6@master
+          GOPRIVATE="go.k6.io/k6"
           if [ "${{ github.event_name }}" == "pull_request" -a \
                "${PR_REPO}" != "${{ github.repository }}" ]; then
             export XK6_K6_REPO="github.com/${PR_REPO}"
+            GOPRIVATE="${GOPRIVATE},${XK6_K6_REPO}"
           fi
           # The following is a workaround for Windows, cause when using 'shell: bash', the PATH is expressed
           # with ':' as separator, but Go code, running on a Windows OS, expects ';' as separator.
@@ -82,7 +84,7 @@ jobs:
             XPATH="$HOME/sdk/gotip/bin;$XPATH"
           fi
           PATH="$XPATH" \
-          GOPRIVATE="go.k6.io/k6" xk6 build "$COMMIT_ID" \
+          GOPRIVATE="${GOPRIVATE}" xk6 build "$COMMIT_ID" \
             --output ./k6ext \
             --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
             --with github.com/grafana/xk6-output-test="$(pwd)/xk6-output-test"
