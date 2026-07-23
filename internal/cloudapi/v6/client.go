@@ -11,14 +11,8 @@ import (
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/v2/internal/cloudapi/clientcfg"
 	"go.k6.io/k6/v2/internal/cloudapi/httperr"
-)
-
-const (
-	// RetryInterval is the default cloud request retry interval
-	RetryInterval = 500 * time.Millisecond
-	// MaxRetries specifies max retry attempts
-	MaxRetries = 3
 )
 
 // Client handles communication with the k6 Cloud API.
@@ -37,20 +31,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		return nil, fmt.Errorf("token is required to create cloud API client")
 	}
 
-	cfg := k6cloud.NewConfiguration()
-	cfg.UserAgent = "k6cloud/" + version
-	cfg.Servers = k6cloud.ServerConfigurations{
-		{
-			URL:         host,
-			Description: "Global k6 Cloud API.",
-		},
-	}
-	cfg.HTTPClient = &http.Client{
-		Timeout:   timeout,
-		Transport: http.DefaultTransport,
-	}
-	cfg.MaxRetries = MaxRetries
-	cfg.RetryInterval = RetryInterval
+	cfg := clientcfg.New(host, version, "Global k6 Cloud API.", timeout)
 
 	c := &Client{
 		apiClient: k6cloud.NewAPIClient(cfg),
