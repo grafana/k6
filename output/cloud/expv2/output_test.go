@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
+	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib/types"
 	"go.k6.io/k6/v2/metrics"
@@ -219,6 +222,43 @@ func TestOutputHandleFlushError(t *testing.T) {
 			assert.Equal(t, tc.expAborted, stopFuncCalled)
 		})
 	}
+}
+
+func TestOutputHandleFlushErrorFromProvisioningHTTPClient(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"code":4,"message":"metrics are no longer accepted"}}`))
+	}))
+	defer srv.Close()
+
+	client := provisioning.NewHTTPClient(srv.Client(), "scoped-token", "v1.2.3", testutils.NewLogger(t))
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL, nil)
+	require.NoError(t, err)
+
+	err = client.Do(req, nil)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, httperr.ErrNotAuthorized)
+
+	stopFuncCalled := false
+	o := Output{
+		logger: testutils.NewLogger(t),
+		testStopFunc: func(error) {
+			stopFuncCalled = true
+		},
+		abort: make(chan struct{}),
+	}
+	o.config.StopOnError = null.BoolFrom(true)
+
+	o.handleFlushError(err)
+
+	select {
+	case <-o.abort:
+	default:
+		t.Error("metrics output abort channel was not closed")
+	}
+	assert.True(t, stopFuncCalled)
 }
 
 // assert that the output does not stuck or panic
