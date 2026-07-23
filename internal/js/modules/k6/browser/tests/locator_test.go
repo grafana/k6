@@ -583,6 +583,55 @@ func TestLocator(t *testing.T) {
 	}
 }
 
+func TestLocatorIsInViewport(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("locators.html"),
+		opts,
+	)
+	require.NoError(t, err)
+
+	l := p.Locator("#inputText", nil)
+
+	// The element is rendered at the top of the page, so it starts within the
+	// viewport.
+	inViewport, err := l.IsInViewport(common.NewFrameIsInViewportOptions(l.Timeout()))
+	require.NoError(t, err)
+	require.True(t, inViewport)
+
+	// Push the element well below the fold so that it no longer intersects the
+	// viewport.
+	_, err = p.Evaluate(`() => {
+		document.body.style.height = '5000px';
+		const el = document.getElementById('inputText');
+		el.style.position = 'absolute';
+		el.style.top = '4000px';
+	}`)
+	require.NoError(t, err)
+
+	inViewport, err = l.IsInViewport(common.NewFrameIsInViewportOptions(l.Timeout()))
+	require.NoError(t, err)
+	require.False(t, inViewport)
+
+	// Scrolling the element fully into view brings it back into the viewport,
+	// including for a high ratio threshold.
+	_, err = p.Evaluate(`() => document.getElementById('inputText').scrollIntoView()`)
+	require.NoError(t, err)
+
+	ropts := common.NewFrameIsInViewportOptions(l.Timeout())
+	ropts.Ratio = 0.99
+	inViewport, err = l.IsInViewport(ropts)
+	require.NoError(t, err)
+	require.True(t, inViewport)
+}
+
 func TestLocatorElementState(t *testing.T) {
 	t.Parallel()
 

@@ -773,13 +773,13 @@ func (r *Runtime) regexpproto_stdMatcher(call FunctionCall) Value {
 	}
 	if rx.pattern.global {
 		rx.setOwnStr("lastIndex", intToValue(0), true)
-		res := rx.pattern.findAllSubmatchIndex(s, 0, -1, rx.pattern.sticky)
-		if len(res) == 0 {
+		results := rx.pattern.findAllSubmatchIndex(s, 0, -1, rx.pattern.sticky)
+		if len(results) == 0 {
 			return _null
 		}
-		a := make([]Value, 0, len(res))
-		for _, result := range res {
-			a = append(a, s.Substring(result[0], result[1]))
+		a := make([]Value, 0, len(results))
+		for _, result := range results {
+			a = append(a, s.Substring(result.indexes[0], result.indexes[1]))
 		}
 		return r.newArrayValues(a)
 	} else {
@@ -905,7 +905,7 @@ func (r *Runtime) regexpproto_stdSearch(call FunctionCall) Value {
 	if !match {
 		return intToValue(-1)
 	}
-	return intToValue(int64(result[0]))
+	return intToValue(int64(result.indexes[0]))
 }
 
 func (r *Runtime) regexpproto_stdSplitterGeneric(splitter *Object, s String, limit Value, unicodeMatching bool) Value {
@@ -1039,43 +1039,43 @@ func (r *Runtime) regexpproto_stdSplitter(call FunctionCall) Value {
 	lastIndex := 0
 	found := 0
 
-	result := pattern.findAllSubmatchIndex(s, 0, -1, false)
+	results := pattern.findAllSubmatchIndex(s, 0, -1, false)
 	if targetLength == 0 {
-		if result == nil {
+		if len(results) == 0 {
 			valueArray = append(valueArray, s)
 		}
 		goto RETURN
 	}
 
-	for _, match := range result {
-		if match[0] == match[1] {
+	for _, result := range results {
+		if result.indexes[0] == result.indexes[1] {
 			// FIXME Ugh, this is a hack
-			if match[0] == 0 || match[0] == targetLength {
+			if result.indexes[0] == 0 || result.indexes[0] == targetLength {
 				continue
 			}
 		}
 
-		if lastIndex != match[0] {
-			valueArray = append(valueArray, s.Substring(lastIndex, match[0]))
+		if lastIndex != result.indexes[0] {
+			valueArray = append(valueArray, s.Substring(lastIndex, result.indexes[0]))
 			found++
-		} else if lastIndex == match[0] {
+		} else if lastIndex == result.indexes[0] {
 			if lastIndex != -1 {
 				valueArray = append(valueArray, stringEmpty)
 				found++
 			}
 		}
 
-		lastIndex = match[1]
+		lastIndex = result.indexes[1]
 		if found == limit {
 			goto RETURN
 		}
 
-		captureCount := len(match) / 2
+		captureCount := len(result.indexes) / 2
 		for index := 1; index < captureCount; index++ {
 			offset := index * 2
 			var value Value
-			if match[offset] != -1 {
-				value = s.Substring(match[offset], match[offset+1])
+			if result.indexes[offset] != -1 {
+				value = s.Substring(result.indexes[offset], result.indexes[offset+1])
 			} else {
 				value = _undefined
 			}
@@ -1139,6 +1139,9 @@ func (r *Runtime) regexpproto_stdReplacerGeneric(rxObj *Object, s, replaceStr St
 		var replacement String
 		if rcall != nil {
 			captures = append(captures, intToValue(int64(position)), s)
+			if namedCaptures := nilSafe(obj.self.getStr("groups", nil)); namedCaptures != _undefined {
+				captures = append(captures, namedCaptures)
+			}
 			replacement = rcall(FunctionCall{
 				This:      _undefined,
 				Arguments: captures,
@@ -1149,6 +1152,10 @@ func (r *Runtime) regexpproto_stdReplacerGeneric(rxObj *Object, s, replaceStr St
 				nextSourcePosition = position + matchLength
 			}
 		} else {
+			var namedCaptures *Object
+			if c := nilSafe(obj.self.getStr("groups", nil)); c != _undefined {
+				namedCaptures = c.ToObject(r)
+			}
 			if position >= nextSourcePosition {
 				resultBuf.WriteString(s.Substring(nextSourcePosition, position))
 				writeSubstitution(s, position, len(captures), func(idx int) String {
@@ -1157,6 +1164,15 @@ func (r *Runtime) regexpproto_stdReplacerGeneric(rxObj *Object, s, replaceStr St
 						return capture.toString()
 					}
 					return stringEmpty
+				}, func(ref String) String {
+					if namedCaptures != nil {
+						capture := nilSafe(namedCaptures.self.getStr(ref.string(), nil))
+						if capture != _undefined {
+							return capture.toString()
+						}
+						return stringEmpty
+					}
+					return nil
 				}, replaceStr, &resultBuf)
 				nextSourcePosition = position + matchLength
 			}
@@ -1168,7 +1184,7 @@ func (r *Runtime) regexpproto_stdReplacerGeneric(rxObj *Object, s, replaceStr St
 	return resultBuf.String()
 }
 
-func writeSubstitution(s String, position int, numCaptures int, getCapture func(int) String, replaceStr String, buf *StringBuilder) {
+func writeSubstitution(s String, position int, numCaptures int, getCapture func(int) String, getNamedCapture func(String) String, replaceStr String, buf *StringBuilder) {
 	l := s.Length()
 	rl := replaceStr.Length()
 	matched := getCapture(0)
@@ -1189,24 +1205,45 @@ func writeSubstitution(s String, position int, numCaptures int, getCapture func(
 				}
 			case '&':
 				buf.WriteString(matched)
+			case '<':
+				var ref String
+				j := i + 2
+				for ; j < rl; j++ {
+					ch := replaceStr.CharAt(j)
+					if ch == '>' {
+						ref = replaceStr.Substring(i+2, j)
+						break
+					}
+				}
+				if ref != nil {
+					capture := getNamedCapture(ref)
+					if capture != nil {
+						buf.WriteString(capture)
+						i = j
+						continue
+					}
+				}
+				buf.WriteRune('$')
+				buf.WriteRune('<')
 			default:
-				matchNumber := 0
+				index := 0
 				j := i + 1
-				for j < rl {
+				lim := min(j+2, rl)
+
+				for ; j < lim; j++ {
 					ch := replaceStr.CharAt(j)
 					if ch >= '0' && ch <= '9' {
-						m := matchNumber*10 + int(ch-'0')
+						m := index*10 + int(ch-'0')
 						if m >= numCaptures {
 							break
 						}
-						matchNumber = m
-						j++
+						index = m
 					} else {
 						break
 					}
 				}
-				if matchNumber > 0 {
-					buf.WriteString(getCapture(matchNumber))
+				if index > 0 {
+					buf.WriteString(getCapture(index))
 					i = j - 1
 					continue
 				} else {
@@ -1242,12 +1279,11 @@ func (r *Runtime) regexpproto_stdReplacer(call FunctionCall) Value {
 	if rx.pattern.global || rx.pattern.sticky {
 		var newLastIndex int64
 		if !rx.pattern.global && len(found) > 0 {
-			newLastIndex = int64(found[len(found)-1][1])
+			newLastIndex = int64(found[len(found)-1].indexes[1])
 		}
 		rx.setOwnStr("lastIndex", intToValue(newLastIndex), true)
 	}
-
-	return stringReplace(s, found, replaceStr, rcall)
+	return r.stringReplace(s, found, replaceStr, rcall)
 }
 
 func (r *Runtime) regExpStringIteratorProto_next(call FunctionCall) Value {

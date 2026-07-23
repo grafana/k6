@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -41,7 +41,7 @@ var (
 	queryDescape    = strings.NewReplacer("%5B", "[", "%5D", "]")
 )
 
-// APIClient manages communication with the Grafana Cloud k6 API v1.9.1
+// APIClient manages communication with the Grafana Cloud k6 API v1.12.0
 // In most cases there should be only one, shared, APIClient.
 type APIClient struct {
 	cfg    *Configuration
@@ -58,6 +58,8 @@ type APIClient struct {
 	LoadZonesAPI *LoadZonesAPIService
 
 	ProjectsAPI *ProjectsAPIService
+
+	ProvisioningAPI *ProvisioningAPIService
 
 	SchedulesAPI *SchedulesAPIService
 
@@ -85,6 +87,7 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.LoadTestsAPI = (*LoadTestsAPIService)(&c.common)
 	c.LoadZonesAPI = (*LoadZonesAPIService)(&c.common)
 	c.ProjectsAPI = (*ProjectsAPIService)(&c.common)
+	c.ProvisioningAPI = (*ProvisioningAPIService)(&c.common)
 	c.SchedulesAPI = (*SchedulesAPIService)(&c.common)
 	c.TestRunsAPI = (*TestRunsAPIService)(&c.common)
 
@@ -275,6 +278,17 @@ func (c *APIClient) callAPI(request *http.Request) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 	for i := 0; i <= c.cfg.MaxRetries; i++ {
+		// http.Client.Do consumes request.Body as it sends the request, so on
+		// any retry we must reset it to a fresh reader. GetBody is non-nil only
+		// when the body is rewindable; leave streaming bodies untouched.
+		if i > 0 && request.GetBody != nil {
+			body, bodyErr := request.GetBody()
+			if bodyErr != nil {
+				return resp, bodyErr
+			}
+			request.Body = body
+		}
+
 		resp, err = c.cfg.HTTPClient.Do(request)
 		if shouldRetry(resp, err, i, c.cfg.MaxRetries) {
 			if c.cfg.Debug {

@@ -14,7 +14,7 @@ type Client interface {
 
 // RequestMetadatasFlusher is an interface for flushing data to the cloud.
 type RequestMetadatasFlusher interface {
-	Flush() error
+	Flush(ctx context.Context) error
 }
 
 // Flusher is an implementation of RequestMetadatasFlusher.
@@ -34,11 +34,11 @@ func NewFlusher(client Client, collector RequestMetadatasCollector) *Flusher {
 }
 
 // Flush retrieves data from the collector and sends it to the insights backend.
-func (f *Flusher) Flush() error {
+func (f *Flusher) Flush(ctx context.Context) error {
 	requestMetadatas := f.collector.PopAll()
 	if len(requestMetadatas) < 1 {
 		return nil
 	}
 
-	return f.client.IngestRequestMetadatasBatch(context.Background(), requestMetadatas)
+	return f.client.IngestRequestMetadatasBatch(ctx, requestMetadatas)
 }

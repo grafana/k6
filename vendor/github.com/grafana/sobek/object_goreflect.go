@@ -154,7 +154,7 @@ func (o *objectGoReflect) init() {
 	// Always use pointer type for non-interface values to be able to access both methods defined on
 	// the literal type and on the pointer.
 	if o.fieldsValue.Kind() != reflect.Interface {
-		methodsType = reflect.PtrTo(o.fieldsValue.Type())
+		methodsType = reflect.PointerTo(o.fieldsValue.Type())
 	} else {
 		methodsType = o.fieldsValue.Type()
 	}

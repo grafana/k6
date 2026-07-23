@@ -5,18 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"time"
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	// RetryInterval is the default cloud request retry interval
-	RetryInterval = 500 * time.Millisecond
-	// MaxRetries specifies max retry attempts
-	MaxRetries = 3
+	"go.k6.io/k6/v2/internal/cloudapi/clientcfg"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 // Client handles communication with the k6 Cloud API.
@@ -35,23 +31,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		return nil, fmt.Errorf("token is required to create cloud API client")
 	}
 
-	cfg := &k6cloud.Configuration{
-		DefaultHeader: make(map[string]string),
-		UserAgent:     "k6cloud/" + version,
-		Servers: k6cloud.ServerConfigurations{
-			{
-				URL:         host,
-				Description: "Global k6 Cloud API.",
-			},
-		},
-		OperationServers: map[string]k6cloud.ServerConfigurations{},
-		HTTPClient: &http.Client{
-			Timeout:   timeout,
-			Transport: &bodyResetTransport{base: http.DefaultTransport},
-		},
-		MaxRetries:    MaxRetries,
-		RetryInterval: RetryInterval,
-	}
+	cfg := clientcfg.New(host, version, "Global k6 Cloud API.", timeout)
 
 	c := &Client{
 		apiClient: k6cloud.NewAPIClient(cfg),
@@ -62,32 +42,20 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 	return c, nil
 }
 
-// SetStackID sets the stack ID for the client.
-func (c *Client) SetStackID(stackID int32) {
-	c.stackID = stackID
+// SetStackID sets the stack ID for the client. It returns an error if
+// stackID does not fit in the int32 range the underlying SDK requires for
+// the X-Stack-Id header.
+func (c *Client) SetStackID(stackID int64) error {
+	if stackID < math.MinInt32 || stackID > math.MaxInt32 {
+		return fmt.Errorf("stack ID %d overflows int32", stackID)
+	}
+	c.stackID = int32(stackID)
+	return nil
 }
 
 // BaseURL returns configured host.
 func (c *Client) BaseURL() string {
 	return c.baseURL
-}
-
-// bodyResetTransport resets req.Body from GetBody before each round trip.
-// The vendored SDK retries 5xx/429 by re-calling Do on the same request
-// without resetting its Body. After Connection: close the drained body
-// causes "ContentLength=N with Body length 0".
-type bodyResetTransport struct{ base http.RoundTripper }
-
-func (rt *bodyResetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.GetBody == nil {
-		return rt.base.RoundTrip(req)
-	}
-	body, err := req.GetBody()
-	if err != nil {
-		return nil, err
-	}
-	req.Body = body
-	return rt.base.RoundTrip(req)
 }
 
 // CheckResponse checks the parsed response.
@@ -116,11 +84,8 @@ func CheckResponse(r *http.Response, err error) error {
 
 	var payload ResponseError
 	if err := json.Unmarshal(data, &payload); err != nil {
-		if r.StatusCode == http.StatusUnauthorized {
-			return errNotAuthenticated
-		}
-		if r.StatusCode == http.StatusForbidden {
-			return errNotAuthorized
+		if classified := httperr.ClassifyStatus(r.StatusCode); classified != nil {
+			return classified
 		}
 		return fmt.Errorf(
 			"unexpected HTTP error from %s: %d %s",
