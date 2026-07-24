@@ -1,0 +1,227 @@
+name: Test k6 Installation
+on:
+  # Run after a new release is published
+  release:
+    types: [published]
+  # Run weekly to verify packages remain installable
+  schedule:
+    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
+  # Allow manual triggering for debugging
+  workflow_dispatch:
+permissions: {}
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  install-linux-deb:
+    name: "APT: ${{ matrix.image }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - debian:bookworm
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y gnupg2 curl ca-certificates
+      - name: Add k6 APT repository
+        run: |
+          gpg -k
+          gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 \
+            --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | tee /etc/apt/sources.list.d/k6.list
+          apt-get update
+      - name: Install k6
+        run: apt-get install -y k6
+      - name: Verify k6
+        run: k6 version
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
+            exit 1
+          fi
+
+  install-linux-rpm:
+    name: "RPM: ${{ matrix.image }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - fedora:41
+          - fedora:42
+          - rockylinux:9
+          - amazonlinux:2023
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - name: Add k6 RPM repository and install
+        run: |
+          dnf install -y https://dl.k6.io/rpm/repo.rpm
+          dnf install -y k6
+      - name: Verify k6
+        run: k6 version
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
+            exit 1
+          fi
+
+  install-macos:
+    name: "Homebrew: ${{ matrix.os }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install k6 via Homebrew
+        run: brew install k6
+      - name: Verify k6
+        run: k6 version
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          installed="$(k6 version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
+            exit 1
+          fi
+
+  install-windows-choco:
+    name: "Chocolatey: windows-latest"
+    runs-on: windows-latest
+    steps:
+      - name: Install k6 via Chocolatey
+        shell: pwsh
+        run: choco install k6 -y
+      - name: Verify k6
+        shell: pwsh
+        run: k6 version
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          $output = k6 version
+          if ($output -match 'v\d+\.\d+\.\d+') {
+            $installed = $Matches[0]
+          } else {
+            Write-Error "Could not parse version from: $output"
+            exit 1
+          }
+          if ($installed -ne $env:EXPECTED_VERSION) {
+            Write-Error "Version mismatch: installed $installed, expected $env:EXPECTED_VERSION"
+            exit 1
+          }
+
+  install-windows-msi:
+    name: "MSI: windows-latest"
+    runs-on: windows-latest
+    steps:
+      - name: Download and install k6 MSI
+        shell: pwsh
+        run: |
+          $msiUrl = "https://dl.k6.io/msi/k6-latest-amd64.msi"
+          $msiPath = "$env:RUNNER_TEMP\k6-latest-amd64.msi"
+          Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath
+          Start-Process msiexec.exe -ArgumentList "/i", $msiPath, "/quiet", "/norestart" -Wait -NoNewWindow
+      - name: Add k6 to PATH
+        shell: pwsh
+        run: echo "C:\Program Files\k6" >> $env:GITHUB_PATH
+      - name: Verify k6
+        shell: pwsh
+        run: k6 version
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          $output = k6 version
+          if ($output -match 'v\d+\.\d+\.\d+') {
+            $installed = $Matches[0]
+          } else {
+            Write-Error "Could not parse version from: $output"
+            exit 1
+          }
+          if ($installed -ne $env:EXPECTED_VERSION) {
+            Write-Error "Version mismatch: installed $installed, expected $env:EXPECTED_VERSION"
+            exit 1
+          }
+
+  install-windows-winget:
+    name: "winget: windows-latest"
+    # winget source updates on GHA runners can be flaky; do not
+    # let transient CDN issues block the entire workflow.
+    continue-on-error: true
+    runs-on: windows-latest
+    steps:
+      - name: Install k6 via winget
+        shell: pwsh
+        run: winget install k6 --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
+      - name: Verify k6
+        shell: pwsh
+        run: k6 version
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          $output = k6 version
+          if ($output -match 'v\d+\.\d+\.\d+') {
+            $installed = $Matches[0]
+          } else {
+            Write-Error "Could not parse version from: $output"
+            exit 1
+          }
+          if ($installed -ne $env:EXPECTED_VERSION) {
+            Write-Error "Version mismatch: installed $installed, expected $env:EXPECTED_VERSION"
+            exit 1
+          }
+
+  install-docker:
+    name: "Docker"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull k6 Docker image
+        run: docker pull grafana/k6:latest
+      - name: Verify k6 in Docker
+        run: docker run --rm grafana/k6:latest version
+      - name: Pull k6 browser image
+        run: docker pull grafana/k6:latest-with-browser
+      - name: Verify k6 browser image
+        run: docker run --rm grafana/k6:latest-with-browser version
+      - name: Verify expected version
+        if: github.event_name == 'release'
+        env:
+          EXPECTED_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          installed="$(docker run --rm grafana/k6:latest version | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          if [ "$installed" != "$EXPECTED_VERSION" ]; then
+            echo "::error::Version mismatch: installed $installed, expected $EXPECTED_VERSION"
+            exit 1
+          fi
