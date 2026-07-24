@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -521,7 +522,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 	loglines := ts.LoggerHook.Drain()
 	require.Len(t, loglines, 1)
 
-	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"features":null}`
+	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"handleSummaryTimeout":null,"features":null}`
 	assert.JSONEq(t, expected, loglines[0].Message)
 }
 
@@ -2535,6 +2536,69 @@ func TestSetupTimeout(t *testing.T) {
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
 	assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
+}
+
+func TestHandleSummaryTimeout(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		env    map[string]string
+		script string
+	}{
+		{
+			name: "script option",
+			script: `
+				import { sleep } from 'k6';
+
+				export const options = {
+					handleSummaryTimeout: '1s',
+				};
+
+				export function handleSummary(data) {
+					sleep(100000);
+				}
+
+				export default function() {}
+			`,
+		},
+		{
+			name: "environment variable",
+			env: map[string]string{
+				"K6_HANDLE_SUMMARY_TIMEOUT": "1s",
+			},
+			script: `
+				import { sleep } from 'k6';
+
+				export function handleSummary(data) {
+					sleep(100000);
+				}
+
+				export default function() {}
+			`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = []string{"k6", "run", "-"}
+			maps.Copy(ts.Env, tc.env)
+			ts.Stdin = bytes.NewBufferString(tc.script)
+
+			start := time.Now()
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			elapsed := time.Since(start)
+			assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of handleSummaryTimeout")
+			assert.Less(
+				t, elapsed, 5*time.Second,
+				"expected less time to have passed because of handleSummaryTimeout",
+			)
+
+			stderr := ts.Stderr.String()
+			t.Log(stderr)
+			assert.Contains(t, stderr, "handleSummary() execution timed out after 1 seconds")
+		})
+	}
 }
 
 func TestTypeScriptSupport(t *testing.T) {
