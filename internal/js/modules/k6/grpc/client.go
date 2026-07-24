@@ -17,9 +17,11 @@ import (
 	"go.k6.io/k6/v2/internal/lib/netext/grpcext"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/netext"
 
 	"github.com/bufbuild/protocompile"
 	"github.com/grafana/sobek"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -148,7 +150,10 @@ func decryptPrivateKey(key, password []byte) ([]byte, error) {
 	return key, nil
 }
 
-func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertificates [][]byte) (*tls.Config, error) {
+func buildTLSConfig(
+	parentConfig *tls.Config, certificate, key []byte, caCertificates [][]byte,
+	aiaEnabled bool, logger logrus.FieldLogger,
+) (*tls.Config, error) {
 	var cp *x509.CertPool
 	if len(caCertificates) > 0 {
 		cp, _ = x509.SystemCertPool()
@@ -177,10 +182,17 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 		}
 		tlsCfg.Certificates = []tls.Certificate{cert}
 	}
+	// Re-wrap so the verification closure reads this config's RootCAs, not the VU's.
+	if aiaEnabled {
+		tlsCfg = netext.WrapTLSConfigForAIAFetching(tlsCfg, logger, nil)
+	}
 	return tlsCfg, nil
 }
 
-func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]any) (*tls.Config, error) {
+func buildTLSConfigFromMap(
+	parentConfig *tls.Config, tlsConfigMap map[string]any,
+	aiaEnabled bool, logger logrus.FieldLogger,
+) (*tls.Config, error) {
 	var cert, key, pass []byte
 	var ca [][]byte
 	var err error
@@ -212,7 +224,7 @@ func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]any
 			ca = [][]byte{[]byte(caCertStr)}
 		}
 	}
-	return buildTLSConfig(parentConfig, cert, key, ca)
+	return buildTLSConfig(parentConfig, cert, key, ca, aiaEnabled, logger)
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
@@ -233,7 +245,8 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	if !p.IsPlaintext {
 		tlsCfg := state.TLSConfig.Clone()
 		if len(p.TLS) > 0 {
-			if tlsCfg, err = buildTLSConfigFromMap(tlsCfg, p.TLS); err != nil {
+			aiaEnabled := state.Options.TLSAIAFetch.Valid && state.Options.TLSAIAFetch.Bool
+			if tlsCfg, err = buildTLSConfigFromMap(tlsCfg, p.TLS, aiaEnabled, state.Logger); err != nil {
 				return false, err
 			}
 		}
