@@ -1,6 +1,7 @@
 package chromium
 
 import (
+	"context"
 	"io/fs"
 	"net"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 
 	k6lib "go.k6.io/k6/v2/lib"
 	k6types "go.k6.io/k6/v2/lib/types"
@@ -16,6 +18,56 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestBrowserTypeInitParsesEnvWithoutScenario locks in the connectOverCDP use
+// case: a plain script has no options.browser, so init must parse browser
+// options from the environment using only the fixed chromium type that
+// ConnectOverCDP passes, without requiring scenario options.
+func TestBrowserTypeInitParsesEnvWithoutScenario(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	bt := NewBrowserType(vu)
+	vu.ActivateVU()
+
+	_, opts, _, err := bt.init(context.Background(), true, map[string]any{"type": "chromium"})
+	require.NoError(t, err)
+	require.NotNil(t, opts)
+}
+
+// TestValidateWSEndpoint pins the fast-fail validation for connectOverCDP
+// endpoints.
+func TestValidateWSEndpoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		endpoint string
+		wantErr  string // substring; empty means the endpoint must be accepted
+	}{
+		{"valid ws", "ws://localhost:9222", ""},
+		{"valid wss with path", "wss://example.com/devtools/browser/abc", ""},
+		{"empty", "", "cannot be empty"},
+		{"blank", "   ", "cannot be empty"},
+		{"wrong scheme", "http://localhost:9222", "scheme must be ws or wss"},
+		{"missing scheme", "localhost:9222", "scheme must be ws or wss"},
+		{"no host with path", "ws:///devtools/browser/id", "host is missing"},
+		{"opaque no host", "ws:localhost:9222", "host is missing"},
+		{"port only no host", "ws://:9222", "host is missing"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := validateWSEndpoint(tc.endpoint)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tc.wantErr)
+		})
+	}
+}
 
 func TestBrowserTypePrepareFlags(t *testing.T) {
 	t.Parallel()

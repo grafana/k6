@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand" // nosemgrep: math-random-used // This is used to generate id for easier debugging
+	"net/url"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -51,8 +52,28 @@ func NewBrowserType(vu k6modules.VU) *BrowserType {
 	}
 }
 
+// Clone returns a new BrowserType that reuses the receiver's already
+// initialized, thread-safe fields (vu, hooks, k6Metrics, envLookupper) but
+// gets its own randSrc and Ctx.
+//
+// This exists, so callers that need a fresh BrowserType per operation (e.g.,
+// concurrent ConnectOverCDP calls in the same iteration) don't have to go
+// through NewBrowserType, which calls vu.InitEnv() and therefore only works
+// during the script init scope, not during an iteration.
+// Sharing a single BrowserType across concurrent operations instead would race
+// on randSrc (used in initContext) and on the Ctx field (written in Connect).
+func (b *BrowserType) Clone() *BrowserType {
+	return &BrowserType{
+		vu:           b.vu,
+		hooks:        b.hooks,
+		k6Metrics:    b.k6Metrics,
+		randSrc:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
+		envLookupper: b.envLookupper,
+	}
+}
+
 func (b *BrowserType) init(
-	ctx context.Context, isRemoteBrowser bool,
+	ctx context.Context, isRemoteBrowser bool, scenarioOpts map[string]any,
 ) (context.Context, *common.BrowserOptions, *log.Logger, error) {
 	ctx = b.initContext(ctx)
 
@@ -68,8 +89,7 @@ func (b *BrowserType) init(
 		browserOpts = common.NewLocalBrowserOptions()
 	}
 
-	opts := k6ext.GetScenarioOpts(b.vu.Context(), b.vu)
-	if err = browserOpts.Parse(ctx, logger, opts, b.envLookupper); err != nil {
+	if err = browserOpts.Parse(ctx, logger, scenarioOpts, b.envLookupper); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing browser options: %w", err)
 	}
 	ctx = common.WithBrowserOptions(ctx, browserOpts)
@@ -92,6 +112,67 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 	return ctx
 }
 
+// ConnectOverCDP attaches the k6 browser to an existing, user-managed browser
+// over CDP, without requiring scenario browser options.
+//
+// The passed context must be the context the caller wants to control both the
+// connection and the browser lifetime; when it is canceled (iteration ends),
+// the connection is torn down.
+func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*common.Browser, error) {
+	// Validate wsEndpoint up front so an empty or malformed value
+	// fails fast with a clear error, instead of a confusing lower-level
+	// connection error.
+	if err := validateWSEndpoint(wsEndpoint); err != nil {
+		return nil, err
+	}
+
+	// Parse browser options from the environment (K6_BROWSER_TIMEOUT,
+	// K6_BROWSER_DEBUG, the log category filter, ...) like Connect does. Pass a
+	// fixed chromium type instead of scenario options: connectOverCDP works
+	// without a browser scenario, and Parse requires the type to be set.
+	ctx, browserOpts, logger, err := b.init(ctx, true, map[string]any{"type": "chromium"})
+	if err != nil {
+		return nil, fmt.Errorf("initializing browser type: %w", err)
+	}
+
+	bp, err := b.connect(ctx, ctx, wsEndpoint, browserOpts, logger)
+	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: browserOpts.Timeout,
+		}
+		return nil, fmt.Errorf("%w", err)
+	}
+
+	return bp, nil
+}
+
+// validateWSEndpoint returns an error if wsEndpoint is not a usable CDP
+// WebSocket URL, catching common mistakes (an empty value, a non-ws scheme,
+// a missing host, etc.) before we attempt to connect.
+func validateWSEndpoint(wsEndpoint string) error {
+	if strings.TrimSpace(wsEndpoint) == "" {
+		return errors.New("WebSocket endpoint cannot be empty")
+	}
+
+	u, err := url.Parse(wsEndpoint)
+	if err != nil {
+		return fmt.Errorf("invalid WebSocket endpoint %q: %w", wsEndpoint, err)
+	}
+
+	if u.Scheme != "ws" && u.Scheme != "wss" {
+		return fmt.Errorf(
+			"invalid WebSocket endpoint %q: scheme must be ws or wss, got %q", wsEndpoint, u.Scheme,
+		)
+	}
+
+	if u.Hostname() == "" {
+		return fmt.Errorf("invalid WebSocket endpoint %q: host is missing", wsEndpoint)
+	}
+
+	return nil
+}
+
 // Connect attaches k6 browser to an existing browser instance.
 //
 // vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
@@ -104,7 +185,7 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
 // the events which allows the connection to close.
 func (b *BrowserType) Connect(ctx, vuCtx context.Context, wsEndpoint string) (*common.Browser, error) {
-	vuCtx, browserOpts, logger, err := b.init(vuCtx, true)
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, true, k6ext.GetScenarioOpts(b.vu.Context(), b.vu))
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
@@ -170,7 +251,7 @@ func (b *BrowserType) link(
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
 // the events which allows the chromium subprocess to shutdown.
 func (b *BrowserType) Launch(ctx, vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
-	vuCtx, browserOpts, logger, err := b.init(vuCtx, false)
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, false, k6ext.GetScenarioOpts(b.vu.Context(), b.vu))
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}

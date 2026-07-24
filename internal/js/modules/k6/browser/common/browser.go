@@ -624,15 +624,26 @@ func (b *Browser) Close() {
 			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
 	}
-	// Wait for all outstanding events (e.g. Target.detachedFromTarget) to be
-	// processed, and for the process to exit gracefully. Otherwise kill it
-	// forcefully after the timeout.
+
+	// Wait for outstanding teardown to drain before closing the connection, so
+	// in-flight CDP messages (e.g. Target.detachedFromTarget) are delivered
+	// rather than dropped by an early WebSocket close.
 	timeout := time.Second
-	select {
-	case <-b.browserProc.processDone:
-	case <-time.After(timeout):
-		b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
-		b.browserProc.Terminate()
+	if b.browserOpts.isRemoteBrowser {
+		// A remote browser has no local process to wait on, so waiting on
+		// processDone would always hit the full timeout. Instead, wait, up to the
+		// timeout, for our targets' detach events to be delivered — observed as
+		// the pages draining to zero — then close.
+		b.waitForPagesToDetach(timeout)
+	} else {
+		// Wait for the process to exit gracefully; otherwise kill it forcefully
+		// after the timeout.
+		select {
+		case <-b.browserProc.processDone:
+		case <-time.After(timeout):
+			b.logger.Debugf("Browser:Close", "killing browser process with PID %d after %s", b.browserProc.Pid(), timeout)
+			b.browserProc.Terminate()
+		}
 	}
 	// This is unintuitive, since the process exited, so the connection would've
 	// been closed as well. The reason we still call conn.Close() here is to
@@ -643,6 +654,34 @@ func (b *Browser) Close() {
 	// for sure when that has finished. This will error writing to the socket,
 	// but we ignore it.
 	b.conn.Close()
+}
+
+// waitForPagesToDetach waits, up to timeout, for the browser's own pages to
+// drain to zero. Closing pages triggers Target.detachedFromTarget events; a
+// page leaves b.pages only once its event has been received and processed.
+//
+// This is a barrier on our own targets' teardown, NOT on the connection going
+// quiet: a remote browser we don't own keeps emitting unsolicited events right
+// up to conn.Close(), and those may still be dropped. That's harmless for us
+// (we've decided we're done), but the guarantee is only "our page detaches are
+// processed", not "all in-flight messages are delivered". It's a bounded,
+// event-driven alternative to waiting on a process exit, which a remote browser
+// doesn't have.
+func (b *Browser) waitForPagesToDetach(timeout time.Duration) {
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+
+	deadline := time.After(timeout)
+	for len(b.getPages()) > 0 {
+		select {
+		case <-deadline:
+			b.logger.Debugf("Browser:Close",
+				"timed out after %s waiting for %d page(s) to detach; closing anyway",
+				timeout, len(b.getPages()))
+			return
+		case <-ticker.C:
+		}
+	}
 }
 
 // CloseContext is a short-cut function to close the current browser's context.
@@ -662,7 +701,7 @@ func (b *Browser) Context() *BrowserContext {
 // IsConnected returns whether the WebSocket connection to the browser process
 // is active or not.
 func (b *Browser) IsConnected() bool {
-	return b.browserProc.isConnected()
+	return !b.closing.Load() && b.browserProc.isConnected()
 }
 
 // NewContext creates a new incognito-like browser context.
@@ -670,6 +709,9 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	_, span := TraceAPICall(b.vuCtx, "", "browser.newContext")
 	defer span.End()
 
+	if b.closing.Load() {
+		return nil, spanRecordErrorf(span, "browser has been closed")
+	}
 	if b.context != nil {
 		return nil, spanRecordErrorf(span, "existing browser context must be closed before creating a new one")
 	}
