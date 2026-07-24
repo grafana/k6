@@ -42,6 +42,25 @@ type CPUProfile struct {
 	Rate float64
 }
 
+// webVitalKey identifies a buffered web vital by the URL of the page it was
+// measured on and the metric name. Keying by URL keeps distinct pages (and
+// subframes) as separate series, while repeated reports for the same page and
+// metric collapse onto a single buffered entry.
+type webVitalKey struct {
+	url  string
+	name string
+}
+
+// webVitalSample is a buffered web vital metric sample together with the
+// attributes needed to emit its web_vital trace span when the buffer is
+// flushed.
+type webVitalSample struct {
+	sample k6metrics.Sample
+	name   string
+	spanID string
+	rating string
+}
+
 /*
 FrameSession is used for managing a frame's life-cycle, or in other words its full session.
 It manages all the event listening while deferring the state storage to the Frame and FrameManager
@@ -87,6 +106,15 @@ type FrameSession struct {
 	// onFrameNavigated, but subsequent calls to onFrameNavigated in the same
 	// mainframe never again create a navigation span.
 	initialNavDone bool
+
+	// Web vital metrics are buffered per (url, metric name) and flushed once
+	// per page: at each main-frame navigation boundary and at page close. This
+	// keeps a single sample per page and metric even when a page reports a
+	// vital more than once. The mutex guards against the initial navigation's
+	// flush, which runs on the page-construction goroutine rather than the
+	// event-loop goroutine.
+	bufferedWebVitalsMu sync.Mutex
+	bufferedWebVitals   map[webVitalKey]webVitalSample
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
@@ -119,6 +147,7 @@ func NewFrameSession(
 		isolatedWorlds:       make(map[string]bool),
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
+		bufferedWebVitals:    make(map[webVitalKey]webVitalSample),
 		vu:                   k6ext.GetVU(ctx),
 		k6Metrics:            k6Metrics,
 		logger:               l,
@@ -235,7 +264,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -255,6 +284,8 @@ func (fs *FrameSession) initEvents() {
 			// If there is an active span for main frame,
 			// end it before exiting so it can be flushed
 			if fs.mainFrameSpan != nil {
+				// Flush the last page's buffered web vitals while its span is live.
+				fs.flushWebVitals()
 				// The url needs to be added here instead of at the start of the span
 				// because at the start of the span we don't know the correct url for
 				// the page we're navigating to. At the end of the span we do have this
@@ -373,26 +404,48 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 
 	tags = tags.With("rating", wv.Rating)
 
-	now := time.Now()
-	pushIfNotDone(fs.vu.Context(), fs.logger, state.Samples, k6metrics.ConnectedSamples{
-		Samples: []k6metrics.Sample{
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
-				Value:      value,
-				Time:       now,
-			},
+	// Buffer the latest value for this page and metric instead of emitting it
+	// immediately. The buffer is flushed once per page so each page contributes
+	// a single sample per metric.
+	fs.bufferedWebVitalsMu.Lock()
+	fs.bufferedWebVitals[webVitalKey{url: wv.URL, name: wv.Name}] = webVitalSample{
+		sample: k6metrics.Sample{
+			TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
+			Value:      value,
+			Time:       time.Now(),
 		},
-	})
-
-	_, span := TraceEvent(
-		fs.ctx, fs.targetID.String(), "web_vital", wv.SpanID, trace.WithAttributes(
-			attribute.String("web_vital.name", wv.Name),
-			attribute.Float64("web_vital.value", value),
-			attribute.String("web_vital.rating", wv.Rating),
-		))
-	defer span.End()
+		name:   wv.Name,
+		spanID: wv.SpanID,
+		rating: wv.Rating,
+	}
+	fs.bufferedWebVitalsMu.Unlock()
 
 	return nil
+}
+
+// flushWebVitals emits every buffered web vital metric sample and its
+// web_vital trace span, then clears the buffer. Clearing makes the flush
+// idempotent, so a page is emitted exactly once even when flushed at both a
+// navigation boundary and at teardown.
+func (fs *FrameSession) flushWebVitals() {
+	fs.bufferedWebVitalsMu.Lock()
+	defer fs.bufferedWebVitalsMu.Unlock()
+
+	for key, wv := range fs.bufferedWebVitals {
+		pushIfNotDone(fs.vu.Context(), fs.logger, fs.vu.State().Samples, k6metrics.ConnectedSamples{
+			Samples: []k6metrics.Sample{wv.sample},
+		})
+
+		_, span := TraceEvent(
+			fs.ctx, fs.targetID.String(), "web_vital", wv.spanID, trace.WithAttributes(
+				attribute.String("web_vital.name", wv.name),
+				attribute.Float64("web_vital.value", wv.sample.Value),
+				attribute.String("web_vital.rating", wv.rating),
+			))
+		span.End()
+
+		delete(fs.bufferedWebVitals, key)
+	}
 }
 
 func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavascriptDialogOpening) {
@@ -821,6 +874,11 @@ func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
 	if newFrame.page.frameManager.MainFrame() != newFrame {
 		return
 	}
+
+	// Flush the outgoing page's buffered web vitals while its navigation span
+	// is still live. This must run after the main-frame guard above so that a
+	// subframe load does not drain the main page's buffer.
+	fs.flushWebVitals()
 
 	// End the navigation span if it is non-nil
 	if fs.mainFrameSpan != nil {
