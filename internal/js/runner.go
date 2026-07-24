@@ -752,12 +752,14 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		params.Exec = consts.DefaultFn
 	}
 
-	// Override the preset global env with any custom env vars
+	// Override the preset global env with any custom env vars.
+	// __ENV is frozen when the freeze-env feature flag is active.
 	env := make(map[string]string, len(u.env)+len(params.Env))
 	maps.Copy(env, u.env)
 	maps.Copy(env, params.Env)
-	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722#issuecomment-1761173634
-	u.Runtime.Set("__ENV", env)
+	if err := setupEnvObject(u.Runtime, env, u.Runner.preInitState.FeatureFlags); err != nil {
+		panic(err) // should not happen with string values
+	}
 
 	opts := u.Runner.Bundle.Options
 

@@ -20,6 +20,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/internal/build"
+	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/lib/consts"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/loader"
@@ -55,6 +56,7 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...any) (*Bundle
 	fs := fsext.NewMemMapFs()
 	var rtOpts *lib.RuntimeOptions
 	var logger logrus.FieldLogger
+	var ff *features.Flags
 	for _, o := range opts {
 		switch opt := o.(type) {
 		case fsext.Fs:
@@ -63,11 +65,14 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...any) (*Bundle
 			rtOpts = &opt
 		case logrus.FieldLogger:
 			logger = opt
+		case *features.Flags:
+			ff = opt
 		default:
 			tb.Fatalf("unknown test option %q", opt)
 		}
 	}
 	preInitState := getTestPreInitState(tb, logger, rtOpts)
+	preInitState.FeatureFlags = ff
 
 	filenameURL := &url.URL{Path: filename, Scheme: "file"}
 
@@ -88,17 +93,21 @@ func getSimpleBundleFromArchive(tb testing.TB, arc *lib.Archive, opts ...any) (*
 	tb.Helper()
 	var rtOpts *lib.RuntimeOptions
 	var logger logrus.FieldLogger
+	var ff *features.Flags
 	for _, o := range opts {
 		switch opt := o.(type) {
 		case lib.RuntimeOptions:
 			rtOpts = &opt
 		case logrus.FieldLogger:
 			logger = opt
+		case *features.Flags:
+			ff = opt
 		default:
 			tb.Fatalf("unknown test option %q", opt)
 		}
 	}
 	preInitState := getTestPreInitState(tb, logger, rtOpts)
+	preInitState.FeatureFlags = ff
 
 	fss := arc.Filesystems
 	moduleResolver := NewModuleResolver(arc.PwdURL, preInitState, fss)
@@ -904,36 +913,32 @@ func TestBundleNotSharable(t *testing.T) {
 	t.Parallel()
 	data := `
 		export default function() {
-			if (__ITER == 0) {
-				if (typeof __ENV.something !== "undefined") {
-					throw new Error("invalid something: " + __ENV.something + " should be undefined");
-				}
-				__ENV.something = __VU;
-			} else if (__ENV.something != __VU) {
-				throw new Error("invalid something: " + __ENV.something+ " should be "+ __VU);
+			if (typeof __ENV.something !== "undefined") {
+				throw new Error("invalid something: " + __ENV.something + " should be undefined");
+			}
+			try { __ENV.something = __VU; throw new Error("should have frozen __ENV"); } catch (e) {
+				if (!(e instanceof TypeError)) { throw e; }
 			}
 		}
 	`
-	b1, err := getSimpleBundle(t, "/script.js", data)
+	ff := &features.Flags{FreezeEnv: true}
+	b1, err := getSimpleBundle(t, "/script.js", data, ff)
 	require.NoError(t, err)
 	logger := testutils.NewLogger(t)
 
-	b2, err := getSimpleBundleFromArchive(t, b1.makeArchive(), logger)
+	b2, err := getSimpleBundleFromArchive(t, b1.makeArchive(), logger, ff)
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
-	var vus, iters uint64 = 10, 1000
+	var vus uint64 = 10
 	for name, b := range bundles {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			for i := range vus {
 				bi, err := b.Instantiate(context.Background(), i)
 				require.NoError(t, err)
-				for j := range iters {
-					require.NoError(t, bi.Runtime.Set("__ITER", j))
-					_, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
-					require.NoError(t, err)
-				}
+				_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
+				require.NoError(t, err)
 			}
 		})
 	}
