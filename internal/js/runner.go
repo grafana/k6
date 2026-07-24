@@ -450,8 +450,9 @@ func prepareHandleSummaryCall(
 
 		if s.NewMachineReadableSummary {
 			mrSummary, mrsErr := summary.ToMachineReadable(s, meta)
-			handleSummaryData = rt.ToValue(mrSummary)
-			err = errors.Join(srErr, mrsErr)
+			jsonCompatibleSummary, jsonCompatibleErr := toJSONCompatibleValue(mrSummary)
+			handleSummaryData = rt.ToValue(jsonCompatibleSummary)
+			err = errors.Join(srErr, mrsErr, jsonCompatibleErr)
 		} else {
 			handleSummaryData = rt.ToValue(summarizeMetricsToObject(legacy, r.Bundle.Options, r.setupData))
 		}
