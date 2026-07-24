@@ -25,9 +25,16 @@ import (
 
 	_ "go.k6.io/k6/v2/internal/secretsource" // import it to register internal secret sources
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
+	dummysecrets "go.k6.io/k6/v2/internal/secretsource/dummy"
 )
 
 const waitLoggerCloseTimeout = time.Second * 5
+
+// secretsOptionalAnnotation marks commands that only read a test's structure
+// and never use real secret values (inspect, archive). For these,
+// persistentPreRunE defaults to the dummy secret source when the user provided
+// none, so they don't fail on scripts that call secrets.get() during init.
+const secretsOptionalAnnotation = "k6_secrets_optional" //nolint:gosec // G101: annotation key, not a credential
 
 func getRootUsageTemplate() string {
 	return `{{.Short}}
@@ -156,6 +163,15 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, _ []string) error {
 		if f == nil || f.Value.String() != "true" {
 			c.globalState.Flags.SecretSource = append(c.globalState.Flags.SecretSource, "cloud")
 		}
+	}
+
+	// For 'k6 inspect' and 'k6 archive', a script's secrets are never actually
+	// used, but its init code may still call secrets.get(). Default to the
+	// 'dummy' secret source (which returns random values) when the user provided
+	// none, so these commands don't fail on secret-using scripts.
+	if secretsAreOptional(cmd) && len(c.globalState.Flags.SecretSource) == 0 {
+		dummysecrets.Register()
+		c.globalState.Flags.SecretSource = []string{dummysecrets.Name}
 	}
 
 	err := c.setupLoggers(c.stopLoggersCh)
@@ -538,6 +554,13 @@ func isCloudRunWithLocalExecution(cmd *cobra.Command) bool {
 		return false
 	}
 	return localExecution
+}
+
+// secretsAreOptional returns true when the command being executed only reads a
+// test's structure and never uses real secret values, as declared by the
+// secretsOptionalAnnotation on the command.
+func secretsAreOptional(cmd *cobra.Command) bool {
+	return cmd != nil && cmd.Annotations[secretsOptionalAnnotation] == "true"
 }
 
 // hasCloudSecretSource returns true if the 'cloud' secret source type appears in sources.
