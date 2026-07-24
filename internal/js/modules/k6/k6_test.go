@@ -125,6 +125,89 @@ func TestGroup(t *testing.T) {
 	})
 }
 
+func TestGroupSleep(t *testing.T) {
+	t.Parallel()
+
+	// collectGroupSamples returns, per group tag, the emitted group_duration and
+	// group_sleep values (in milliseconds).
+	collectGroupSamples := func(t *testing.T, tc *testCase) map[string]struct{ duration, sleep float64 } {
+		t.Helper()
+		state := tc.testRuntime.VU.State()
+		out := map[string]struct{ duration, sleep float64 }{}
+		for _, container := range metrics.GetBufferedSamples(tc.samples) {
+			for _, s := range container.GetSamples() {
+				group, _ := s.Tags.Get("group")
+				entry := out[group]
+				switch s.Metric {
+				case state.BuiltinMetrics.GroupDuration:
+					entry.duration = s.Value
+				case state.BuiltinMetrics.GroupSleep:
+					entry.sleep = s.Value
+				default:
+					continue
+				}
+				out[group] = entry
+			}
+		}
+		return out
+	}
+
+	t.Run("no sleep", func(t *testing.T) {
+		t.Parallel()
+		tc := testCaseRuntime(t)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("g", function() {})`)
+		require.NoError(t, err)
+
+		groups := collectGroupSamples(t, tc)
+		g, ok := groups["::g"]
+		require.True(t, ok, "group_duration/group_sleep not emitted")
+		// A group with no sleep must report zero sleep, but still emits the metric.
+		assert.Equal(t, float64(0), g.sleep, "group_sleep should be zero without sleep")
+	})
+
+	t.Run("with sleep", func(t *testing.T) {
+		t.Parallel()
+		tc := testCaseRuntime(t)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("g", function() { k6.sleep(0.2); })`)
+		require.NoError(t, err)
+
+		groups := collectGroupSamples(t, tc)
+		g, ok := groups["::g"]
+		require.True(t, ok)
+		// group_sleep should be roughly the slept time, and never exceed the
+		// wall-clock group_duration.
+		assert.Greater(t, g.sleep, float64(150), "group_sleep too small: %v", g.sleep)
+		assert.LessOrEqual(t, g.sleep, g.duration, "group_sleep must not exceed group_duration")
+	})
+
+	t.Run("nested groups attribute sleep to each window", func(t *testing.T) {
+		t.Parallel()
+		tc := testCaseRuntime(t)
+		_, err := tc.testRuntime.RunOnEventLoop(`
+			k6.group("outer", function() {
+				k6.sleep(0.2);
+				k6.group("inner", function() {
+					k6.sleep(0.2);
+				});
+			})`)
+		require.NoError(t, err)
+
+		groups := collectGroupSamples(t, tc)
+		inner, ok := groups["::outer::inner"]
+		require.True(t, ok, "inner group not emitted")
+		outer, ok := groups["::outer"]
+		require.True(t, ok, "outer group not emitted")
+
+		// Inner window slept ~200ms.
+		assert.Greater(t, inner.sleep, float64(150), "inner group_sleep too small: %v", inner.sleep)
+		assert.LessOrEqual(t, inner.sleep, inner.duration)
+		// Outer window slept ~400ms (its own sleep plus the inner group's sleep).
+		assert.Greater(t, outer.sleep, float64(350), "outer group_sleep too small: %v", outer.sleep)
+		assert.LessOrEqual(t, outer.sleep, outer.duration)
+		assert.Greater(t, outer.sleep, inner.sleep, "outer sleep should include inner sleep")
+	})
+}
+
 func TestCheckObject(t *testing.T) {
 	t.Parallel()
 	t.Run("boolean", func(t *testing.T) {

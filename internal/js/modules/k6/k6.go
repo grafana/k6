@@ -31,6 +31,15 @@ type (
 	// K6 represents an instance of the k6 module.
 	K6 struct {
 		vu modules.VU
+
+		// groupSleep is the cumulative time this VU has spent in sleep() calls.
+		// It is used to attribute sleep time to the group(s) currently being
+		// executed: group() snapshots this value on entry and diffs it on exit,
+		// so the difference is exactly the sleep that happened within that
+		// group's window (correctly accounting for nested groups). A VU runs a
+		// single iteration at a time on one goroutine and JS is single-threaded,
+		// so this field needs no synchronization.
+		groupSleep time.Duration
 	}
 )
 
@@ -71,12 +80,17 @@ func (*K6) Fail(msg string) (sobek.Value, error) {
 // Sleep waits the provided seconds before continuing the execution.
 func (mi *K6) Sleep(secs float64) {
 	ctx := mi.vu.Context()
+	start := time.Now()
 	timer := time.NewTimer(time.Duration(secs * float64(time.Second)))
 	select {
 	case <-timer.C:
 	case <-ctx.Done():
 		timer.Stop()
 	}
+	// Account for the actual time spent sleeping (which may be shorter than
+	// requested if the context was cancelled) so that group() can subtract it
+	// from the enclosing group(s). See the K6.groupSleep field.
+	mi.groupSleep += time.Since(start)
 }
 
 // RandomSeed sets the seed to the random generator used for this VU.
@@ -125,11 +139,21 @@ func (mi *K6) Group(name string, val sobek.Value) (sobek.Value, error) {
 	}()
 
 	startTime := time.Now()
+	startSleep := mi.groupSleep
 	ret, err := fn(sobek.Undefined())
 	t := time.Now()
+	// Sleep time that occurred within this group's execution window. For nested
+	// groups this correctly captures only the sleep of the current window, since
+	// each enclosing group takes its own snapshot/diff.
+	groupSleep := mi.groupSleep - startSleep
 
 	ctx := mi.vu.Context()
 	ctm := state.Tags.GetCurrentValues()
+	// group_duration keeps its historical wall-clock semantics (including sleep)
+	// for backward compatibility, and is emitted as a standalone sample exactly
+	// as before. group_sleep is emitted as a separate sample so users can measure
+	// sleep per group and derive active time as group_duration - group_sleep.
+	// See issue #921.
 	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: state.BuiltinMetrics.GroupDuration,
@@ -137,6 +161,15 @@ func (mi *K6) Group(name string, val sobek.Value) (sobek.Value, error) {
 		},
 		Time:     t,
 		Value:    metrics.D(t.Sub(startTime)),
+		Metadata: ctm.Metadata,
+	})
+	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
+		TimeSeries: metrics.TimeSeries{
+			Metric: state.BuiltinMetrics.GroupSleep,
+			Tags:   ctm.Tags,
+		},
+		Time:     t,
+		Value:    metrics.D(groupSleep),
 		Metadata: ctm.Metadata,
 	})
 
