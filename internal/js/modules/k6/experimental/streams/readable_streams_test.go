@@ -31,6 +31,7 @@ func TestReadableStream(t *testing.T) {
 		"general.any.js",
 		"reentrant-strategies.any.js",
 		"templated.any.js",
+		"tee.any.js",
 	}
 
 	for _, suite := range suites {

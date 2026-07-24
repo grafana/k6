@@ -111,37 +111,29 @@ func newRejectedPromiseForRuntime(rt *sobek.Runtime, with any) *sobek.Promise {
 // promiseThen facilitates instantiating a new promise and defining callbacks for to be executed
 // on fulfillment as well as rejection, directly from Go.
 func promiseThen(
-	rt *sobek.Runtime,
+	_ *sobek.Runtime,
 	promise *sobek.Promise,
 	onFulfilled, onRejected func(sobek.Value),
 ) (*sobek.Promise, error) {
-	val, err := rt.RunString(
-		`(function(promise, onFulfilled, onRejected) { return promise.then(onFulfilled, onRejected) })`)
-	if err != nil {
-		return nil, newError(RuntimeError, "unable to initialize promiseThen internal helper function")
+	if promise == nil {
+		return nil, newError(AssertionError, "cannot react to a nil promise")
 	}
 
-	cal, ok := sobek.AssertFunction(val)
-	if !ok {
-		return nil, newError(RuntimeError, "the internal promiseThen helper is not a function")
+	var fulfill func(sobek.Value) sobek.Value
+	if onFulfilled != nil {
+		fulfill = func(value sobek.Value) sobek.Value {
+			onFulfilled(value)
+			return sobek.Undefined()
+		}
 	}
-
-	if onRejected == nil {
-		val, err = cal(sobek.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled))
-	} else {
-		val, err = cal(sobek.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled), rt.ToValue(onRejected))
+	var reject func(sobek.Value) sobek.Value
+	if onRejected != nil {
+		reject = func(reason sobek.Value) sobek.Value {
+			onRejected(reason)
+			return sobek.Undefined()
+		}
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	newPromise, ok := val.Export().(*sobek.Promise)
-	if !ok {
-		return nil, newError(RuntimeError, "unable to cast the internal promiseThen helper's return value to a promise")
-	}
-
-	return newPromise, nil
+	return promise.Then(fulfill, reject), nil
 }
 
 // promiseThenReturn is like [promiseThen], but its callbacks return a [sobek.Value] which the
@@ -149,37 +141,23 @@ func promiseThen(
 // it). This is needed to implement the specification's "reacting to a promise ... returns X"
 // steps, where X may itself be a promise.
 func promiseThenReturn(
-	rt *sobek.Runtime,
+	_ *sobek.Runtime,
 	promise *sobek.Promise,
 	onFulfilled, onRejected func(sobek.Value) sobek.Value,
 ) (*sobek.Promise, error) {
-	val, err := rt.RunString(
-		`(function(promise, onFulfilled, onRejected) { return promise.then(onFulfilled, onRejected) })`)
-	if err != nil {
-		return nil, newError(RuntimeError, "unable to initialize promiseThenReturn internal helper function")
+	if promise == nil {
+		return nil, newError(AssertionError, "cannot react to a nil promise")
 	}
 
-	cal, ok := sobek.AssertFunction(val)
-	if !ok {
-		return nil, newError(RuntimeError, "the internal promiseThenReturn helper is not a function")
-	}
+	return promise.Then(onFulfilled, onRejected), nil
+}
 
-	if onRejected == nil {
-		val, err = cal(sobek.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled))
-	} else {
-		val, err = cal(sobek.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled), rt.ToValue(onRejected))
-	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	newPromise, ok := val.Export().(*sobek.Promise)
-	if !ok {
-		return nil, newError(RuntimeError, "unable to cast the internal promiseThenReturn helper's return value to a promise")
-	}
-
-	return newPromise, nil
+// queueStreamMicrotask queues fn behind the current JavaScript job. Stream algorithms use this
+// helper where the specification explicitly requires a microtask boundary before mutating stream
+// state. In particular, default tee must give an error observed through reader.closed priority over
+// a synchronously available chunk.
+func queueStreamMicrotask(rt *sobek.Runtime, fn func()) {
+	rt.EnqueueMicrotask(fn)
 }
 
 // markPromiseHandled marks the given promise as handled to prevent unhandled rejection
