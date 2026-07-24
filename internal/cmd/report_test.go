@@ -50,8 +50,7 @@ func TestCreateReport(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		s.GetState().MarkEnded()
 
-		m := createReport(usage.New(), s)
-		require.NoError(t, err)
+		m := createReport(usage.New(), s, nil)
 
 		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
@@ -72,8 +71,7 @@ func TestCreateReport(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		m := createReport(usage.New(), s)
-		require.NoError(t, err)
+		m := createReport(usage.New(), s, nil)
 
 		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
@@ -94,8 +92,7 @@ func TestCreateReport(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		m := createReport(usage.New(), s)
-		require.NoError(t, err)
+		m := createReport(usage.New(), s, nil)
 
 		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])

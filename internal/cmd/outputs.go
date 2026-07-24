@@ -152,6 +152,15 @@ func createOutputs(
 			}
 		}
 
+		// An output is an extension by membership in the output registry, not by
+		// its name, so built-in outputs stay out of the "extensions" bucket that
+		// the usage report filters against the catalog.
+		if e, isExt := ext.Get(ext.OutputExtension)[outputType]; isExt {
+			if err := test.preInitState.Usage.Values("extensions", e); err != nil {
+				gs.Logger.WithError(err).Warnf("Couldn't report usage for output extension %q", outputType)
+			}
+		}
+
 		params := baseParams
 		params.OutputType = outputType
 		params.ConfigArgument = outputArg
