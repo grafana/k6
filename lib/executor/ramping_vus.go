@@ -526,6 +526,7 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		activeVUsCount: new(int64),
 		started:        startTime,
 		runIteration:   getIterationRunner(vlv.executionState, vlv.logger),
+		cancel:         cancel,
 	}
 
 	progressFn := runState.makeProgressFn(regularDuration)
@@ -550,12 +551,12 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		handleNewScheduledVUs  = runState.scheduledVUsHandlerStrategy()
 	)
 	handledGracefulSteps := runState.iterateSteps(
-		ctx,
+		maxDurationCtx,
 		handleNewMaxAllowedVUs,
 		handleNewScheduledVUs,
 	)
 	go runState.runRemainingGracefulSteps(
-		ctx,
+		maxDurationCtx,
 		handleNewMaxAllowedVUs,
 		handledGracefulSteps,
 	)
@@ -574,6 +575,7 @@ type rampingVUsRunState struct {
 	wg             sync.WaitGroup
 
 	runIteration func(context.Context, lib.ActiveVU) bool // a helper closure function that runs a single iteration
+	cancel       func()
 }
 
 func (rs *rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn func() (float64, []string)) {
@@ -684,7 +686,11 @@ func (rs *rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionSt
 	return func(raw lib.ExecutionStep) {
 		pv := raw.PlannedVUs
 		for ; cur < pv; cur++ {
-			_ = rs.vuHandles[cur].start() // TODO: handle the error
+			if err := rs.vuHandles[cur].start(); err != nil {
+				rs.executor.logger.WithError(err).Error("Cannot start a VU")
+				rs.cancel()
+				return
+			}
 		}
 		for ; pv < cur; cur-- {
 			rs.vuHandles[cur-1].gracefulStop()
@@ -710,7 +716,14 @@ func waiter(ctx context.Context, start time.Time) func(offset time.Duration) boo
 				// now we do a step
 			}
 		}
-		return false
+		// honor cancellation even for past-due steps, where diff <= 0 and the
+		// select above is skipped
+		select {
+		case <-ctx.Done():
+			return true
+		default:
+			return false
+		}
 	}
 }
 
