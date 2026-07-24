@@ -29,6 +29,8 @@ type ReadableStream struct {
 	// reader holds the current reader of the stream if the stream is locked to a reader
 	// or nil otherwise.
 	reader any
+	// readerPrototype is the canonical prototype shared by readers vended by this stream.
+	readerPrototype *sobek.Object
 
 	// state holds the current state of the stream
 	state ReadableStreamState
@@ -67,7 +69,7 @@ func (stream *ReadableStream) GetReader(options *sobek.Object) sobek.Value {
 	if options == nil || common.IsNullish(options) ||
 		options.Get("mode") == nil || sobek.IsUndefined(options.Get("mode")) {
 		defaultReader := stream.acquireDefaultReader()
-		defaultReaderObj, err := NewReadableStreamDefaultReaderObject(defaultReader)
+		defaultReaderObj, err := NewReadableStreamDefaultReaderObject(defaultReader, stream.readerPrototype)
 		if err != nil {
 			common.Throw(stream.runtime, err)
 		}
@@ -169,19 +171,145 @@ func createReadableStream(
 	return stream
 }
 
-// toObject builds the stream's JavaScript object, using the given proto as its prototype and
-// installing the `locked` brand-check getter on it (once).
+const readableStreamGoRefKey = "__k6ReadableStream__"
+
+func readableStreamFromValue(rt *sobek.Runtime, value sobek.Value) *ReadableStream {
+	if value == nil || common.IsNullish(value) || !isObject(value) {
+		return nil
+	}
+
+	ref := value.ToObject(rt).Get(readableStreamGoRefKey)
+	if ref == nil {
+		return nil
+	}
+
+	stream, _ := ref.Export().(*ReadableStream)
+	return stream
+}
+
+func readableStreamFromThis(rt *sobek.Runtime, value sobek.Value) *ReadableStream {
+	stream := readableStreamFromValue(rt, value)
+	if stream == nil {
+		throw(rt, newTypeError(rt, "value is not a ReadableStream"))
+	}
+	return stream
+}
+
+func installReadableStreamPrototype(rt *sobek.Runtime, proto *sobek.Object) error {
+	if err := defineStreamGetter(rt, proto, "locked", func(this sobek.Value) sobek.Value {
+		return rt.ToValue(readableStreamFromThis(rt, this).isLocked())
+	}); err != nil {
+		return err
+	}
+	if err := defineStreamMethod(rt, proto, "cancel", func(this, reason sobek.Value) *sobek.Promise {
+		stream := readableStreamFromValue(rt, this)
+		if stream == nil {
+			return newRejectedPromiseForRuntime(rt, newTypeError(rt, "value is not a ReadableStream").Err())
+		}
+		promise, err := stream.Cancel(reason)
+		if err != nil {
+			return newRejectedPromiseForRuntime(rt, err)
+		}
+		return promise
+	}); err != nil {
+		return err
+	}
+	if err := defineStreamMethod(rt, proto, "getReader", func(this, options sobek.Value) sobek.Value {
+		stream := readableStreamFromThis(rt, this)
+		if options == nil || common.IsNullish(options) {
+			return stream.GetReader(nil)
+		}
+		if !isObject(options) {
+			throw(rt, newTypeError(rt, "getReader options must be an object"))
+		}
+		return stream.GetReader(options.ToObject(rt))
+	}); err != nil {
+		return err
+	}
+	if err := defineStreamMethod(rt, proto, "tee", func(this, _ sobek.Value) sobek.Value {
+		return readableStreamFromThis(rt, this).Tee()
+	}); err != nil {
+		return err
+	}
+	return installReadableStreamPipeMethods(rt, proto)
+}
+
+func installReadableStreamPipeMethods(rt *sobek.Runtime, proto *sobek.Object) error {
+	pipeTo, err := wrapPrototypeFunction(rt,
+		func(this, destinationValue, optionsValue sobek.Value) *sobek.Promise {
+			source := readableStreamFromThis(rt, this)
+			destination := writableStreamFromValue(rt, destinationValue)
+			if destination == nil {
+				throw(rt, newTypeError(rt, "destination is not a WritableStream"))
+			}
+			options := convertStreamPipeOptions(rt, optionsValue)
+			return source.pipeTo(destination, options)
+		}, `
+(function(pipeTo) {
+  const reject = Promise.reject.bind(Promise);
+  return function(destination, options) {
+    try {
+      return pipeTo(this, destination, options);
+    } catch (error) {
+      return reject(error);
+    }
+  };
+})`)
+	if err != nil {
+		return err
+	}
+	if err := setDefaultPrototypePropertyOf(proto, "pipeTo", pipeTo); err != nil {
+		return err
+	}
+
+	pipeThrough, err := wrapPrototypeFunction(rt,
+		func(this, pairValue, optionsValue sobek.Value) sobek.Value {
+			source := readableStreamFromThis(rt, this)
+			if !isObject(pairValue) {
+				throw(rt, newTypeError(rt, "transform must be an object"))
+			}
+			pair := pairValue.ToObject(rt)
+			readableValue := pair.Get("readable")
+			readable := readableStreamFromValue(rt, readableValue)
+			if readable == nil {
+				throw(rt, newTypeError(rt, "transform.readable is not a ReadableStream"))
+			}
+			writableValue := pair.Get("writable")
+			writable := writableStreamFromValue(rt, writableValue)
+			if writable == nil {
+				throw(rt, newTypeError(rt, "transform.writable is not a WritableStream"))
+			}
+			options := convertStreamPipeOptions(rt, optionsValue)
+			if source.isLocked() {
+				throw(rt, newTypeError(rt, "source stream is locked"))
+			}
+			if writable.isLocked() {
+				throw(rt, newTypeError(rt, "destination stream is locked"))
+			}
+			promise := source.pipeTo(writable, options)
+			markPromiseHandled(rt, promise)
+			return readableValue
+		}, `
+(function(pipeThrough) {
+  return function(transform, options) {
+    return pipeThrough(this, transform, options);
+  };
+})`)
+	if err != nil {
+		return err
+	}
+	return setDefaultPrototypePropertyOf(proto, "pipeThrough", pipeThrough)
+}
+
+// toObject builds an extensible JavaScript object with the given prototype.
 func (stream *ReadableStream) toObject(proto *sobek.Object) *sobek.Object {
 	rt := stream.runtime
-	streamObj := rt.ToValue(stream).ToObject(rt)
+	streamObj := rt.NewObject()
 
-	if proto.Get("locked") == nil {
-		err := proto.DefineAccessorProperty("locked", rt.ToValue(func() sobek.Value {
-			return rt.ToValue(stream.Locked)
-		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-		if err != nil {
-			common.Throw(rt, newError(RuntimeError, err.Error()))
-		}
+	if err := streamObj.DefineDataProperty(
+		readableStreamGoRefKey, rt.ToValue(stream), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE,
+	); err != nil {
+		common.Throw(rt, newError(RuntimeError, err.Error()))
 	}
 
 	if err := streamObj.SetPrototype(proto); err != nil {

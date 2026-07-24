@@ -104,6 +104,10 @@ func newRejectedPromise(vu modules.VU, with any) *sobek.Promise {
 	return newRejectedPromiseWrapper(vu.Runtime(), with).promise
 }
 
+func newRejectedPromiseForRuntime(rt *sobek.Runtime, with any) *sobek.Promise {
+	return newRejectedPromiseWrapper(rt, with).promise
+}
+
 // promiseThen facilitates instantiating a new promise and defining callbacks for to be executed
 // on fulfillment as well as rejection, directly from Go.
 func promiseThen(
@@ -225,6 +229,46 @@ func setDefaultPrototypePropertyOf(obj *sobek.Object, propName string, propValue
 	}
 
 	return nil
+}
+
+func defineStreamGetter(rt *sobek.Runtime, proto *sobek.Object, name string, getter any) error {
+	if hasOwnProperty(proto, name) {
+		return nil
+	}
+	wrapper, err := wrapPrototypeFunction(rt, getter, `
+(function(getter) {
+  return function() { return getter(this); };
+})`)
+	if err != nil {
+		return err
+	}
+	return proto.DefineAccessorProperty(name, wrapper, nil, sobek.FLAG_TRUE, sobek.FLAG_TRUE)
+}
+
+func defineStreamMethod(rt *sobek.Runtime, proto *sobek.Object, name string, method any) error {
+	if hasOwnProperty(proto, name) {
+		return nil
+	}
+	wrapper, err := wrapPrototypeFunction(rt, method, `
+(function(method) {
+  return function(arg) { return method(this, arg); };
+})`)
+	if err != nil {
+		return err
+	}
+	return setDefaultPrototypePropertyOf(proto, name, wrapper)
+}
+
+func wrapPrototypeFunction(rt *sobek.Runtime, callback any, source string) (sobek.Value, error) {
+	wrapper, err := rt.RunString(source)
+	if err != nil {
+		return nil, err
+	}
+	call, ok := sobek.AssertFunction(wrapper)
+	if !ok {
+		return nil, newError(RuntimeError, "prototype wrapper is not a function")
+	}
+	return call(sobek.Undefined(), rt.ToValue(callback))
 }
 
 func hasOwnProperty(obj *sobek.Object, propName string) bool {
