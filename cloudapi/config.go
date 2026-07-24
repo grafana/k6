@@ -34,19 +34,19 @@ type Config struct {
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
-	// MetricsPushURL is the explicit URL to push metrics to, returned by
-	// the provisioning API's start_local_execution endpoint. When set, the
-	// cloud Output uses this URL instead of deriving one from Host. Set
-	// programmatically by `cmd/outputs_cloud.go` for the
-	// `k6 cloud run --local-execution` provisioning flow; never set via
-	// env vars or user-facing config.
-	MetricsPushURL null.String `json:"metricsPushURL"`
+	// MetricsPushURL is the URL to push metrics to. In the self-provision
+	// flow it is set programmatically from the provisioning API response;
+	// in the externally-provisioned flow an orchestrator supplies it via
+	// K6_CLOUD_METRICS_PUSH_URL. When set, the cloud Output pushes here
+	// instead of deriving a URL from Host.
+	MetricsPushURL null.String `json:"metricsPushURL" envconfig:"K6_CLOUD_METRICS_PUSH_URL"`
 
-	// TestRunToken is the scoped test-run token returned by the
-	// provisioning API's start_local_execution endpoint. When set, the
-	// cloud Output uses it as the Bearer token for metrics push and notify.
-	// Set programmatically; never set via env vars or user-facing config.
-	TestRunToken null.String `json:"testRunToken"`
+	// TestRunToken is the scoped test-run token used as the Bearer token
+	// for metrics push (and notify, in the self-provision flow). Set
+	// programmatically in the self-provision flow, or supplied via
+	// K6_CLOUD_TEST_RUN_TOKEN by an external orchestrator that provisioned
+	// the run.
+	TestRunToken null.String `json:"testRunToken" envconfig:"K6_CLOUD_TEST_RUN_TOKEN"`
 
 	// PushRefID is the identifier used by k6 Cloud to correlate all the things that
 	// belong to the same test run/execution. Currently, it is equivalent to the test run id.
