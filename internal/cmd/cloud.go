@@ -444,9 +444,6 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	testCmd := getCmdCloudTest(c)
 	cloudCmd.AddCommand(testCmd)
 
-	cloudCmd.Flags().SortFlags = false
-	cloudCmd.Flags().AddFlagSet(c.flagSet())
-
 	// Use custom template similar to root - hardcode flags to avoid showing global flags
 	cloudTemplate := getCloudUsageTemplate()
 	cloudCmd.SetUsageTemplate(cloudTemplate)
