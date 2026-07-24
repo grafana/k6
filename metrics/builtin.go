@@ -10,6 +10,7 @@ const (
 
 	ChecksName        = "checks"
 	GroupDurationName = "group_duration"
+	GroupSleepName    = "group_sleep"
 
 	HTTPReqsName              = "http_reqs"
 	HTTPReqFailedName         = "http_req_failed"
@@ -45,6 +46,7 @@ type BuiltinMetrics struct {
 	// Runner-emitted.
 	Checks        *Metric
 	GroupDuration *Metric
+	GroupSleep    *Metric
 
 	// HTTP-related.
 	HTTPReqs              *Metric
@@ -84,6 +86,7 @@ func RegisterBuiltinMetrics(registry *Registry) *BuiltinMetrics {
 
 		Checks:        registry.MustNewMetric(ChecksName, Rate),
 		GroupDuration: registry.MustNewMetric(GroupDurationName, Trend, Time),
+		GroupSleep:    registry.MustNewMetric(GroupSleepName, Trend, Time),
 
 		HTTPReqs:              registry.MustNewMetric(HTTPReqsName, Counter),
 		HTTPReqFailed:         registry.MustNewMetric(HTTPReqFailedName, Rate),
