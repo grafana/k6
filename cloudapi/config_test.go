@@ -146,6 +146,93 @@ func TestConfig_Apply_MergesNewFields(t *testing.T) {
 	}
 }
 
+// TestConfig_LogsFieldsFromEnvconfig verifies the log-push config
+// fields are read from the environment via envconfig (K6_CLOUD_LOGS_*)
+// so an external orchestrator that provisioned a run can hand the log
+// push settings to a local k6.
+func TestConfig_LogsFieldsFromEnvconfig(t *testing.T) {
+	t.Parallel()
+
+	envVars := map[string]string{
+		"K6_CLOUD_LOGS_PUSH_URL":         "https://api.k6.io/logs/v1/test_runs/42",
+		"K6_CLOUD_LOGS_LEVEL":            "info",
+		"K6_CLOUD_LOGS_LIMIT":            "900",
+		"K6_CLOUD_LOGS_PUSH_PERIOD":      "3s",
+		"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE": "10000",
+		"K6_CLOUD_LOGS_ALLOWED_LABELS":   "lz,level,test_run_id",
+	}
+
+	config, _, err := GetConsolidatedConfig(nil, envVars, "", nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, null.StringFrom("https://api.k6.io/logs/v1/test_runs/42"), config.LogsPushURL)
+	assert.Equal(t, null.StringFrom("info"), config.LogsLevel)
+	assert.Equal(t, null.IntFrom(900), config.LogsLimit)
+	assert.Equal(t, types.NewNullDuration(3*time.Second, true), config.LogsPushPeriod)
+	assert.Equal(t, null.IntFrom(10000), config.LogsMessageMaxSize)
+	assert.Equal(t, []string{"lz", "level", "test_run_id"}, config.LogsAllowedLabels)
+}
+
+func TestConfig_Apply_MergesLogsFields(t *testing.T) {
+	t.Parallel()
+
+	baseCfg := Config{
+		LogsPushURL:        null.StringFrom("https://base.example/logs"),
+		LogsLevel:          null.StringFrom("warn"),
+		LogsLimit:          null.IntFrom(100),
+		LogsPushPeriod:     types.NewNullDuration(1*time.Second, true),
+		LogsMessageMaxSize: null.IntFrom(1024),
+		LogsAllowedLabels:  []string{"level"},
+	}
+	appliedCfg := Config{
+		LogsPushURL:        null.StringFrom("https://applied.example/logs"),
+		LogsLevel:          null.StringFrom("info"),
+		LogsLimit:          null.IntFrom(900),
+		LogsPushPeriod:     types.NewNullDuration(3*time.Second, true),
+		LogsMessageMaxSize: null.IntFrom(10000),
+		LogsAllowedLabels:  []string{"lz", "test_run_id"},
+	}
+
+	cases := []struct {
+		name    string
+		base    Config
+		applied Config
+		want    Config
+	}{
+		{
+			name:    "applied populated, base unset → uses applied",
+			base:    Config{},
+			applied: appliedCfg,
+			want:    appliedCfg,
+		},
+		{
+			name:    "applied unset, base populated → keeps base",
+			base:    baseCfg,
+			applied: Config{},
+			want:    baseCfg,
+		},
+		{
+			name:    "both populated → applied wins",
+			base:    baseCfg,
+			applied: appliedCfg,
+			want:    appliedCfg,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := tc.base.Apply(tc.applied)
+			assert.Equal(t, tc.want.LogsPushURL, got.LogsPushURL)
+			assert.Equal(t, tc.want.LogsLevel, got.LogsLevel)
+			assert.Equal(t, tc.want.LogsLimit, got.LogsLimit)
+			assert.Equal(t, tc.want.LogsPushPeriod, got.LogsPushPeriod)
+			assert.Equal(t, tc.want.LogsMessageMaxSize, got.LogsMessageMaxSize)
+			assert.Equal(t, tc.want.LogsAllowedLabels, got.LogsAllowedLabels)
+		})
+	}
+}
+
 func TestGetConsolidatedConfig(t *testing.T) {
 	t.Parallel()
 	config, warn, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil)

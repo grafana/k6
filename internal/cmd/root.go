@@ -21,6 +21,7 @@ import (
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/log"
+	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
 	"go.k6.io/k6/v2/secretsource"
 
 	_ "go.k6.io/k6/v2/internal/secretsource" // import it to register internal secret sources
@@ -84,10 +85,11 @@ func ExecuteWithGlobalState(gs *state.GlobalState) {
 type rootCommand struct {
 	globalState *state.GlobalState
 
-	cmd            *cobra.Command
-	stopLoggersCh  chan struct{}
-	loggersWg      sync.WaitGroup
-	loggerIsRemote bool
+	cmd                *cobra.Command
+	stopLoggersCh      chan struct{}
+	loggersWg          sync.WaitGroup
+	loggerIsRemote     bool
+	enableCloudLogPush bool
 }
 
 // newRootCommand creates a root command with a default launcher
@@ -156,6 +158,14 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, _ []string) error {
 		if f == nil || f.Value.String() != "true" {
 			c.globalState.Flags.SecretSource = append(c.globalState.Flags.SecretSource, "cloud")
 		}
+	}
+
+	// For 'k6 cloud run --local-execution', push k6's own logs to the cloud unless
+	// --no-cloud-logs is set. The decision is made here and applied in setupLoggers,
+	// which registers the pusher on the logger.
+	if isCloudRunWithLocalExecution(cmd) {
+		f := cmd.Flag("no-cloud-logs")
+		c.enableCloudLogPush = f == nil || f.Value.String() != "true"
 	}
 
 	err := c.setupLoggers(c.stopLoggersCh)
@@ -413,6 +423,10 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		c.setLoggerHook(ctx, hook)
 	}
 
+	// Attach the cloud log pusher after the secrets-redaction hook so it only
+	// ever observes redacted entries (see setupCloudLogPusher).
+	c.setupCloudLogPusher(stop)
+
 	// Sometimes the Go runtime uses the standard log output to
 	// log some messages directly.
 	// It does when an invalid char is found in a Cookie.
@@ -433,6 +447,30 @@ func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
 	})
 	c.globalState.Logger.AddHook(h)
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
+}
+
+// setupCloudLogPusher registers the cloud log pusher on the logger and starts
+// its Listen goroutine under the logger goroutine group. It does nothing unless
+// cloud log push is enabled. It must be called after the secrets-redaction hook
+// is registered: logrus fires hooks in registration order and each hook mutates
+// the same entry in place, so a hook added later only observes redacted entries.
+// Unlike setLoggerHook, the hook is added directly and the primary log output is
+// left intact; the pusher only mirrors entries to the cloud. The pusher buffers
+// until it is configured and drains on shutdown when stop fires and its context
+// is cancelled.
+func (c *rootCommand) setupCloudLogPusher(stop <-chan struct{}) {
+	if !c.enableCloudLogPush {
+		return
+	}
+	p := cloudlog.New(c.globalState.FallbackLogger)
+	c.globalState.CloudLogPusher = p
+	c.globalState.Logger.AddHook(p)
+	pctx, pcancel := context.WithCancel(context.Background())
+	c.loggersWg.Go(func() { p.Listen(pctx) })
+	c.loggersWg.Go(func() {
+		<-stop
+		pcancel()
+	})
 }
 
 //nolint:gocognit

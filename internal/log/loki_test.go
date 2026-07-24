@@ -93,6 +93,74 @@ func TestSyslogFromConfigLine(t *testing.T) {
 	}
 }
 
+func TestNewLokiHook(t *testing.T) {
+	t.Parallel()
+
+	opts := LokiHookOptions{
+		Addr:          "somewhere:1233",
+		PushPeriod:    time.Minute*5 + time.Second*32,
+		Limit:         32,
+		MsgMaxSize:    1231,
+		Level:         "info",
+		AllowedLabels: []string{"something"},
+		Labels:        [][2]string{{"something", "else"}, {"foo", "bar"}},
+		Headers:       [][2]string{{"x-test", "123"}, {"authorization", "token foobar"}},
+		Profile:       true,
+	}
+
+	res, err := NewLokiHook(nil, opts)
+	require.NoError(t, err)
+	hook, ok := res.(*lokiHook)
+	require.True(t, ok)
+
+	assert.Equal(t, "somewhere:1233", hook.addr)
+	assert.Equal(t, time.Minute*5+time.Second*32, hook.pushPeriod)
+	assert.Equal(t, 32, hook.limit)
+	assert.Equal(t, 1231, hook.msgMaxSize)
+	assert.Equal(t, logrus.AllLevels[:5], hook.levels)
+	assert.Equal(t, []string{"something"}, hook.allowedLabels)
+	assert.Equal(t, [][2]string{{"something", "else"}, {"foo", "bar"}}, hook.labels)
+	assert.Equal(t, [][2]string{{"x-test", "123"}, {"authorization", "token foobar"}}, hook.headers)
+	assert.True(t, hook.profile)
+
+	// The tail-end setup (droppedLabels/droppedMsg/client) must have run:
+	// non-allowed labels are folded into droppedMsg and dropped from droppedLabels.
+	assert.Equal(t, map[string]string{"something": "else"}, hook.droppedLabels)
+	assert.Equal(t,
+		"k6 dropped %d log messages because they were above the limit of %d messages / %s foo=bar level=warning",
+		hook.droppedMsg)
+	require.NotNil(t, hook.client)
+	assert.Equal(t, time.Minute*5+time.Second*32, hook.client.Timeout)
+}
+
+func TestNewLokiHook_Defaults(t *testing.T) {
+	t.Parallel()
+
+	res, err := NewLokiHook(nil, LokiHookOptions{})
+	require.NoError(t, err)
+	hook, ok := res.(*lokiHook)
+	require.True(t, ok)
+
+	assert.Equal(t, "http://127.0.0.1:3100/loki/api/v1/push", hook.addr)
+	assert.Equal(t, time.Second*1, hook.pushPeriod)
+	assert.Equal(t, 100, hook.limit)
+	assert.Equal(t, 1024*1024, hook.msgMaxSize)
+	assert.Equal(t, logrus.AllLevels, hook.levels)
+	assert.Nil(t, hook.allowedLabels)
+	assert.Nil(t, hook.labels)
+	assert.Nil(t, hook.headers)
+	assert.False(t, hook.profile)
+
+	// The tail-end setup runs even with defaults: only the level label is seeded,
+	// and with no allowedLabels the droppedMsg is left untouched.
+	assert.Equal(t, map[string]string{"level": "warning"}, hook.droppedLabels)
+	assert.Equal(t,
+		"k6 dropped %d log messages because they were above the limit of %d messages / %s",
+		hook.droppedMsg)
+	require.NotNil(t, hook.client)
+	assert.Equal(t, time.Second*1, hook.client.Timeout)
+}
+
 func TestLogEntryMarshal(t *testing.T) {
 	t.Parallel()
 	entry := logEntry{
