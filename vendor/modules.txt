@@ -1,7 +1,7 @@
 # buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.11-20240617172848-e1dbca2775a7.1
 ## explicit; go 1.23
 buf.build/gen/go/gogo/protobuf/protocolbuffers/go/gogoproto
-# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1
+# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260707164124-2360da55afce.1
 ## explicit; go 1.23
 buf.build/gen/go/prometheus/prometheus/protocolbuffers/go
 # github.com/Azure/go-ntlmssp v0.1.1
@@ -17,7 +17,7 @@ github.com/PuerkitoBio/goquery
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 ## explicit
 github.com/Soontao/goHttpDigestClient
-# github.com/andybalholm/brotli v1.2.1
+# github.com/andybalholm/brotli v1.2.2
 ## explicit; go 1.22
 github.com/andybalholm/brotli
 github.com/andybalholm/brotli/flate
@@ -110,11 +110,12 @@ github.com/chromedp/sysutil
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dlclark/regexp2 v1.12.0
-## explicit; go 1.13
-github.com/dlclark/regexp2
-github.com/dlclark/regexp2/syntax
-# github.com/evanw/esbuild v0.28.0
+# github.com/dlclark/regexp2/v2 v2.2.2
+## explicit; go 1.25
+github.com/dlclark/regexp2/v2
+github.com/dlclark/regexp2/v2/helpers
+github.com/dlclark/regexp2/v2/syntax
+# github.com/evanw/esbuild v0.28.1
 ## explicit; go 1.13
 github.com/evanw/esbuild/internal/api_helpers
 github.com/evanw/esbuild/internal/ast
@@ -178,14 +179,14 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.3
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/k6-cloud-openapi-client-go v0.0.2
+# github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa7c
 ## explicit; go 1.23.4
 github.com/grafana/k6-cloud-openapi-client-go/k6
 # github.com/grafana/k6provider v0.5.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b
-## explicit; go 1.20
+# github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4
+## explicit; go 1.25
 github.com/grafana/sobek
 github.com/grafana/sobek/ast
 github.com/grafana/sobek/file
@@ -194,6 +195,10 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
+# github.com/grafana/sobek-webapi-encoding v0.1.0
+## explicit; go 1.25.0
+github.com/grafana/sobek-webapi-encoding
+github.com/grafana/sobek-webapi-encoding/encoding
 # github.com/grafana/xk6-dashboard-assets v0.1.2
 ## explicit; go 1.24
 github.com/grafana/xk6-dashboard-assets
@@ -230,7 +235,7 @@ github.com/jhump/protoreflect/v2/internal/reparse
 github.com/jhump/protoreflect/v2/internal/sort
 github.com/jhump/protoreflect/v2/protoresolve
 github.com/jhump/protoreflect/v2/sourceinfo
-# github.com/klauspost/compress v1.18.5
+# github.com/klauspost/compress v1.19.0
 ## explicit; go 1.24
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
@@ -251,7 +256,7 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.22
 ## explicit; go 1.21
 github.com/mattn/go-isatty
-# github.com/mccutchen/go-httpbin/v2 v2.23.0
+# github.com/mccutchen/go-httpbin/v2 v2.24.0
 ## explicit; go 1.25.0
 github.com/mccutchen/go-httpbin/v2/httpbin
 github.com/mccutchen/go-httpbin/v2/httpbin/digest
@@ -446,7 +451,7 @@ go.uber.org/goleak/internal/stack
 # go.yaml.in/yaml/v2 v2.4.2
 ## explicit; go 1.15
 go.yaml.in/yaml/v2
-# golang.org/x/crypto v0.53.0
+# golang.org/x/crypto v0.54.0
 ## explicit; go 1.25.0
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
@@ -455,7 +460,7 @@ golang.org/x/crypto/ripemd160
 ## explicit; go 1.25.0
 golang.org/x/crypto/x509roots/fallback
 golang.org/x/crypto/x509roots/fallback/bundle
-# golang.org/x/net v0.56.0
+# golang.org/x/net v0.57.0
 ## explicit; go 1.25.0
 golang.org/x/net/context
 golang.org/x/net/html
@@ -468,29 +473,35 @@ golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/httpsfv
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sync v0.21.0
+# golang.org/x/sync v0.22.0
 ## explicit; go 1.25.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.46.0
+# golang.org/x/sys v0.47.0
 ## explicit; go 1.25.0
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.44.0
+# golang.org/x/term v0.45.0
 ## explicit; go 1.25.0
 golang.org/x/term
-# golang.org/x/text v0.38.0
+# golang.org/x/text v0.40.0
 ## explicit; go 1.25.0
 golang.org/x/text/cases
 golang.org/x/text/collate
+golang.org/x/text/encoding
+golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/unicode
 golang.org/x/text/internal
 golang.org/x/text/internal/colltab
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
+golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
+golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
@@ -506,7 +517,7 @@ google.golang.org/genproto/googleapis/api/httpbody
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.81.1
+# google.golang.org/grpc v1.82.1
 ## explicit; go 1.25.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -528,6 +539,7 @@ google.golang.org/grpc/encoding
 google.golang.org/grpc/encoding/gzip
 google.golang.org/grpc/encoding/internal
 google.golang.org/grpc/encoding/proto
+google.golang.org/grpc/experimental/balancer/weight
 google.golang.org/grpc/experimental/stats
 google.golang.org/grpc/grpclog
 google.golang.org/grpc/grpclog/internal
@@ -536,7 +548,6 @@ google.golang.org/grpc/health/grpc_health_v1
 google.golang.org/grpc/internal
 google.golang.org/grpc/internal/backoff
 google.golang.org/grpc/internal/balancer/gracefulswitch
-google.golang.org/grpc/internal/balancer/weight
 google.golang.org/grpc/internal/balancerload
 google.golang.org/grpc/internal/binarylog
 google.golang.org/grpc/internal/buffer
@@ -562,6 +573,7 @@ google.golang.org/grpc/internal/stats
 google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
+google.golang.org/grpc/internal/transport/internal
 google.golang.org/grpc/internal/transport/networktype
 google.golang.org/grpc/internal/transport/readyreader
 google.golang.org/grpc/keepalive

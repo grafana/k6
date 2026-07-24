@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,7 +22,7 @@ var _ MappedNullable = &ProjectLabelPutItem{}
 // ProjectLabelPutItem Single project label for PUT request
 type ProjectLabelPutItem struct {
 	// Label key ID. Mutually exclusive with 'key'.
-	KeyId NullableInt32 `json:"key_id,omitempty"`
+	KeyId NullableInt64 `json:"key_id,omitempty"`
 	// Label key name. Mutually exclusive with 'key_id'.
 	Key NullableString `json:"key,omitempty" validate:"regexp=^[^\\\\s'\\\\\\";\\\\\\\\%]+$"`
 	// Label value.
@@ -51,9 +51,9 @@ func NewProjectLabelPutItemWithDefaults() *ProjectLabelPutItem {
 }
 
 // GetKeyId returns the KeyId field value if set, zero value otherwise (both if not set or set to explicit null).
-func (o *ProjectLabelPutItem) GetKeyId() int32 {
+func (o *ProjectLabelPutItem) GetKeyId() int64 {
 	if o == nil || IsNil(o.KeyId.Get()) {
-		var ret int32
+		var ret int64
 		return ret
 	}
 	return *o.KeyId.Get()
@@ -62,7 +62,7 @@ func (o *ProjectLabelPutItem) GetKeyId() int32 {
 // GetKeyIdOk returns a tuple with the KeyId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
 // NOTE: If the value is an explicit nil, `nil, true` will be returned
-func (o *ProjectLabelPutItem) GetKeyIdOk() (*int32, bool) {
+func (o *ProjectLabelPutItem) GetKeyIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -78,8 +78,8 @@ func (o *ProjectLabelPutItem) HasKeyId() bool {
 	return false
 }
 
-// SetKeyId gets a reference to the given NullableInt32 and assigns it to the KeyId field.
-func (o *ProjectLabelPutItem) SetKeyId(v int32) {
+// SetKeyId gets a reference to the given NullableInt64 and assigns it to the KeyId field.
+func (o *ProjectLabelPutItem) SetKeyId(v int64) {
 	o.KeyId.Set(&v)
 }
 

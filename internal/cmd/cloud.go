@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -100,10 +99,9 @@ func newCloudV6ClientFromConfig(
 		return nil, cloudapi.Config{}, err
 	}
 
-	if cloudConfig.StackID.Int64 < math.MinInt32 || cloudConfig.StackID.Int64 > math.MaxInt32 {
-		return nil, cloudapi.Config{}, fmt.Errorf("stack ID %d overflows int32", cloudConfig.StackID.Int64)
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
+		return nil, cloudapi.Config{}, err
 	}
-	client.SetStackID(int32(cloudConfig.StackID.Int64))
 
 	return client, cloudConfig, nil
 }
@@ -348,7 +346,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	ticker := time.NewTicker(time.Millisecond * 2000)
 	if c.showCloudLogs {
-		refID := strconv.FormatInt(int64(testRunID), 10)
+		refID := strconv.FormatInt(testRunID, 10)
 		go func() {
 			logger.Debug("Connecting to cloud logs server...")
 			if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
@@ -519,33 +517,18 @@ func prepCloudTestRun(
 	ctx context.Context, gs *state.GlobalState,
 	client *cloudapiv6.Client,
 	cloudConfig *cloudapi.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
-) (int32, error) {
-	toInt32 := func(v int64) (int32, error) {
-		if v < math.MinInt32 || v > math.MaxInt32 {
-			return 0, fmt.Errorf("value %d overflows int32", v)
-		}
-		return int32(v), nil
-	}
-
-	stackID, err := toInt32(cloudConfig.StackID.Int64)
-	if err != nil {
+) (int64, error) {
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
 		return 0, err
 	}
-	client.SetStackID(stackID)
 
-	projectID, err := toInt32(cloudConfig.ProjectID.Int64)
-	if err != nil {
-		return 0, err
-	}
+	projectID := cloudConfig.ProjectID.Int64
 
 	if projectID == 0 {
 		if err := resolveAndSetProjectID(gs, cloudConfig, tmpCloudConfig, arc); err != nil {
 			return 0, err
 		}
-		projectID, err = toInt32(cloudConfig.ProjectID.Int64)
-		if err != nil {
-			return 0, err
-		}
+		projectID = cloudConfig.ProjectID.Int64
 	}
 
 	if err := client.ValidateOptions(ctx, projectID, arc.Options); err != nil {
@@ -606,11 +589,11 @@ func resolveAndSetProjectID(
 	return nil
 }
 
-func resolveCloudTestURL(stackURL string, testID int32) (string, error) {
+func resolveCloudTestURL(stackURL string, testID int64) (string, error) {
 	u, err := url.Parse(stackURL)
 	if err != nil {
 		return "", fmt.Errorf("invalid stack URL: %w", err)
 	}
 
-	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(int64(testID), 10)).String(), nil
+	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(testID, 10)).String(), nil
 }

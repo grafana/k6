@@ -35,11 +35,11 @@ type ReadableStreamGenericReader interface {
 	// SetStream sets the stream that owns this reader.
 	SetStream(stream *ReadableStream)
 
-	// GetClosed returns a [sobek.Promise] that resolves when the stream is closed.
-	GetClosed() (p *sobek.Promise, resolve, reject func(any) error)
+	// getClosed returns the promise that resolves when the stream is closed.
+	getClosed() *promiseWrapper
 
-	// SetClosed sets the [sobek.Promise] that resolves when the stream is closed.
-	SetClosed(p *sobek.Promise, resolve, reject func(any) error)
+	// setClosed sets the promise that resolves when the stream is closed.
+	setClosed(*promiseWrapper)
 
 	// Cancel returns a [sobek.Promise] that resolves when the stream is canceled.
 	Cancel(reason sobek.Value) *sobek.Promise
@@ -47,9 +47,7 @@ type ReadableStreamGenericReader interface {
 
 // BaseReadableStreamReader is a base implement
 type BaseReadableStreamReader struct {
-	closedPromise            *sobek.Promise
-	closedPromiseResolveFunc func(resolve any) error
-	closedPromiseRejectFunc  func(reason any) error
+	closedPromise *promiseWrapper
 
 	// stream is a [ReadableStream] instance that owns this reader
 	stream *ReadableStream
@@ -73,16 +71,14 @@ func (reader *BaseReadableStreamReader) SetStream(stream *ReadableStream) {
 	reader.vu = stream.vu
 }
 
-// GetClosed returns the reader's closed promise as well as its resolve and reject functions.
-func (reader *BaseReadableStreamReader) GetClosed() (p *sobek.Promise, resolve, reject func(any) error) {
-	return reader.closedPromise, reader.closedPromiseResolveFunc, reader.closedPromiseRejectFunc
+// getClosed returns the reader's closed promise.
+func (reader *BaseReadableStreamReader) getClosed() *promiseWrapper {
+	return reader.closedPromise
 }
 
-// SetClosed sets the reader's closed promise as well as its resolve and reject functions.
-func (reader *BaseReadableStreamReader) SetClosed(p *sobek.Promise, resolve, reject func(any) error) {
-	reader.closedPromise = p
-	reader.closedPromiseResolveFunc = resolve
-	reader.closedPromiseRejectFunc = reject
+// setClosed sets the reader's closed promise.
+func (reader *BaseReadableStreamReader) setClosed(promise *promiseWrapper) {
+	reader.closedPromise = promise
 }
 
 // Cancel returns a [sobek.Promise] that resolves when the stream is canceled.
@@ -134,24 +130,14 @@ func (reader *BaseReadableStreamReader) release() {
 
 	// 4. If stream.[[state]] is "readable", reject reader.[[closedPromise]] with a TypeError exception.
 	if stream.state == ReadableStreamStateReadable {
-		err := reader.closedPromiseRejectFunc(newTypeError(reader.runtime, "stream is readable").Err())
-		if err != nil {
-			panic(err)
-		}
+		reader.closedPromise.rejectWith(newTypeError(reader.runtime, "stream is readable"))
 	} else { // 5. Otherwise, set reader.[[closedPromise]] to a promise rejected with a TypeError exception.
-		reader.closedPromise = newRejectedPromise(stream.vu, newTypeError(reader.runtime, "stream is not readable").Err())
+		reader.closedPromise = newRejectedPromiseWrapper(
+			stream.runtime, newTypeError(reader.runtime, "stream is not readable"))
 	}
 
 	// 6. Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
-	// FIXME: See https://github.com/dop251/goja/issues/565
-	var (
-		err       error
-		doNothing = func(sobek.Value) {}
-	)
-	_, err = promiseThen(stream.vu.Runtime(), reader.closedPromise, doNothing, doNothing)
-	if err != nil {
-		common.Throw(stream.vu.Runtime(), newError(RuntimeError, err.Error()))
-	}
+	markPromiseHandled(stream.runtime, reader.closedPromise.promise)
 
 	// 7. Perform ! stream.[[controller]].[[ReleaseSteps]]().
 	stream.controller.releaseSteps()
@@ -190,7 +176,7 @@ func ReadableStreamReaderGenericInitialize(reader ReadableStreamGenericReader, s
 	stream.reader = reader
 	stream.Locked = true
 
-	promise, resolve, reject := stream.runtime.NewPromise()
+	promise := newPromiseWrapper(stream.runtime)
 
 	switch stream.state {
 	// 3. If stream.[[state]] is "readable",
@@ -200,10 +186,7 @@ func ReadableStreamReaderGenericInitialize(reader ReadableStreamGenericReader, s
 	// 4. Otherwise, if stream.[[state]] is "closed",
 	case ReadableStreamStateClosed:
 		// 4.1 Set reader.[[closedPromise]] to a promise resolved with undefined.
-		err := resolve(sobek.Undefined())
-		if err != nil {
-			panic(err) // TODO(@mstoykov): probably better to move them out as errors
-		}
+		promise.resolveWith(sobek.Undefined())
 	// 5. Otherwise,
 	default:
 		// 5.1 Assert: stream.[[state]] is "errored".
@@ -212,29 +195,15 @@ func ReadableStreamReaderGenericInitialize(reader ReadableStreamGenericReader, s
 		}
 
 		// 5.2 Set reader.[[closedPromise]] to a promise rejected with stream.[[storedError]].
-		if jsErr, ok := stream.storedError.(*jsError); ok {
-			err := reject(jsErr.Err())
-			if err != nil {
-				panic(err)
-			}
+		if _, ok := stream.storedError.(*jsError); ok {
+			promise.rejectWith(stream.storedError)
 		} else {
-			err := reject(errToObj(stream.runtime, stream.storedError))
-			if err != nil {
-				panic(err)
-			}
+			promise.rejectWith(errToObj(stream.runtime, stream.storedError))
 		}
 
 		// 5.3 Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
-		// See https://github.com/dop251/goja/issues/565
-		var (
-			err       error
-			doNothing = func(sobek.Value) {}
-		)
-		_, err = promiseThen(stream.vu.Runtime(), promise, doNothing, doNothing)
-		if err != nil {
-			common.Throw(stream.vu.Runtime(), newError(RuntimeError, err.Error()))
-		}
+		markPromiseHandled(stream.runtime, promise.promise)
 	}
 
-	reader.SetClosed(promise, resolve, reject)
+	reader.setClosed(promise)
 }

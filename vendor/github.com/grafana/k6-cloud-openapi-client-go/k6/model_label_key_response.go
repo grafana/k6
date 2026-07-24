@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,7 +22,7 @@ var _ MappedNullable = &LabelKeyResponse{}
 // LabelKeyResponse Label key response model
 type LabelKeyResponse struct {
 	// Label key ID.
-	Id int32 `json:"id"`
+	Id int64 `json:"id"`
 	// Label key name.
 	Key string `json:"key"`
 	// Label key description.
@@ -36,7 +36,7 @@ type _LabelKeyResponse LabelKeyResponse
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewLabelKeyResponse(id int32, key string) *LabelKeyResponse {
+func NewLabelKeyResponse(id int64, key string) *LabelKeyResponse {
 	this := LabelKeyResponse{}
 	this.Id = id
 	this.Key = key
@@ -52,9 +52,9 @@ func NewLabelKeyResponseWithDefaults() *LabelKeyResponse {
 }
 
 // GetId returns the Id field value
-func (o *LabelKeyResponse) GetId() int32 {
+func (o *LabelKeyResponse) GetId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -63,7 +63,7 @@ func (o *LabelKeyResponse) GetId() int32 {
 
 // GetIdOk returns a tuple with the Id field value
 // and a boolean to check if the value has been set.
-func (o *LabelKeyResponse) GetIdOk() (*int32, bool) {
+func (o *LabelKeyResponse) GetIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -71,7 +71,7 @@ func (o *LabelKeyResponse) GetIdOk() (*int32, bool) {
 }
 
 // SetId sets field value
-func (o *LabelKeyResponse) SetId(v int32) {
+func (o *LabelKeyResponse) SetId(v int64) {
 	o.Id = v
 }
 

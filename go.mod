@@ -2,35 +2,36 @@ module go.k6.io/k6/v2
 
 go 1.25.0
 
-toolchain go1.25.11
+toolchain go1.25.12
 
 require (
-	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260331160422-eae785f0a21d.1
+	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260707164124-2360da55afce.1
 	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v1.2.1
+	github.com/andybalholm/brotli v1.2.2
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d
-	github.com/evanw/esbuild v0.28.0
+	github.com/evanw/esbuild v0.28.1
 	github.com/fatih/color v1.19.0
 	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/k6-cloud-openapi-client-go v0.0.2
+	github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa7c
 	github.com/grafana/k6provider v0.5.0
-	github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b
+	github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4
+	github.com/grafana/sobek-webapi-encoding v0.1.0
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.18.0
-	github.com/klauspost/compress v1.18.5
+	github.com/klauspost/compress v1.19.0
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mattn/go-isatty v0.0.22
-	github.com/mccutchen/go-httpbin/v2 v2.23.0
+	github.com/mccutchen/go-httpbin/v2 v2.24.0
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -56,13 +57,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0
 	go.opentelemetry.io/proto/otlp v1.10.0
 	go.uber.org/goleak v1.3.0
-	golang.org/x/crypto v0.53.0
+	golang.org/x/crypto v0.54.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260609182332-5f2de1a9f1e2
-	golang.org/x/net v0.56.0
-	golang.org/x/sync v0.21.0
-	golang.org/x/term v0.44.0
+	golang.org/x/net v0.57.0
+	golang.org/x/sync v0.22.0
+	golang.org/x/term v0.45.0
 	golang.org/x/time v0.15.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -76,7 +77,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dlclark/regexp2 v1.12.0 // indirect
+	github.com/dlclark/regexp2/v2 v2.2.2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
@@ -95,8 +96,8 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect

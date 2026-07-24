@@ -22,14 +22,14 @@ func (r *Runtime) builtinJSON_parse(call FunctionCall) Value {
 
 	value, err := r.builtinJSON_decodeValue(d)
 	if errors.Is(err, io.EOF) {
-		panic(r.newError(r.getSyntaxError(), "Unexpected end of JSON input (%v)", err.Error()))
+		panic(r.newErrorf(r.getSyntaxError(), "Unexpected end of JSON input (%v)", err.Error()))
 	}
 	if err != nil {
 		panic(r.newError(r.getSyntaxError(), err.Error()))
 	}
 
 	if tok, err := d.Token(); err != io.EOF {
-		panic(r.newError(r.getSyntaxError(), "Unexpected token at the end: %v", tok))
+		panic(r.newErrorf(r.getSyntaxError(), "Unexpected token at the end: %v", tok))
 	}
 
 	var reviver func(FunctionCall) Value

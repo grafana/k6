@@ -1148,6 +1148,11 @@ func jumpStmtsLookTheSame(left js_ast.S, right js_ast.S) bool {
 }
 
 func (p *parser) selectLocalKind(kind js_ast.LocalKind) js_ast.LocalKind {
+	// Use "var" instead of "let" and "const" if they aren't supported
+	if (kind == js_ast.LocalLet || kind == js_ast.LocalConst) && p.options.unsupportedJSFeatures.Has(compat.ConstAndLet) {
+		return js_ast.LocalVar
+	}
+
 	// Use "var" instead of "let" and "const" if the variable declaration may
 	// need to be separated from the initializer. This allows us to safely move
 	// this declaration into a nested scope.
@@ -1518,7 +1523,6 @@ func (p *parser) declareSymbol(kind ast.SymbolKind, loc logger.Loc, name string)
 	// Overwrite this name in the declaring scope
 	p.currentScope.Members[name] = js_ast.ScopeMember{Ref: ref, Loc: loc}
 	return ref
-
 }
 
 // This type is just so we can use Go's native sort function
@@ -3488,6 +3492,7 @@ const (
 	exprFlagForLoopInit
 	exprFlagForAwaitLoopInit
 	exprFlagAfterQuestionAndBeforeColon
+	exprFlagIsNewTarget
 )
 
 func (p *parser) parsePrefix(level js_ast.L, errors *deferredErrors, flags exprFlag) js_ast.Expr {
@@ -3819,7 +3824,7 @@ func (p *parser) parsePrefix(level js_ast.L, errors *deferredErrors, flags exprF
 			return js_ast.Expr{Loc: loc, Data: &js_ast.ENewTarget{Range: r}}
 		}
 
-		target := p.parseExprWithFlags(js_ast.LMember, flags)
+		target := p.parseExprWithFlags(js_ast.LMember, flags|exprFlagIsNewTarget)
 		args := []js_ast.Expr{}
 		var closeParenLoc logger.Loc
 		var isMultiLine bool
@@ -4320,6 +4325,11 @@ func (p *parser) parseSuffix(left js_ast.Expr, level js_ast.L, errors *deferredE
 			optionalChain = oldOptionalChain
 
 		case js_lexer.TQuestionDot:
+			if (flags & exprFlagIsNewTarget) != 0 {
+				p.log.AddError(&p.tracker, p.lexer.Range(), "Cannot use an unparenthesized optional chain inside the target of \"new\"")
+				flags &= ^exprFlagIsNewTarget // Don't report this error more than once in this spot
+			}
+
 			p.lexer.Next()
 			optionalStart := js_ast.OptionalChainStart
 
@@ -9180,7 +9190,7 @@ func (p *parser) mangleStmts(stmts []js_ast.Stmt, kind stmtsKind) []js_ast.Stmt 
 				// should have visited all the uses of "let" and "const" declarations
 				// by now since they are scoped to this block which we just finished
 				// visiting.
-				if prevS, ok := result[len(result)-1].Data.(*js_ast.SLocal); ok && prevS.Kind != js_ast.LocalVar {
+				if prevS, ok := result[len(result)-1].Data.(*js_ast.SLocal); ok && (prevS.Kind == js_ast.LocalLet || prevS.Kind == js_ast.LocalConst) {
 					last := prevS.Decls[len(prevS.Decls)-1]
 
 					// The binding must be an identifier that is only used once.
@@ -10008,9 +10018,18 @@ func (p *parser) visitForLoopInit(stmt js_ast.Stmt, isInOrOf bool) js_ast.Stmt {
 }
 
 func (p *parser) recordDeclaredSymbol(ref ast.Ref) {
+	isTopLevel := p.currentScope == p.moduleScope
+
+	// Check whether this symbol was hoisted out of a nested scope into the module scope
+	if !isTopLevel {
+		if symbol := p.symbols[ref.InnerIndex]; symbol.Kind.IsHoisted() && p.moduleScope.Members[symbol.OriginalName].Ref == ref {
+			isTopLevel = true
+		}
+	}
+
 	p.declaredSymbols = append(p.declaredSymbols, js_ast.DeclaredSymbol{
 		Ref:        ref,
-		IsTopLevel: p.currentScope == p.moduleScope,
+		IsTopLevel: isTopLevel,
 	})
 }
 
@@ -18217,7 +18236,7 @@ const (
 	whyESMImportStatement
 )
 
-// Say why this the current file is being considered an ES module
+// Say why the current file is being considered an ES module
 func (p *parser) whyESModule() (whyESM, []logger.MsgData) {
 	because := "This file is considered to be an ECMAScript module because"
 	switch {

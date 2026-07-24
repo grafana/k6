@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	defaultLoadTestID int32 = 456
-	defaultTestRunID  int32 = 123
+	defaultLoadTestID int64 = 456
+	defaultTestRunID  int64 = 123
 )
 
 // Server is a test HTTP server for the v6 cloud API.
@@ -39,7 +39,7 @@ type Server struct {
 type Config struct {
 	// TestRunID is the id reported by the start-test response and used
 	// in the test-run routes. Defaults to [defaultTestRunID] when zero.
-	TestRunID int32
+	TestRunID int64
 
 	// ProgressCallback returns the [cloudapi.TestProgress] reported by
 	// each test fetch. When nil, a finished passing run is reported.
@@ -119,7 +119,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
-	projectID, err := strconv.ParseInt(r.PathValue("projectID"), 10, 32)
+	projectID, err := strconv.ParseInt(r.PathValue("projectID"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid project ID", http.StatusBadRequest)
 		return
@@ -127,14 +127,14 @@ func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
 
 	tests := make([]k6cloud.LoadTestApiModel, 0, len(s.cfg.LoadTests))
 	for _, test := range s.cfg.LoadTests {
-		if test.ProjectID != int32(projectID) {
+		if test.ProjectID != projectID {
 			continue
 		}
 		tests = append(tests, *k6cloud.NewLoadTestApiModel(
 			test.ID,
 			test.ProjectID,
 			test.Name,
-			*k6cloud.NewNullableInt32(nil),
+			*k6cloud.NewNullableInt64(nil),
 			test.Created,
 			test.Updated,
 		))
@@ -146,13 +146,10 @@ func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleListLoadZones(w http.ResponseWriter, _ *http.Request) {
 	zones := make([]k6cloud.LoadZoneApiModel, len(s.cfg.LoadZones))
 	for i, zone := range s.cfg.LoadZones {
-		m := k6cloud.NewLoadZoneApiModel(zone.ID, zone.Name, zone.K6LoadZoneID)
-		// The SDK doesn't model `public`/`available`, so emit them via the
-		// untyped catch-all, matching how the real API returns them.
-		m.AdditionalProperties = map[string]any{
-			"public":    zone.Public,
-			"available": zone.Available,
-		}
+		m := k6cloud.NewLoadZoneApiModel(
+			zone.ID, zone.Name, zone.K6LoadZoneID,
+			zone.Available, *k6cloud.NewNullableString(nil), zone.Public,
+		)
 		zones[i] = *m
 	}
 	res := k6cloud.NewLoadZonesListApiModel(zones)
@@ -186,7 +183,7 @@ func (s *Server) handleStartTest(w http.ResponseWriter, _ *http.Request) {
 	res.SetTestRunDetailsPageUrl(fmt.Sprintf("https://stack.grafana.com/a/k6-app/runs/%d", s.cfg.TestRunID))
 	// SDK decoder requires these keys on the other end even when empty.
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
-	res.SetResultDetails(map[string]any{})
+	res.SetResultDetails(*k6cloud.NewResultDetailsApiModel(""))
 	res.SetOptions(map[string]any{})
 	writeJSON(w, http.StatusOK, res)
 }
@@ -210,7 +207,7 @@ func (s *Server) handleGetTestRun(w http.ResponseWriter, _ *http.Request) {
 	res.SetStatusHistory(cloudapi.ToStatusModel(tp.StatusHistory))
 	// SDK decoder requires these keys on the other end even when empty.
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
-	res.SetResultDetails(map[string]any{})
+	res.SetResultDetails(k6cloud.ResultDetailsApiModelAsTestRunApiModelResultDetails(k6cloud.NewResultDetailsApiModel("")))
 	res.SetOptions(map[string]any{})
 	writeJSON(w, http.StatusOK, res)
 }
