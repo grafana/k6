@@ -3,6 +3,7 @@ package cloudapi
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -351,6 +352,115 @@ func TestUploadTest(t *testing.T) {
 		_, err := client.UploadTest(t.Context(), "test", 1, newTestArchive(t))
 		assert.ErrorIs(t, err, errTestNotExists)
 	})
+}
+
+func TestCreateOrFindLoadTest(t *testing.T) {
+	t.Parallel()
+
+	var (
+		method     string
+		path       string
+		stackID    string
+		authHeader string
+		formName   string
+		hasScript  bool
+	)
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		path = r.URL.Path
+		stackID = r.Header.Get("X-Stack-Id")
+		authHeader = r.Header.Get("Authorization")
+
+		require.NoError(t, r.ParseMultipartForm(1<<20))
+		formName = r.FormValue("name")
+		_, _, err := r.FormFile("script")
+		hasScript = err == nil
+
+		res := k6cloud.NewLoadTestApiModelWithDefaults()
+		res.SetId(12345)
+		writeJSON(t, w, http.StatusOK, res)
+	}))
+
+	id, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	require.NoError(t, err)
+	assert.Equal(t, int64(12345), id)
+	assert.Equal(t, http.MethodPost, method)
+	assert.Equal(t, "/cloud/v6/projects/99/load_tests", path)
+	assert.Equal(t, "my-test", formName)
+	assert.False(t, hasScript, "request must not include a script part")
+	assert.Equal(t, "1", stackID)
+	assert.Equal(t, "Bearer test-token", authHeader)
+}
+
+func TestCreateOrFindLoadTest_ConflictFallsBackToFindByName(t *testing.T) {
+	t.Parallel()
+
+	var (
+		getHit  bool
+		getName string
+		getTop  string
+	)
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			writeError(t, w, http.StatusConflict, "conflict", "already exists")
+		case http.MethodGet:
+			getHit = true
+			getName = r.URL.Query().Get("name")
+			getTop = r.URL.Query().Get("$top")
+			lt := k6cloud.NewLoadTestApiModelWithDefaults()
+			lt.SetId(67890)
+			writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{lt}})
+		}
+	}))
+
+	id, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	require.NoError(t, err)
+	assert.Equal(t, int64(67890), id)
+	assert.True(t, getHit, "GET fallback should have been called")
+	assert.Equal(t, "my-test", getName)
+	assert.Equal(t, "1", getTop)
+}
+
+func TestCreateOrFindLoadTest_ConflictWithNoMatchReturnsError(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			writeError(t, w, http.StatusConflict, "conflict", "already exists")
+		case http.MethodGet:
+			writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{}})
+		}
+	}))
+
+	_, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	assert.ErrorIs(t, err, errTestNotExists)
+}
+
+func TestCreateOrFindLoadTest_NonConflictHTTPErrorReturned(t *testing.T) {
+	t.Parallel()
+
+	var getHit bool
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			writeError(t, w, http.StatusInternalServerError, "server_error", "internal error")
+		case http.MethodGet:
+			getHit = true
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+
+	_, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	require.Error(t, err)
+
+	var rerr ResponseError
+	assert.True(t, errors.As(err, &rerr))
+	assert.Equal(t, http.StatusInternalServerError, rerr.Response.StatusCode)
+	assert.False(t, getHit, "GET fallback should not be called on non-conflict error")
 }
 
 func TestStartTest(t *testing.T) {
