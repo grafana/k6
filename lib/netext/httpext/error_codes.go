@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"golang.org/x/net/http2"
@@ -92,6 +93,68 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 	return 1 + errCode(code)
 }
 
+// http2ErrCodeByName maps the textual form produced by http2.ErrCode.String()
+// (e.g. "PROTOCOL_ERROR") back to its code. Only the spec-defined codes are
+// recognized; anything else returns false.
+func http2ErrCodeByName(name string) (http2.ErrCode, bool) {
+	for code := http2.ErrCodeNo; code <= http2.ErrCodeHTTP11Required; code++ {
+		if code.String() == name {
+			return code, true
+		}
+	}
+	return 0, false
+}
+
+// errorCodeForHTTP2Message classifies an HTTP/2 error by the text of its
+// Error() method. All HTTP/2 error types from both golang.org/x/net/http2 and
+// Go's stdlib net/http/internal/http2 produce the same Error() strings, so
+// this single path handles every Go version uniformly. Only spec-defined error
+// codes are recognized; an unknown code falls through.
+func errorCodeForHTTP2Message(msg string) (errCode, string, bool) {
+	switch {
+	case strings.HasPrefix(msg, "stream error: "):
+		// Format: "stream error: stream ID N; ERRCODE[; cause]"
+		// Cause is omitted when StreamError.Cause == nil, so the trailing "; cause"
+		// segment may be absent. Skip "stream error: stream ID N; " then take the
+		// ERRCODE up to the next ";" (with cause) or end of string (without cause).
+		if _, rest, ok := strings.Cut(msg, "; "); ok {
+			name, _, _ := strings.Cut(rest, ";")
+			if code, ok := http2ErrCodeByName(strings.TrimSpace(name)); ok {
+				return unknownHTTP2StreamErrorCode + http2ErrCodeOffset(code),
+					fmt.Sprintf(http2StreamErrorCodeMsg, code), true
+			}
+		}
+	case strings.HasPrefix(msg, "connection error: "):
+		name := strings.TrimPrefix(msg, "connection error: ")
+		if code, ok := http2ErrCodeByName(name); ok {
+			return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(code),
+				fmt.Sprintf(http2ConnectionErrorCodeMsg, code), true
+		}
+	case strings.HasPrefix(msg, "http2: server sent GOAWAY"):
+		if name, ok := stringBetween(msg, "ErrCode=", ","); ok {
+			if code, ok := http2ErrCodeByName(name); ok {
+				return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(code),
+					fmt.Sprintf(http2GoAwayErrorCodeMsg, code), true
+			}
+		}
+	}
+	return 0, "", false
+}
+
+// stringBetween returns the substring of s found between the first occurrence
+// of prefix and the next occurrence of sep that follows it.
+func stringBetween(s, prefix, sep string) (string, bool) {
+	_, after, found := strings.Cut(s, prefix)
+	if !found {
+		return "", false
+	}
+	mid, _, found := strings.Cut(after, sep)
+	if !found {
+		return "", false
+	}
+	return mid, true
+}
+
 //nolint:errorlint
 func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
 	// TODO: refactor this further - a big switch would be more readable, maybe
@@ -173,15 +236,6 @@ func errorCodeForError(err error) (errCode, string) {
 		return blackListedIPErrorCode, blackListedIPErrorCodeMsg
 	case netext.BlockedHostError:
 		return blockedHostnameErrorCode, blockedHostnameErrorMsg
-	case http2.GoAwayError:
-		return unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(e.ErrCode),
-			fmt.Sprintf(http2GoAwayErrorCodeMsg, e.ErrCode)
-	case http2.StreamError:
-		return unknownHTTP2StreamErrorCode + http2ErrCodeOffset(e.Code),
-			fmt.Sprintf(http2StreamErrorCodeMsg, e.Code)
-	case http2.ConnectionError:
-		return unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCode(e)),
-			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCode(e))
 	case *net.OpError:
 		return errorCodeForNetOpError(e)
 	case x509.UnknownAuthorityError:
@@ -193,8 +247,15 @@ func errorCodeForError(err error) (errCode, string) {
 	case *url.Error:
 		return errorCodeForError(e.Err)
 	default:
+		// Unwrap first: a wrapped error may have a concrete inner type that one of
+		// the cases above can match. String matching runs only on errors that have
+		// no unwrappable inner type, reducing the chance of a false positive from
+		// a non-HTTP/2 error whose message happens to start with an HTTP/2 prefix.
 		if wrappedErr := errors.Unwrap(err); wrappedErr != nil {
 			return errorCodeForError(wrappedErr)
+		}
+		if code, msg, ok := errorCodeForHTTP2Message(err.Error()); ok {
+			return code, msg
 		}
 
 		return defaultErrorCode, err.Error()

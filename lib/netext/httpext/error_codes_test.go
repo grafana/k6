@@ -338,6 +338,80 @@ func TestHTTP2GoAwayError(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity), msg)
 }
 
+// TestHTTP2MessageFallback covers message-based classification of HTTP/2 errors.
+// Both golang.org/x/net/http2 and Go's stdlib net/http/internal/http2 produce
+// identical Error() strings, so a single message-based path handles every Go
+// version uniformly. This feeds exact error strings directly, so it runs on
+// every Go version without a live server.
+func TestHTTP2MessageFallback(t *testing.T) {
+	t.Parallel()
+
+	streamErr := fmt.Errorf("stream error: stream ID 1; %v; EOF", http2.ErrCodeInternal)
+	streamErrNoCause := fmt.Errorf("stream error: stream ID 1; %v", http2.ErrCodeInternal)
+	connErr := errors.New("connection error: " + http2.ErrCodeProtocol.String())
+	goAwayErr := fmt.Errorf(
+		"http2: server sent GOAWAY and closed the connection; LastStreamID=4, ErrCode=%v, debug=%q",
+		http2.ErrCodeInadequateSecurity, "whatever")
+
+	testCases := []struct {
+		name     string
+		err      error
+		wantCode errCode
+		wantMsg  string
+	}{
+		{
+			"stream error",
+			streamErr,
+			unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			"stream error wrapped",
+			fmt.Errorf("read: %w", streamErr),
+			unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			"stream error no cause",
+			streamErrNoCause,
+			unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			"connection error",
+			connErr,
+			unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCodeProtocol),
+			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCodeProtocol),
+		},
+		{
+			"connection error wrapped in url.Error",
+			&url.Error{Op: "Get", URL: "https://example.com", Err: connErr},
+			unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCodeProtocol),
+			fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCodeProtocol),
+		},
+		{
+			"goaway error",
+			goAwayErr,
+			unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(http2.ErrCodeInadequateSecurity),
+			fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity),
+		},
+		{
+			"goaway error wrapped",
+			fmt.Errorf("read tcp: %w", goAwayErr),
+			unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(http2.ErrCodeInadequateSecurity),
+			fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			code, msg := errorCodeForError(tc.err)
+			assert.Equal(t, tc.wantCode, code)
+			assert.Equal(t, tc.wantMsg, msg)
+		})
+	}
+}
+
 type connKeyT int32
 
 const connKey connKeyT = 2
@@ -372,10 +446,10 @@ func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBi
 	require.NoError(t, err)
 
 	transport := &http.Transport{
-		DialContext:     dialer.DialContext,
-		TLSClientConfig: tlsConfig,
+		DialContext:       dialer.DialContext,
+		TLSClientConfig:   tlsConfig,
+		ForceAttemptHTTP2: true,
 	}
-	require.NoError(t, http2.ConfigureTransport(transport))
 	return &httpmultibin.HTTPMultiBin{
 		Mux:         mux,
 		ServerHTTP2: http2Srv,
