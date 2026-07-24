@@ -55,6 +55,9 @@ const (
 
 	// PageEventRequestFailed represents the page requestfailed event.
 	PageEventRequestFailed PageEventName = "requestfailed"
+
+	// PageEventDialog represents the page dialog event.
+	PageEventDialog PageEventName = "dialog"
 )
 
 // PageEventHandler is a function type that handles a page on event.
@@ -546,6 +549,20 @@ func (p *Page) onRequestFailed(request *Request) {
 	for handle := range p.eventHandlersByName(PageEventRequestFailed) {
 		if err := handle(PageEvent{Request: request}); err != nil {
 			p.logger.Warnf("onRequestFailed", "handler returned an error: %v", err)
+		}
+	}
+}
+
+// onDialog calls PageEventDialog handlers when a JavaScript dialog is opened.
+func (p *Page) onDialog(dialog *Dialog) {
+	if !p.hasEventHandler(PageEventDialog) {
+		p.logger.Warnf("onDialog", "dialog dismissed automatically, use page.on('dialog') to handle it")
+		return
+	}
+	for handle := range p.eventHandlersByName(PageEventDialog) {
+		if err := handle(PageEvent{Dialog: dialog}); err != nil {
+			p.logger.Warnf("onDialog", "handler returned an error: %v", err)
+			return
 		}
 	}
 }
@@ -1432,11 +1449,14 @@ type PageEvent struct {
 
 	// Response is the read only response that was received from the WuT.
 	Response *Response
+
+	// Dialog is the dialog event.
+	Dialog *Dialog
 }
 
-// On subscribes to a page event for which the given handler will be executed
-// passing in the ConsoleMessage associated with the event.
-// The only accepted event value is 'console'.
+// On subscribes to a page event for which the given handler will be executed.
+// Accepted event values are: 'console', 'dialog', 'metric', 'request', 'response',
+// 'requestfinished', 'requestfailed'.
 func (p *Page) On(event PageEventName, handler PageEventHandler) error {
 	if handler == nil {
 		return errors.New(`"handler" argument cannot be nil`)

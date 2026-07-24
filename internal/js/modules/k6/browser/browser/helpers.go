@@ -131,6 +131,51 @@ func queueTask[T any](
 	}
 }
 
+// awaitHandlerResult checks whether retVal is a pending Promise. If so, it
+// attaches .then/.catch callbacks that write the outcome to result when the
+// Promise settles. If retVal is not a Promise or is already fulfilled, it
+// writes to result immediately; rejected Promises are handled through the
+// rejection callback.
+//
+// Must be called from the event-loop goroutine (e.g., inside a tq.Queue task)
+// so that the .then/.catch callbacks are registered while the runtime is in a
+// safe state to accept them.
+func awaitHandlerResult(rt *sobek.Runtime, retVal sobek.Value, result chan<- error) {
+	if k6common.IsNullish(retVal) {
+		result <- nil
+		return
+	}
+	p, ok := retVal.Export().(*sobek.Promise)
+	if !ok {
+		result <- nil
+		return
+	}
+	if p.State() == sobek.PromiseStateFulfilled {
+		result <- nil
+		return
+	}
+	// For both pending and already-rejected Promises, attach .then/.catch so
+	// Sobek marks the promise as handled (preventing unhandled rejection tracking)
+	// and so the outcome is routed through the callbacks in both cases.
+	pObj := retVal.ToObject(rt)
+	thenFn, ok := sobek.AssertFunction(pObj.Get("then"))
+	if !ok {
+		result <- fmt.Errorf("page.on handler returned a non-thenable value")
+		return
+	}
+	onFulfilled := rt.ToValue(func(sobek.Value) { result <- nil })
+	onRejected := rt.ToValue(func(v sobek.Value) {
+		if err, ok := v.Export().(error); ok {
+			result <- err
+		} else {
+			result <- fmt.Errorf("%v", v)
+		}
+	})
+	if _, err := thenFn(retVal, onFulfilled, onRejected); err != nil {
+		result <- err
+	}
+}
+
 // newTaskQueue returns a new [taskqueue.TaskQueue] that is closed after
 // the returned cancel function is called or when the VU's context is done.
 //
