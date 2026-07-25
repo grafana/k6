@@ -132,9 +132,18 @@ type connectParams struct {
 	MaxSendSize           int64
 	TLS                   map[string]any
 	Authority             string
+
+	// ConnectionSharing lets this client reuse a connection already established
+	// by another VU to the same server with the same parameters, instead of
+	// dialing its own. It only shares connections within a k6 instance, so in a
+	// distributed execution each instance keeps its own set of connections.
+	//
+	// This is experimental: the conditions under which a connection is shared
+	// may change in a future release.
+	ConnectionSharing bool
 }
 
-func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
+func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit,funlen
 	result := &connectParams{
 		IsPlaintext:           false,
 		UseReflectionProtocol: false,
@@ -208,6 +217,12 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 			result.Authority, ok = v.(string)
 			if !ok {
 				return result, fmt.Errorf("invalid authority value: '%#v', it needs to be a string", v)
+			}
+		case "connectionSharing":
+			var ok bool
+			result.ConnectionSharing, ok = v.(bool)
+			if !ok {
+				return result, fmt.Errorf("invalid connectionSharing value: '%#v', it needs to be boolean", v)
 			}
 		default:
 			return result, fmt.Errorf("unknown connect param: %q", k)
