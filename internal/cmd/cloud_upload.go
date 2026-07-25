@@ -11,21 +11,15 @@ const cloudUploadCommandName = "upload"
 
 type cmdCloudUpload struct {
 	globalState *state.GlobalState
-
-	// deprecatedCloudCmd holds an instance of the k6 cloud command that we store
-	// in order to be able to call its run method to support the cloud upload
-	// feature
-	deprecatedCloudCmd *cmdCloud
 }
 
-func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
+func getCmdCloudUpload(gs *state.GlobalState) *cobra.Command {
 	c := &cmdCloudUpload{
-		globalState:        cloudCmd.gs,
-		deprecatedCloudCmd: cloudCmd,
+		globalState: gs,
 	}
 
 	// uploadCloudCommand represents the 'cloud upload' command
-	exampleText := getExampleText(cloudCmd.gs, `
+	exampleText := getExampleText(gs, `
   # Upload a test to Grafana Cloud without running it
   $ {{.}} cloud upload script.js`[1:])
 
@@ -44,14 +38,16 @@ func getCmdCloudUpload(cloudCmd *cmdCloud) *cobra.Command {
 	return uploadCloudCommand
 }
 
-func (c *cmdCloudUpload) preRun(cmd *cobra.Command, args []string) error {
-	return c.deprecatedCloudCmd.preRun(cmd, args)
+func (c *cmdCloudUpload) preRun(cmd *cobra.Command, _ []string) error {
+	// The upload command doesn't expose the --show-logs/--exit-on-running flags,
+	// but we still validate the corresponding env variables for wrong values.
+	var showCloudLogs, exitOnRunning bool
+	return applyCloudEnvOverrides(c.globalState, cmd, &showCloudLogs, &exitOnRunning)
 }
 
 // run is the code that runs when the user executes `k6 cloud upload`
 func (c *cmdCloudUpload) run(cmd *cobra.Command, args []string) error {
-	c.deprecatedCloudCmd.uploadOnly = true
-	return c.deprecatedCloudCmd.run(cmd, args)
+	return runCloudTest(c.globalState, cmd, args, false, false, true)
 }
 
 func (c *cmdCloudUpload) flagSet() *pflag.FlagSet {
