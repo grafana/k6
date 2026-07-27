@@ -65,20 +65,35 @@ jobs:
 
           go build .
           ./k6 version
+      - name: Build docker image
+        run: docker buildx build --target with-browser --load -t k6-browser:test .
+#      - name: Run E2E tests
+#        run: |
+#          set -x
+#          if [ "$RUNNER_OS" == "Linux" ] && [ "$RUNNER_ARCH" == "X64" ]; then
+#            export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
+#          fi
+#          export K6_BROWSER_HEADLESS=true
+#          export K6_NO_USAGE_REPORT=true
+#          for f in examples/browser/*.js; do
+#            if [ "$f" == "examples/browser/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
+#              echo "skipping $f on Windows"
+#              continue
+#            fi
+#            ./k6 run -q "$f"
+#          done
       - name: Run E2E tests
         run: |
           set -x
-          if [ "$RUNNER_OS" == "Linux" ] && [ "$RUNNER_ARCH" == "X64" ]; then
-            export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
-          fi
-          export K6_BROWSER_HEADLESS=true
-          export K6_NO_USAGE_REPORT=true
+
           for f in examples/browser/*.js; do
-            if [ "$f" == "examples/browser/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
-              echo "skipping $f on Windows"
-              continue
-            fi
-            ./k6 run -q "$f"
+            docker run --rm \
+              --pull never \
+              --user "$(id -u):$(id -g)" \
+              --env K6_BROWSER_HEADLESS=true \
+              --env K6_NO_USAGE_REPORT=true \
+              -v "$PWD:/home/k6" \
+            k6-browser:test run -q "$f"
           done
       - name: Check screenshot
         # TODO: Do something more sophisticated?
