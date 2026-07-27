@@ -110,7 +110,7 @@ github.com/chromedp/sysutil
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dlclark/regexp2/v2 v2.2.2
+# github.com/dlclark/regexp2/v2 v2.5.2
 ## explicit; go 1.25
 github.com/dlclark/regexp2/v2
 github.com/dlclark/regexp2/v2/helpers
@@ -185,8 +185,8 @@ github.com/grafana/k6-cloud-openapi-client-go/k6
 # github.com/grafana/k6provider v0.5.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4
-## explicit; go 1.25
+# github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f
+## explicit; go 1.25.0
 github.com/grafana/sobek
 github.com/grafana/sobek/ast
 github.com/grafana/sobek/file

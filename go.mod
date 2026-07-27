@@ -22,7 +22,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa7c
 	github.com/grafana/k6provider v0.5.0
-	github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4
+	github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f
 	github.com/grafana/sobek-webapi-encoding v0.1.0
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -77,7 +77,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dlclark/regexp2/v2 v2.2.2 // indirect
+	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect

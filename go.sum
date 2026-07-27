@@ -36,8 +36,8 @@ github.com/cpuguy83/go-md2man/v2 v2.0.1/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46t
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/dlclark/regexp2/v2 v2.2.2 h1:MYWvNYw8okuqNhwTYO587EZMiDruVa2vhV6fsGpfya0=
-github.com/dlclark/regexp2/v2 v2.2.2/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
+github.com/dlclark/regexp2/v2 v2.5.2 h1:HAsucWRhsqcDzl6Ua9aR8JwYOTzrZyPrF0/FNxJVAI0=
+github.com/dlclark/regexp2/v2 v2.5.2/go.mod h1:avUrQvPaLz2DrFNHJF0taWAFFX2C1GMSSoeiqFjcBmU=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
@@ -96,8 +96,8 @@ github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa
 github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa7c/go.mod h1:RhZGBq6e90zSi0EME83c6S1qkOzD8pP0MNETqieWX0k=
 github.com/grafana/k6provider v0.5.0 h1:SwItWPOMQHfRytezQBKpeXLxjNmcyD/x9PTA28pEbwg=
 github.com/grafana/k6provider v0.5.0/go.mod h1:R9WKthnwk96E47m6w/mnC13hhBYTn5iMdP5caFt/t5k=
-github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4 h1:LJ2pEOxFbfUIhrkpROwZ6hLhuCn6e5GSX08v5GFwN/4=
-github.com/grafana/sobek v0.0.0-20260708062710-267a0e055bb4/go.mod h1:BL/2XROA/Wtlb+zGEhkSdSZiMFIgw+D2ZdDfrbccyVE=
+github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f h1:YNPYRCa0yVIPtLYrzNzsfObrRZJQDupuGL3zW3SWn0M=
+github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f/go.mod h1:Sza3zAy+gfXCTtzbPuijuT5odA6N3lQxMTVpCP8sC/4=
 github.com/grafana/sobek-webapi-encoding v0.1.0 h1:2qf2pUiI6j33vl2etSE0Id4mfSQ4Jfa0VVfUuSccAkI=
 github.com/grafana/sobek-webapi-encoding v0.1.0/go.mod h1:IegnWm83cyZ8qTnfL6Rivmx7dpMVE+w3CblopwfL/go=
 github.com/grafana/xk6-dashboard-assets v0.1.2 h1:n2wqytPICn2ZYsKa9HE6GlvFXk+WjByMfT4eM+ms3gE=

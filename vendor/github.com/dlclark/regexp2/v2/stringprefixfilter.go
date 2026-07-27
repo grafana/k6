@@ -39,6 +39,15 @@ func newStringPrefixFilter(code *syntax.Code) StringPrefixFilter {
 		return stringIndexPrefixesFilter(opts.LeadingPrefixes, false, minRequiredLength)
 	case syntax.LeadingStrings_OrdinalIgnoreCase_LeftToRight:
 		return stringIndexPrefixesFilter(opts.LeadingPrefixes, true, minRequiredLength)
+	case syntax.LeadingSet_LeftToRight:
+		if len(opts.FixedDistanceSets) == 0 {
+			return nil
+		}
+		set := opts.FixedDistanceSets[0]
+		if set.Range == nil && (len(set.Chars) == 0 || len(set.Chars) > 5) {
+			return nil
+		}
+		return stringFixedDistanceSetFilter(set, minRequiredLength)
 	case syntax.FixedDistanceChar_LeftToRight:
 		return stringFixedDistanceCharFilter(opts.FixedDistanceLiteral.C, opts.FixedDistanceLiteral.Distance, minRequiredLength)
 	case syntax.FixedDistanceString_LeftToRight:
@@ -48,6 +57,87 @@ func newStringPrefixFilter(code *syntax.Code) StringPrefixFilter {
 	default:
 		return nil
 	}
+}
+
+type asciiSetStringScanner struct {
+	chars    string
+	first    byte
+	last     byte
+	useRange bool
+	distance int
+}
+
+func newASCIISetStringScanner(set syntax.FixedDistanceSet) (asciiSetStringScanner, bool) {
+	if set.Negated || set.Distance < 0 {
+		return asciiSetStringScanner{}, false
+	}
+	if set.Range != nil {
+		if set.Range.First < 0 || set.Range.Last > utf8.RuneSelf-1 {
+			return asciiSetStringScanner{}, false
+		}
+		return asciiSetStringScanner{
+			first:    byte(set.Range.First),
+			last:     byte(set.Range.Last),
+			useRange: true,
+			distance: set.Distance,
+		}, true
+	}
+	if len(set.Chars) == 0 {
+		return asciiSetStringScanner{}, false
+	}
+	chars := make([]byte, len(set.Chars))
+	for i, ch := range set.Chars {
+		if ch < 0 || ch > utf8.RuneSelf-1 {
+			return asciiSetStringScanner{}, false
+		}
+		chars[i] = byte(ch)
+	}
+	return asciiSetStringScanner{chars: string(chars), distance: set.Distance}, true
+}
+
+func stringFixedDistanceSetFilter(set syntax.FixedDistanceSet, minRequiredLength int) StringPrefixFilter {
+	scanner, ok := newASCIISetStringScanner(set)
+	if !ok {
+		return nil
+	}
+
+	return func(input string, startAt int) (candidateByteIndex int, ok bool) {
+		if !hasMinRequiredBytes(input, startAt, minRequiredLength) {
+			return 0, false
+		}
+
+		for searchAt := startAt; searchAt < len(input); {
+			offset := scanner.index(input[searchAt:])
+			if offset < 0 {
+				return 0, false
+			}
+			setByteIndex := searchAt + offset
+			candidateByteIndex, valid := stringFixedDistanceCandidateStart(input, startAt, setByteIndex, scanner.distance)
+			if valid && hasMinRequiredBytes(input, candidateByteIndex, minRequiredLength) {
+				return candidateByteIndex, true
+			}
+			if valid {
+				return 0, false
+			}
+			searchAt = setByteIndex + 1
+		}
+		return 0, false
+	}
+}
+
+func (s asciiSetStringScanner) index(input string) int {
+	if !s.useRange {
+		if len(s.chars) == 1 {
+			return strings.IndexByte(input, s.chars[0])
+		}
+		return strings.IndexAny(input, s.chars)
+	}
+	for i := 0; i < len(input); i++ {
+		if input[i] >= s.first && input[i] <= s.last {
+			return i
+		}
+	}
+	return -1
 }
 
 func stringIndexPrefixFilter(prefix string, ignoreCase bool, minRequiredLength int) StringPrefixFilter {
