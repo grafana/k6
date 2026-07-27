@@ -198,7 +198,7 @@ func decoderStateInit(s *Reader) bool {
 	s.rb_roundtrips = 0
 	s.partial_pos_out = 0
 
-	s.block_type_trees = nil
+	clear(s.block_type_trees)
 	s.block_len_trees = nil
 	s.ringbuffer_size = 0
 	s.new_ringbuffer_size = 0
@@ -212,12 +212,8 @@ func decoderStateInit(s *Reader) bool {
 
 	s.sub_loop_counter = 0
 
-	s.literal_hgroup.codes = nil
-	s.literal_hgroup.htrees = nil
-	s.insert_copy_hgroup.codes = nil
-	s.insert_copy_hgroup.htrees = nil
-	s.distance_hgroup.codes = nil
-	s.distance_hgroup.htrees = nil
+	cleanupCodes(s)
+	cleanupHTrees(s)
 
 	s.is_last_metablock = 0
 	s.is_uncompressed = 0
@@ -232,8 +228,6 @@ func decoderStateInit(s *Reader) bool {
 	s.dist_rb[2] = 11
 	s.dist_rb[3] = 4
 	s.dist_rb_idx = 0
-	s.block_type_trees = nil
-	s.block_len_trees = nil
 
 	s.symbol_lists.storage = s.symbols_lists_array[:]
 	s.symbol_lists.offset = huffmanMaxCodeLength + 1
@@ -266,29 +260,54 @@ func decoderStateMetablockBegin(s *Reader) {
 	s.dist_context_map_slice = nil
 	s.dist_htree_index = 0
 	s.context_lookup = nil
-	s.literal_hgroup.codes = nil
-	s.literal_hgroup.htrees = nil
-	s.insert_copy_hgroup.codes = nil
-	s.insert_copy_hgroup.htrees = nil
-	s.distance_hgroup.codes = nil
-	s.distance_hgroup.htrees = nil
+
+	cleanupCodes(s)
+	cleanupHTrees(s)
 }
 
 func decoderStateCleanupAfterMetablock(s *Reader) {
 	s.context_modes = nil
 	s.context_map = nil
 	s.dist_context_map = nil
-	s.literal_hgroup.htrees = nil
-	s.insert_copy_hgroup.htrees = nil
-	s.distance_hgroup.htrees = nil
+	cleanupHTrees(s)
 }
 
-func decoderHuffmanTreeGroupInit(s *Reader, group *huffmanTreeGroup, alphabet_size uint32, max_symbol uint32, ntrees uint32) bool {
+func decoderHuffmanTreeGroupInit(group *huffmanTreeGroup, alphabet_size uint32, max_symbol uint32, ntrees uint32) {
 	var max_table_size uint = uint(kMaxHuffmanTableSize[(alphabet_size+31)>>5])
 	group.alphabet_size = uint16(alphabet_size)
 	group.max_symbol = uint16(max_symbol)
 	group.num_htrees = uint16(ntrees)
-	group.htrees = make([][]huffmanCode, ntrees)
-	group.codes = make([]huffmanCode, (uint(ntrees) * max_table_size))
-	return !(group.codes == nil)
+
+	makeCodesBuffer(group, uint(ntrees)*max_table_size)
+	makeTreesBuffer(group, ntrees)
+}
+
+func makeTreesBuffer(group *huffmanTreeGroup, treesLen uint32) {
+	if cap(group.htrees) < int(treesLen) {
+		group.htrees = make([][]huffmanCode, treesLen)
+		return
+	}
+
+	group.htrees = group.htrees[:treesLen]
+}
+
+func makeCodesBuffer(group *huffmanTreeGroup, codesLen uint) {
+	if cap(group.codes) < int(codesLen) {
+		group.codes = make([]huffmanCode, codesLen)
+		return
+	}
+
+	group.codes = group.codes[:codesLen]
+}
+
+func cleanupCodes(s *Reader) {
+	clear(s.literal_hgroup.codes)
+	clear(s.insert_copy_hgroup.codes)
+	clear(s.distance_hgroup.codes)
+}
+
+func cleanupHTrees(s *Reader) {
+	clear(s.literal_hgroup.htrees)
+	clear(s.insert_copy_hgroup.htrees)
+	clear(s.distance_hgroup.htrees)
 }

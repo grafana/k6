@@ -10,7 +10,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v1.2.1
+	github.com/andybalholm/brotli v1.2.2
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d
 	github.com/evanw/esbuild v0.28.1
@@ -30,8 +30,8 @@ require (
 	github.com/jhump/protoreflect v1.18.0
 	github.com/klauspost/compress v1.19.0
 	github.com/mattn/go-colorable v0.1.15
-	github.com/mattn/go-isatty v0.0.22
-	github.com/mccutchen/go-httpbin/v2 v2.23.1
+	github.com/mattn/go-isatty v0.0.23
+	github.com/mccutchen/go-httpbin/v2 v2.24.0
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -63,7 +63,7 @@ require (
 	golang.org/x/sync v0.22.0
 	golang.org/x/term v0.45.0
 	golang.org/x/time v0.15.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.1
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
