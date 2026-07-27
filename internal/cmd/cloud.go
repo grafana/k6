@@ -333,14 +333,12 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	c.printTestStatus(testProgress.FormatStatus())
 
 	if testProgress.ThresholdsFailed() {
-		//nolint:staticcheck
 		return errext.WithExitCodeIfNone(
 			errors.New(withFailureDetails("Thresholds have been crossed", testProgress.ResultMessage, testURL)),
 			exitcodes.ThresholdsHaveFailed,
 		)
 	}
 	if testProgress.TestFailed() {
-		//nolint:staticcheck
 		return errext.WithExitCodeIfNone(
 			errors.New(withFailureDetails("The test has failed", testProgress.ResultMessage, testURL)),
 			exitcodes.CloudTestRunFailed,
