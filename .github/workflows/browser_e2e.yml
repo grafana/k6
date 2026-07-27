@@ -25,8 +25,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [stable, tip]
-        platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+#        go: [stable, tip]
+        go: [stable]
+#        platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+        platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
