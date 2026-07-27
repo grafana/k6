@@ -89,7 +89,7 @@ jobs:
           for f in examples/browser/*.js; do
             docker run --rm \
               --pull never \
-              --security-opt apparmor=unconfined \                                         
+              --security-opt apparmor=unconfined \
               --user "$(id -u):$(id -g)" \
               --env K6_BROWSER_HEADLESS=true \
               --env K6_NO_USAGE_REPORT=true \
