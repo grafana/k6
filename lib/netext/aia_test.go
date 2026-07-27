@@ -7,14 +7,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
 	"fmt"
 	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -22,150 +20,33 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/v2/internal/lib/testutils/tlstest"
 )
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-// testChain holds a three-level certificate chain: root CA → intermediate CA → leaf.
-// The leaf's AIA extension points to an HTTP URL where the intermediate can be fetched.
-type testChain struct {
-	rootCert         *x509.Certificate
-	intermediateCert *x509.Certificate
-	intermediateDER  []byte
-	leafCert         *x509.Certificate
-	leafKey          *ecdsa.PrivateKey
-	rootPool         *x509.CertPool
-}
-
-// newTestChain builds a root CA, intermediate CA, and leaf certificate.
-// aiaURL is baked into both the intermediate and leaf as their IssuingCertificateURL,
-// so that WrapTLSConfigForAIAFetching knows where to fetch the intermediate from.
-func newTestChain(t testing.TB, aiaURL string) *testChain {
+// buildChainWithAIA is a small local shim: creates a tlstest.Chain and bakes aiaURL into
+// the leaf template so both the AIA URL and the leaf DER are ready in one call.
+func buildChainWithAIA(t testing.TB, aiaURL string) *tlstest.Chain {
 	t.Helper()
-
-	genKey := func(t testing.TB) *ecdsa.PrivateKey {
-		t.Helper()
-		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		require.NoError(t, err)
-		return k
-	}
-	serial := func(t testing.TB) *big.Int {
-		t.Helper()
-		n, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-		require.NoError(t, err)
-		return n
-	}
-
-	// Root CA – self-signed, trusted
-	rootKey := genKey(t)
-	rootTmpl := &x509.Certificate{
-		SerialNumber:          serial(t),
-		Subject:               pkix.Name{CommonName: "Test Root CA"},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-	rootDER, err := x509.CreateCertificate(rand.Reader, rootTmpl, rootTmpl, &rootKey.PublicKey, rootKey)
-	require.NoError(t, err)
-	rootCert, err := x509.ParseCertificate(rootDER)
-	require.NoError(t, err)
-
-	// Intermediate CA – signed by root, NOT sent by TLS server, fetched via AIA
-	interKey := genKey(t)
-	interTmpl := &x509.Certificate{
-		SerialNumber:          serial(t),
-		Subject:               pkix.Name{CommonName: "Test Intermediate CA"},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-	interDER, err := x509.CreateCertificate(rand.Reader, interTmpl, rootCert, &interKey.PublicKey, rootKey)
-	require.NoError(t, err)
-	interCert, err := x509.ParseCertificate(interDER)
-	require.NoError(t, err)
-
-	// Leaf cert – signed by intermediate, presented alone by the TLS server
-	leafKey := genKey(t)
-	leafTmpl := &x509.Certificate{
-		SerialNumber:          serial(t),
-		Subject:               pkix.Name{CommonName: "localhost"},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames:              []string{"localhost"},
-		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
-		IssuingCertificateURL: []string{aiaURL}, // Where to fetch the intermediate
-	}
-	leafDER, err := x509.CreateCertificate(rand.Reader, leafTmpl, interCert, &leafKey.PublicKey, interKey)
-	require.NoError(t, err)
-	leafCert, err := x509.ParseCertificate(leafDER)
-	require.NoError(t, err)
-
-	rootPool := x509.NewCertPool()
-	rootPool.AddCert(rootCert)
-
-	return &testChain{
-		rootCert:         rootCert,
-		intermediateCert: interCert,
-		intermediateDER:  interDER,
-		leafCert:         leafCert,
-		leafKey:          leafKey,
-		rootPool:         rootPool,
-	}
-}
-
-// leafTLSCert returns a tls.Certificate containing only the leaf (no chain).
-func (tc *testChain) leafTLSCert(t testing.TB) tls.Certificate {
-	t.Helper()
-	leafKeyDER, err := x509.MarshalECPrivateKey(tc.leafKey)
-	require.NoError(t, err)
-	cert, err := tls.X509KeyPair(
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: tc.leafCert.Raw}),
-		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: leafKeyDER}),
-	)
-	require.NoError(t, err)
-	return cert
+	c := tlstest.NewChain(t)
+	c.SetAIAURL(aiaURL)
+	return c
 }
 
 // leafOnlyTLSServer starts an HTTPS server that sends only the leaf certificate.
-// Clients that rely on a complete chain or AIA will observe an incomplete chain.
-func (tc *testChain) leafOnlyTLSServer(t testing.TB) *httptest.Server {
+func leafOnlyTLSServer(t testing.TB, c *tlstest.Chain) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintln(w, "ok")
 	}))
-	srv.TLS = &tls.Config{Certificates: []tls.Certificate{tc.leafTLSCert(t)}}
+	srv.TLS = &tls.Config{Certificates: []tls.Certificate{c.LeafTLSCertificate(t)}}
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 	return srv
-}
-
-// aiaHandler is a thread-safe HTTP handler that serves raw DER bytes.
-// Set certDER before making any requests; it is safe to set it after the server starts
-// as long as no requests arrive before it is set.
-type aiaHandler struct {
-	mu      sync.RWMutex
-	certDER []byte
-}
-
-func (h *aiaHandler) setCert(der []byte) {
-	h.mu.Lock()
-	h.certDER = der
-	h.mu.Unlock()
-}
-
-func (h *aiaHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	w.Header().Set("Content-Type", "application/pkix-cert")
-	_, _ = w.Write(h.certDER)
 }
 
 // startAIAServer starts an httptest.Server backed by h, returning the server URL.
@@ -206,15 +87,15 @@ func closeBody(resp *http.Response) {
 func TestWrapTLSConfigForAIAFetching_HappyPath(t *testing.T) {
 	t.Parallel()
 
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(t, h)
-	chain := newTestChain(t, aiaSrv.URL+"/ca.der")
-	h.setCert(chain.intermediateDER) // serve real intermediate
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER) // serve real intermediate
 
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		nil, // default AIA client
 	)
@@ -230,30 +111,21 @@ func TestWrapTLSConfigForAIAFetching_HappyPath(t *testing.T) {
 func TestWrapTLSConfigForAIAFetching_CompleteChainPassesThrough(t *testing.T) {
 	t.Parallel()
 
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(t, h)
-	chain := newTestChain(t, aiaSrv.URL+"/ca.der")
-	h.setCert(chain.intermediateDER)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER)
 
 	// Build a TLS server that sends the FULL chain: leaf + intermediate.
-	leafKeyDER, err := x509.MarshalECPrivateKey(chain.leafKey)
-	require.NoError(t, err)
-	fullChainCert, err := tls.X509KeyPair(
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.leafCert.Raw}),
-		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: leafKeyDER}),
-	)
-	require.NoError(t, err)
-	fullChainCert.Certificate = append(fullChainCert.Certificate, chain.intermediateCert.Raw)
-
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintln(w, "ok")
 	}))
-	srv.TLS = &tls.Config{Certificates: []tls.Certificate{fullChainCert}}
+	srv.TLS = &tls.Config{Certificates: []tls.Certificate{chain.FullChainTLSCertificate(t)}}
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		nil,
 	)
@@ -269,15 +141,15 @@ func TestWrapTLSConfigForAIAFetching_CompleteChainPassesThrough(t *testing.T) {
 func TestWrapTLSConfigForAIAFetching_Disabled(t *testing.T) {
 	t.Parallel()
 
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(t, h)
-	chain := newTestChain(t, aiaSrv.URL+"/ca.der")
-	h.setCert(chain.intermediateDER)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER)
 
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	// No wrapping – behaves exactly like plain Go TLS.
-	plainCfg := &tls.Config{RootCAs: chain.rootPool}
+	plainCfg := &tls.Config{RootCAs: chain.RootPool}
 	resp, err := testHTTPClient(t, plainCfg).Get(tlsSrv.URL) //nolint:noctx
 	closeBody(resp)
 	require.Error(t, err)
@@ -311,13 +183,13 @@ func TestWrapTLSConfigForAIAFetching_UnreachableAIAURL(t *testing.T) {
 	require.NoError(t, ln.Close())
 
 	aiaURL := fmt.Sprintf("http://127.0.0.1:%d/ca.der", port)
-	chain := newTestChain(t, aiaURL) // leaf cert points to closed port
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	chain := buildChainWithAIA(t, aiaURL) // leaf cert points to closed port
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	// Fast client so the connection-refused error surfaces quickly.
 	fastClient := &http.Client{Timeout: 500 * time.Millisecond}
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		fastClient,
 	)
@@ -343,13 +215,13 @@ func TestWrapTLSConfigForAIAFetching_FetchTimeout(t *testing.T) {
 	}))
 	t.Cleanup(hangSrv.Close)
 
-	chain := newTestChain(t, hangSrv.URL+"/ca.der")
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	chain := buildChainWithAIA(t, hangSrv.URL+"/ca.der")
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	const shortTimeout = 100 * time.Millisecond
 	fastClient := &http.Client{Timeout: shortTimeout}
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		fastClient,
 	)
@@ -378,11 +250,11 @@ func TestWrapTLSConfigForAIAFetching_AIAReturnsHTTPError(t *testing.T) {
 	}))
 	t.Cleanup(errSrv.Close)
 
-	chain := newTestChain(t, errSrv.URL+"/ca.der")
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	chain := buildChainWithAIA(t, errSrv.URL+"/ca.der")
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		nil,
 	)
@@ -407,11 +279,11 @@ func TestWrapTLSConfigForAIAFetching_MalformedAIACert(t *testing.T) {
 	}))
 	t.Cleanup(garbageSrv.Close)
 
-	chain := newTestChain(t, garbageSrv.URL+"/ca.der")
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	chain := buildChainWithAIA(t, garbageSrv.URL+"/ca.der")
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		nil,
 	)
@@ -468,12 +340,12 @@ func TestWrapTLSConfigForAIAFetching_CircularAIAReferences(t *testing.T) {
 	// served it – the simplest circular reference (A → server → A → server → ...).
 	// We need the server URL before creating the cert, so use a pointer trick:
 	// start the server with a handler that reads from a shared variable.
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	circularSrv := startAIAServer(t, h)
 	circularURL := circularSrv.URL + "/ca.der"
 
 	// Build the chain using circularURL as the leaf's AIA URL.
-	chain := newTestChain(t, circularURL)
+	chain := buildChainWithAIA(t, circularURL)
 
 	// Build a decoy cert (self-signed) whose own AIA also points to circularURL,
 	// creating the cycle: leaf → fetch decoy → decoy → fetch decoy (seen → stop).
@@ -490,15 +362,15 @@ func TestWrapTLSConfigForAIAFetching_CircularAIAReferences(t *testing.T) {
 	}
 	decoyDER, err := x509.CreateCertificate(rand.Reader, decoyTmpl, decoyTmpl, &decoyKey.PublicKey, decoyKey)
 	require.NoError(t, err)
-	h.setCert(decoyDER) // AIA server serves the decoy (not the real intermediate)
+	h.SetCert(decoyDER) // AIA server serves the decoy (not the real intermediate)
 
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	// Use a fast client to bound the test duration in case the seen-map protection
 	// were somehow bypassed (belt-and-suspenders).
 	fastClient := &http.Client{Timeout: 2 * time.Second}
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		fastClient,
 	)
@@ -520,16 +392,16 @@ func TestWrapTLSConfigForAIAFetching_CircularAIAReferences(t *testing.T) {
 func TestWrapTLSConfigForAIAFetching_HostnameMismatchRejected(t *testing.T) {
 	t.Parallel()
 
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(t, h)
-	chain := newTestChain(t, aiaSrv.URL+"/ca.der")
-	h.setCert(chain.intermediateDER)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER)
 
-	tlsSrv := chain.leafOnlyTLSServer(t)
+	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
 		&tls.Config{
-			RootCAs:    chain.rootPool,
+			RootCAs:    chain.RootPool,
 			ServerName: "wrong.example.com", // deliberately wrong
 		},
 		nullLogger(),
@@ -570,29 +442,20 @@ func newBenchClient(tlsCfg *tls.Config) *http.Client {
 // BenchmarkTLSHandshake_Baseline measures a plain TLS handshake with a complete chain and
 // no AIA wrapping, establishing the cost floor.
 func BenchmarkTLSHandshake_Baseline(b *testing.B) {
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(b, h)
-	chain := newTestChain(b, aiaSrv.URL+"/ca.der")
-	h.setCert(chain.intermediateDER)
+	chain := buildChainWithAIA(b, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER)
 
 	// Full chain server: leaf + intermediate, no AIA fetch ever needed.
-	leafKeyDER, err := x509.MarshalECPrivateKey(chain.leafKey)
-	require.NoError(b, err)
-	fullChainCert, err := tls.X509KeyPair(
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.leafCert.Raw}),
-		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: leafKeyDER}),
-	)
-	require.NoError(b, err)
-	fullChainCert.Certificate = append(fullChainCert.Certificate, chain.intermediateCert.Raw)
-
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintln(w, "ok")
 	}))
-	srv.TLS = &tls.Config{Certificates: []tls.Certificate{fullChainCert}}
+	srv.TLS = &tls.Config{Certificates: []tls.Certificate{chain.FullChainTLSCertificate(b)}}
 	srv.StartTLS()
 	b.Cleanup(srv.Close)
 
-	client := newBenchClient(&tls.Config{RootCAs: chain.rootPool})
+	client := newBenchClient(&tls.Config{RootCAs: chain.RootPool})
 
 	b.ResetTimer()
 	for b.Loop() {
@@ -606,30 +469,21 @@ func BenchmarkTLSHandshake_Baseline(b *testing.B) {
 // but the server sends a complete certificate chain, so verification succeeds on the first
 // attempt and no HTTP fetch is ever triggered.
 func BenchmarkTLSHandshake_AIANotNeeded(b *testing.B) {
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(b, h)
-	chain := newTestChain(b, aiaSrv.URL+"/ca.der")
-	h.setCert(chain.intermediateDER)
+	chain := buildChainWithAIA(b, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER)
 
 	// Full chain server: leaf + intermediate — same as Baseline, but with AIA wrapper active.
-	leafKeyDER, err := x509.MarshalECPrivateKey(chain.leafKey)
-	require.NoError(b, err)
-	fullChainCert, err := tls.X509KeyPair(
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.leafCert.Raw}),
-		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: leafKeyDER}),
-	)
-	require.NoError(b, err)
-	fullChainCert.Certificate = append(fullChainCert.Certificate, chain.intermediateCert.Raw)
-
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintln(w, "ok")
 	}))
-	srv.TLS = &tls.Config{Certificates: []tls.Certificate{fullChainCert}}
+	srv.TLS = &tls.Config{Certificates: []tls.Certificate{chain.FullChainTLSCertificate(b)}}
 	srv.StartTLS()
 	b.Cleanup(srv.Close)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		nil,
 	)
@@ -647,16 +501,16 @@ func BenchmarkTLSHandshake_AIANotNeeded(b *testing.B) {
 // enabled but the intermediate is already cached — the steady-state cost for many VUs
 // hitting the same server.
 func BenchmarkTLSHandshake_AIAWarmCache(b *testing.B) {
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(b, h)
 	aiaURL := aiaSrv.URL + "/ca.der"
-	chain := newTestChain(b, aiaURL)
-	h.setCert(chain.intermediateDER)
+	chain := buildChainWithAIA(b, aiaURL)
+	h.SetCert(chain.IntermediateDER)
 
-	tlsSrv := chain.leafOnlyTLSServer(b)
+	tlsSrv := leafOnlyTLSServer(b, chain)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		nil,
 	)
@@ -681,16 +535,16 @@ func BenchmarkTLSHandshake_AIAWarmCache(b *testing.B) {
 // and the intermediate is not cached, so each handshake triggers an HTTP round-trip to
 // the AIA endpoint (first connection to a new server).
 func BenchmarkTLSHandshake_AIAColdCache(b *testing.B) {
-	h := &aiaHandler{}
+	h := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(b, h)
 	aiaURL := aiaSrv.URL + "/ca.der"
-	chain := newTestChain(b, aiaURL)
-	h.setCert(chain.intermediateDER)
+	chain := buildChainWithAIA(b, aiaURL)
+	h.SetCert(chain.IntermediateDER)
 
-	tlsSrv := chain.leafOnlyTLSServer(b)
+	tlsSrv := leafOnlyTLSServer(b, chain)
 
 	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.rootPool},
+		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
 		nil,
 	)
