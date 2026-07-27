@@ -30,7 +30,7 @@ func getCmdCloudLoadZoneList(loadZoneCmd *cmdCloudLoadZone) *cobra.Command {
 	listCmd := &cobra.Command{
 		Use:     "list",
 		Short:   "List Grafana Cloud k6 load zones",
-		Long:    `List all load zones available in the configured Grafana Cloud k6 stack.`,
+		Long:    `List all load zones in the configured Grafana Cloud k6 stack.`,
 		Example: exampleText,
 		Args:    cobra.NoArgs,
 		RunE:    c.run,
