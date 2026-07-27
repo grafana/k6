@@ -15,12 +15,14 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
 	aiaFetchTimeout  = 10 * time.Second
 	aiaMaxCertSize   = 64 * 1024 // 64 KB per intermediate – far more than any real cert needs
-	aiaMaxFetchDepth = 5         // how many AIA hops to follow up the issuer chain
+	aiaMaxFetchDepth = 5         // max number of HTTP fetches per handshake (bounds chain length)
+	aiaCacheEntryTTL = 24 * time.Hour
 )
 
 // aiaHTTPClient is the default HTTP client used for fetching intermediate certificates
@@ -40,16 +42,29 @@ var (
 )
 
 // aiaIntermediateCache caches successfully fetched intermediate certificates by AIA URL.
-// Repeated TLS handshakes (e.g. many VUs hitting the same server) pay the HTTP cost at
-// most once per URL per process lifetime.
-var aiaIntermediateCache sync.Map //nolint:gochecknoglobals
+// Entries expire after aiaCacheEntryTTL so long-running tests eventually pick up rotated
+// intermediates. aiaFetchGroup coalesces concurrent fetches for the same URL — with hundreds
+// of VUs starting cold against the same server, only one HTTP request is issued.
+var (
+	aiaIntermediateCache sync.Map           //nolint:gochecknoglobals
+	aiaFetchGroup        singleflight.Group //nolint:gochecknoglobals
+)
 
+type aiaCacheEntry struct {
+	cert     *x509.Certificate
+	storedAt time.Time
+}
+
+// getSystemCertPool loads the system cert pool once per process. Returns nil on failure so
+// callers can fall through to Go's default behaviour (x509.VerifyOptions treats nil Roots as
+// "use system pool"), rather than substituting an empty pool that guarantees verification
+// failure.
 func getSystemCertPool(logger logrus.FieldLogger) *x509.CertPool {
 	systemCertPoolOnce.Do(func() {
 		pool, err := x509.SystemCertPool()
 		if err != nil {
-			logger.WithError(err).Debug("AIA: failed to load system cert pool, using empty pool")
-			pool = x509.NewCertPool()
+			logger.WithError(err).Debug("AIA: failed to load system cert pool")
+			return
 		}
 		cachedSystemPool = pool
 	})
@@ -203,11 +218,17 @@ func verifyWithAIA(
 // transport sets to the dialled host — correct for both hostname and IP targets.
 func buildVerifyConnFn(prev func(tls.ConnectionState) error) func(tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
+		// Guard both fields: callers wrapping a config for a non-HTTP transport may leave
+		// ServerName empty (e.g. IP-only dials), and PeerCertificates is empty on the very
+		// first callback of a resumed session. In either case there is nothing to verify;
+		// chain checks have already run in VerifyPeerCertificate.
 		if cs.ServerName != "" && len(cs.PeerCertificates) > 0 {
 			if err := cs.PeerCertificates[0].VerifyHostname(cs.ServerName); err != nil {
 				return err
 			}
 		}
+		// prev is nil for the common HTTP transport path (VerifyConnection is not set by
+		// http.Transport). Kept for external callers that may compose their own callback.
 		if prev != nil {
 			return prev(cs)
 		}
@@ -216,17 +237,24 @@ func buildVerifyConnFn(prev func(tls.ConnectionState) error) func(tls.Connection
 }
 
 // fetchAIAIntermediates follows the AIA IssuingCertificateURL fields on the presented
-// certificates (BFS, up to aiaMaxFetchDepth hops) and returns any newly found intermediates.
+// certificates (BFS, up to aiaMaxFetchDepth HTTP fetches) and returns any newly found
+// intermediates.
+//
+// The depth limit bounds the number of HTTP fetches actually performed, not the number of
+// certs walked. Chains where the server sends many certs plus one AIA URL used to exhaust
+// the counter without ever fetching; now we only tick the counter when we issue a fetch,
+// so genuinely deep chains can still complete.
 func fetchAIAIntermediates(
 	certs []*x509.Certificate, httpClient *http.Client, logger logrus.FieldLogger,
 ) []*x509.Certificate {
 	var fetched []*x509.Certificate
 	seen := make(map[string]bool)
+	fetches := 0
 
 	queue := make([]*x509.Certificate, 0, len(certs))
 	queue = append(queue, certs...)
 
-	for depth := 0; depth < aiaMaxFetchDepth && len(queue) > 0; depth++ {
+	for len(queue) > 0 && fetches < aiaMaxFetchDepth {
 		cert := queue[0]
 		queue = queue[1:]
 
@@ -236,26 +264,66 @@ func fetchAIAIntermediates(
 			}
 			seen[rawURL] = true
 
-			if cached, ok := aiaIntermediateCache.Load(rawURL); ok {
-				issuer := cached.(*x509.Certificate) //nolint:forcetypeassert
-				fetched = append(fetched, issuer)
-				queue = append(queue, issuer)
-				continue
+			issuer, ok := loadCachedAIACert(rawURL)
+			if !ok {
+				if fetches >= aiaMaxFetchDepth {
+					break
+				}
+				fetches++
+				var err error
+				issuer, err = fetchAndCacheAIACert(rawURL, httpClient, logger)
+				if err != nil {
+					logger.WithError(err).WithField("url", rawURL).Debug("AIA intermediate certificate fetch failed")
+					continue
+				}
 			}
 
-			issuer, err := fetchCertFromAIAURL(rawURL, httpClient, logger)
-			if err != nil {
-				logger.WithError(err).WithField("url", rawURL).Debug("AIA intermediate certificate fetch failed")
-				continue
-			}
-
-			aiaIntermediateCache.Store(rawURL, issuer)
 			fetched = append(fetched, issuer)
 			queue = append(queue, issuer)
 		}
 	}
 
 	return fetched
+}
+
+// loadCachedAIACert returns the cached intermediate for rawURL if it has not expired.
+// Expired entries are removed and reported as a miss.
+func loadCachedAIACert(rawURL string) (*x509.Certificate, bool) {
+	raw, ok := aiaIntermediateCache.Load(rawURL)
+	if !ok {
+		return nil, false
+	}
+	entry := raw.(*aiaCacheEntry) //nolint:forcetypeassert
+	if time.Since(entry.storedAt) > aiaCacheEntryTTL {
+		aiaIntermediateCache.Delete(rawURL)
+		return nil, false
+	}
+	return entry.cert, true
+}
+
+// fetchAndCacheAIACert coalesces concurrent fetches for the same URL via singleflight, so a
+// cold-start burst of VUs against the same server issues a single HTTP request. On success
+// the intermediate is cached with a fresh timestamp.
+func fetchAndCacheAIACert(
+	rawURL string, httpClient *http.Client, logger logrus.FieldLogger,
+) (*x509.Certificate, error) {
+	v, err, _ := aiaFetchGroup.Do(rawURL, func() (any, error) {
+		// Re-check the cache under the singleflight barrier: earlier waiters may have
+		// populated it while we were queued.
+		if cert, ok := loadCachedAIACert(rawURL); ok {
+			return cert, nil
+		}
+		cert, err := fetchCertFromAIAURL(rawURL, httpClient, logger)
+		if err != nil {
+			return nil, err
+		}
+		aiaIntermediateCache.Store(rawURL, &aiaCacheEntry{cert: cert, storedAt: time.Now()})
+		return cert, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(*x509.Certificate), nil //nolint:forcetypeassert
 }
 
 // fetchCertFromAIAURL retrieves a single X.509 certificate (DER or PEM) from rawURL.
