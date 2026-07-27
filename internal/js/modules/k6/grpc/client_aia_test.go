@@ -2,14 +2,9 @@ package grpc
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
-	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +14,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/v2/internal/lib/testutils/tlstest"
 	"go.k6.io/k6/v2/lib/netext"
 )
 
@@ -26,24 +23,24 @@ import (
 func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	t.Parallel()
 
-	chain := newGRPCTestChain(t)
+	chain := tlstest.NewChain(t)
 
 	aiaSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/pkix-cert")
-		_, _ = w.Write(chain.intermediateDER)
+		_, _ = w.Write(chain.IntermediateDER)
 	}))
 	t.Cleanup(aiaSrv.Close)
-	chain.setAIAURL(t, aiaSrv.URL)
+	chain.SetAIAURL(aiaSrv.URL)
 
-	tlsListener := chain.newLeafOnlyTLSServer(t)
+	tlsListener := newLeafOnlyTLSListener(t, chain)
 	t.Cleanup(func() { _ = tlsListener.Close() })
 
 	// VU config has no RootCAs; the user relies on per-connect cacerts.
 	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12}
 	wrappedVU := netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
 
-	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.rootDER})
-	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{rootPEM}, true, nullLogger())
+	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.RootDER})
+	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{rootPEM}, true, false, nullLogger())
 	require.NoError(t, err)
 
 	tlsCfg.ServerName = "localhost"
@@ -56,99 +53,60 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	_ = conn.Close()
 }
 
-type grpcTestChain struct {
-	rootDER         []byte
-	rootCert        *x509.Certificate
-	rootKey         *ecdsa.PrivateKey
-	intermediateDER []byte
-	intermediateKey *ecdsa.PrivateKey
-	interCert       *x509.Certificate
-	leafKey         *ecdsa.PrivateKey
-	leafTmpl        *x509.Certificate
+// Verifies gRPC is not silently insecure when AIA is enabled: if the presented cert cannot
+// be validated against the caller's cacerts, the dial must fail even though the wrapper
+// disables Go's built-in InsecureSkipVerify handling internally.
+func TestBuildTLSConfig_AIARejectsMismatchedCACert(t *testing.T) {
+	t.Parallel()
+
+	// Server chain (root A → inter A → leaf).
+	chain := tlstest.NewChain(t)
+
+	aiaSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/pkix-cert")
+		_, _ = w.Write(chain.IntermediateDER)
+	}))
+	t.Cleanup(aiaSrv.Close)
+	chain.SetAIAURL(aiaSrv.URL)
+
+	tlsListener := newLeafOnlyTLSListener(t, chain)
+	t.Cleanup(func() { _ = tlsListener.Close() })
+
+	// Build an unrelated root CA (root B). The caller supplies root B as `cacerts` and enables
+	// AIA. The server presents a chain rooted in A, so verification must fail.
+	otherChain := tlstest.NewChain(t)
+	otherRootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: otherChain.RootDER})
+
+	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	wrappedVU := netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
+
+	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{otherRootPEM}, true, false, nullLogger())
+	require.NoError(t, err)
+	tlsCfg.ServerName = "localhost"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	dialer := &tls.Dialer{Config: tlsCfg}
+	conn, err := dialer.DialContext(ctx, "tcp", tlsListener.Addr().String())
+	if conn != nil {
+		_ = conn.Close()
+	}
+	require.Error(t, err, "AIA-enabled gRPC dial must fail when cacerts do not cover the server chain")
+	require.True(t,
+		strings.Contains(err.Error(), "unknown authority") ||
+			strings.Contains(err.Error(), "signed by"),
+		"unexpected error: %v", err,
+	)
 }
 
-func newGRPCTestChain(t testing.TB) *grpcTestChain {
+// newLeafOnlyTLSListener starts a raw tls.Listener that serves the leaf certificate only.
+// Used by gRPC path tests (which want a low-level TLS handshake, not an HTTP server).
+func newLeafOnlyTLSListener(t testing.TB, c *tlstest.Chain) net.Listener {
 	t.Helper()
 
-	genKey := func() *ecdsa.PrivateKey {
-		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-		require.NoError(t, err)
-		return k
-	}
-	serial := func() *big.Int {
-		n, err := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
-		require.NoError(t, err)
-		return n
-	}
-
-	rootKey := genKey()
-	rootTmpl := &x509.Certificate{
-		SerialNumber:          serial(),
-		Subject:               pkix.Name{CommonName: "gRPC Test Root"},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-	rootDER, err := x509.CreateCertificate(rand.Reader, rootTmpl, rootTmpl, &rootKey.PublicKey, rootKey)
-	require.NoError(t, err)
-	rootCert, err := x509.ParseCertificate(rootDER)
-	require.NoError(t, err)
-
-	interKey := genKey()
-	interTmpl := &x509.Certificate{
-		SerialNumber:          serial(),
-		Subject:               pkix.Name{CommonName: "gRPC Test Intermediate"},
-		NotBefore:             time.Now().Add(-time.Hour),
-		NotAfter:              time.Now().Add(24 * time.Hour),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-	}
-	interDER, err := x509.CreateCertificate(rand.Reader, interTmpl, rootCert, &interKey.PublicKey, rootKey)
-	require.NoError(t, err)
-	interCert, err := x509.ParseCertificate(interDER)
-	require.NoError(t, err)
-
-	leafKey := genKey()
-	leafTmpl := &x509.Certificate{
-		SerialNumber: serial(),
-		Subject:      pkix.Name{CommonName: "localhost"},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(24 * time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		DNSNames:     []string{"localhost"},
-		IPAddresses:  []net.IP{net.ParseIP("127.0.0.1")},
-	}
-
-	return &grpcTestChain{
-		rootDER:         rootDER,
-		rootCert:        rootCert,
-		rootKey:         rootKey,
-		intermediateDER: interDER,
-		intermediateKey: interKey,
-		interCert:       interCert,
-		leafKey:         leafKey,
-		leafTmpl:        leafTmpl,
-	}
-}
-
-func (c *grpcTestChain) setAIAURL(t testing.TB, aiaURL string) {
-	t.Helper()
-	c.leafTmpl.IssuingCertificateURL = []string{aiaURL}
-}
-
-func (c *grpcTestChain) newLeafOnlyTLSServer(t testing.TB) net.Listener {
-	t.Helper()
-	leafDER, err := x509.CreateCertificate(rand.Reader, c.leafTmpl, c.interCert, &c.leafKey.PublicKey, c.intermediateKey)
-	require.NoError(t, err)
-	leafKeyDER, err := x509.MarshalECPrivateKey(c.leafKey)
-	require.NoError(t, err)
 	leafCert, err := tls.X509KeyPair(
-		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: leafDER}),
-		pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: leafKeyDER}),
+		pemEncodeCert(c.LeafTLSCertificate(t).Certificate[0]),
+		pemEncodeKey(t, c),
 	)
 	require.NoError(t, err)
 
@@ -162,9 +120,6 @@ func (c *grpcTestChain) newLeafOnlyTLSServer(t testing.TB) net.Listener {
 		for {
 			conn, acceptErr := listener.Accept()
 			if acceptErr != nil {
-				if strings.Contains(acceptErr.Error(), "use of closed") {
-					return
-				}
 				return
 			}
 			// Force the handshake to complete, then close.
@@ -177,6 +132,17 @@ func (c *grpcTestChain) newLeafOnlyTLSServer(t testing.TB) net.Listener {
 		}
 	}()
 	return listener
+}
+
+func pemEncodeCert(der []byte) []byte {
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+}
+
+func pemEncodeKey(t testing.TB, c *tlstest.Chain) []byte {
+	t.Helper()
+	keyDER, err := x509.MarshalECPrivateKey(c.LeafKey)
+	require.NoError(t, err)
+	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 }
 
 func nullLogger() logrus.FieldLogger {

@@ -152,7 +152,7 @@ func decryptPrivateKey(key, password []byte) ([]byte, error) {
 
 func buildTLSConfig(
 	parentConfig *tls.Config, certificate, key []byte, caCertificates [][]byte,
-	aiaEnabled bool, logger logrus.FieldLogger,
+	aiaEnabled, insecureSkipVerify bool, logger logrus.FieldLogger,
 ) (*tls.Config, error) {
 	var cp *x509.CertPool
 	if len(caCertificates) > 0 {
@@ -167,9 +167,12 @@ func buildTLSConfig(
 	// Ignoring 'TLS MinVersion is too low' because this tls.Config will inherit MinValue and MaxValue
 	// from the vu state tls.Config
 
+	// insecureSkipVerify reflects the user's original intent (state.Options.InsecureSkipTLSVerify),
+	// not parentConfig.InsecureSkipVerify — the latter is forced to true internally by the AIA
+	// wrapper on the VU config, and inheriting it would silently disable verification here.
 	tlsCfg := &tls.Config{
 		CipherSuites:       parentConfig.CipherSuites,
-		InsecureSkipVerify: parentConfig.InsecureSkipVerify, //nolint:gosec
+		InsecureSkipVerify: insecureSkipVerify, //nolint:gosec
 		MinVersion:         parentConfig.MinVersion,
 		MaxVersion:         parentConfig.MaxVersion,
 		Renegotiation:      parentConfig.Renegotiation,
@@ -191,7 +194,7 @@ func buildTLSConfig(
 
 func buildTLSConfigFromMap(
 	parentConfig *tls.Config, tlsConfigMap map[string]any,
-	aiaEnabled bool, logger logrus.FieldLogger,
+	aiaEnabled, insecureSkipVerify bool, logger logrus.FieldLogger,
 ) (*tls.Config, error) {
 	var cert, key, pass []byte
 	var ca [][]byte
@@ -224,7 +227,7 @@ func buildTLSConfigFromMap(
 			ca = [][]byte{[]byte(caCertStr)}
 		}
 	}
-	return buildTLSConfig(parentConfig, cert, key, ca, aiaEnabled, logger)
+	return buildTLSConfig(parentConfig, cert, key, ca, aiaEnabled, insecureSkipVerify, logger)
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
@@ -245,8 +248,9 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	if !p.IsPlaintext {
 		tlsCfg := state.TLSConfig.Clone()
 		if len(p.TLS) > 0 {
-			aiaEnabled := state.Options.TLSAIAFetch.Valid && state.Options.TLSAIAFetch.Bool
-			if tlsCfg, err = buildTLSConfigFromMap(tlsCfg, p.TLS, aiaEnabled, state.Logger); err != nil {
+			aiaEnabled := state.Options.TLSAIAFetch.Bool
+			insecureSkipVerify := state.Options.InsecureSkipTLSVerify.Bool
+			if tlsCfg, err = buildTLSConfigFromMap(tlsCfg, p.TLS, aiaEnabled, insecureSkipVerify, state.Logger); err != nil {
 				return false, err
 			}
 		}
