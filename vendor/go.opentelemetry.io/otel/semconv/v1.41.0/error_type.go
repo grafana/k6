@@ -1,7 +1,9 @@
+// Code generated from semantic convention specification. DO NOT EDIT.
+
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.40.0"
+package semconv // import "go.opentelemetry.io/otel/semconv/v1.41.0"
 
 import (
 	"errors"
@@ -73,7 +75,7 @@ func unwrapFmtWrapped(err error) error {
 	for reflect.TypeOf(err) == fmtWrapErrorType {
 		u := errors.Unwrap(err)
 		if u == nil {
-			return err // Should never happen, but avoid returning nil if unwrapping fails.
+			return err // When the wrapped error is nil, use the concrete type of the wrapper.
 		}
 		err = u
 	}
