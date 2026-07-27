@@ -8,11 +8,7 @@ import (
 	"strings"
 )
 
-var (
-	errNotAuthorized    = errors.New("not allowed to upload result to k6 Cloud")
-	errNotAuthenticated = errors.New("failed to authenticate with k6 Cloud")
-	errUnknown          = errors.New("an error occurred communicating with k6 Cloud")
-)
+var errUnknown = errors.New("an error occurred communicating with k6 Cloud")
 
 // ResponseError represents an error cause by talking to the API
 type ResponseError struct {

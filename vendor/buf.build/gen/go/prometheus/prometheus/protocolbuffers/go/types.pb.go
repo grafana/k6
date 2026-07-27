@@ -193,10 +193,13 @@ func (x LabelMatcher_Type) Number() protoreflect.EnumNumber {
 type Chunk_Encoding int32
 
 const (
-	Chunk_UNKNOWN         Chunk_Encoding = 0
-	Chunk_XOR             Chunk_Encoding = 1
-	Chunk_HISTOGRAM       Chunk_Encoding = 2
-	Chunk_FLOAT_HISTOGRAM Chunk_Encoding = 3
+	Chunk_UNKNOWN            Chunk_Encoding = 0
+	Chunk_XOR                Chunk_Encoding = 1
+	Chunk_HISTOGRAM          Chunk_Encoding = 2
+	Chunk_FLOAT_HISTOGRAM    Chunk_Encoding = 3
+	Chunk_XOR2               Chunk_Encoding = 4
+	Chunk_HISTOGRAM_ST       Chunk_Encoding = 5
+	Chunk_FLOAT_HISTOGRAM_ST Chunk_Encoding = 6
 )
 
 // Enum value maps for Chunk_Encoding.
@@ -206,12 +209,18 @@ var (
 		1: "XOR",
 		2: "HISTOGRAM",
 		3: "FLOAT_HISTOGRAM",
+		4: "XOR2",
+		5: "HISTOGRAM_ST",
+		6: "FLOAT_HISTOGRAM_ST",
 	}
 	Chunk_Encoding_value = map[string]int32{
-		"UNKNOWN":         0,
-		"XOR":             1,
-		"HISTOGRAM":       2,
-		"FLOAT_HISTOGRAM": 3,
+		"UNKNOWN":            0,
+		"XOR":                1,
+		"HISTOGRAM":          2,
+		"FLOAT_HISTOGRAM":    3,
+		"XOR2":               4,
+		"HISTOGRAM_ST":       5,
+		"FLOAT_HISTOGRAM_ST": 6,
 	}
 )
 
@@ -1827,17 +1836,20 @@ const file_types_proto_rawDesc = "" +
 	"\x06end_ms\x18\x04 \x01(\x03R\x05endMs\x12\x1a\n" +
 	"\bgrouping\x18\x05 \x03(\tR\bgrouping\x12\x0e\n" +
 	"\x02by\x18\x06 \x01(\bR\x02by\x12\x19\n" +
-	"\brange_ms\x18\a \x01(\x03R\arangeMs\"\xd1\x01\n" +
+	"\brange_ms\x18\a \x01(\x03R\arangeMs\"\x85\x02\n" +
 	"\x05Chunk\x12\x1e\n" +
 	"\vmin_time_ms\x18\x01 \x01(\x03R\tminTimeMs\x12\x1e\n" +
 	"\vmax_time_ms\x18\x02 \x01(\x03R\tmaxTimeMs\x12.\n" +
 	"\x04type\x18\x03 \x01(\x0e2\x1a.prometheus.Chunk.EncodingR\x04type\x12\x12\n" +
-	"\x04data\x18\x04 \x01(\fR\x04data\"D\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\"x\n" +
 	"\bEncoding\x12\v\n" +
 	"\aUNKNOWN\x10\x00\x12\a\n" +
 	"\x03XOR\x10\x01\x12\r\n" +
 	"\tHISTOGRAM\x10\x02\x12\x13\n" +
-	"\x0fFLOAT_HISTOGRAM\x10\x03\"q\n" +
+	"\x0fFLOAT_HISTOGRAM\x10\x03\x12\b\n" +
+	"\x04XOR2\x10\x04\x12\x10\n" +
+	"\fHISTOGRAM_ST\x10\x05\x12\x16\n" +
+	"\x12FLOAT_HISTOGRAM_ST\x10\x06\"q\n" +
 	"\rChunkedSeries\x12/\n" +
 	"\x06labels\x18\x01 \x03(\v2\x11.prometheus.LabelB\x04\xc8\xde\x1f\x00R\x06labels\x12/\n" +
 	"\x06chunks\x18\x02 \x03(\v2\x11.prometheus.ChunkB\x04\xc8\xde\x1f\x00R\x06chunksB;Z9buf.build/gen/go/prometheus/prometheus/protocolbuffers/gob\x06proto3"

@@ -308,7 +308,7 @@ func validateTokenV6(
 		return "", 0, 0, err
 	}
 
-	return normalizedURL, int64(authResp.StackId), int64(authResp.DefaultProjectId), nil
+	return normalizedURL, authResp.StackId, authResp.DefaultProjectId, nil
 }
 
 // normalizeStackURL converts a stack slug to a full URL if needed and removes trailing slashes.
