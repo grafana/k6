@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2018 gRPC authors.
+ * Copyright 2026 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
  *
  */
 
-package grpc
+// Package internal contains functionality internal to the transport package.
+package internal
 
-// Version is the current grpc version.
-const Version = "1.82.1"
+// TimeNowFunc is a variable that can be set to override the default behavior of
+// getting the current time in nanoseconds. It is used in transport code to set
+// channelz timestamps, and is exposed here for testing purposes.
+var TimeNowFunc func() int64
