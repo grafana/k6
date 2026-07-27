@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"sync"
 
 	"github.com/chromedp/cdproto/cdp"
 	cdppage "github.com/chromedp/cdproto/page"
@@ -10,6 +11,7 @@ import (
 type Dialog struct {
 	ctx          context.Context
 	session      session
+	mu           sync.Mutex
 	handled      bool
 	dialogType   string
 	message      string
@@ -39,6 +41,8 @@ func (d *Dialog) Dismiss() error {
 }
 
 func (d *Dialog) handle(accept bool, promptText []string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.handled {
 		return nil
 	}

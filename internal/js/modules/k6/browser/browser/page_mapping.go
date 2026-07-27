@@ -785,10 +785,19 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 		pageEvents := map[common.PageEventName]struct {
 			mapp func(vu moduleVU, event common.PageEvent) mapping
 			wait bool // Whether to wait for the handler to complete.
+			// propagateErr, when true, re-queues the handler error through the
+			// task queue so it reaches the event loop and fails the iteration
+			// (e.g. metric). When false, the error is logged and ignored.
+			propagateErr bool
+			// waitTimeout, if non-nil, caps how long we wait for the handler
+			// to settle. Exceeding the timeout is not fatal: the On handler
+			// returns nil and the caller (e.g. frame_session) falls back to
+			// auto-dismiss. Nil means wait indefinitely (until ctx cancellation).
+			waitTimeout func() time.Duration
 		}{
 			common.PageEventConsole:         {mapp: mapConsoleMessage},
-			common.PageEventDialog:          {mapp: mapDialog, wait: true},
-			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true},
+			common.PageEventDialog:          {mapp: mapDialog, wait: true, waitTimeout: p.Timeout},
+			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true, propagateErr: true},
 			common.PageEventRequest:         {mapp: mapRequestEvent},
 			common.PageEventResponse:        {mapp: mapResponseEvent},
 			common.PageEventRequestFinished: {mapp: mapRequestEvent},
@@ -825,15 +834,33 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 				rt := vu.Runtime()
 				retVal, err := handle(sobek.Undefined(), rt.ToValue(pageEvent.mapp(vu, event)))
 				if err != nil {
-					result <- fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+					wrappedErr := fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+					result <- wrappedErr
+					if pageEvent.propagateErr {
+						// Return the error from the task so it propagates through
+						// the event loop and fails the iteration (e.g. metric).
+						return wrappedErr
+					}
 					return nil
 				}
 				awaitHandlerResult(rt, retVal, result)
 				return nil
 			})
+
+			var timeoutCh <-chan time.Time
+			if pageEvent.waitTimeout != nil {
+				timer := time.NewTimer(pageEvent.waitTimeout())
+				defer timer.Stop()
+				timeoutCh = timer.C
+			}
 			select {
 			case err := <-result:
 				return err
+			case <-timeoutCh:
+				vu.State().Logger.Warnf(
+					"page.on('%s') handler did not settle within %s, falling back to auto-dismiss",
+					eventName, pageEvent.waitTimeout())
+				return nil
 			case <-ctx.Done():
 				return errors.New("iteration ended before page.on handler completed executing")
 			}
