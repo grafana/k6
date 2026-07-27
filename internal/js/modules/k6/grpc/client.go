@@ -167,9 +167,9 @@ func buildTLSConfig(
 	// Ignoring 'TLS MinVersion is too low' because this tls.Config will inherit MinValue and MaxValue
 	// from the vu state tls.Config
 
-	// insecureSkipVerify reflects the user's original intent (state.Options.InsecureSkipTLSVerify),
-	// not parentConfig.InsecureSkipVerify — the latter is forced to true internally by the AIA
-	// wrapper on the VU config, and inheriting it would silently disable verification here.
+	// Take insecureSkipVerify from the user's option, not parentConfig — the AIA wrapper
+	// forces parentConfig.InsecureSkipVerify to true internally, so inheriting silently
+	// disables verification.
 	tlsCfg := &tls.Config{
 		CipherSuites:       parentConfig.CipherSuites,
 		InsecureSkipVerify: insecureSkipVerify, //nolint:gosec

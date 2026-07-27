@@ -19,7 +19,7 @@ import (
 	"go.k6.io/k6/v2/lib/netext"
 )
 
-// Verifies AIA verification honours gRPC-supplied cacerts, not the VU config's RootCAs.
+// AIA verification must honour per-connect cacerts, not the VU config's RootCAs.
 func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	t.Parallel()
 
@@ -35,7 +35,7 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	tlsListener := newLeafOnlyTLSListener(t, chain)
 	t.Cleanup(func() { _ = tlsListener.Close() })
 
-	// VU config has no RootCAs; the user relies on per-connect cacerts.
+	// VU config has no RootCAs — the user relies on per-connect cacerts.
 	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12}
 	wrappedVU := netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
 
@@ -53,13 +53,11 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	_ = conn.Close()
 }
 
-// Verifies gRPC is not silently insecure when AIA is enabled: if the presented cert cannot
-// be validated against the caller's cacerts, the dial must fail even though the wrapper
-// disables Go's built-in InsecureSkipVerify handling internally.
+// Guard against silent insecurity: with AIA enabled and mismatched cacerts, the dial
+// must fail — even though the AIA wrapper flips InsecureSkipVerify internally.
 func TestBuildTLSConfig_AIARejectsMismatchedCACert(t *testing.T) {
 	t.Parallel()
 
-	// Server chain (root A → inter A → leaf).
 	chain := tlstest.NewChain(t)
 
 	aiaSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -72,8 +70,8 @@ func TestBuildTLSConfig_AIARejectsMismatchedCACert(t *testing.T) {
 	tlsListener := newLeafOnlyTLSListener(t, chain)
 	t.Cleanup(func() { _ = tlsListener.Close() })
 
-	// Build an unrelated root CA (root B). The caller supplies root B as `cacerts` and enables
-	// AIA. The server presents a chain rooted in A, so verification must fail.
+	// Unrelated root — the caller supplies this as cacerts; the server presents a chain
+	// rooted in a different CA, so verification must fail.
 	otherChain := tlstest.NewChain(t)
 	otherRootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: otherChain.RootDER})
 
@@ -99,8 +97,7 @@ func TestBuildTLSConfig_AIARejectsMismatchedCACert(t *testing.T) {
 	)
 }
 
-// newLeafOnlyTLSListener starts a raw tls.Listener that serves the leaf certificate only.
-// Used by gRPC path tests (which want a low-level TLS handshake, not an HTTP server).
+// newLeafOnlyTLSListener starts a raw tls.Listener serving only the leaf certificate.
 func newLeafOnlyTLSListener(t testing.TB, c *tlstest.Chain) net.Listener {
 	t.Helper()
 
@@ -122,7 +119,6 @@ func newLeafOnlyTLSListener(t testing.TB, c *tlstest.Chain) net.Listener {
 			if acceptErr != nil {
 				return
 			}
-			// Force the handshake to complete, then close.
 			if tlsConn, ok := conn.(*tls.Conn); ok {
 				hctx, hcancel := context.WithTimeout(context.Background(), 5*time.Second)
 				_ = tlsConn.HandshakeContext(hctx)
