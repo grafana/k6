@@ -1,4 +1,5 @@
 import { browser, networkProfiles } from 'k6/browser';
+import { fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -46,6 +47,8 @@ export async function normal() {
 
   try {
     await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }
@@ -59,6 +62,8 @@ export async function networkThrottled() {
     await page.throttleNetwork(networkProfiles["Slow 3G"]);
 
     await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }
@@ -72,6 +77,8 @@ export async function cpuThrottled() {
     await page.throttleCPU({ rate: 4 });
 
     await page.goto('https://quickpizza.grafana.com/test.k6.io/', { waitUntil: 'networkidle' });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }
