@@ -1,8 +1,6 @@
 module go.k6.io/k6/v2
 
-go 1.25.0
-
-toolchain go1.25.12
+go 1.26
 
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20260707164124-2360da55afce.1
@@ -12,10 +10,10 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.2.2
 	github.com/bufbuild/protocompile v0.14.1
-	github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d
+	github.com/chromedp/cdproto v0.0.0-20260719223732-95f6af754cfe
 	github.com/evanw/esbuild v0.28.1
 	github.com/fatih/color v1.19.0
-	github.com/go-json-experiment/json v0.0.0-20250211171154-1ae217ad3535
+	github.com/go-json-experiment/json v0.0.0-20260623181947-01eb4420fa68
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0

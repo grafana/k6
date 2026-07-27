@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/chromedp/cdproto/accessibility"
+	"github.com/chromedp/cdproto/ads"
 	"github.com/chromedp/cdproto/animation"
 	"github.com/chromedp/cdproto/audits"
 	"github.com/chromedp/cdproto/autofill"
@@ -22,10 +23,12 @@ import (
 	"github.com/chromedp/cdproto/cachestorage"
 	"github.com/chromedp/cdproto/cast"
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/crashreportcontext"
 	"github.com/chromedp/cdproto/css"
 	"github.com/chromedp/cdproto/debugger"
 	"github.com/chromedp/cdproto/deviceaccess"
 	"github.com/chromedp/cdproto/deviceorientation"
+	"github.com/chromedp/cdproto/digitalcredentials"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/domdebugger"
 	"github.com/chromedp/cdproto/domsnapshot"
@@ -57,6 +60,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/cdproto/serviceworker"
+	"github.com/chromedp/cdproto/smartcardemulation"
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/cdproto/systeminfo"
 	"github.com/chromedp/cdproto/target"
@@ -64,6 +68,7 @@ import (
 	"github.com/chromedp/cdproto/tracing"
 	"github.com/chromedp/cdproto/webaudio"
 	"github.com/chromedp/cdproto/webauthn"
+	"github.com/chromedp/cdproto/webmcp"
 	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 )
@@ -94,6 +99,7 @@ const (
 	CommandAccessibilityQueryAXTree                                  = accessibility.CommandQueryAXTree
 	EventAccessibilityLoadComplete                                   = "Accessibility.loadComplete"
 	EventAccessibilityNodesUpdated                                   = "Accessibility.nodesUpdated"
+	CommandAdsGetAdMetrics                                           = ads.CommandGetAdMetrics
 	CommandAnimationDisable                                          = animation.CommandDisable
 	CommandAnimationEnable                                           = animation.CommandEnable
 	CommandAnimationGetCurrentTime                                   = animation.CommandGetCurrentTime
@@ -111,7 +117,6 @@ const (
 	CommandAuditsGetEncodedResponse                                  = audits.CommandGetEncodedResponse
 	CommandAuditsDisable                                             = audits.CommandDisable
 	CommandAuditsEnable                                              = audits.CommandEnable
-	CommandAuditsCheckContrast                                       = audits.CommandCheckContrast
 	CommandAuditsCheckFormsIssues                                    = audits.CommandCheckFormsIssues
 	EventAuditsIssueAdded                                            = "Audits.issueAdded"
 	CommandAutofillTrigger                                           = autofill.CommandTrigger
@@ -144,7 +149,6 @@ const (
 	EventBluetoothEmulationCharacteristicOperationReceived           = "BluetoothEmulation.characteristicOperationReceived"
 	EventBluetoothEmulationDescriptorOperationReceived               = "BluetoothEmulation.descriptorOperationReceived"
 	CommandBrowserSetPermission                                      = browser.CommandSetPermission
-	CommandBrowserGrantPermissions                                   = browser.CommandGrantPermissions
 	CommandBrowserResetPermissions                                   = browser.CommandResetPermissions
 	CommandBrowserSetDownloadBehavior                                = browser.CommandSetDownloadBehavior
 	CommandBrowserCancelDownload                                     = browser.CommandCancelDownload
@@ -162,7 +166,6 @@ const (
 	CommandBrowserSetDockTile                                        = browser.CommandSetDockTile
 	CommandBrowserExecuteBrowserCommand                              = browser.CommandExecuteBrowserCommand
 	CommandBrowserAddPrivacySandboxEnrollmentOverride                = browser.CommandAddPrivacySandboxEnrollmentOverride
-	CommandBrowserAddPrivacySandboxCoordinatorKeyConfig              = browser.CommandAddPrivacySandboxCoordinatorKeyConfig
 	EventBrowserDownloadWillBegin                                    = "Browser.downloadWillBegin"
 	EventBrowserDownloadProgress                                     = "Browser.downloadProgress"
 	CommandCSSAddRule                                                = css.CommandAddRule
@@ -192,8 +195,9 @@ const (
 	CommandCSSSetPropertyRulePropertyName                            = css.CommandSetPropertyRulePropertyName
 	CommandCSSSetKeyframeKey                                         = css.CommandSetKeyframeKey
 	CommandCSSSetMediaText                                           = css.CommandSetMediaText
-	CommandCSSSetContainerQueryText                                  = css.CommandSetContainerQueryText
+	CommandCSSSetContainerQueryConditionText                         = css.CommandSetContainerQueryConditionText
 	CommandCSSSetSupportsText                                        = css.CommandSetSupportsText
+	CommandCSSSetNavigationText                                      = css.CommandSetNavigationText
 	CommandCSSSetScopeText                                           = css.CommandSetScopeText
 	CommandCSSSetRuleSelector                                        = css.CommandSetRuleSelector
 	CommandCSSSetStyleSheetText                                      = css.CommandSetStyleSheetText
@@ -221,6 +225,7 @@ const (
 	CommandCastStopCasting                                           = cast.CommandStopCasting
 	EventCastSinksUpdated                                            = "Cast.sinksUpdated"
 	EventCastIssueUpdated                                            = "Cast.issueUpdated"
+	CommandCrashReportContextGetEntries                              = crashreportcontext.CommandGetEntries
 	CommandDOMCollectClassNamesFromSubtree                           = dom.CommandCollectClassNamesFromSubtree
 	CommandDOMCopyTo                                                 = dom.CommandCopyTo
 	CommandDOMDescribeNode                                           = dom.CommandDescribeNode
@@ -271,6 +276,7 @@ const (
 	CommandDOMGetAnchorElement                                       = dom.CommandGetAnchorElement
 	CommandDOMForceShowPopover                                       = dom.CommandForceShowPopover
 	EventDOMAttributeModified                                        = "DOM.attributeModified"
+	EventDOMAdoptedStyleSheetsModified                               = "DOM.adoptedStyleSheetsModified"
 	EventDOMAttributeRemoved                                         = "DOM.attributeRemoved"
 	EventDOMCharacterDataModified                                    = "DOM.characterDataModified"
 	EventDOMChildNodeCountUpdated                                    = "DOM.childNodeCountUpdated"
@@ -282,6 +288,8 @@ const (
 	EventDOMPseudoElementAdded                                       = "DOM.pseudoElementAdded"
 	EventDOMTopLayerElementsUpdated                                  = "DOM.topLayerElementsUpdated"
 	EventDOMScrollableFlagUpdated                                    = "DOM.scrollableFlagUpdated"
+	EventDOMAdRelatedStateUpdated                                    = "DOM.adRelatedStateUpdated"
+	EventDOMAffectedByStartingStylesFlagUpdated                      = "DOM.affectedByStartingStylesFlagUpdated"
 	EventDOMPseudoElementRemoved                                     = "DOM.pseudoElementRemoved"
 	EventDOMSetChildNodes                                            = "DOM.setChildNodes"
 	EventDOMShadowRootPopped                                         = "DOM.shadowRootPopped"
@@ -349,6 +357,7 @@ const (
 	EventDeviceAccessDeviceRequestPrompted                           = "DeviceAccess.deviceRequestPrompted"
 	CommandDeviceOrientationClearDeviceOrientationOverride           = deviceorientation.CommandClearDeviceOrientationOverride
 	CommandDeviceOrientationSetDeviceOrientationOverride             = deviceorientation.CommandSetDeviceOrientationOverride
+	CommandDigitalCredentialsSetVirtualWalletBehavior                = digitalcredentials.CommandSetVirtualWalletBehavior
 	CommandEmulationClearDeviceMetricsOverride                       = emulation.CommandClearDeviceMetricsOverride
 	CommandEmulationClearGeolocationOverride                         = emulation.CommandClearGeolocationOverride
 	CommandEmulationResetPageScaleFactor                             = emulation.CommandResetPageScaleFactor
@@ -374,7 +383,6 @@ const (
 	CommandEmulationSetSensorOverrideReadings                        = emulation.CommandSetSensorOverrideReadings
 	CommandEmulationSetPressureSourceOverrideEnabled                 = emulation.CommandSetPressureSourceOverrideEnabled
 	CommandEmulationSetPressureStateOverride                         = emulation.CommandSetPressureStateOverride
-	CommandEmulationSetPressureDataOverride                          = emulation.CommandSetPressureDataOverride
 	CommandEmulationSetIdleOverride                                  = emulation.CommandSetIdleOverride
 	CommandEmulationClearIdleOverride                                = emulation.CommandClearIdleOverride
 	CommandEmulationSetPageScaleFactor                               = emulation.CommandSetPageScaleFactor
@@ -389,11 +397,19 @@ const (
 	CommandEmulationSetUserAgentOverride                             = emulation.CommandSetUserAgentOverride
 	CommandEmulationSetAutomationOverride                            = emulation.CommandSetAutomationOverride
 	CommandEmulationSetSmallViewportHeightDifferenceOverride         = emulation.CommandSetSmallViewportHeightDifferenceOverride
+	CommandEmulationGetScreenInfos                                   = emulation.CommandGetScreenInfos
+	CommandEmulationAddScreen                                        = emulation.CommandAddScreen
+	CommandEmulationUpdateScreen                                     = emulation.CommandUpdateScreen
+	CommandEmulationRemoveScreen                                     = emulation.CommandRemoveScreen
+	CommandEmulationSetPrimaryScreen                                 = emulation.CommandSetPrimaryScreen
 	EventEmulationVirtualTimeBudgetExpired                           = "Emulation.virtualTimeBudgetExpired"
+	EventEmulationScreenOrientationLockChanged                       = "Emulation.screenOrientationLockChanged"
 	CommandEventBreakpointsSetInstrumentationBreakpoint              = eventbreakpoints.CommandSetInstrumentationBreakpoint
 	CommandEventBreakpointsRemoveInstrumentationBreakpoint           = eventbreakpoints.CommandRemoveInstrumentationBreakpoint
 	CommandEventBreakpointsDisable                                   = eventbreakpoints.CommandDisable
+	CommandExtensionsTriggerAction                                   = extensions.CommandTriggerAction
 	CommandExtensionsLoadUnpacked                                    = extensions.CommandLoadUnpacked
+	CommandExtensionsGetExtensions                                   = extensions.CommandGetExtensions
 	CommandExtensionsUninstall                                       = extensions.CommandUninstall
 	CommandExtensionsGetStorageItems                                 = extensions.CommandGetStorageItems
 	CommandExtensionsRemoveStorageItems                              = extensions.CommandRemoveStorageItems
@@ -469,6 +485,7 @@ const (
 	EventInspectorDetached                                           = "Inspector.detached"
 	EventInspectorTargetCrashed                                      = "Inspector.targetCrashed"
 	EventInspectorTargetReloadedAfterCrash                           = "Inspector.targetReloadedAfterCrash"
+	EventInspectorWorkerScriptLoaded                                 = "Inspector.workerScriptLoaded"
 	CommandLayerTreeCompositingReasons                               = layertree.CommandCompositingReasons
 	CommandLayerTreeDisable                                          = layertree.CommandDisable
 	CommandLayerTreeEnable                                           = layertree.CommandEnable
@@ -492,7 +509,7 @@ const (
 	EventMediaPlayerEventsAdded                                      = "Media.playerEventsAdded"
 	EventMediaPlayerMessagesLogged                                   = "Media.playerMessagesLogged"
 	EventMediaPlayerErrorsRaised                                     = "Media.playerErrorsRaised"
-	EventMediaPlayersCreated                                         = "Media.playersCreated"
+	EventMediaPlayerCreated                                          = "Media.playerCreated"
 	CommandMemoryGetDOMCounters                                      = memory.CommandGetDOMCounters
 	CommandMemoryGetDOMCountersForLeakDetection                      = memory.CommandGetDOMCountersForLeakDetection
 	CommandMemoryPrepareForLeakDetection                             = memory.CommandPrepareForLeakDetection
@@ -510,8 +527,10 @@ const (
 	CommandNetworkClearBrowserCookies                                = network.CommandClearBrowserCookies
 	CommandNetworkDeleteCookies                                      = network.CommandDeleteCookies
 	CommandNetworkDisable                                            = network.CommandDisable
-	CommandNetworkEmulateNetworkConditions                           = network.CommandEmulateNetworkConditions
+	CommandNetworkEmulateNetworkConditionsByRule                     = network.CommandEmulateNetworkConditionsByRule
+	CommandNetworkOverrideNetworkState                               = network.CommandOverrideNetworkState
 	CommandNetworkEnable                                             = network.CommandEnable
+	CommandNetworkConfigureDurableMessages                           = network.CommandConfigureDurableMessages
 	CommandNetworkGetCertificate                                     = network.CommandGetCertificate
 	CommandNetworkGetCookies                                         = network.CommandGetCookies
 	CommandNetworkGetResponseBody                                    = network.CommandGetResponseBody
@@ -530,6 +549,9 @@ const (
 	CommandNetworkStreamResourceContent                              = network.CommandStreamResourceContent
 	CommandNetworkGetSecurityIsolationStatus                         = network.CommandGetSecurityIsolationStatus
 	CommandNetworkEnableReportingAPI                                 = network.CommandEnableReportingAPI
+	CommandNetworkEnableDeviceBoundSessions                          = network.CommandEnableDeviceBoundSessions
+	CommandNetworkDeleteDeviceBoundSession                           = network.CommandDeleteDeviceBoundSession
+	CommandNetworkFetchSchemefulSite                                 = network.CommandFetchSchemefulSite
 	CommandNetworkLoadNetworkResource                                = network.CommandLoadNetworkResource
 	CommandNetworkSetCookieControls                                  = network.CommandSetCookieControls
 	EventNetworkDataReceived                                         = "Network.dataReceived"
@@ -557,6 +579,8 @@ const (
 	EventNetworkDirectTCPSocketClosed                                = "Network.directTCPSocketClosed"
 	EventNetworkDirectTCPSocketChunkSent                             = "Network.directTCPSocketChunkSent"
 	EventNetworkDirectTCPSocketChunkReceived                         = "Network.directTCPSocketChunkReceived"
+	EventNetworkDirectUDPSocketJoinedMulticastGroup                  = "Network.directUDPSocketJoinedMulticastGroup"
+	EventNetworkDirectUDPSocketLeftMulticastGroup                    = "Network.directUDPSocketLeftMulticastGroup"
 	EventNetworkDirectUDPSocketCreated                               = "Network.directUDPSocketCreated"
 	EventNetworkDirectUDPSocketOpened                                = "Network.directUDPSocketOpened"
 	EventNetworkDirectUDPSocketAborted                               = "Network.directUDPSocketAborted"
@@ -568,13 +592,11 @@ const (
 	EventNetworkResponseReceivedEarlyHints                           = "Network.responseReceivedEarlyHints"
 	EventNetworkTrustTokenOperationDone                              = "Network.trustTokenOperationDone"
 	EventNetworkPolicyUpdated                                        = "Network.policyUpdated"
-	EventNetworkSubresourceWebBundleMetadataReceived                 = "Network.subresourceWebBundleMetadataReceived"
-	EventNetworkSubresourceWebBundleMetadataError                    = "Network.subresourceWebBundleMetadataError"
-	EventNetworkSubresourceWebBundleInnerResponseParsed              = "Network.subresourceWebBundleInnerResponseParsed"
-	EventNetworkSubresourceWebBundleInnerResponseError               = "Network.subresourceWebBundleInnerResponseError"
 	EventNetworkReportingAPIReportAdded                              = "Network.reportingApiReportAdded"
 	EventNetworkReportingAPIReportUpdated                            = "Network.reportingApiReportUpdated"
 	EventNetworkReportingAPIEndpointsChangedForOrigin                = "Network.reportingApiEndpointsChangedForOrigin"
+	EventNetworkDeviceBoundSessionsAdded                             = "Network.deviceBoundSessionsAdded"
+	EventNetworkDeviceBoundSessionEventOccurred                      = "Network.deviceBoundSessionEventOccurred"
 	CommandOverlayDisable                                            = overlay.CommandDisable
 	CommandOverlayEnable                                             = overlay.CommandEnable
 	CommandOverlayGetHighlightObjectForTest                          = overlay.CommandGetHighlightObjectForTest
@@ -594,16 +616,20 @@ const (
 	CommandOverlaySetShowFlexOverlays                                = overlay.CommandSetShowFlexOverlays
 	CommandOverlaySetShowScrollSnapOverlays                          = overlay.CommandSetShowScrollSnapOverlays
 	CommandOverlaySetShowContainerQueryOverlays                      = overlay.CommandSetShowContainerQueryOverlays
+	CommandOverlaySetShowInspectedElementAnchor                      = overlay.CommandSetShowInspectedElementAnchor
 	CommandOverlaySetShowPaintRects                                  = overlay.CommandSetShowPaintRects
 	CommandOverlaySetShowLayoutShiftRegions                          = overlay.CommandSetShowLayoutShiftRegions
 	CommandOverlaySetShowScrollBottleneckRects                       = overlay.CommandSetShowScrollBottleneckRects
 	CommandOverlaySetShowViewportSizeOnResize                        = overlay.CommandSetShowViewportSizeOnResize
 	CommandOverlaySetShowHinge                                       = overlay.CommandSetShowHinge
+	CommandOverlaySetShowDisplayCutout                               = overlay.CommandSetShowDisplayCutout
 	CommandOverlaySetShowIsolatedElements                            = overlay.CommandSetShowIsolatedElements
 	CommandOverlaySetShowWindowControlsOverlay                       = overlay.CommandSetShowWindowControlsOverlay
 	EventOverlayInspectNodeRequested                                 = "Overlay.inspectNodeRequested"
 	EventOverlayNodeHighlightRequested                               = "Overlay.nodeHighlightRequested"
 	EventOverlayScreenshotRequested                                  = "Overlay.screenshotRequested"
+	EventOverlayInspectPanelShowRequested                            = "Overlay.inspectPanelShowRequested"
+	EventOverlayInspectedElementWindowRestored                       = "Overlay.inspectedElementWindowRestored"
 	EventOverlayInspectModeCanceled                                  = "Overlay.inspectModeCanceled"
 	CommandPWAGetOsAppState                                          = pwa.CommandGetOsAppState
 	CommandPWAInstall                                                = pwa.CommandInstall
@@ -660,6 +686,7 @@ const (
 	CommandPageWaitForDebugger                                       = page.CommandWaitForDebugger
 	CommandPageSetInterceptFileChooserDialog                         = page.CommandSetInterceptFileChooserDialog
 	CommandPageSetPrerenderingAllowed                                = page.CommandSetPrerenderingAllowed
+	CommandPageGetAnnotatedPageContent                               = page.CommandGetAnnotatedPageContent
 	EventPageDomContentEventFired                                    = "Page.domContentEventFired"
 	EventPageFileChooserOpened                                       = "Page.fileChooserOpened"
 	EventPageFrameAttached                                           = "Page.frameAttached"
@@ -759,7 +786,33 @@ const (
 	EventServiceWorkerWorkerErrorReported                            = "ServiceWorker.workerErrorReported"
 	EventServiceWorkerWorkerRegistrationUpdated                      = "ServiceWorker.workerRegistrationUpdated"
 	EventServiceWorkerWorkerVersionUpdated                           = "ServiceWorker.workerVersionUpdated"
-	CommandStorageGetStorageKeyForFrame                              = storage.CommandGetStorageKeyForFrame
+	CommandSmartCardEmulationEnable                                  = smartcardemulation.CommandEnable
+	CommandSmartCardEmulationDisable                                 = smartcardemulation.CommandDisable
+	CommandSmartCardEmulationReportEstablishContextResult            = smartcardemulation.CommandReportEstablishContextResult
+	CommandSmartCardEmulationReportReleaseContextResult              = smartcardemulation.CommandReportReleaseContextResult
+	CommandSmartCardEmulationReportListReadersResult                 = smartcardemulation.CommandReportListReadersResult
+	CommandSmartCardEmulationReportGetStatusChangeResult             = smartcardemulation.CommandReportGetStatusChangeResult
+	CommandSmartCardEmulationReportBeginTransactionResult            = smartcardemulation.CommandReportBeginTransactionResult
+	CommandSmartCardEmulationReportPlainResult                       = smartcardemulation.CommandReportPlainResult
+	CommandSmartCardEmulationReportConnectResult                     = smartcardemulation.CommandReportConnectResult
+	CommandSmartCardEmulationReportDataResult                        = smartcardemulation.CommandReportDataResult
+	CommandSmartCardEmulationReportStatusResult                      = smartcardemulation.CommandReportStatusResult
+	CommandSmartCardEmulationReportError                             = smartcardemulation.CommandReportError
+	EventSmartCardEmulationEstablishContextRequested                 = "SmartCardEmulation.establishContextRequested"
+	EventSmartCardEmulationReleaseContextRequested                   = "SmartCardEmulation.releaseContextRequested"
+	EventSmartCardEmulationListReadersRequested                      = "SmartCardEmulation.listReadersRequested"
+	EventSmartCardEmulationGetStatusChangeRequested                  = "SmartCardEmulation.getStatusChangeRequested"
+	EventSmartCardEmulationCancelRequested                           = "SmartCardEmulation.cancelRequested"
+	EventSmartCardEmulationConnectRequested                          = "SmartCardEmulation.connectRequested"
+	EventSmartCardEmulationDisconnectRequested                       = "SmartCardEmulation.disconnectRequested"
+	EventSmartCardEmulationTransmitRequested                         = "SmartCardEmulation.transmitRequested"
+	EventSmartCardEmulationControlRequested                          = "SmartCardEmulation.controlRequested"
+	EventSmartCardEmulationGetAttribRequested                        = "SmartCardEmulation.getAttribRequested"
+	EventSmartCardEmulationSetAttribRequested                        = "SmartCardEmulation.setAttribRequested"
+	EventSmartCardEmulationStatusRequested                           = "SmartCardEmulation.statusRequested"
+	EventSmartCardEmulationBeginTransactionRequested                 = "SmartCardEmulation.beginTransactionRequested"
+	EventSmartCardEmulationEndTransactionRequested                   = "SmartCardEmulation.endTransactionRequested"
+	CommandStorageGetStorageKey                                      = storage.CommandGetStorageKey
 	CommandStorageClearDataForOrigin                                 = storage.CommandClearDataForOrigin
 	CommandStorageClearDataForStorageKey                             = storage.CommandClearDataForStorageKey
 	CommandStorageGetCookies                                         = storage.CommandGetCookies
@@ -777,9 +830,6 @@ const (
 	CommandStorageUntrackIndexedDBForStorageKey                      = storage.CommandUntrackIndexedDBForStorageKey
 	CommandStorageGetTrustTokens                                     = storage.CommandGetTrustTokens
 	CommandStorageClearTrustTokens                                   = storage.CommandClearTrustTokens
-	CommandStorageGetInterestGroupDetails                            = storage.CommandGetInterestGroupDetails
-	CommandStorageSetInterestGroupTracking                           = storage.CommandSetInterestGroupTracking
-	CommandStorageSetInterestGroupAuctionTracking                    = storage.CommandSetInterestGroupAuctionTracking
 	CommandStorageGetSharedStorageMetadata                           = storage.CommandGetSharedStorageMetadata
 	CommandStorageGetSharedStorageEntries                            = storage.CommandGetSharedStorageEntries
 	CommandStorageSetSharedStorageEntry                              = storage.CommandSetSharedStorageEntry
@@ -790,27 +840,15 @@ const (
 	CommandStorageSetStorageBucketTracking                           = storage.CommandSetStorageBucketTracking
 	CommandStorageDeleteStorageBucket                                = storage.CommandDeleteStorageBucket
 	CommandStorageRunBounceTrackingMitigations                       = storage.CommandRunBounceTrackingMitigations
-	CommandStorageSetAttributionReportingLocalTestingMode            = storage.CommandSetAttributionReportingLocalTestingMode
-	CommandStorageSetAttributionReportingTracking                    = storage.CommandSetAttributionReportingTracking
-	CommandStorageSendPendingAttributionReports                      = storage.CommandSendPendingAttributionReports
 	CommandStorageGetRelatedWebsiteSets                              = storage.CommandGetRelatedWebsiteSets
-	CommandStorageGetAffectedURLsForThirdPartyCookieMetadata         = storage.CommandGetAffectedURLsForThirdPartyCookieMetadata
-	CommandStorageSetProtectedAudienceKAnonymity                     = storage.CommandSetProtectedAudienceKAnonymity
 	EventStorageCacheStorageContentUpdated                           = "Storage.cacheStorageContentUpdated"
 	EventStorageCacheStorageListUpdated                              = "Storage.cacheStorageListUpdated"
 	EventStorageIndexedDBContentUpdated                              = "Storage.indexedDBContentUpdated"
 	EventStorageIndexedDBListUpdated                                 = "Storage.indexedDBListUpdated"
-	EventStorageInterestGroupAccessed                                = "Storage.interestGroupAccessed"
-	EventStorageInterestGroupAuctionEventOccurred                    = "Storage.interestGroupAuctionEventOccurred"
-	EventStorageInterestGroupAuctionNetworkRequestCreated            = "Storage.interestGroupAuctionNetworkRequestCreated"
 	EventStorageSharedStorageAccessed                                = "Storage.sharedStorageAccessed"
 	EventStorageSharedStorageWorkletOperationExecutionFinished       = "Storage.sharedStorageWorkletOperationExecutionFinished"
 	EventStorageStorageBucketCreatedOrUpdated                        = "Storage.storageBucketCreatedOrUpdated"
 	EventStorageStorageBucketDeleted                                 = "Storage.storageBucketDeleted"
-	EventStorageAttributionReportingSourceRegistered                 = "Storage.attributionReportingSourceRegistered"
-	EventStorageAttributionReportingTriggerRegistered                = "Storage.attributionReportingTriggerRegistered"
-	EventStorageAttributionReportingReportSent                       = "Storage.attributionReportingReportSent"
-	EventStorageAttributionReportingVerboseDebugReportSent           = "Storage.attributionReportingVerboseDebugReportSent"
 	CommandSystemInfoGetInfo                                         = systeminfo.CommandGetInfo
 	CommandSystemInfoGetFeatureState                                 = systeminfo.CommandGetFeatureState
 	CommandSystemInfoGetProcessInfo                                  = systeminfo.CommandGetProcessInfo
@@ -830,6 +868,7 @@ const (
 	CommandTargetAutoAttachRelated                                   = target.CommandAutoAttachRelated
 	CommandTargetSetDiscoverTargets                                  = target.CommandSetDiscoverTargets
 	CommandTargetSetRemoteLocations                                  = target.CommandSetRemoteLocations
+	CommandTargetGetDevToolsTarget                                   = target.CommandGetDevToolsTarget
 	CommandTargetOpenDevTools                                        = target.CommandOpenDevTools
 	EventTargetAttachedToTarget                                      = "Target.attachedToTarget"
 	EventTargetDetachedFromTarget                                    = "Target.detachedFromTarget"
@@ -843,6 +882,7 @@ const (
 	EventTetheringAccepted                                           = "Tethering.accepted"
 	CommandTracingEnd                                                = tracing.CommandEnd
 	CommandTracingGetCategories                                      = tracing.CommandGetCategories
+	CommandTracingGetTrackEventDescriptor                            = tracing.CommandGetTrackEventDescriptor
 	CommandTracingRecordClockSyncMarker                              = tracing.CommandRecordClockSyncMarker
 	CommandTracingRequestMemoryDump                                  = tracing.CommandRequestMemoryDump
 	CommandTracingStart                                              = tracing.CommandStart
@@ -882,6 +922,14 @@ const (
 	EventWebAuthnCredentialDeleted                                   = "WebAuthn.credentialDeleted"
 	EventWebAuthnCredentialUpdated                                   = "WebAuthn.credentialUpdated"
 	EventWebAuthnCredentialAsserted                                  = "WebAuthn.credentialAsserted"
+	CommandWebMCPEnable                                              = webmcp.CommandEnable
+	CommandWebMCPDisable                                             = webmcp.CommandDisable
+	CommandWebMCPInvokeTool                                          = webmcp.CommandInvokeTool
+	CommandWebMCPCancelInvocation                                    = webmcp.CommandCancelInvocation
+	EventWebMCPToolsAdded                                            = "WebMCP.toolsAdded"
+	EventWebMCPToolsRemoved                                          = "WebMCP.toolsRemoved"
+	EventWebMCPToolInvoked                                           = "WebMCP.toolInvoked"
+	EventWebMCPToolResponded                                         = "WebMCP.toolResponded"
 )
 
 // Error error type.
@@ -934,6 +982,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(accessibility.EventLoadComplete)
 	case EventAccessibilityNodesUpdated:
 		v = new(accessibility.EventNodesUpdated)
+	case CommandAdsGetAdMetrics:
+		v = new(ads.GetAdMetricsReturns)
 	case CommandAnimationDisable:
 		return emptyVal, nil
 	case CommandAnimationEnable:
@@ -967,8 +1017,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 	case CommandAuditsDisable:
 		return emptyVal, nil
 	case CommandAuditsEnable:
-		return emptyVal, nil
-	case CommandAuditsCheckContrast:
 		return emptyVal, nil
 	case CommandAuditsCheckFormsIssues:
 		v = new(audits.CheckFormsIssuesReturns)
@@ -1034,8 +1082,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(bluetoothemulation.EventDescriptorOperationReceived)
 	case CommandBrowserSetPermission:
 		return emptyVal, nil
-	case CommandBrowserGrantPermissions:
-		return emptyVal, nil
 	case CommandBrowserResetPermissions:
 		return emptyVal, nil
 	case CommandBrowserSetDownloadBehavior:
@@ -1069,8 +1115,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 	case CommandBrowserExecuteBrowserCommand:
 		return emptyVal, nil
 	case CommandBrowserAddPrivacySandboxEnrollmentOverride:
-		return emptyVal, nil
-	case CommandBrowserAddPrivacySandboxCoordinatorKeyConfig:
 		return emptyVal, nil
 	case EventBrowserDownloadWillBegin:
 		v = new(browser.EventDownloadWillBegin)
@@ -1130,10 +1174,12 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(css.SetKeyframeKeyReturns)
 	case CommandCSSSetMediaText:
 		v = new(css.SetMediaTextReturns)
-	case CommandCSSSetContainerQueryText:
-		v = new(css.SetContainerQueryTextReturns)
+	case CommandCSSSetContainerQueryConditionText:
+		v = new(css.SetContainerQueryConditionTextReturns)
 	case CommandCSSSetSupportsText:
 		v = new(css.SetSupportsTextReturns)
+	case CommandCSSSetNavigationText:
+		v = new(css.SetNavigationTextReturns)
 	case CommandCSSSetScopeText:
 		v = new(css.SetScopeTextReturns)
 	case CommandCSSSetRuleSelector:
@@ -1188,6 +1234,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(cast.EventSinksUpdated)
 	case EventCastIssueUpdated:
 		v = new(cast.EventIssueUpdated)
+	case CommandCrashReportContextGetEntries:
+		v = new(crashreportcontext.GetEntriesReturns)
 	case CommandDOMCollectClassNamesFromSubtree:
 		v = new(dom.CollectClassNamesFromSubtreeReturns)
 	case CommandDOMCopyTo:
@@ -1288,6 +1336,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(dom.ForceShowPopoverReturns)
 	case EventDOMAttributeModified:
 		v = new(dom.EventAttributeModified)
+	case EventDOMAdoptedStyleSheetsModified:
+		v = new(dom.EventAdoptedStyleSheetsModified)
 	case EventDOMAttributeRemoved:
 		v = new(dom.EventAttributeRemoved)
 	case EventDOMCharacterDataModified:
@@ -1310,6 +1360,10 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(dom.EventTopLayerElementsUpdated)
 	case EventDOMScrollableFlagUpdated:
 		v = new(dom.EventScrollableFlagUpdated)
+	case EventDOMAdRelatedStateUpdated:
+		v = new(dom.EventAdRelatedStateUpdated)
+	case EventDOMAffectedByStartingStylesFlagUpdated:
+		v = new(dom.EventAffectedByStartingStylesFlagUpdated)
 	case EventDOMPseudoElementRemoved:
 		v = new(dom.EventPseudoElementRemoved)
 	case EventDOMSetChildNodes:
@@ -1444,6 +1498,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandDeviceOrientationSetDeviceOrientationOverride:
 		return emptyVal, nil
+	case CommandDigitalCredentialsSetVirtualWalletBehavior:
+		return emptyVal, nil
 	case CommandEmulationClearDeviceMetricsOverride:
 		return emptyVal, nil
 	case CommandEmulationClearGeolocationOverride:
@@ -1494,8 +1550,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandEmulationSetPressureStateOverride:
 		return emptyVal, nil
-	case CommandEmulationSetPressureDataOverride:
-		return emptyVal, nil
 	case CommandEmulationSetIdleOverride:
 		return emptyVal, nil
 	case CommandEmulationClearIdleOverride:
@@ -1524,16 +1578,32 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandEmulationSetSmallViewportHeightDifferenceOverride:
 		return emptyVal, nil
+	case CommandEmulationGetScreenInfos:
+		v = new(emulation.GetScreenInfosReturns)
+	case CommandEmulationAddScreen:
+		v = new(emulation.AddScreenReturns)
+	case CommandEmulationUpdateScreen:
+		v = new(emulation.UpdateScreenReturns)
+	case CommandEmulationRemoveScreen:
+		return emptyVal, nil
+	case CommandEmulationSetPrimaryScreen:
+		return emptyVal, nil
 	case EventEmulationVirtualTimeBudgetExpired:
 		v = new(emulation.EventVirtualTimeBudgetExpired)
+	case EventEmulationScreenOrientationLockChanged:
+		v = new(emulation.EventScreenOrientationLockChanged)
 	case CommandEventBreakpointsSetInstrumentationBreakpoint:
 		return emptyVal, nil
 	case CommandEventBreakpointsRemoveInstrumentationBreakpoint:
 		return emptyVal, nil
 	case CommandEventBreakpointsDisable:
 		return emptyVal, nil
+	case CommandExtensionsTriggerAction:
+		return emptyVal, nil
 	case CommandExtensionsLoadUnpacked:
 		v = new(extensions.LoadUnpackedReturns)
+	case CommandExtensionsGetExtensions:
+		v = new(extensions.GetExtensionsReturns)
 	case CommandExtensionsUninstall:
 		return emptyVal, nil
 	case CommandExtensionsGetStorageItems:
@@ -1684,6 +1754,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(inspector.EventTargetCrashed)
 	case EventInspectorTargetReloadedAfterCrash:
 		v = new(inspector.EventTargetReloadedAfterCrash)
+	case EventInspectorWorkerScriptLoaded:
+		v = new(inspector.EventWorkerScriptLoaded)
 	case CommandLayerTreeCompositingReasons:
 		v = new(layertree.CompositingReasonsReturns)
 	case CommandLayerTreeDisable:
@@ -1730,8 +1802,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(media.EventPlayerMessagesLogged)
 	case EventMediaPlayerErrorsRaised:
 		v = new(media.EventPlayerErrorsRaised)
-	case EventMediaPlayersCreated:
-		v = new(media.EventPlayersCreated)
+	case EventMediaPlayerCreated:
+		v = new(media.EventPlayerCreated)
 	case CommandMemoryGetDOMCounters:
 		v = new(memory.GetDOMCountersReturns)
 	case CommandMemoryGetDOMCountersForLeakDetection:
@@ -1766,9 +1838,13 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandNetworkDisable:
 		return emptyVal, nil
-	case CommandNetworkEmulateNetworkConditions:
+	case CommandNetworkEmulateNetworkConditionsByRule:
+		v = new(network.EmulateNetworkConditionsByRuleReturns)
+	case CommandNetworkOverrideNetworkState:
 		return emptyVal, nil
 	case CommandNetworkEnable:
+		return emptyVal, nil
+	case CommandNetworkConfigureDurableMessages:
 		return emptyVal, nil
 	case CommandNetworkGetCertificate:
 		v = new(network.GetCertificateReturns)
@@ -1806,6 +1882,12 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(network.GetSecurityIsolationStatusReturns)
 	case CommandNetworkEnableReportingAPI:
 		return emptyVal, nil
+	case CommandNetworkEnableDeviceBoundSessions:
+		return emptyVal, nil
+	case CommandNetworkDeleteDeviceBoundSession:
+		return emptyVal, nil
+	case CommandNetworkFetchSchemefulSite:
+		v = new(network.FetchSchemefulSiteReturns)
 	case CommandNetworkLoadNetworkResource:
 		v = new(network.LoadNetworkResourceReturns)
 	case CommandNetworkSetCookieControls:
@@ -1860,6 +1942,10 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(network.EventDirectTCPSocketChunkSent)
 	case EventNetworkDirectTCPSocketChunkReceived:
 		v = new(network.EventDirectTCPSocketChunkReceived)
+	case EventNetworkDirectUDPSocketJoinedMulticastGroup:
+		v = new(network.EventDirectUDPSocketJoinedMulticastGroup)
+	case EventNetworkDirectUDPSocketLeftMulticastGroup:
+		v = new(network.EventDirectUDPSocketLeftMulticastGroup)
 	case EventNetworkDirectUDPSocketCreated:
 		v = new(network.EventDirectUDPSocketCreated)
 	case EventNetworkDirectUDPSocketOpened:
@@ -1882,20 +1968,16 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(network.EventTrustTokenOperationDone)
 	case EventNetworkPolicyUpdated:
 		v = new(network.EventPolicyUpdated)
-	case EventNetworkSubresourceWebBundleMetadataReceived:
-		v = new(network.EventSubresourceWebBundleMetadataReceived)
-	case EventNetworkSubresourceWebBundleMetadataError:
-		v = new(network.EventSubresourceWebBundleMetadataError)
-	case EventNetworkSubresourceWebBundleInnerResponseParsed:
-		v = new(network.EventSubresourceWebBundleInnerResponseParsed)
-	case EventNetworkSubresourceWebBundleInnerResponseError:
-		v = new(network.EventSubresourceWebBundleInnerResponseError)
 	case EventNetworkReportingAPIReportAdded:
 		v = new(network.EventReportingAPIReportAdded)
 	case EventNetworkReportingAPIReportUpdated:
 		v = new(network.EventReportingAPIReportUpdated)
 	case EventNetworkReportingAPIEndpointsChangedForOrigin:
 		v = new(network.EventReportingAPIEndpointsChangedForOrigin)
+	case EventNetworkDeviceBoundSessionsAdded:
+		v = new(network.EventDeviceBoundSessionsAdded)
+	case EventNetworkDeviceBoundSessionEventOccurred:
+		v = new(network.EventDeviceBoundSessionEventOccurred)
 	case CommandOverlayDisable:
 		return emptyVal, nil
 	case CommandOverlayEnable:
@@ -1934,6 +2016,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandOverlaySetShowContainerQueryOverlays:
 		return emptyVal, nil
+	case CommandOverlaySetShowInspectedElementAnchor:
+		return emptyVal, nil
 	case CommandOverlaySetShowPaintRects:
 		return emptyVal, nil
 	case CommandOverlaySetShowLayoutShiftRegions:
@@ -1943,6 +2027,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 	case CommandOverlaySetShowViewportSizeOnResize:
 		return emptyVal, nil
 	case CommandOverlaySetShowHinge:
+		return emptyVal, nil
+	case CommandOverlaySetShowDisplayCutout:
 		return emptyVal, nil
 	case CommandOverlaySetShowIsolatedElements:
 		return emptyVal, nil
@@ -1954,6 +2040,10 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(overlay.EventNodeHighlightRequested)
 	case EventOverlayScreenshotRequested:
 		v = new(overlay.EventScreenshotRequested)
+	case EventOverlayInspectPanelShowRequested:
+		v = new(overlay.EventInspectPanelShowRequested)
+	case EventOverlayInspectedElementWindowRestored:
+		v = new(overlay.EventInspectedElementWindowRestored)
 	case EventOverlayInspectModeCanceled:
 		v = new(overlay.EventInspectModeCanceled)
 	case CommandPWAGetOsAppState:
@@ -2066,6 +2156,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandPageSetPrerenderingAllowed:
 		return emptyVal, nil
+	case CommandPageGetAnnotatedPageContent:
+		v = new(page.GetAnnotatedPageContentReturns)
 	case EventPageDomContentEventFired:
 		v = new(page.EventDomContentEventFired)
 	case EventPageFileChooserOpened:
@@ -2264,8 +2356,60 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(serviceworker.EventWorkerRegistrationUpdated)
 	case EventServiceWorkerWorkerVersionUpdated:
 		v = new(serviceworker.EventWorkerVersionUpdated)
-	case CommandStorageGetStorageKeyForFrame:
-		v = new(storage.GetStorageKeyForFrameReturns)
+	case CommandSmartCardEmulationEnable:
+		return emptyVal, nil
+	case CommandSmartCardEmulationDisable:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportEstablishContextResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportReleaseContextResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportListReadersResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportGetStatusChangeResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportBeginTransactionResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportPlainResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportConnectResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportDataResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportStatusResult:
+		return emptyVal, nil
+	case CommandSmartCardEmulationReportError:
+		return emptyVal, nil
+	case EventSmartCardEmulationEstablishContextRequested:
+		v = new(smartcardemulation.EventEstablishContextRequested)
+	case EventSmartCardEmulationReleaseContextRequested:
+		v = new(smartcardemulation.EventReleaseContextRequested)
+	case EventSmartCardEmulationListReadersRequested:
+		v = new(smartcardemulation.EventListReadersRequested)
+	case EventSmartCardEmulationGetStatusChangeRequested:
+		v = new(smartcardemulation.EventGetStatusChangeRequested)
+	case EventSmartCardEmulationCancelRequested:
+		v = new(smartcardemulation.EventCancelRequested)
+	case EventSmartCardEmulationConnectRequested:
+		v = new(smartcardemulation.EventConnectRequested)
+	case EventSmartCardEmulationDisconnectRequested:
+		v = new(smartcardemulation.EventDisconnectRequested)
+	case EventSmartCardEmulationTransmitRequested:
+		v = new(smartcardemulation.EventTransmitRequested)
+	case EventSmartCardEmulationControlRequested:
+		v = new(smartcardemulation.EventControlRequested)
+	case EventSmartCardEmulationGetAttribRequested:
+		v = new(smartcardemulation.EventGetAttribRequested)
+	case EventSmartCardEmulationSetAttribRequested:
+		v = new(smartcardemulation.EventSetAttribRequested)
+	case EventSmartCardEmulationStatusRequested:
+		v = new(smartcardemulation.EventStatusRequested)
+	case EventSmartCardEmulationBeginTransactionRequested:
+		v = new(smartcardemulation.EventBeginTransactionRequested)
+	case EventSmartCardEmulationEndTransactionRequested:
+		v = new(smartcardemulation.EventEndTransactionRequested)
+	case CommandStorageGetStorageKey:
+		v = new(storage.GetStorageKeyReturns)
 	case CommandStorageClearDataForOrigin:
 		return emptyVal, nil
 	case CommandStorageClearDataForStorageKey:
@@ -2300,12 +2444,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(storage.GetTrustTokensReturns)
 	case CommandStorageClearTrustTokens:
 		v = new(storage.ClearTrustTokensReturns)
-	case CommandStorageGetInterestGroupDetails:
-		v = new(storage.GetInterestGroupDetailsReturns)
-	case CommandStorageSetInterestGroupTracking:
-		return emptyVal, nil
-	case CommandStorageSetInterestGroupAuctionTracking:
-		return emptyVal, nil
 	case CommandStorageGetSharedStorageMetadata:
 		v = new(storage.GetSharedStorageMetadataReturns)
 	case CommandStorageGetSharedStorageEntries:
@@ -2326,18 +2464,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandStorageRunBounceTrackingMitigations:
 		v = new(storage.RunBounceTrackingMitigationsReturns)
-	case CommandStorageSetAttributionReportingLocalTestingMode:
-		return emptyVal, nil
-	case CommandStorageSetAttributionReportingTracking:
-		return emptyVal, nil
-	case CommandStorageSendPendingAttributionReports:
-		v = new(storage.SendPendingAttributionReportsReturns)
 	case CommandStorageGetRelatedWebsiteSets:
 		v = new(storage.GetRelatedWebsiteSetsReturns)
-	case CommandStorageGetAffectedURLsForThirdPartyCookieMetadata:
-		v = new(storage.GetAffectedURLsForThirdPartyCookieMetadataReturns)
-	case CommandStorageSetProtectedAudienceKAnonymity:
-		return emptyVal, nil
 	case EventStorageCacheStorageContentUpdated:
 		v = new(storage.EventCacheStorageContentUpdated)
 	case EventStorageCacheStorageListUpdated:
@@ -2346,12 +2474,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(storage.EventIndexedDBContentUpdated)
 	case EventStorageIndexedDBListUpdated:
 		v = new(storage.EventIndexedDBListUpdated)
-	case EventStorageInterestGroupAccessed:
-		v = new(storage.EventInterestGroupAccessed)
-	case EventStorageInterestGroupAuctionEventOccurred:
-		v = new(storage.EventInterestGroupAuctionEventOccurred)
-	case EventStorageInterestGroupAuctionNetworkRequestCreated:
-		v = new(storage.EventInterestGroupAuctionNetworkRequestCreated)
 	case EventStorageSharedStorageAccessed:
 		v = new(storage.EventSharedStorageAccessed)
 	case EventStorageSharedStorageWorkletOperationExecutionFinished:
@@ -2360,14 +2482,6 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(storage.EventStorageBucketCreatedOrUpdated)
 	case EventStorageStorageBucketDeleted:
 		v = new(storage.EventStorageBucketDeleted)
-	case EventStorageAttributionReportingSourceRegistered:
-		v = new(storage.EventAttributionReportingSourceRegistered)
-	case EventStorageAttributionReportingTriggerRegistered:
-		v = new(storage.EventAttributionReportingTriggerRegistered)
-	case EventStorageAttributionReportingReportSent:
-		v = new(storage.EventAttributionReportingReportSent)
-	case EventStorageAttributionReportingVerboseDebugReportSent:
-		v = new(storage.EventAttributionReportingVerboseDebugReportSent)
 	case CommandSystemInfoGetInfo:
 		v = new(systeminfo.GetInfoReturns)
 	case CommandSystemInfoGetFeatureState:
@@ -2406,6 +2520,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandTargetSetRemoteLocations:
 		return emptyVal, nil
+	case CommandTargetGetDevToolsTarget:
+		v = new(target.GetDevToolsTargetReturns)
 	case CommandTargetOpenDevTools:
 		v = new(target.OpenDevToolsReturns)
 	case EventTargetAttachedToTarget:
@@ -2432,6 +2548,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		return emptyVal, nil
 	case CommandTracingGetCategories:
 		v = new(tracing.GetCategoriesReturns)
+	case CommandTracingGetTrackEventDescriptor:
+		v = new(tracing.GetTrackEventDescriptorReturns)
 	case CommandTracingRecordClockSyncMarker:
 		return emptyVal, nil
 	case CommandTracingRequestMemoryDump:
@@ -2510,6 +2628,22 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(webauthn.EventCredentialUpdated)
 	case EventWebAuthnCredentialAsserted:
 		v = new(webauthn.EventCredentialAsserted)
+	case CommandWebMCPEnable:
+		return emptyVal, nil
+	case CommandWebMCPDisable:
+		return emptyVal, nil
+	case CommandWebMCPInvokeTool:
+		v = new(webmcp.InvokeToolReturns)
+	case CommandWebMCPCancelInvocation:
+		return emptyVal, nil
+	case EventWebMCPToolsAdded:
+		v = new(webmcp.EventToolsAdded)
+	case EventWebMCPToolsRemoved:
+		v = new(webmcp.EventToolsRemoved)
+	case EventWebMCPToolInvoked:
+		v = new(webmcp.EventToolInvoked)
+	case EventWebMCPToolResponded:
+		v = new(webmcp.EventToolResponded)
 	default:
 		return nil, cdp.ErrUnknownCommandOrEvent(msg.Method)
 	}

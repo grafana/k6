@@ -2020,8 +2020,9 @@ func (p *GetAnchorElementParams) Do(ctx context.Context) (nodeID cdp.NodeID, err
 // ForceShowPopoverParams when enabling, this API force-opens the popover
 // identified by nodeId and keeps it open until disabled.
 type ForceShowPopoverParams struct {
-	NodeID cdp.NodeID `json:"nodeId"` // Id of the popover HTMLElement
-	Enable bool       `json:"enable"` // If true, opens the popover and keeps it open. If false, closes the popover if it was previously force-opened.
+	NodeID        cdp.NodeID        `json:"nodeId"`                           // Id of the popover HTMLElement
+	Enable        bool              `json:"enable"`                           // If true, opens the popover and keeps it open. If false, closes the popover if it was previously force-opened.
+	InvokerNodeID cdp.BackendNodeID `json:"invokerNodeId,omitempty,omitzero"` // Optional ID of the element invoking this popover, used to establish the implicit anchor. If not provided, it will fall back to the first invoker in the document, preferring elements with a popovertarget attribute over those with a commandfor attribute. Note that if there are multiple invokers, this is just an estimate.
 }
 
 // ForceShowPopover when enabling, this API force-opens the popover
@@ -2038,6 +2039,16 @@ func ForceShowPopover(nodeID cdp.NodeID, enable bool) *ForceShowPopoverParams {
 		NodeID: nodeID,
 		Enable: enable,
 	}
+}
+
+// WithInvokerNodeID optional ID of the element invoking this popover, used
+// to establish the implicit anchor. If not provided, it will fall back to the
+// first invoker in the document, preferring elements with a popovertarget
+// attribute over those with a commandfor attribute. Note that if there are
+// multiple invokers, this is just an estimate.
+func (p ForceShowPopoverParams) WithInvokerNodeID(invokerNodeID cdp.BackendNodeID) *ForceShowPopoverParams {
+	p.InvokerNodeID = invokerNodeID
+	return &p
 }
 
 // ForceShowPopoverReturns return values.

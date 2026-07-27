@@ -7,3 +7,14 @@ package emulation
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#event-virtualTimeBudgetExpired
 type EventVirtualTimeBudgetExpired struct{}
+
+// EventScreenOrientationLockChanged fired when a page calls
+// screen.orientation.lock() or screen.orientation.unlock() while device
+// emulation is enabled. This allows the DevTools frontend to update the
+// emulated device orientation accordingly.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#event-screenOrientationLockChanged
+type EventScreenOrientationLockChanged struct {
+	Locked      bool               `json:"locked"`                         // Whether the screen orientation is currently locked.
+	Orientation *ScreenOrientation `json:"orientation,omitempty,omitzero"` // The orientation lock type requested by the page. Only set when locked is true.
+}

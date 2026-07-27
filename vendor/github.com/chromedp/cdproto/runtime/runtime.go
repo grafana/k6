@@ -262,7 +262,7 @@ func (p CompileScriptParams) WithExecutionContextID(executionContextID Execution
 
 // CompileScriptReturns return values.
 type CompileScriptReturns struct {
-	ScriptID         ScriptID          `json:"scriptId,omitempty,omitzero"`         // Id of the script.
+	ScriptID         cdp.ScriptID      `json:"scriptId,omitempty,omitzero"`         // Id of the script.
 	ExceptionDetails *ExceptionDetails `json:"exceptionDetails,omitempty,omitzero"` // Exception details.
 }
 
@@ -272,7 +272,7 @@ type CompileScriptReturns struct {
 //
 //	scriptID - Id of the script.
 //	exceptionDetails - Exception details.
-func (p *CompileScriptParams) Do(ctx context.Context) (scriptID ScriptID, exceptionDetails *ExceptionDetails, err error) {
+func (p *CompileScriptParams) Do(ctx context.Context) (scriptID cdp.ScriptID, exceptionDetails *ExceptionDetails, err error) {
 	// execute
 	var res CompileScriptReturns
 	err = cdp.Execute(ctx, CommandCompileScript, p, &res)
@@ -821,7 +821,7 @@ func (p *RunIfWaitingForDebuggerParams) Do(ctx context.Context) (err error) {
 
 // RunScriptParams runs script with given id in a given context.
 type RunScriptParams struct {
-	ScriptID              ScriptID           `json:"scriptId"`                              // Id of the script to run.
+	ScriptID              cdp.ScriptID       `json:"scriptId"`                              // Id of the script to run.
 	ExecutionContextID    ExecutionContextID `json:"executionContextId,omitempty,omitzero"` // Specifies in which execution context to perform script run. If the parameter is omitted the evaluation will be performed in the context of the inspected page.
 	ObjectGroup           string             `json:"objectGroup,omitempty,omitzero"`        // Symbolic group name that can be used to release multiple objects.
 	Silent                bool               `json:"silent"`                                // In silent mode exceptions thrown during evaluation are not reported and do not pause execution. Overrides setPauseOnException state.
@@ -838,7 +838,7 @@ type RunScriptParams struct {
 // parameters:
 //
 //	scriptID - Id of the script to run.
-func RunScript(scriptID ScriptID) *RunScriptParams {
+func RunScript(scriptID cdp.ScriptID) *RunScriptParams {
 	return &RunScriptParams{
 		ScriptID:              scriptID,
 		Silent:                false,
