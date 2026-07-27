@@ -15,7 +15,7 @@ func getCmdCloudLoadZone(cloudCmd *cmdCloud) *cobra.Command {
 	}
 
 	exampleText := getExampleText(cloudCmd.gs, `
-  # List all load zones available in the configured stack
+  # List all load zones in the configured stack
   $ {{.}} cloud load-zone list
 
   # List load zones in JSON format
