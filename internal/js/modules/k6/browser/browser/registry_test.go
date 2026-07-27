@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
@@ -361,7 +360,7 @@ func TestBrowserRegistry(t *testing.T) {
 func TestStartConnectTraceAttributes(t *testing.T) {
 	t.Parallel()
 
-	rec := &traceRecorder{}
+	rec := k6test.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
 
 	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
@@ -376,65 +375,10 @@ func TestStartConnectTraceAttributes(t *testing.T) {
 	}
 	r.startConnectTrace(vu.Context(), vu.State().Iteration)
 
-	span, ok := rec.find("iteration")
+	span, ok := rec.Find("iteration")
 	require.True(t, ok, "expected an 'iteration' root span")
-	require.Equal(t, int64(42), spanAttrInt64(t, span, "test.vu"))
-	require.Equal(t, "default", spanAttrString(t, span, "test.scenario"))
-}
-
-// traceRecorder is a minimal sdktrace.SpanProcessor that captures started spans
-// so tests can inspect their names and attributes.
-type traceRecorder struct {
-	mu    sync.Mutex
-	spans []recordedSpan
-}
-
-type recordedSpan struct {
-	name  string
-	attrs []attribute.KeyValue
-}
-
-func (r *traceRecorder) OnStart(_ context.Context, s sdktrace.ReadWriteSpan) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.spans = append(r.spans, recordedSpan{name: s.Name(), attrs: s.Attributes()})
-}
-
-func (r *traceRecorder) OnEnd(sdktrace.ReadOnlySpan)      {}
-func (r *traceRecorder) Shutdown(context.Context) error   { return nil }
-func (r *traceRecorder) ForceFlush(context.Context) error { return nil }
-
-func (r *traceRecorder) find(name string) (recordedSpan, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, s := range r.spans {
-		if s.name == name {
-			return s, true
-		}
-	}
-	return recordedSpan{}, false
-}
-
-func spanAttrInt64(t *testing.T, s recordedSpan, key string) int64 {
-	t.Helper()
-	for _, kv := range s.attrs {
-		if string(kv.Key) == key {
-			return kv.Value.AsInt64()
-		}
-	}
-	t.Fatalf("attribute %q not found on span %q", key, s.name)
-	return 0
-}
-
-func spanAttrString(t *testing.T, s recordedSpan, key string) string {
-	t.Helper()
-	for _, kv := range s.attrs {
-		if string(kv.Key) == key {
-			return kv.Value.AsString()
-		}
-	}
-	t.Fatalf("attribute %q not found on span %q", key, s.name)
-	return ""
+	require.Equal(t, int64(42), span.AttrInt64(t, "test.vu"))
+	require.Equal(t, "default", span.AttrString(t, "test.scenario"))
 }
 
 func TestParseTracesMetadata(t *testing.T) {

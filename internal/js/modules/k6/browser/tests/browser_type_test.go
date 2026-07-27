@@ -2,13 +2,10 @@ package tests
 
 import (
 	"context"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	oteltrace "go.opentelemetry.io/otel/trace"
 
 	k6event "go.k6.io/k6/v2/internal/event"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/browser"
@@ -109,20 +106,6 @@ func setupChromiumVU(t *testing.T, opts ...any) *k6test.VU {
 	return vu
 }
 
-func TestChromiumConnectOverCDP(t *testing.T) {
-	t.Parallel()
-
-	tb := newTestBrowser(t)
-	vu := setupChromiumVU(t)
-	_, err := vu.RunAsync(t, `
-		const b = await chromium.connectOverCDP("%s");
-		const p = await b.newPage();
-		await p.close();
-		await b.close();
-	`, tb.wsURL)
-	require.NoError(t, err)
-}
-
 // TestChromiumConnectOverCDPConcurrent is a regression test for a data race
 // where two concurrent chromium.connectOverCDP calls in the same iteration
 // used to race.
@@ -221,76 +204,6 @@ func TestChromiumConnectOverCDPExitSweep(t *testing.T) {
 	require.False(t, got.Result().ToBoolean(), "expected browser to be disconnected after Exit sweep")
 }
 
-// spanInfo is a minimal snapshot of a recorded span.
-type spanInfo struct {
-	name     string
-	traceID  oteltrace.TraceID
-	spanID   oteltrace.SpanID
-	parentID oteltrace.SpanID
-	attrs    []attribute.KeyValue
-}
-
-// spanRecorder is a minimal sdktrace.SpanProcessor that records started spans
-// (for parent/attribute inspection) and which span IDs have ended.
-type spanRecorder struct {
-	mu      sync.Mutex
-	started []spanInfo
-	ended   map[oteltrace.SpanID]bool
-}
-
-func newSpanRecorder() *spanRecorder {
-	return &spanRecorder{ended: make(map[oteltrace.SpanID]bool)}
-}
-
-func (r *spanRecorder) OnStart(_ context.Context, s sdktrace.ReadWriteSpan) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.started = append(r.started, spanInfo{
-		name:     s.Name(),
-		traceID:  s.SpanContext().TraceID(),
-		spanID:   s.SpanContext().SpanID(),
-		parentID: s.Parent().SpanID(),
-		attrs:    s.Attributes(),
-	})
-}
-
-func (r *spanRecorder) OnEnd(s sdktrace.ReadOnlySpan) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.ended[s.SpanContext().SpanID()] = true
-}
-
-func (r *spanRecorder) Shutdown(context.Context) error   { return nil }
-func (r *spanRecorder) ForceFlush(context.Context) error { return nil }
-
-func (r *spanRecorder) find(name string) (spanInfo, bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, s := range r.started {
-		if s.name == name {
-			return s, true
-		}
-	}
-	return spanInfo{}, false
-}
-
-func (r *spanRecorder) isEnded(id oteltrace.SpanID) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.ended[id]
-}
-
-func spanAttrInt64(t *testing.T, s spanInfo, key string) int64 {
-	t.Helper()
-	for _, kv := range s.attrs {
-		if string(kv.Key) == key {
-			return kv.Value.AsInt64()
-		}
-	}
-	t.Fatalf("attribute %q not found on span %q", key, s.name)
-	return 0
-}
-
 // TestChromiumConnectOverCDPTraceLinkage verifies that a call made over a
 // connectOverCDP browser produces a span parented under an iteration root
 // span keyed by the real iteration number, and that root span is
@@ -299,7 +212,7 @@ func spanAttrInt64(t *testing.T, s spanInfo, key string) int64 {
 func TestChromiumConnectOverCDPTraceLinkage(t *testing.T) {
 	t.Parallel()
 
-	rec := newSpanRecorder()
+	rec := k6test.NewSpanRecorder()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
 
 	tb := newTestBrowser(t)
@@ -317,24 +230,24 @@ func TestChromiumConnectOverCDPTraceLinkage(t *testing.T) {
 	// End the iteration so the iteration root span is closed.
 	vu.EndIteration(t)
 
-	iterSpan, ok := rec.find("iteration")
+	iterSpan, ok := rec.Find("iteration")
 	require.True(t, ok, "expected an 'iteration' root span")
-	newPageSpan, ok := rec.find("browser.newPage")
+	newPageSpan, ok := rec.Find("browser.newPage")
 	require.True(t, ok, "expected a 'browser.newPage' span")
 
 	// The browser API span must be parented under the iteration trace that
 	// connectOverCDP established. If startConnectTrace did not wire the tracer
 	// into the browser's context, browser.newPage would be a noop/orphaned span
 	// and these assertions would fail.
-	require.Equal(t, iterSpan.traceID, newPageSpan.traceID,
+	require.Equal(t, iterSpan.TraceID, newPageSpan.TraceID,
 		"browser.newPage span should be in the same trace as the iteration span")
-	require.Equal(t, iterSpan.spanID, newPageSpan.parentID,
+	require.Equal(t, iterSpan.SpanID, newPageSpan.ParentID,
 		"browser.newPage span should be parented under the iteration span")
 
 	// The iteration span must be keyed by the real iteration number and ended
 	// when the iteration ends.
-	require.Equal(t, wantIter, spanAttrInt64(t, iterSpan, "test.iteration.number"))
-	require.True(t, rec.isEnded(iterSpan.spanID), "iteration span should be ended at IterEnd")
+	require.Equal(t, wantIter, iterSpan.AttrInt64(t, "test.iteration.number"))
+	require.True(t, rec.IsEnded(iterSpan.SpanID), "iteration span should be ended at IterEnd")
 }
 
 func TestBrowserTypeLaunchToConnect(t *testing.T) {
