@@ -24,7 +24,7 @@ func getCmdCloudLoadZoneList(loadZoneCmd *cmdCloudLoadZone) *cobra.Command {
 	}
 
 	exampleText := getExampleText(loadZoneCmd.globalState, `
-  # List all load zones available in the configured stack
+  # List all load zones in the configured stack
   $ {{.}} cloud load-zone list`[1:])
 
 	listCmd := &cobra.Command{
