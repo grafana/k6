@@ -144,8 +144,8 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
 - [ ] 19. **Document the new field** (spec: "Report used catalog extensions in the usage report")
   - Prereq: tasks 1-18 (document the shipped behaviour). Docs, not code: no test row.
   - The public [usage collection page](https://grafana.com/docs/k6/latest/set-up/usage-collection/) states "Only k6 built-in JavaScript modules and outputs are considered. Private modules and custom extensions are excluded.", which this change makes false.
-  - Implement: update that page in grafana/k6-docs to document the `extensions` field (`{module, version, kind}`), its public-catalog-only scope, and that the existing opt-out covers it. Add the implementation PR's entry under `release notes/`.
-  - Verify: the k6-docs PR is open and linked from the implementation PR; the release-notes entry rides the implementation PR.
+  - Implement: update that page in grafana/k6-docs to document the `extensions` field (`{module, version, kind}`), its public-catalog-only scope, that `k6 x` invocations of extension subcommands now send a usage report of their own, and that the existing opt-out (env var and config file) covers all of it.
+  - Verify: the k6-docs PR is open and linked from the implementation PR; the release-notes entry lands in the next release's notes, which the repo compiles in a single release PR rather than per feature PR.
 
 ## Hardening
 
