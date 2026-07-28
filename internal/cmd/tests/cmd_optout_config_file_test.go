@@ -15,10 +15,10 @@ import (
 	"go.k6.io/k6/v2/lib/fsext"
 )
 
-// TestConfigFileOptOutSuppressesReports covers the config-file opt-out
-// (noUsageReport: true) with K6_NO_USAGE_REPORT unset: it must suppress the
-// usage report on every reporting path, matching the documented opt-out.
-func TestConfigFileOptOutSuppressesReports(t *testing.T) {
+// TestConfigFileOptOut covers the config-file opt-out (noUsageReport: true)
+// on every reporting path: alone it must suppress the usage report, and
+// K6_NO_USAGE_REPORT=false must win over it and re-enable reporting.
+func TestConfigFileOptOut(t *testing.T) {
 	t.Parallel()
 
 	registerReportTestSubcommand(t)
@@ -26,9 +26,11 @@ func TestConfigFileOptOutSuppressesReports(t *testing.T) {
 	testSubModule := "go.k6.io/k6/v2/internal/cmd/tests"
 
 	tt := []struct {
-		name  string
-		args  []string
-		stdin string
+		name        string
+		args        []string
+		stdin       string
+		envOptOut   string // K6_NO_USAGE_REPORT; empty leaves it unset
+		wantReports int32
 	}{
 		{
 			name:  "config file opt-out suppresses the run report",
@@ -38,6 +40,19 @@ func TestConfigFileOptOutSuppressesReports(t *testing.T) {
 		{
 			name: "config file opt-out suppresses the subcommand report",
 			args: []string{"x", "testsub"},
+		},
+		{
+			name:        "env re-enables the run report over the config file",
+			args:        []string{"run", "-"},
+			stdin:       `export default function() {};`,
+			envOptOut:   "false",
+			wantReports: 1,
+		},
+		{
+			name:        "env re-enables the subcommand report over the config file",
+			args:        []string{"x", "testsub"},
+			envOptOut:   "false",
+			wantReports: 1,
 		},
 	}
 
@@ -61,8 +76,11 @@ func TestConfigFileOptOutSuppressesReports(t *testing.T) {
 			t.Cleanup(catalogServer.Close)
 
 			ts := NewGlobalTestState(t)
-			// The env opt-out must stay unset so the config file is the only gate.
+			// The default env opt-out would mask the config file gate.
 			delete(ts.Env, "K6_NO_USAGE_REPORT")
+			if tc.envOptOut != "" {
+				ts.Env["K6_NO_USAGE_REPORT"] = tc.envOptOut
+			}
 			ts.Env[state.UsageReportURL] = reportServer.URL
 			ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
 
@@ -78,8 +96,8 @@ func TestConfigFileOptOutSuppressesReports(t *testing.T) {
 
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-			require.Equal(t, int32(0), reportCount.Load(),
-				"expected the config-file opt-out to suppress the usage report")
+			require.Equal(t, tc.wantReports, reportCount.Load(),
+				"unexpected usage report count with noUsageReport set in the config file")
 		})
 	}
 }
