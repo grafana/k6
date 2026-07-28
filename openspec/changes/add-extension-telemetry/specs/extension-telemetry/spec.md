@@ -19,6 +19,7 @@ The field MUST contain only extensions present in the public registry catalog. E
 - **GIVEN** a catalogued extension compiled into the binary, and a script that imports, selects, and invokes nothing
 - **WHEN** `k6 run` executes that script
 - **THEN** the report omits the `extensions` key rather than sending an empty array
+- **AND** the stand-in catalog server receives no request, because a run without used extensions has nothing to filter
 
 ### Requirement: Importable extension usage is recorded
 
@@ -60,7 +61,7 @@ The system MUST decide whether an extension is public by comparing its Go module
 
 Each surface records the resolved extension at the point of use, not its name: the registry entry it records already carries the Go module path and version (read from build info), so assembly performs no re-resolution. Matching MUST be by module path, never by the recorded name, so a private fork that reuses a public import name resolves at its recording site to its own module path and is dropped.
 
-The catalog is fetched, or read from the existing cache, as part of the bounded, non-fatal usage-report send, never on the run's hot path. A newly catalogued extension becomes reportable as soon as the cache refreshes, with no new k6 release required.
+The catalog is fetched, or read from the existing cache, as part of the bounded, non-fatal usage-report send, never on the run's hot path, and only when the report has recorded used extensions to filter: a run that used none sends its report without consulting the catalog. A newly catalogued extension becomes reportable as soon as the cache refreshes, with no new k6 release required.
 
 #### Scenario: Extension not in the catalog is filtered out
 - **GIVEN** the stand-in catalog omits the module path of a used extension

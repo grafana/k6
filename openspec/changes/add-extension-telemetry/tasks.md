@@ -146,3 +146,11 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
   - The public [usage collection page](https://grafana.com/docs/k6/latest/set-up/usage-collection/) states "Only k6 built-in JavaScript modules and outputs are considered. Private modules and custom extensions are excluded.", which this change makes false.
   - Implement: update that page in grafana/k6-docs to document the `extensions` field (`{module, version, kind}`), its public-catalog-only scope, and that the existing opt-out covers it. Add the implementation PR's entry under `release notes/`.
   - Verify: the k6-docs PR is open and linked from the implementation PR; the release-notes entry rides the implementation PR.
+
+## Hardening
+
+- [ ] 20. **Skip the catalog for extension-less runs** (spec: "Public-catalog filter via the registry catalog" / "Compiled-but-unused extension is not reported")
+  - Prereq: task 7's filter.
+  - Row: extend the compiled-but-unused row: GIVEN a catalogued extension compiled into the binary and a script that uses nothing, WHEN `k6 run` executes it, THEN the report omits the `extensions` key AND the stand-in catalog server receives no request.
+  - Red: it fails because the run path resolves the catalog eagerly while assembling the report. Make it pass by resolving the catalog lazily: `createReport` takes the catalog as a function and `resolveExtensions` calls it only after finding recorded extension usage.
+  - Verify: `go test -race ./internal/cmd/tests/ -run TestRunReportsExtensions` red then green; `make lint` clean.
