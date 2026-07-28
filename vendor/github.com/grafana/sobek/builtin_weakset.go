@@ -1,5 +1,7 @@
 package sobek
 
+import "weak"
+
 type weakSetObject struct {
 	baseObject
 	s weakMap
@@ -8,7 +10,7 @@ type weakSetObject struct {
 func (ws *weakSetObject) init() {
 	ws.baseObject.init()
 	ws.s = weakMap{
-		m: make(map[uint64]Value),
+		m: make(map[weak.Pointer[Object]]weakMapEntry),
 	}
 }
 

@@ -6,53 +6,67 @@ import (
 	"weak"
 )
 
+type weakMapEntry struct {
+	value   Value
+	cleanup runtime.Cleanup
+}
+
 type weakMap struct {
-	m map[uint64]Value
+	// Keys are weak.Pointer values rather than raw object addresses so that a
+	// delayed cleanup for a collected key cannot delete a live entry whose
+	// Object was later allocated at the same address (pointer ABA).
+	m map[weak.Pointer[Object]]weakMapEntry
 	sync.Mutex
 }
 
 func (wm *weakMap) set(key *Object, value Value) {
-	id := key.getId()
+	k := weak.Make(key)
 	wm.Lock()
-	_, exists := wm.m[id]
-	wm.m[id] = value
-	wm.Unlock()
-	if !exists {
-		wmPtr := weak.Make(wm) // do not hold strong reference to wm so that it could be collected by GC
-		runtime.AddCleanup(key, func(id uint64) {
-			wm := wmPtr.Value()
-			if wm == nil {
-				return
-			}
-			wm.Lock()
-			delete(wm.m, id)
-			wm.Unlock()
-		}, id)
+	defer wm.Unlock()
+	if e, exists := wm.m[k]; exists {
+		e.value = value
+		wm.m[k] = e
+		return
 	}
+	wmPtr := weak.Make(wm) // do not hold strong reference to wm so that it could be collected by GC
+	cleanup := runtime.AddCleanup(key, func(k weak.Pointer[Object]) {
+		wm := wmPtr.Value()
+		if wm == nil {
+			return
+		}
+		wm.Lock()
+		delete(wm.m, k)
+		wm.Unlock()
+	}, k)
+	wm.m[k] = weakMapEntry{value: value, cleanup: cleanup}
 }
 
 func (wm *weakMap) get(key *Object) (res Value) {
-	id := key.getId()
+	k := weak.Make(key)
 	wm.Lock()
-	res = wm.m[id]
+	if e, ok := wm.m[k]; ok {
+		res = e.value
+	}
 	wm.Unlock()
 	return
 }
 
 func (wm *weakMap) remove(key *Object) (removed bool) {
-	id := key.getId()
+	k := weak.Make(key)
 	wm.Lock()
-	if _, removed = wm.m[id]; removed {
-		delete(wm.m, id)
+	if e, ok := wm.m[k]; ok {
+		e.cleanup.Stop()
+		delete(wm.m, k)
+		removed = true
 	}
 	wm.Unlock()
 	return
 }
 
 func (wm *weakMap) has(key *Object) bool {
-	id := key.getId()
+	k := weak.Make(key)
 	wm.Lock()
-	_, exists := wm.m[id]
+	_, exists := wm.m[k]
 	wm.Unlock()
 	return exists
 }
@@ -65,7 +79,7 @@ type weakMapObject struct {
 func (wmo *weakMapObject) init() {
 	wmo.baseObject.init()
 	wmo.m = weakMap{
-		m: make(map[uint64]Value),
+		m: make(map[weak.Pointer[Object]]weakMapEntry),
 	}
 }
 
