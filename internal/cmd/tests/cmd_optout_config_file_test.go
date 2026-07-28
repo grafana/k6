@@ -16,8 +16,9 @@ import (
 )
 
 // TestConfigFileOptOut covers the config-file opt-out (noUsageReport: true)
-// on every reporting path: alone it must suppress the usage report, and
-// K6_NO_USAGE_REPORT=false must win over it and re-enable reporting.
+// on every reporting path: alone it must suppress the usage report,
+// K6_NO_USAGE_REPORT=false must win over it and re-enable reporting, and an
+// unreadable config file must fail closed by skipping the report.
 func TestConfigFileOptOut(t *testing.T) {
 	t.Parallel()
 
@@ -29,6 +30,7 @@ func TestConfigFileOptOut(t *testing.T) {
 		name        string
 		args        []string
 		stdin       string
+		config      string // config file content; empty means {"noUsageReport": true}
 		envOptOut   string // K6_NO_USAGE_REPORT; empty leaves it unset
 		wantReports int32
 	}{
@@ -53,6 +55,15 @@ func TestConfigFileOptOut(t *testing.T) {
 			args:        []string{"x", "testsub"},
 			envOptOut:   "false",
 			wantReports: 1,
+		},
+		{
+			// An unreadable config file must fail closed: no report, while
+			// the subcommand still runs (the zero exit code is asserted by
+			// the test state).
+			name:      "unreadable config file skips the subcommand report",
+			args:      []string{"x", "testsub"},
+			config:    `{not json`,
+			envOptOut: "false",
 		},
 	}
 
@@ -84,9 +95,12 @@ func TestConfigFileOptOut(t *testing.T) {
 			ts.Env[state.UsageReportURL] = reportServer.URL
 			ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
 
+			config := tc.config
+			if config == "" {
+				config = `{"noUsageReport": true}`
+			}
 			require.NoError(t, ts.FS.MkdirAll(filepath.Dir(ts.Flags.ConfigFilePath), 0o755))
-			require.NoError(t, fsext.WriteFile(ts.FS, ts.Flags.ConfigFilePath,
-				[]byte(`{"noUsageReport": true}`), 0o600))
+			require.NoError(t, fsext.WriteFile(ts.FS, ts.Flags.ConfigFilePath, []byte(config), 0o600))
 
 			ts.CmdArgs = append([]string{"k6"}, tc.args...)
 			if tc.stdin != "" {
