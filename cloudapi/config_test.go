@@ -57,12 +57,13 @@ func TestConfigApply(t *testing.T) {
 	assert.Equal(t, full, defaults.Apply(full))
 }
 
-// The scoped test_run_token is short-lived and run-scoped; it is now
-// deliberately accepted via env (K6_CLOUD_TEST_RUN_TOKEN) so an
-// external orchestrator that provisioned the run can hand it to a
-// local k6. It still never touches lib.Options / the archive — the
-// long-lived org token remains the sensitive credential and is
-// unaffected here.
+// TestConfig_NewFieldsRoundTripThroughJSON also serves as the security
+// regression for "scoped tokens stay in-process": the fields live on
+// cloudapi.Config (which round-trips only via derivedConfig.Collectors[cloud])
+// and NOT on lib.Options (which is serialised into the archive's
+// metadata.json and pushed to the cloud). A new field accidentally added
+// to lib.Options would be serialised into the archive — but the new
+// fields here are on cloudapi.Config, so they cannot leak that way.
 func TestConfig_NewFieldsRoundTripThroughJSON(t *testing.T) {
 	t.Parallel()
 
@@ -84,23 +85,22 @@ func TestConfig_NewFieldsRoundTripThroughJSON(t *testing.T) {
 	assert.Equal(t, original.TestRunToken, roundTripped.TestRunToken)
 }
 
-// TestConfig_NewFieldsFromEnvconfig verifies the scoped push creds are
-// read from the environment via envconfig (K6_CLOUD_METRICS_PUSH_URL /
-// K6_CLOUD_TEST_RUN_TOKEN) so an external orchestrator that provisioned
-// a run can hand them to a local k6.
-func TestConfig_NewFieldsFromEnvconfig(t *testing.T) {
+func TestConfig_NewFieldsNotPickedUpByEnvconfig(t *testing.T) {
 	t.Parallel()
 
+	// Set env vars with every plausible name a user might guess.
 	envVars := map[string]string{
-		"K6_CLOUD_METRICS_PUSH_URL": "https://push.example/m",
-		"K6_CLOUD_TEST_RUN_TOKEN":   "scoped-xyz",
+		"K6_CLOUD_METRICS_PUSH_URL": "foo",
+		"K6_CLOUD_TEST_RUN_TOKEN":   "bar",
+		"K6_CLOUD_METRICSPUSHURL":   "foo",
+		"K6_CLOUD_TESTRUNTOKEN":     "bar",
 	}
 
 	config, _, err := GetConsolidatedConfig(nil, envVars, "", nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, null.StringFrom("https://push.example/m"), config.MetricsPushURL)
-	assert.Equal(t, null.StringFrom("scoped-xyz"), config.TestRunToken)
+	assert.Equal(t, null.String{}, config.MetricsPushURL)
+	assert.Equal(t, null.String{}, config.TestRunToken)
 }
 
 func TestConfig_Apply_MergesNewFields(t *testing.T) {

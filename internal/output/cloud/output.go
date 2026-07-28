@@ -223,8 +223,10 @@ func (out *Output) Start() error {
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
 
-		// Exactly one of the scoped push creds set is a misconfiguration
-		// (typically an external orchestrator that forgot one env var).
+		// Exactly one of the scoped push creds set is a misconfiguration.
+		// The cmd layer already validates this for the externally-provisioned
+		// env case (internal/cmd/outputs_cloud.go); this is the defensive
+		// backstop for any other source (e.g. a hand-written cloud config).
 		if out.config.MetricsPushURL.Valid != out.config.TestRunToken.Valid {
 			return fmt.Errorf(
 				"both K6_CLOUD_METRICS_PUSH_URL and K6_CLOUD_TEST_RUN_TOKEN " +
@@ -233,8 +235,9 @@ func (out *Output) Start() error {
 
 		// Provisioning-mode push. Armed whenever the scoped push credentials
 		// are present: either k6 self-provisioned (no PushRefID) or an external
-		// service provisioned the run and passed the creds via env (PushRefID
-		// set; that service owns create/start/notify).
+		// service provisioned the run and its creds were injected into the
+		// cloud config by the cmd layer (PushRefID set; that service owns
+		// create/start/notify).
 		if out.config.MetricsPushURL.Valid && out.config.TestRunToken.Valid {
 			if err := out.lazyInitProvisioning(); err != nil {
 				return err
