@@ -72,9 +72,6 @@ func WrapTLSConfigForAIAFetching(cfg *tls.Config, logger logrus.FieldLogger, htt
 		httpClient = aiaHTTPClient
 	}
 
-	prevVerifyPeer := cfg.VerifyPeerCertificate
-	prevVerifyConn := cfg.VerifyConnection
-
 	newCfg := cfg.Clone()
 
 	// Suppresses Go's built-in verification so we can interpose AIA fetching;
@@ -83,8 +80,8 @@ func WrapTLSConfigForAIAFetching(cfg *tls.Config, logger logrus.FieldLogger, htt
 
 	// Callbacks read newCfg.RootCAs at handshake time (not capture-at-wrap-time) so
 	// callers can modify RootCAs after wrapping and have the change take effect.
-	newCfg.VerifyPeerCertificate = buildVerifyPeerFn(newCfg, logger, httpClient, prevVerifyPeer)
-	newCfg.VerifyConnection = buildVerifyConnFn(prevVerifyConn)
+	newCfg.VerifyPeerCertificate = buildVerifyPeerFn(newCfg, logger, httpClient)
+	newCfg.VerifyConnection = buildVerifyConnFn()
 	return newCfg
 }
 
@@ -92,7 +89,6 @@ func buildVerifyPeerFn(
 	cfg *tls.Config,
 	logger logrus.FieldLogger,
 	httpClient *http.Client,
-	prev func([][]byte, [][]*x509.Certificate) error,
 ) func([][]byte, [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 		if len(rawCerts) == 0 {
@@ -124,14 +120,7 @@ func buildVerifyPeerFn(
 			// Hostname verification runs in buildVerifyConnFn where cs.ServerName is available.
 		}
 
-		if err := verifyWithAIA(certs, opts, intermediates, httpClient, logger); err != nil {
-			return err
-		}
-
-		if prev != nil {
-			return prev(rawCerts, nil)
-		}
-		return nil
+		return verifyWithAIA(certs, opts, intermediates, httpClient, logger)
 	}
 }
 
@@ -178,19 +167,14 @@ func verifyWithAIA(
 	return retryErr
 }
 
-func buildVerifyConnFn(prev func(tls.ConnectionState) error) func(tls.ConnectionState) error {
+func buildVerifyConnFn() func(tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
 		// Empty ServerName = IP-only dial without SNI, no hostname to verify.
 		// Matches Go stdlib (x509.VerifyOptions.DNSName is skipped when empty).
-		if cs.ServerName != "" {
-			if err := cs.PeerCertificates[0].VerifyHostname(cs.ServerName); err != nil {
-				return err
-			}
+		if cs.ServerName == "" {
+			return nil
 		}
-		if prev != nil {
-			return prev(cs)
-		}
-		return nil
+		return cs.PeerCertificates[0].VerifyHostname(cs.ServerName)
 	}
 }
 
