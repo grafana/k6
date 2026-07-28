@@ -6,7 +6,7 @@ Every scenario below is written as a test vector: the **GIVEN** fixes the catalo
 
 ### Requirement: Report used catalog extensions in the usage report
 
-The usage report MUST include an `extensions` field listing the extensions actually used during the run. An extension is "used" when the test exercises it, not merely when it is compiled into the binary: an importable extension MUST be reported only if one of its `k6/x/*` modules was resolved, an output extension MUST be reported only if it was selected with `--out`, and a subcommand extension MUST be reported only if it was invoked.
+The usage report MUST include an `extensions` field listing the extensions actually used during the run. An extension is "used" when the test exercises it, not merely when it is compiled into the binary: an importable extension MUST be reported only if one of its `k6/x/*` modules was resolved, an output extension MUST be reported only if it was selected with `--out`, and a subcommand extension MUST be reported only if it was invoked, directly or through one of its nested subcommands.
 
 The field MUST contain only extensions present in the public registry catalog. Extensions absent from the catalog MUST NOT appear. When no catalog extension was used, the field MUST be omitted, consistent with how `modules` behaves today: the key appears only once a value is recorded, so an empty `extensions` array is never emitted.
 
@@ -103,7 +103,7 @@ Extension telemetry MUST NOT introduce a separate opt-out. It MUST be suppressed
 
 ### Requirement: Subcommand extension usage is reported
 
-Subcommand extensions (`k6 x <name>`) MUST report their usage through the same shared usage-report mechanism every command uses: the same collector, transport, opt-out, and bounded, debug-logged, never-failing send, not a bespoke path. The report is sent from the seam that runs the command and thus learns which command actually ran, reporting only when that command is a registered subcommand extension: a baked-in subcommand reports in-process; a provisioned subcommand reports from the provisioned child that runs it, because the host never builds the command for an extension it lacks and so never reports. The report MUST be sent whether the subcommand exited zero or non-zero, since telemetry counts the invocation regardless of outcome, and MUST NOT alter the command's own run hook. Only subcommands present in the registry catalog MUST be reported.
+Subcommand extensions (`k6 x <name>`) MUST report their usage through the same shared usage-report mechanism every command uses: the same collector, transport, opt-out, and bounded, debug-logged, never-failing send, not a bespoke path. The report is sent from the seam that runs the command and thus learns which command actually ran, reporting only when that command belongs to a registered subcommand extension: cobra returns the deepest command it executed, so the extension MUST be resolved from the direct child of the root-level `x` command on the executed command's parent chain, never from the executed command's bare name. A nested invocation (`k6 x <name> <child>`) counts toward its extension, and a builtin command sharing a registered extension's name is never reported. A baked-in subcommand reports in-process; a provisioned subcommand reports from the provisioned child that runs it, because the host never builds the command for an extension it lacks and so never reports. The report MUST be sent whether the subcommand exited zero or non-zero, since telemetry counts the invocation regardless of outcome, and MUST NOT alter the command's own run hook. Only subcommands present in the registry catalog MUST be reported.
 
 Reporting the subcommand name, version, and kind is sufficient. The subcommand's own arguments or internal behaviour are out of scope. The subcommand report carries the identifying fields the run report already sends that do not depend on a run (`k6_version`, `is_ci`, `goos`, `goarch`) alongside the `extensions` entry, and omits the run-only execution stats (`duration`, `iterations`, `vus_max`, `executors`) that require a run scheduler.
 
@@ -111,6 +111,16 @@ Reporting the subcommand name, version, and kind is sufficient. The subcommand's
 - **GIVEN** the stand-in catalog lists the module path behind a baked-in subcommand `testsub`
 - **WHEN** the user runs `k6 x testsub`
 - **THEN** the stand-in server receives exactly one report listing that module path with kind `subcommand`
+
+#### Scenario: Nested subcommand invocation is reported under its extension
+- **GIVEN** the stand-in catalog lists the module path behind a baked-in subcommand `testnest` whose command has a child `child`
+- **WHEN** the user runs `k6 x testnest child`
+- **THEN** the stand-in server receives exactly one report listing `testnest`'s module path with kind `subcommand`
+
+#### Scenario: Builtin sharing an extension's name is not reported
+- **GIVEN** a baked-in subcommand extension named `version`, listed in the stand-in catalog
+- **WHEN** the user runs the builtin `k6 version`
+- **THEN** the stand-in server receives no request
 
 #### Scenario: Unknown subcommand is not reported
 - **GIVEN** `K6_PROVISION_CATALOG_URL` points at an unreachable server

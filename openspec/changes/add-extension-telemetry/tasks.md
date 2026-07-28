@@ -154,3 +154,9 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
   - Row: extend the compiled-but-unused row: GIVEN a catalogued extension compiled into the binary and a script that uses nothing, WHEN `k6 run` executes it, THEN the report omits the `extensions` key AND the stand-in catalog server receives no request.
   - Red: it fails because the run path resolves the catalog eagerly while assembling the report. Make it pass by resolving the catalog lazily: `createReport` takes the catalog as a function and `resolveExtensions` calls it only after finding recorded extension usage.
   - Verify: `go test -race ./internal/cmd/tests/ -run TestRunReportsExtensions` red then green; `make lint` clean.
+
+- [ ] 21. **Count nested and shadowed subcommand runs correctly** (spec: "Subcommand extension usage is reported" / "Nested subcommand invocation is reported under its extension", "Builtin sharing an extension's name is not reported")
+  - Prereq: task 14's subcommand report.
+  - Rows: GIVEN a baked-in catalogued subcommand `testnest` whose command has a child `child`, WHEN the user runs `k6 x testnest child`, THEN the stand-in server receives exactly one report listing `testnest`'s module path with kind `subcommand`. GIVEN a baked-in subcommand extension named `version` listed in the catalog, WHEN the user runs the builtin `k6 version`, THEN the stand-in server receives no request.
+  - Red: both fail because the report matches the executed command's bare name: cobra returns the deepest command it ran, so a nested child misses the registry while a builtin sharing an extension's name hits it. Make them pass by resolving the extension from the direct child of the root-level `x` command on the executed command's parent chain.
+  - Verify: `go test -race ./internal/cmd/tests/ -run "TestNestedSubcommandReportsUsage|TestBuiltinNamedSubcommandExtensionIsNotReported"` red then green; `make lint` clean.
