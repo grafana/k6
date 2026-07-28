@@ -95,7 +95,20 @@ func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
 	if !ok {
 		return
 	}
-	if conf, err := readEnvConfig(gs.Env); err != nil || conf.NoUsageReport.Bool {
+	// The opt-out honors both sources that reach this path, the config file
+	// and the env var, with the env winning like on the run path. An
+	// unreadable source fails closed by skipping the send.
+	fileConf, err := readDiskConfig(gs)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Skipping the usage report")
+		return
+	}
+	envConf, err := readEnvConfig(gs.Env)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Skipping the usage report")
+		return
+	}
+	if fileConf.Apply(envConf).NoUsageReport.Bool {
 		return
 	}
 	reportUsage(gs.Ctx, gs, func(ctx context.Context) map[string]any {
