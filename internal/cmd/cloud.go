@@ -63,6 +63,58 @@ func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 	return nil
 }
 
+// newCloudV6ClientFromConfig builds a v6 cloud API client from the on-disk and
+// environment configuration. It verifies that a complete login is configured
+// (using authPrefix in the error message) and wires the resolved stack ID into
+// the client. It returns the client alongside the consolidated cloud config.
+func newCloudV6ClientFromConfig(
+	gs *state.GlobalState, authPrefix string,
+) (*cloudapiv6.Client, cloudapi.Config, error) {
+	currentDiskConf, err := readDiskConfig(gs)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		currentDiskConf.Collectors["cloud"], gs.Env, "", nil)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+	if warn != "" {
+		gs.Logger.Warn(warn)
+	}
+
+	if err := checkCloudLoginFor(cloudConfig, authPrefix); err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	client, err := cloudapiv6.NewClient(
+		gs.Logger,
+		cloudConfig.Token.String,
+		cloudConfig.Hostv6.String,
+		build.Version,
+		cloudConfig.Timeout.TimeDuration(),
+	)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	return client, cloudConfig, nil
+}
+
+// cloudStackName returns a human-readable name for the configured stack,
+// falling back to "stack-<id>" when the stack URL is not available.
+func cloudStackName(conf cloudapi.Config) string {
+	if conf.StackURL.Valid {
+		return conf.StackURL.String
+	}
+	return fmt.Sprintf("stack-%d", conf.StackID.Int64)
+}
+
 // cmdCloud handles the `k6 cloud` sub-command
 type cmdCloud struct {
 	gs *state.GlobalState
@@ -440,6 +492,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 
 	projectCmd := getCmdCloudProject(c)
 	cloudCmd.AddCommand(projectCmd)
+
+	loadZoneCmd := getCmdCloudLoadZone(c)
+	cloudCmd.AddCommand(loadZoneCmd)
 
 	testCmd := getCmdCloudTest(c)
 	cloudCmd.AddCommand(testCmd)
