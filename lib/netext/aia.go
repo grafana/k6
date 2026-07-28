@@ -180,10 +180,9 @@ func verifyWithAIA(
 
 func buildVerifyConnFn(prev func(tls.ConnectionState) error) func(tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
-		// ServerName may be empty on non-HTTP transports (IP dials); PeerCertificates is
-		// empty on the first callback of a resumed session. Chain checks ran in
-		// VerifyPeerCertificate, so skip when we can't verify hostname.
-		if cs.ServerName != "" && len(cs.PeerCertificates) > 0 {
+		// Empty ServerName = IP-only dial without SNI, no hostname to verify.
+		// Matches Go stdlib (x509.VerifyOptions.DNSName is skipped when empty).
+		if cs.ServerName != "" {
 			if err := cs.PeerCertificates[0].VerifyHostname(cs.ServerName); err != nil {
 				return err
 			}
