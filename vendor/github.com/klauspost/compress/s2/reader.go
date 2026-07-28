@@ -216,13 +216,18 @@ func (r *Reader) skippable(tmp []byte, n int, allowEOF bool, id uint8) (ok bool)
 		return r.err == nil
 	}
 	if rs, ok := r.r.(io.ReadSeeker); ok {
-		_, err := rs.Seek(int64(n), io.SeekCurrent)
-		if err == nil {
-			return true
-		}
-		if err == io.ErrUnexpectedEOF || (r.err == io.EOF && !allowEOF) {
-			r.err = ErrCorrupt
-			return false
+		if cur, err := rs.Seek(0, io.SeekCurrent); err == nil {
+			if end, err := rs.Seek(0, io.SeekEnd); err == nil {
+				if cur+int64(n) <= end {
+					if _, err := rs.Seek(cur+int64(n), io.SeekStart); err == nil {
+						return true
+					}
+				}
+				if _, err := rs.Seek(cur, io.SeekStart); err != nil {
+					r.err = ErrCorrupt
+					return false
+				}
+			}
 		}
 	}
 	for n > 0 {
