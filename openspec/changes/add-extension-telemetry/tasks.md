@@ -160,3 +160,9 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
   - Rows: GIVEN a baked-in catalogued subcommand `testnest` whose command has a child `child`, WHEN the user runs `k6 x testnest child`, THEN the stand-in server receives exactly one report listing `testnest`'s module path with kind `subcommand`. GIVEN a baked-in subcommand extension named `version` listed in the catalog, WHEN the user runs the builtin `k6 version`, THEN the stand-in server receives no request.
   - Red: both fail because the report matches the executed command's bare name: cobra returns the deepest command it ran, so a nested child misses the registry while a builtin sharing an extension's name hits it. Make them pass by resolving the extension from the direct child of the root-level `x` command on the executed command's parent chain.
   - Verify: `go test -race ./internal/cmd/tests/ -run "TestNestedSubcommandReportsUsage|TestBuiltinNamedSubcommandExtensionIsNotReported"` red then green; `make lint` clean.
+
+- [ ] 22. **Honor the config-file opt-out on the subcommand path** (spec: "Extension telemetry respects the existing opt-out" / "Config-file opt-out suppresses the subcommand report")
+  - Prereq: task 18's env opt-out.
+  - Row: GIVEN the config file sets `noUsageReport: true` and `K6_NO_USAGE_REPORT` is unset, WHEN the user runs `k6 x testsub`, THEN the stand-in server receives no request; the same config also suppresses the `k6 run` report, pinning both paths.
+  - Red: the subcommand subtest fails because the gate reads only the environment. Make it pass by also reading the config file (`readDiskConfig`) and applying the env config over it, skipping the send when either source is unreadable (fail closed, logged at debug).
+  - Verify: `go test -race ./internal/cmd/tests/ -run TestConfigFileOptOutSuppressesReports` red then green; `make lint` clean.

@@ -87,12 +87,17 @@ If the registry catalog cannot be fetched or read from cache, or is empty or can
 
 ### Requirement: Extension telemetry respects the existing opt-out
 
-Extension telemetry MUST NOT introduce a separate opt-out. It MUST be suppressed whenever the existing usage report is disabled, via `--no-usage-report` or `K6_NO_USAGE_REPORT`, across the run path and the subcommand path. When usage reporting is enabled, extension data is included by the same mechanism that sends the rest of the report.
+Extension telemetry MUST NOT introduce a separate opt-out. It MUST be suppressed whenever the existing usage report is disabled, via `--no-usage-report` on the commands that define it, `K6_NO_USAGE_REPORT`, or the config file's `noUsageReport` option, across the run path and the subcommand path. The environment MUST win over the config file, matching the run path's precedence, and an unreadable opt-out source MUST fail closed by skipping the send. When usage reporting is enabled, extension data is included by the same mechanism that sends the rest of the report.
 
 #### Scenario: Opt-out suppresses extension data
 - **GIVEN** `K6_NO_USAGE_REPORT=true`, `K6_USAGE_REPORT_URL` pointed at a stand-in server, and the catalog listing the extension
 - **WHEN** `k6 run` executes a script that imports it, or `k6 x <name>` runs a catalogued subcommand
 - **THEN** the stand-in server receives no request
+
+#### Scenario: Config-file opt-out suppresses the subcommand report
+- **GIVEN** the config file sets `noUsageReport: true` and `K6_NO_USAGE_REPORT` is unset
+- **WHEN** the user runs `k6 x <name>` for a baked-in catalogued subcommand, or `k6 run` executes a script
+- **THEN** the stand-in server receives no request from either path
 
 #### Scenario: No separate flag is required
 - **GIVEN** usage reporting enabled (the default) and the stand-in catalog listing the extension
