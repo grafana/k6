@@ -31,10 +31,26 @@ func registerNestedTestSubcommand(t *testing.T) {
 				Use: "testnest",
 				Run: func(*cobra.Command, []string) {},
 			}
-			root.AddCommand(&cobra.Command{
+			child := &cobra.Command{
 				Use: "child",
 				Run: func(*cobra.Command, []string) {},
+			}
+			child.AddCommand(&cobra.Command{
+				Use: "grandchild",
+				Run: func(*cobra.Command, []string) {},
 			})
+			// An x-named nested subcommand exercises the walk's root-level
+			// check: the walk must climb past it to the extension under the
+			// real x.
+			nestedX := &cobra.Command{
+				Use: "x",
+				Run: func(*cobra.Command, []string) {},
+			}
+			nestedX.AddCommand(&cobra.Command{
+				Use: "leaf",
+				Run: func(*cobra.Command, []string) {},
+			})
+			root.AddCommand(child, nestedX)
 			return root
 		})
 	})
@@ -115,6 +131,9 @@ func TestNestedSubcommandReportsUsage(t *testing.T) {
 	}{
 		{name: "root invocation is reported", args: []string{"x", "testnest"}},
 		{name: "child invocation is reported under the extension", args: []string{"x", "testnest", "child"}},
+		{name: "grandchild invocation is reported under the extension", args: []string{"x", "testnest", "child", "grandchild"}},
+		{name: "x-named nested invocation is reported under the extension", args: []string{"x", "testnest", "x"}},
+		{name: "invocation under an x-named nested subcommand is reported", args: []string{"x", "testnest", "x", "leaf"}},
 	}
 
 	for _, tc := range tt {
