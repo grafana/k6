@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/lib/fsext"
 )
@@ -24,7 +25,7 @@ func TestConfigFileOptOut(t *testing.T) {
 
 	registerReportTestSubcommand(t)
 
-	testSubModule := "go.k6.io/k6/v2/internal/cmd/tests"
+	testSubModule := ext.Get(ext.SubcommandExtension)["testsub"].Path
 
 	tt := []struct {
 		name        string
