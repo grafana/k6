@@ -73,42 +73,57 @@ func registerBuiltinNamedTestSubcommand(t *testing.T) {
 	})
 }
 
-// TestBuiltinNamedSubcommandExtensionIsNotReported covers a subcommand
-// extension sharing a builtin command's name: running the builtin must not
-// report the extension, even when the catalog lists it.
-func TestBuiltinNamedSubcommandExtensionIsNotReported(t *testing.T) {
+// TestBuiltinNamedSubcommandExtension covers a subcommand extension sharing a
+// builtin command's name: running the builtin must not report the extension,
+// even when the catalog lists it, while running the extension under x must.
+func TestBuiltinNamedSubcommandExtension(t *testing.T) {
 	t.Parallel()
 
 	registerBuiltinNamedTestSubcommand(t)
 
 	versionModule := ext.Get(ext.SubcommandExtension)["version"].Path
 
-	var reportCount atomic.Int32
-	reportServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			reportCount.Add(1)
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(reportServer.Close)
+	tt := []struct {
+		name        string
+		args        []string
+		wantReports int32
+	}{
+		{name: "the builtin does not report the extension", args: []string{"version"}},
+		{name: "the extension under x is reported", args: []string{"x", "version"}, wantReports: 1},
+	}
 
-	catalogServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"version": {"subcommands":["version"],"module":"` + versionModule + `"}}`))
-	}))
-	t.Cleanup(catalogServer.Close)
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	ts := NewGlobalTestState(t)
-	ts.Env["K6_NO_USAGE_REPORT"] = "false"
-	ts.Env[state.UsageReportURL] = reportServer.URL
-	ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
-	ts.CmdArgs = []string{"k6", "version"}
-	ts.ReparseFlags()
+			var reportCount atomic.Int32
+			reportServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					reportCount.Add(1)
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
+			t.Cleanup(reportServer.Close)
 
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+			catalogServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"version": {"subcommands":["version"],"module":"` + versionModule + `"}}`))
+			}))
+			t.Cleanup(catalogServer.Close)
 
-	require.Equal(t, int32(0), reportCount.Load(),
-		"expected the builtin run to send no report despite an extension sharing its name")
+			ts := NewGlobalTestState(t)
+			ts.Env["K6_NO_USAGE_REPORT"] = "false"
+			ts.Env[state.UsageReportURL] = reportServer.URL
+			ts.Env[state.ProvisionCatalogURL] = catalogServer.URL
+			ts.CmdArgs = append([]string{"k6"}, tc.args...)
+			ts.ReparseFlags()
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			require.Equal(t, tc.wantReports, reportCount.Load(),
+				"unexpected usage report count for a builtin-named extension")
+		})
+	}
 }
 
 func TestNestedSubcommandReportsUsage(t *testing.T) {
