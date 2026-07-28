@@ -144,12 +144,14 @@ type AIAHandler struct {
 	certDER []byte
 }
 
+// SetCert atomically updates the DER bytes served by subsequent requests.
 func (h *AIAHandler) SetCert(der []byte) {
 	h.mu.Lock()
 	h.certDER = der
 	h.mu.Unlock()
 }
 
+// ServeHTTP writes the currently-set DER bytes as an AIA response.
 func (h *AIAHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
