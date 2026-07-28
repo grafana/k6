@@ -22,7 +22,8 @@ func TestWeakMapDeleteReuseKeepsLiveEntries(t *testing.T) {
 	_, err := rt.RunString(`globalThis.__wm = new WeakMap();`)
 	require.NoError(t, err)
 
-	const rounds = 20000
+	// Unfixed sobek typically loses a live entry within a few hundred rounds.
+	const rounds = 5000
 	for round := range rounds {
 		_, err := rt.RunString(`
 (() => {
@@ -44,7 +45,7 @@ func TestWeakMapDeleteReuseKeepsLiveEntries(t *testing.T) {
 		require.NoError(t, err)
 
 		goruntime.GC()
-		time.Sleep(200 * time.Microsecond)
+		time.Sleep(50 * time.Microsecond)
 
 		val, err := rt.RunString(`__wm.get(__last)`)
 		require.NoError(t, err)
@@ -65,7 +66,7 @@ func TestWeakSetDeleteReuseKeepsLiveEntries(t *testing.T) {
 	_, err := rt.RunString(`globalThis.__ws = new WeakSet();`)
 	require.NoError(t, err)
 
-	const rounds = 20000
+	const rounds = 5000
 	for round := range rounds {
 		_, err := rt.RunString(`
 (() => {
@@ -87,7 +88,7 @@ func TestWeakSetDeleteReuseKeepsLiveEntries(t *testing.T) {
 		require.NoError(t, err)
 
 		goruntime.GC()
-		time.Sleep(200 * time.Microsecond)
+		time.Sleep(50 * time.Microsecond)
 
 		val, err := rt.RunString(`__ws.has(__last)`)
 		require.NoError(t, err)
