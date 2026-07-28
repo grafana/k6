@@ -53,6 +53,51 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 	_ = conn.Close()
 }
 
+func TestBuildTLSConfig_InsecureSkipVerifyIsHonoured(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	chain.SetAIAURL("http://127.0.0.1:1") // never reached; skip short-circuits
+
+	tlsListener := newLeafOnlyTLSListener(t, chain)
+	t.Cleanup(func() { _ = tlsListener.Close() })
+
+	// Unrelated CA — verification would fail if it ran.
+	otherChain := tlstest.NewChain(t)
+	otherRootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: otherChain.RootDER})
+
+	for _, aiaEnabled := range []bool{false, true} {
+		name := "aia_off"
+		if aiaEnabled {
+			name = "aia_on"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			vuCfg := &tls.Config{
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: true, //nolint:gosec // deliberate: user asked for it
+			}
+			parent := vuCfg
+			if aiaEnabled {
+				parent = netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
+			}
+
+			tlsCfg, err := buildTLSConfig(parent, nil, nil, [][]byte{otherRootPEM}, aiaEnabled, true, nullLogger())
+			require.NoError(t, err)
+			require.True(t, tlsCfg.InsecureSkipVerify, "user asked to skip verification; must be honoured")
+			tlsCfg.ServerName = "localhost"
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			dialer := &tls.Dialer{Config: tlsCfg}
+			conn, err := dialer.DialContext(ctx, "tcp", tlsListener.Addr().String())
+			require.NoError(t, err, "handshake must succeed with insecureSkipTLSVerify even against a mismatched CA")
+			_ = conn.Close()
+		})
+	}
+}
+
 // Guard against silent insecurity: with AIA enabled and mismatched cacerts, the dial
 // must fail — even though the AIA wrapper flips InsecureSkipVerify internally.
 func TestBuildTLSConfig_AIARejectsMismatchedCACert(t *testing.T) {
