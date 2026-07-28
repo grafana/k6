@@ -86,13 +86,12 @@ Run "k6 x explore" to see the full list of official and community-provided subco
 // reportSubcommandUsage reports usage for a subcommand extension after it runs.
 // It is called with the command cobra actually executed, whether that command
 // succeeded or failed, so a subcommand that exits non-zero is still counted. It
-// reports only for a name backed by a registered subcommand extension, so the
-// catch-all `x` help, `k6 run`, completions, and provisioning stubs are ignored.
+// reports only for a command backed by a registered subcommand extension, so
+// the catch-all `x` help, `k6 run`, builtins sharing an extension's name,
+// completions, and provisioning stubs are ignored. A nested invocation
+// (`k6 x <name> <child>`) counts toward the extension that owns the child.
 func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
-	if executed == nil {
-		return
-	}
-	extension, ok := ext.Get(ext.SubcommandExtension)[executed.Name()]
+	extension, ok := subcommandExtension(executed)
 	if !ok {
 		return
 	}
@@ -102,6 +101,25 @@ func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
 	reportUsage(gs.Ctx, gs, func(ctx context.Context) map[string]any {
 		return createSubcommandReport(ctx, gs, extension)
 	})
+}
+
+// subcommandExtension resolves the executed command to the registered
+// subcommand extension it belongs to: the direct child of the root-level `x`
+// command on the executed command's parent chain. Matching by position rather
+// than by the executed command's bare name keeps a builtin sharing an
+// extension's name unreported and lets a nested invocation count toward its
+// extension. cobra returns the deepest command it ran, so the walk climbs from
+// there.
+func subcommandExtension(executed *cobra.Command) (*ext.Extension, bool) {
+	for cmd := executed; cmd != nil && cmd.HasParent(); cmd = cmd.Parent() {
+		parent := cmd.Parent()
+		if parent.Name() != "x" || parent.Parent() == nil || parent.Parent().HasParent() {
+			continue
+		}
+		extension, ok := ext.Get(ext.SubcommandExtension)[cmd.Name()]
+		return extension, ok
+	}
+	return nil, false
 }
 
 // registryStubs returns cobra stubs for registry-advertised subcommands not
