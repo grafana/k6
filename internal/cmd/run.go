@@ -461,7 +461,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if !conf.NoUsageReport.Bool {
 		backgroundProcesses.Go(func() {
 			reportUsage(globalCtx, c.gs, func(ctx context.Context) map[string]any {
-				return createReport(test.preInitState.Usage, execScheduler, catalogModulePaths(ctx, c.gs))
+				return createReport(test.preInitState.Usage, execScheduler, func() map[string]struct{} {
+					return catalogModulePaths(ctx, c.gs)
+				})
 			})
 		})
 	}
