@@ -76,7 +76,7 @@ func TestBuildTLSConfig_InsecureSkipVerifyIsHonoured(t *testing.T) {
 
 			vuCfg := &tls.Config{
 				MinVersion:         tls.VersionTLS12,
-				InsecureSkipVerify: true, //nolint:gosec // deliberate: user asked for it
+				InsecureSkipVerify: true,
 			}
 			parent := vuCfg
 			if aiaEnabled {
