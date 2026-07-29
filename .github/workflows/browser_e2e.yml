@@ -85,7 +85,7 @@ jobs:
       - name: Run E2E tests
         run: |
           set -x
-          TEST_OUTPUT_DIR=${{ github.workspace }}/output
+          TEST_OUTPUT_DIR=${{ github.workspace }}/e2e-output
 
           mkdir "$TEST_OUTPUT_DIR"
 
