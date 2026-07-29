@@ -149,9 +149,12 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 
 	c := p.cfg.Load()
 
+	// Level is intentionally omitted here: cloudlog filters by level itself in
+	// forward (below), so the hook's own Levels() dispatch is unused. Handing an
+	// invalid backend level to NewLokiHook would make it fail and disable the
+	// whole push, so we parse the level ourselves and fall back gracefully.
 	lokiHook, err := log.NewLokiHook(p.fallbackLogger, log.LokiHookOptions{
 		Addr:          c.PushURL,
-		Level:         c.Level,
 		Limit:         c.Limit,
 		PushPeriod:    c.PushPeriod,
 		MsgMaxSize:    c.MsgMaxSize,
@@ -171,13 +174,19 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 	// where the level is known. logrus orders levels by severity (lower =
 	// more severe), so an entry passes iff it is at least as severe as the
 	// configured level: e.Level <= minLevel. An unset level keeps all.
-	minLevel := logrus.TraceLevel // "" => keep all levels
+	minLevel := logrus.TraceLevel // "" => keep all levels (defer to the logger)
 	if c.Level != "" {
 		if lvl, err := logrus.ParseLevel(c.Level); err == nil {
 			minLevel = lvl
-		} else if p.fallbackLogger != nil {
-			p.fallbackLogger.WithField("level", c.Level).
-				Warn("invalid cloud log level; pushing all levels")
+		} else {
+			// The level comes from the backend, not the user, so a bad value
+			// falls back to info (the backend's own default) rather than
+			// pushing everything or disabling the push entirely.
+			minLevel = logrus.InfoLevel
+			if p.fallbackLogger != nil {
+				p.fallbackLogger.WithField("level", c.Level).
+					Warn("invalid cloud log level; defaulting to info")
+			}
 		}
 	}
 

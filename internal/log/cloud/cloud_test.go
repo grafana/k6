@@ -401,3 +401,73 @@ func TestPusher_EmptyLevelKeepsAll(t *testing.T) {
 		t.Fatal("Listen did not return after ctx was cancelled")
 	}
 }
+
+// TestPusher_InvalidLevelDefaultsToInfo verifies that an unparseable Level
+// (which can only come from the backend) neither disables the push nor keeps
+// all levels: it falls back to info, so debug is dropped while info and above
+// are still pushed.
+func TestPusher_InvalidLevelDefaultsToInfo(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu   sync.Mutex
+		body strings.Builder
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		mu.Lock()
+		body.Write(b)
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	p := New(testutils.NewLogger(t))
+	p.SetConfig(Config{
+		PushURL:    srv.URL,
+		Token:      "tok",
+		TestRunID:  "run-badlvl",
+		Level:      "bogus", // invalid => fall back to info
+		PushPeriod: 20 * time.Millisecond,
+	})
+
+	// Debug fired first, so if it were going to be pushed it would land no
+	// later than the info/error entries.
+	for _, e := range []*logrus.Entry{
+		{Time: time.Now(), Level: logrus.DebugLevel, Message: "msg-debug"},
+		{Time: time.Now(), Level: logrus.InfoLevel, Message: "msg-info"},
+		{Time: time.Now(), Level: logrus.ErrorLevel, Message: "msg-error"},
+	} {
+		require.NoError(t, p.Fire(e))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	listenDone := make(chan struct{})
+	go func() {
+		p.Listen(ctx)
+		close(listenDone)
+	}()
+
+	got := func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		return body.String()
+	}
+
+	// info/error (at or above the info fallback) are pushed despite the
+	// invalid level, proving the push is not disabled.
+	require.Eventually(t, func() bool {
+		b := got()
+		return strings.Contains(b, "msg-info") && strings.Contains(b, "msg-error")
+	}, 2*time.Second, 10*time.Millisecond, "info/error not pushed with an invalid level")
+
+	// debug (below info) is dropped, proving the fallback is info, not all.
+	assert.NotContains(t, got(), "msg-debug")
+
+	cancel()
+	select {
+	case <-listenDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Listen did not return after ctx was cancelled")
+	}
+}
