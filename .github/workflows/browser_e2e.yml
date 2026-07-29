@@ -88,16 +88,17 @@ jobs:
           TEST_OUTPUT_DIR=${{ github.workspace }}/e2e-output
 
           mkdir "$TEST_OUTPUT_DIR"
+          chmod 777 "$TEST_OUTPUT_DIR"
 
           cd examples/browser
           for f in *.js; do
             docker run --rm \
               --pull never \
               --env K6_NO_USAGE_REPORT=true \
-              --env E2E_OUTPUT_PATH=output \
-              -v "$PWD:/home/k6/tests" \
-              -v "$TEST_OUTPUT_DIR:/home/k6/output" \
-            k6-browser:test run -q "./tests/$f"
+              --env E2E_OUTPUT_PATH=/output \
+              -v "$PWD:/tests" \
+              -v "$TEST_OUTPUT_DIR:/output" \
+            k6-browser:test run -q "/tests/$f"
           done
       - name: Check screenshot
         # TODO: Do something more sophisticated?
