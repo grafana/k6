@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -650,6 +651,198 @@ export default function() { console.log('hello from the vu'); };`
 
 		assert.Nil(t, ts.CloudLogPusher,
 			"cloud log pusher should not be registered for a non-local-execution run")
+	})
+
+	// The subtests below mirror TestCloudMetricsPushCredentials (which pins the metrics
+	// push-credential resolution) for the cloud *log* push: the observable
+	// is which bearer token / URL k6 streams logs with across the
+	// self-provisioned, externally-provisioned and legacy paths. The
+	// sentinel token consts (scopedToken, bogusToken, extToken,
+	// staleConfigToken, orgToken) are shared with
+	// cmd_cloud_run_push_credentials_test.go.
+
+	// A2 (log): a stray K6_CLOUD_TEST_RUN_TOKEN in the env must NOT override
+	// the run-scoped token the self-provisioned flow gets from provisioning.
+	// The token is programmatic-only (no envconfig), so the stray is inert.
+	t.Run("self-provisioned log push ignores a stray token env var", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = bogusToken
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		for _, a := range auths {
+			assert.Equalf(t, "Bearer "+scopedToken, a,
+				"log push must use the run-scoped token, not the stray env token %q", bogusToken)
+		}
+	})
+
+	// A3 (log): a stray K6_CLOUD_LOGS_PUSH_URL must NOT override the
+	// provisioning-supplied logs URL. conf.Apply(runtime_config) overwrites
+	// the env value. If it leaked, the push would go to the unroutable host
+	// and the provisioning logs endpoint (rec) would record nothing.
+	t.Run("self-provisioned log push ignores a stray logs-push-URL env var", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = "http://stray.invalid/logs/push"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies,
+			"log push must hit the provisioning logs URL, not the stray env URL")
+		for _, a := range auths {
+			assert.Equal(t, "Bearer "+scopedToken, a)
+		}
+	})
+
+	// A4 (log): both stray env vars at once — scoped token + provisioning URL
+	// must still win.
+	t.Run("self-provisioned log push ignores both stray env vars", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = bogusToken
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = "http://stray.invalid/logs/push"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies,
+			"log push must hit the provisioning logs URL with the scoped token")
+		for _, a := range auths {
+			assert.Equal(t, "Bearer "+scopedToken, a)
+		}
+	})
+
+	// A8 (log): a stale testRunToken living in the k6 config file must NOT
+	// override the run-scoped token in the self-provisioned flow.
+	t.Run("self-provisioned log push ignores a stale config-file token", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		cfg := []byte(`{"collectors":{"cloud":{"testRunToken":"` + staleConfigToken + `"}}}`)
+		require.NoError(t, ts.FS.MkdirAll(filepath.Dir(ts.Flags.ConfigFilePath), 0o755))
+		require.NoError(t, fsext.WriteFile(ts.FS, ts.Flags.ConfigFilePath, cfg, 0o644))
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		for _, a := range auths {
+			assert.Equalf(t, "Bearer "+scopedToken, a,
+				"log push must use the run-scoped token, not the stale config token %q", staleConfigToken)
+		}
+	})
+
+	// B2 (log): partial scoped creds (only the token) must error before any
+	// log push happens.
+	t.Run("errors on partial scoped creds and pushes no logs", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = "99999"
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = extToken // only one of the required pair
+		ts.ExpectedExitCode = -1
+
+		rec := &logPushRecorder{}
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^" + logsPushPath + "$": http.HandlerFunc(rec.handler),
+		})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		out := ts.Stdout.String() + ts.Stderr.String()
+		assert.Contains(t, out, "must be set together",
+			"expected a clear both-or-neither error for partial scoped creds")
+		_, bodies := rec.snapshot()
+		assert.Empty(t, bodies, "no cloud log push should happen when the run errors out")
+	})
+
+	// A5/A6 (log): the legacy `k6 run --out=cloud` path must not register a
+	// cloud log pusher at all (log streaming is a --local-execution feature).
+	t.Run("does not register the pusher for k6 run --out=cloud", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
+		ts.Env["K6_CLOUD_TOKEN"] = orgToken
+		const refID = 1337
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/v1/tests$": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprintf(w, `{"reference_id": "%d", "config": {}}`, refID)
+			}),
+		})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Nil(t, ts.CloudLogPusher,
+			"cloud log streaming is only for cloud run --local-execution, not --out=cloud")
+	})
+
+	// A6 (log): a PushRefID relay run with no scoped creds and no logs push
+	// URL must not push logs anywhere (the pusher stays unconfigured).
+	t.Run("relay run without a logs push URL pushes no logs", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = "99999"
+
+		rec := &logPushRecorder{}
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/v1/tests$":            failHandler(t, "CreateTestRun must not be called with PushRefID"),
+			"POST ^/provisioning/v1/":     failHandler(t, "provisioning API must not be called with PushRefID"),
+			"POST ^" + logsPushPath + "$": http.HandlerFunc(rec.handler),
+		})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		assert.Empty(t, bodies,
+			"a relay run with no logs push URL must not push logs anywhere")
+	})
+
+	// "and more" (beyond the metrics matrix): the pusher must honour the
+	// backend-configured log level. The logger runs at debug (-v) so
+	// console.debug reaches the pusher hook; the provisioning logs config
+	// (level=info) must then drop it before pushing, while info survives.
+	t.Run("self-provisioned log push filters lines below the configured level", func(t *testing.T) {
+		t.Parallel()
+
+		lvlScript := `
+export const options = { cloud: { name: 'Test cloud logs', projectID: 123456 } };
+export default function() {
+	console.debug('debug-line-must-be-filtered');
+	console.log('info-line-must-be-pushed');
+};`
+		ts := makeTestState(t, lvlScript, []string{"--local-execution", "-v", "--log-output=stdout"})
+		rec := setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		all := strings.Join(bodies, "\n")
+		assert.Contains(t, all, "info-line-must-be-pushed",
+			"info-level lines should be pushed")
+		assert.NotContains(t, all, "debug-line-must-be-filtered",
+			"debug-level lines must be filtered out by the configured level (info)")
 	})
 }
 
