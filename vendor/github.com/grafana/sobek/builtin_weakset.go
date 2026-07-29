@@ -7,7 +7,9 @@ type weakSetObject struct {
 
 func (ws *weakSetObject) init() {
 	ws.baseObject.init()
-	ws.s = weakMap(ws.val.runtime.genId())
+	ws.s = weakMap{
+		m: make(map[uint64]Value),
+	}
 }
 
 func (r *Runtime) weakSetProto_add(call FunctionCall) Value {

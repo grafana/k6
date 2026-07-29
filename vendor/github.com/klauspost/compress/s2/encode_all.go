@@ -981,7 +981,7 @@ searchDict:
 				cv = load64(src, s)
 				continue
 			}
-		} else if uint32(cv>>(checkRep*8)) == load32(src, s-repeat+checkRep) {
+		} else if repeat > 0 && uint32(cv>>(checkRep*8)) == load32(src, s-repeat+checkRep) {
 			base := s + checkRep
 			// Extend back
 			for i := base - repeat; base > nextEmit && i > 0 && src[i-1] == src[base-1]; {
