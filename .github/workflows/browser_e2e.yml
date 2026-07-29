@@ -90,9 +90,9 @@ jobs:
             docker run --rm \
               --pull never \
               --env K6_NO_USAGE_REPORT=true \
-              -v "$PWD:/tests" \
-            k6-browser:test run -q "/tests/$f"
+              -v "$PWD:/home/k6/tests" \
+            k6-browser:test run -q "./tests/$f"
           done
-#      - name: Check screenshot
-#        # TODO: Do something more sophisticated?
-#        run: test -s screenshot.png
+      - name: Check screenshot
+        # TODO: Do something more sophisticated?
+        run: test -s screenshot.png
