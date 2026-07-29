@@ -39,3 +39,43 @@ func TestNewReadableStreamFromReader(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, exp, p.Result().String())
 }
+
+func TestNewReadableStreamFromReaderUsesRuntimeIntrinsics(t *testing.T) {
+	t.Parallel()
+
+	r := newStreamsRuntime(t)
+	rs := NewReadableStreamFromReader(r.VU, bytes.NewReader(nil))
+	require.NoError(t, r.VU.Runtime().Set("rs", rs))
+
+	value, err := r.RunOnEventLoop(`
+JSON.stringify([
+  rs instanceof ReadableStream,
+  Object.getPrototypeOf(rs) === ReadableStream.prototype,
+  Object.getPrototypeOf(rs.getReader()) === ReadableStreamDefaultReader.prototype,
+]);
+`)
+	require.NoError(t, err)
+	require.Equal(t, `[true,true,true]`, value.String())
+}
+
+func TestReadableStreamModuleReusesPreexistingRuntimeIntrinsics(t *testing.T) {
+	t.Parallel()
+
+	r := modulestest.NewRuntime(t)
+	rs := NewReadableStreamFromReader(r.VU, bytes.NewReader(nil))
+	m := New().NewModuleInstance(r.VU)
+	for name, value := range m.Exports().Named {
+		require.NoError(t, r.VU.Runtime().Set(name, value))
+	}
+	require.NoError(t, r.VU.Runtime().Set("rs", rs))
+
+	value, err := r.RunOnEventLoop(`
+JSON.stringify([
+  rs instanceof ReadableStream,
+  rs.constructor === ReadableStream,
+  Object.getPrototypeOf(rs.getReader()) === ReadableStreamDefaultReader.prototype,
+]);
+`)
+	require.NoError(t, err)
+	require.Equal(t, `[true,true,true]`, value.String())
+}

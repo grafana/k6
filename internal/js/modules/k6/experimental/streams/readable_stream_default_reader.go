@@ -16,32 +16,87 @@ type ReadableStreamDefaultReader struct {
 }
 
 // NewReadableStreamDefaultReaderObject creates a new sobek.Object from a [ReadableStreamDefaultReader] instance.
-func NewReadableStreamDefaultReaderObject(reader *ReadableStreamDefaultReader) (*sobek.Object, error) {
+func NewReadableStreamDefaultReaderObject(
+	reader *ReadableStreamDefaultReader,
+	proto *sobek.Object,
+) (*sobek.Object, error) {
 	rt := reader.stream.runtime
 	obj := rt.NewObject()
-	objName := "ReadableStreamDefaultReader"
-
-	err := obj.DefineAccessorProperty("closed", rt.ToValue(func() *sobek.Promise {
-		return reader.getClosed().promise
-	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-	if err != nil {
+	if proto == nil {
+		return nil, newError(RuntimeError, "ReadableStreamDefaultReader prototype is not initialized")
+	}
+	if err := obj.DefineDataProperty(
+		readableStreamDefaultReaderGoRefKey,
+		rt.ToValue(reader),
+		sobek.FLAG_FALSE,
+		sobek.FLAG_FALSE,
+		sobek.FLAG_FALSE,
+	); err != nil {
 		return nil, err
 	}
-
-	if err := setReadOnlyPropertyOf(obj, objName, "cancel", rt.ToValue(reader.Cancel)); err != nil {
-		return nil, err
-	}
-
-	// Exposing the properties of the [ReadableStreamDefaultReader] interface
-	if err := setReadOnlyPropertyOf(obj, objName, "read", rt.ToValue(reader.Read)); err != nil {
-		return nil, err
-	}
-
-	if err := setReadOnlyPropertyOf(obj, objName, "releaseLock", rt.ToValue(reader.ReleaseLock)); err != nil {
+	if err := obj.SetPrototype(proto); err != nil {
 		return nil, err
 	}
 
 	return obj, nil
+}
+
+const readableStreamDefaultReaderGoRefKey = "__k6ReadableStreamDefaultReader__"
+
+func readableStreamDefaultReaderFromValue(rt *sobek.Runtime, value sobek.Value) *ReadableStreamDefaultReader {
+	if value == nil || common.IsNullish(value) || !isObject(value) {
+		return nil
+	}
+	ref := value.ToObject(rt).Get(readableStreamDefaultReaderGoRefKey)
+	if ref == nil {
+		return nil
+	}
+	reader, _ := ref.Export().(*ReadableStreamDefaultReader)
+	return reader
+}
+
+func readableStreamDefaultReaderFromThis(rt *sobek.Runtime, value sobek.Value) *ReadableStreamDefaultReader {
+	reader := readableStreamDefaultReaderFromValue(rt, value)
+	if reader == nil {
+		throw(rt, newTypeError(rt, "value is not a ReadableStreamDefaultReader"))
+	}
+	return reader
+}
+
+func installReadableStreamDefaultReaderPrototype(rt *sobek.Runtime, proto *sobek.Object) error {
+	if err := defineStreamGetter(rt, proto, "closed", func(this sobek.Value) *sobek.Promise {
+		return readableStreamDefaultReaderFromThis(rt, this).getClosed().promise
+	}); err != nil {
+		return err
+	}
+	if err := defineStreamMethod(rt, proto, "cancel", func(this, reason sobek.Value) *sobek.Promise {
+		reader := readableStreamDefaultReaderFromValue(rt, this)
+		if reader == nil {
+			return newRejectedPromiseForRuntime(
+				rt,
+				newTypeError(rt, "value is not a ReadableStreamDefaultReader").Err(),
+			)
+		}
+		return reader.Cancel(reason)
+	}); err != nil {
+		return err
+	}
+	if err := defineStreamMethod(rt, proto, "read", func(this, _ sobek.Value) *sobek.Promise {
+		reader := readableStreamDefaultReaderFromValue(rt, this)
+		if reader == nil {
+			return newRejectedPromiseForRuntime(
+				rt,
+				newTypeError(rt, "value is not a ReadableStreamDefaultReader").Err(),
+			)
+		}
+		return reader.Read()
+	}); err != nil {
+		return err
+	}
+	return defineStreamMethod(rt, proto, "releaseLock", func(this, _ sobek.Value) sobek.Value {
+		readableStreamDefaultReaderFromThis(rt, this).ReleaseLock()
+		return sobek.Undefined()
+	})
 }
 
 // Ensure the ReadableStreamReader interface is implemented correctly
