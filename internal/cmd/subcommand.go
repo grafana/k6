@@ -90,8 +90,10 @@ Run "k6 x explore" to see the full list of official and community-provided subco
 // the catch-all `x` help, `k6 run`, builtins sharing an extension's name,
 // completions, and provisioning stubs are ignored. A nested invocation
 // (`k6 x <name> <child>`) counts toward the extension that owns the child.
+// Displaying an extension's help counts too, whether requested with the flag
+// (`k6 x <name> --help`) or the help command (`k6 help x <name>`).
 func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
-	extension, ok := subcommandExtension(executed)
+	extension, ok := subcommandExtension(helpTarget(executed))
 	if !ok {
 		return
 	}
@@ -114,6 +116,23 @@ func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
 	reportUsage(gs.Ctx, gs, func(ctx context.Context) map[string]any {
 		return createSubcommandReport(ctx, gs, extension)
 	})
+}
+
+// helpTarget resolves the root help command to the command whose help it
+// displayed, so `k6 help x <name>` counts toward the extension like
+// `k6 x <name> --help` does. Any other command passes through unchanged. The
+// lookup repeats the one cobra's help command ran on its positional args,
+// which its flag set still holds after execution.
+func helpTarget(executed *cobra.Command) *cobra.Command {
+	if executed == nil || executed.Name() != "help" ||
+		!executed.HasParent() || executed.Parent().HasParent() {
+		return executed
+	}
+	target, _, err := executed.Root().Find(executed.Flags().Args())
+	if err != nil {
+		return executed
+	}
+	return target
 }
 
 // subcommandExtension resolves the executed command to the registered
