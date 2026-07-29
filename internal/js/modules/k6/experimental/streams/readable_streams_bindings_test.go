@@ -19,6 +19,25 @@ JSON.stringify([
 	require.Equal(t, `[true,true]`, result.String())
 }
 
+func TestReadableStreamDefaultControllerEnqueuesUndefinedWhenChunkIsOmitted(t *testing.T) {
+	t.Parallel()
+
+	result := runStreamPromiseScript(t, `
+const stream = new ReadableStream({
+  start(controller) {
+    controller.enqueue();
+    controller.close();
+  },
+});
+const reader = stream.getReader();
+const first = await reader.read();
+const second = await reader.read();
+return JSON.stringify([first.value === undefined, first.done, second.done]);
+`)
+
+	require.Equal(t, `[true,false,true]`, result.String())
+}
+
 func TestReadableStreamBindingsUseCanonicalPrototypes(t *testing.T) {
 	t.Parallel()
 

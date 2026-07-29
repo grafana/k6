@@ -91,8 +91,23 @@ func (stream *ReadableStream) GetReader(options *sobek.Object) sobek.Value {
 //
 // [tee]: https://streams.spec.whatwg.org/#rs-tee
 func (stream *ReadableStream) Tee() sobek.Value {
-	common.Throw(stream.runtime, newError(NotSupportedError, "'tee()' is not supported yet"))
-	return sobek.Undefined()
+	// 1. If ! IsReadableStreamLocked(this) is true, throw a TypeError exception.
+	if stream.isLocked() {
+		throw(stream.runtime, newTypeError(stream.runtime, "cannot tee a locked stream"))
+	}
+
+	// 2. Let branches be ? ReadableStreamTee(this).
+	branches := stream.tee()
+	intrinsics := readableIntrinsicsForRuntime(stream.runtime)
+	if intrinsics == nil {
+		throw(stream.runtime, newError(RuntimeError, "ReadableStream intrinsics are not initialized"))
+	}
+
+	// 3. Return « branches.[[branch1]], branches.[[branch2]] ».
+	return stream.runtime.NewArray(
+		branches[0].toObject(intrinsics.streamPrototype),
+		branches[1].toObject(intrinsics.streamPrototype),
+	)
 }
 
 // ReadableStreamState represents the current state of a ReadableStream

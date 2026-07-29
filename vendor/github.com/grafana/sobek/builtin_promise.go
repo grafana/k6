@@ -71,6 +71,33 @@ func (p *Promise) Result() Value {
 	return p.result
 }
 
+// Then attaches host-defined fulfillment and rejection reactions without entering JavaScript.
+// Reactions use the same promise job queue as Promise.prototype.then(). A nil callback has the
+// standard identity or thrower behavior.
+func (p *Promise) Then(onFulfilled, onRejected func(Value) Value) *Promise {
+	r := p.val.runtime
+	resultCapability := r.newPromiseCapability(r.getPromise())
+	callbackValue := func(callback func(Value) Value) Value {
+		if callback == nil {
+			return _undefined
+		}
+		return r.newNativeFunc(func(call FunctionCall) Value {
+			result := callback(call.Argument(0))
+			if result == nil {
+				return _undefined
+			}
+			return result
+		}, "", 1)
+	}
+	result := r.performPromiseThen(
+		p,
+		callbackValue(onFulfilled),
+		callbackValue(onRejected),
+		resultCapability,
+	)
+	return result.(*Object).self.(*Promise) //nolint:forcetypeassert
+}
+
 func (p *Promise) toValue(r *Runtime) Value {
 	if p == nil || p.val == nil {
 		return _null
@@ -189,6 +216,13 @@ func (r *Runtime) newPromiseResolveThenableJob(p *Promise, thenable Value, then 
 
 func (r *Runtime) enqueuePromiseJob(job func()) {
 	r.jobQueue = append(r.jobQueue, job)
+}
+
+// EnqueueMicrotask appends a host-defined job to the runtime's promise job queue. The job runs on
+// the runtime goroutine after the current JavaScript job returns and before control leaves the
+// runtime. Callers must not invoke this method from another goroutine.
+func (r *Runtime) EnqueueMicrotask(job func()) {
+	r.enqueuePromiseJob(job)
 }
 
 func (r *Runtime) triggerPromiseReactions(reactions []*promiseReaction, argument Value) {
