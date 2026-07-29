@@ -89,8 +89,6 @@ jobs:
           for f in *.js; do
             docker run --rm \
               --pull never \
-#              --security-opt apparmor=unconfined \
-#              --user "$(id -u):$(id -g)" \
               --env K6_NO_USAGE_REPORT=true \
               -v "$PWD:/tests" \
             k6-browser:test run -q "/tests/$f"
