@@ -85,14 +85,20 @@ jobs:
       - name: Run E2E tests
         run: |
           set -x
+          TEST_OUTPUT_DIR=${{ github.workspace }}/output
+
+          mkdir "$TEST_OUTPUT_DIR"
+
           cd examples/browser
           for f in *.js; do
             docker run --rm \
               --pull never \
               --env K6_NO_USAGE_REPORT=true \
+              --env E2E_OUTPUT_PATH=output \
               -v "$PWD:/home/k6/tests" \
+              -v "$TEST_OUTPUT_DIR:/home/k6/output" \
             k6-browser:test run -q "./tests/$f"
           done
       - name: Check screenshot
         # TODO: Do something more sophisticated?
-        run: test -s screenshot.png
+        run: test -s "$TEST_OUTPUT_DIR/screenshot.png"

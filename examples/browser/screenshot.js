@@ -20,10 +20,12 @@ export const options = {
 export default async function() {
   const context = await browser.newContext();
   const page = await context.newPage();
-  
+
   try {
     await page.goto('https://quickpizza.grafana.com/test.k6.io/');
-    await page.screenshot({ path: 'screenshot.png' });
+
+	const outputPath = __ENV.E2E_OUTPUT_PATH || '.'
+  	await page.screenshot({ path: `${outputPath}/screenshot.png` });
     // TODO: Assert this somehow. Upload as CI artifact or just an external `ls`?
     // Maybe even do a fuzzy image comparison against a preset known good screenshot?
   } catch (error) {
