@@ -25,6 +25,8 @@ import (
 var (
 	// DefaultMatchTimeout used when running regexp matches -- "forever"
 	DefaultMatchTimeout = time.Duration(math.MaxInt64)
+	// ErrBacktrackingStackLimit is returned when a match exceeds its configured backtracking stack size.
+	ErrBacktrackingStackLimit = errors.New("regexp2: maximum backtracking stack size exceeded")
 )
 
 // Regexp is the representation of a compiled regular expression.
@@ -59,7 +61,9 @@ type Regexp struct {
 	// hook points to override runner functions
 	findFirstChar      func(r *Runner) bool
 	execute            func(r *Runner) error
+	executeQuick       func(r *Runner) error
 	stringPrefixFilter StringPrefixFilter
+	quickCode          *syntax.Code // bool-only program with unobservable captures removed
 }
 
 // Compile parses a regular expression and returns, if successful,
@@ -107,12 +111,23 @@ func compile(expr string, c compileConfig) (*Regexp, error) {
 		capslist:      tree.Caplist,
 		capsize:       code.Capsize,
 		code:          code,
+		quickCode:     makeQuickCode(code),
 		MatchTimeout:  DefaultMatchTimeout,
 		optimizations: c.optimizations,
 	}
 	re.stringPrefixFilter = newStringPrefixFilter(code)
 	re.initCaches()
 	return re, nil
+}
+
+func makeQuickCode(code *syntax.Code) *syntax.Code {
+	if code == nil || len(code.QuickCodes) == 0 {
+		return nil
+	}
+	quick := *code
+	quick.Codes = code.QuickCodes
+	quick.QuickCodes = nil
+	return &quick
 }
 
 // MustCompile is like Compile but panics if the expression cannot be parsed.
@@ -230,12 +245,12 @@ func (re *Regexp) FindStringMatch(s string) (*Match, error) {
 	if runeStart < 0 {
 		runeStart = 0
 	}
-	return re.run(false, runeStart, r, newStringMatchText(s, r))
+	return re.run(false, runeStart, -1, r, newStringMatchText(s, r))
 }
 
 // FindRunesMatch searches the input rune slice for a Regexp match
 func (re *Regexp) FindRunesMatch(r []rune) (*Match, error) {
-	return re.run(false, -1, r, newMatchText(r))
+	return re.run(false, -1, -1, r, newMatchText(r))
 }
 
 // FindStringMatchStartingAt searches the input string for a Regexp match starting at the startAt index
@@ -254,12 +269,12 @@ func (re *Regexp) FindStringMatchStartingAt(s string, startAt int) (*Match, erro
 		return nil, errors.New("startAt must align to the start of a valid rune in the input string")
 	}
 
-	return re.run(false, startAt, r, newStringMatchText(s, r))
+	return re.run(false, startAt, -1, r, newStringMatchText(s, r))
 }
 
 // FindRunesMatchStartingAt searches the input rune slice for a Regexp match starting at the startAt index
 func (re *Regexp) FindRunesMatchStartingAt(r []rune, startAt int) (*Match, error) {
-	return re.run(false, startAt, r, newMatchText(r))
+	return re.run(false, startAt, -1, r, newMatchText(r))
 }
 
 // FindAllStringIndex returns a slice of byte index pairs identifying all
@@ -299,6 +314,9 @@ func (re *Regexp) FindAllStringIndex(s string, n int) ([][]int, error) {
 	}
 
 	byteOffsets := newStringByteMapper(s)
+	if re.quickCode != nil {
+		runner.code = re.quickCode
+	}
 	return re.findAllRunesIndex(runner, input, runeStart, n, func(runeIndex, runeLength int) (int, int) {
 		if byteOffsets == nil {
 			return runeIndex, runeIndex + runeLength
@@ -321,6 +339,9 @@ func (re *Regexp) FindAllRunesIndex(r []rune, n int) ([][]int, error) {
 	if re.RightToLeft() {
 		startAt = len(r)
 	}
+	if re.quickCode != nil {
+		runner.code = re.quickCode
+	}
 	return re.findAllRunesIndex(runner, r, startAt, n, func(runeIndex, runeLength int) (int, int) {
 		return runeIndex, runeIndex + runeLength
 	})
@@ -335,8 +356,9 @@ func (re *Regexp) findAllRunesIndex(runner *Runner, input []rune, startAt, n int
 	}
 
 	prevEnd := -1
+	previousMatchLength := -1
 	for n != 0 {
-		m, err := runner.scan(input, nil, startAt, true, re.MatchTimeout)
+		m, err := runner.scan(input, nil, startAt, previousMatchLength, true, re.MatchTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -355,23 +377,7 @@ func (re *Regexp) findAllRunesIndex(runner *Runner, input []rune, startAt, n int
 		}
 
 		startAt = m.textpos
-		if m.RuneLength == 0 {
-			if re.RightToLeft() {
-				if m.textpos == 0 {
-					break
-				}
-				if startAt == m.textstart {
-					startAt--
-				}
-			} else {
-				if m.textpos == len(input) {
-					break
-				}
-				if startAt == m.textstart {
-					startAt++
-				}
-			}
-		}
+		previousMatchLength = m.RuneLength
 	}
 	return out, nil
 }
@@ -420,29 +426,7 @@ func (re *Regexp) FindNextMatch(m *Match) (*Match, error) {
 		return nil, nil
 	}
 
-	// If previous match was empty, advance by one before matching to prevent
-	// infinite loop
-	startAt := m.textpos
-	if m.RuneLength == 0 {
-		if re.RightToLeft() {
-			if m.textpos == 0 {
-				return nil, nil
-			}
-			if startAt == m.textstart {
-				startAt--
-			}
-		} else {
-			if m.textpos == len(m.text.runes) {
-				return nil, nil
-			}
-
-			if startAt == m.textstart {
-				startAt++
-			}
-
-		}
-	}
-	return re.run(false, startAt, m.text.runes, m.text)
+	return re.run(false, m.textpos, m.RuneLength, m.text.runes, m.text)
 }
 
 // MatchString return true if the string matches the regex
@@ -486,8 +470,11 @@ func (re *Regexp) matchStringAt(s string, startAt int) (bool, error) {
 			pooledRuneBuffers.put(pooledInput)
 		}
 	}()
+	if re.quickCode != nil {
+		runner.code = re.quickCode
+	}
 
-	m, err := runner.scan(input, nil, runeStart, true, re.MatchTimeout)
+	m, err := runner.scan(input, nil, runeStart, -1, true, re.MatchTimeout)
 	if err != nil {
 		return false, err
 	}
@@ -525,7 +512,7 @@ func getRunes(s string) []rune {
 // MatchRunes return true if the runes matches the regex
 // error will be set if a timeout occurs
 func (re *Regexp) MatchRunes(r []rune) (bool, error) {
-	m, err := re.run(true, -1, r, nil)
+	m, err := re.run(true, -1, -1, r, nil)
 	if err != nil {
 		return false, err
 	}

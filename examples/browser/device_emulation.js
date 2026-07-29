@@ -1,4 +1,5 @@
 import { browser, devices } from 'k6/browser';
+import { fail } from 'k6';
 import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
@@ -45,6 +46,8 @@ export default async function() {
     if (!__ENV.K6_BROWSER_HEADLESS) {
       await page.waitForTimeout(10000);
     }
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

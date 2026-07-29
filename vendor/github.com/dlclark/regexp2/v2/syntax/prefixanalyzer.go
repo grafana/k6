@@ -895,10 +895,11 @@ func tryFindRawFixedSets(node *RegexNode, res *[]FixedDistanceSet, distance *int
 							combined[fixedSet.Distance] = v
 						}
 					} else {
+						setCopy := fixedSet.Set.Copy()
 						combined[fixedSet.Distance] = struct {
 							Set   *CharSet
 							Count int
-						}{Set: fixedSet.Set, Count: 1}
+						}{Set: &setCopy, Count: 1}
 					}
 				}
 			}
