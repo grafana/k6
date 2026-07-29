@@ -102,4 +102,4 @@ jobs:
           done
       - name: Check screenshot
         # TODO: Do something more sophisticated?
-        run: test -s "$TEST_OUTPUT_DIR/screenshot.png"
+        run: test -s "${{ github.workspace }}/e2e-output"
