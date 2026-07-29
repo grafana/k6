@@ -29,7 +29,7 @@ export default async function() {
     // TODO: Assert this somehow. Upload as CI artifact or just an external `ls`?
     // Maybe even do a fuzzy image comparison against a preset known good screenshot?
   } catch (error) {
-    fail(`Browser iteration failed: ${error.message}`);
+    fail(`Browser iteration failed: ${error}`);
   } finally {
     await page.close();
   }
