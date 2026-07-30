@@ -3,6 +3,7 @@ package oauth
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,6 +100,22 @@ func TestFetchK6TokenErrors(t *testing.T) {
 			require.ErrorContains(t, err, tc.wantErr)
 		})
 	}
+}
+
+func TestFetchK6TokenClipsAHugeErrorBody(t *testing.T) {
+	t.Parallel()
+
+	// The body is read up to maxResponseBytes; none of that belongs in a
+	// terminal, and the server controls its length.
+	server, _ := newFakeK6Plugin(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(strings.Repeat("x", 100_000)))
+	})
+
+	_, err := FetchK6Token(t.Context(), server.URL+proxyAPIPath, "gat_test")
+	require.Error(t, err)
+	assert.Less(t, len(err.Error()), 1_000, "a server must not be able to flood the terminal")
+	assert.Contains(t, err.Error(), "…")
 }
 
 func TestFetchK6TokenRefusesUntrustedHost(t *testing.T) {

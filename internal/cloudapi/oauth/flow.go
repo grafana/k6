@@ -262,7 +262,7 @@ func (f *Flow) handleCallback(
 	}
 
 	proxyEndpoint := q.Get("endpoint")
-	if err := validateGrafanaURL(proxyEndpoint); err != nil {
+	if err := f.validateCallbackURL(proxyEndpoint); err != nil {
 		fail(fmt.Errorf("untrusted API endpoint in the login response: %w", err), "Invalid API endpoint.")
 		return
 	}
@@ -271,13 +271,13 @@ func (f *Flow) handleCallback(
 	// against a stack URL directly, in which case the caller already knows it.
 	stackURL := q.Get("instanceEndpoint")
 	if stackURL != "" {
-		if err := validateGrafanaURL(stackURL); err != nil {
+		if err := f.validateCallbackURL(stackURL); err != nil {
 			fail(fmt.Errorf("untrusted stack URL in the login response: %w", err), "Invalid stack URL.")
 			return
 		}
 	}
 
-	exchanged, err := exchangeCode(ctx, proxyEndpoint, code, sess.verifier)
+	exchanged, err := exchangeCode(ctx, proxyEndpoint, code, sess.verifier, f.validateCallbackURL)
 	if err != nil {
 		fail(err, "Could not exchange the authorization code for a token.")
 		return
@@ -300,7 +300,21 @@ type exchangeResponse struct {
 	} `json:"data"`
 }
 
-func exchangeCode(ctx context.Context, endpoint, code, verifier string) (*exchangeResponse, error) {
+// validateCallbackURL checks a URL the browser handed back. A flow pointed at a
+// local stack is a development or test setup, so local endpoints are acceptable
+// there; a flow pointed at Grafana Cloud must stay within Grafana Cloud. Without
+// that distinction, a page that induced a login could redirect the code exchange
+// — and with it the PKCE verifier — to a process listening on this machine.
+func (f *Flow) validateCallbackURL(raw string) error {
+	if isLocalURL(f.StackURL) {
+		return validateGrafanaURL(raw)
+	}
+	return validateGrafanaHost(raw)
+}
+
+func exchangeCode(
+	ctx context.Context, endpoint, code, verifier string, validate func(string) error,
+) (*exchangeResponse, error) {
 	body, err := json.Marshal(map[string]string{"code": code, "code_verifier": verifier})
 	if err != nil {
 		return nil, err
@@ -340,7 +354,7 @@ func exchangeCode(ctx context.Context, endpoint, code, verifier string) (*exchan
 	if result.Data.Token == "" {
 		return nil, errors.New("the token exchange response contained no token")
 	}
-	if err := validateGrafanaURL(result.Data.APIEndpoint); err != nil {
+	if err := validate(result.Data.APIEndpoint); err != nil {
 		return nil, fmt.Errorf("the token exchange returned an untrusted api_endpoint: %w", err)
 	}
 	return &result, nil

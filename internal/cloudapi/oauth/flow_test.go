@@ -184,6 +184,58 @@ func TestCallbackRejectsEmptyExpectedState(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 }
 
+func TestCallbackRejectsLocalEndpointsFromACloudStack(t *testing.T) {
+	t.Parallel()
+
+	// A login against a real stack must not be redirectable to a local address:
+	// the exchange carries the PKCE verifier, so a page that induced the login
+	// could otherwise collect it from a listener on this machine. The local
+	// exemption applies only when the flow itself targets a local stack.
+	tests := map[string]string{
+		"localhost": "http://localhost:8080",
+		"loopback":  "http://127.0.0.1:8080",
+		"IPv6":      "http://[::1]:8080",
+	}
+
+	for name, endpoint := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			flow := &Flow{StackURL: "https://team.grafana.net"}
+			sess, err := newSession()
+			require.NoError(t, err)
+
+			resultCh := make(chan *Result, 1)
+			errCh := make(chan error, 2)
+			target := "/callback?state=" + sess.state + "&code=auth-code&endpoint=" + url.QueryEscape(endpoint)
+
+			flow.handleCallback(
+				t.Context(), httptest.NewRecorder(),
+				httptest.NewRequest(http.MethodGet, target, nil),
+				sess, resultCh, errCh,
+			)
+
+			require.ErrorContains(t, <-errCh, "untrusted API endpoint")
+			assert.Empty(t, resultCh)
+		})
+	}
+}
+
+func TestCallbackAllowsLocalEndpointsFromALocalStack(t *testing.T) {
+	t.Parallel()
+
+	// The counterpart: pointing the flow at a local stack is how development
+	// setups and these tests work, so local endpoints stay acceptable there.
+	// The full local path is exercised by the httptest-backed flow tests; this
+	// pins the decision itself.
+	local := &Flow{StackURL: "http://127.0.0.1:3000"}
+	require.NoError(t, local.validateCallbackURL("http://127.0.0.1:8080"))
+
+	cloud := &Flow{StackURL: "https://team.grafana.net"}
+	require.Error(t, cloud.validateCallbackURL("http://127.0.0.1:8080"))
+	require.NoError(t, cloud.validateCallbackURL("https://assistant.grafana.net/assistant"))
+}
+
 func TestFlowRunRejectsUntrustedEndpoints(t *testing.T) {
 	t.Parallel()
 

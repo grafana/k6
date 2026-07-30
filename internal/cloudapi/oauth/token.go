@@ -74,7 +74,14 @@ func FetchK6Token(ctx context.Context, apiBase, accessToken string) (string, err
 // are indistinguishable from the status code alone, so the server's own message
 // is kept alongside the hint rather than replaced by it.
 func accountError(requestURL string, status int, body []byte) error {
+	// The body is read up to maxResponseBytes, which is far more than belongs in
+	// a terminal, so it is clipped to something a person can read.
+	const maxDetail = 256
+
 	detail := strings.TrimSpace(stripControlChars(string(body)))
+	if len(detail) > maxDetail {
+		detail = detail[:maxDetail] + "…"
+	}
 	if detail == "" {
 		detail = "no details given"
 	}
