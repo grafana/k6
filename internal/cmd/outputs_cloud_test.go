@@ -10,6 +10,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/cloudapi"
+	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
@@ -205,6 +206,16 @@ func TestBuildConfigFromRuntimeConfig_NilFieldsLeftUnset(t *testing.T) {
 	assert.False(t, cfg.AggregationPeriod.Valid, "AggregationPeriod should be unset when input is nil")
 	assert.False(t, cfg.AggregationWaitPeriod.Valid, "AggregationWaitPeriod should be unset when input is nil")
 	assert.False(t, cfg.MaxTimeSeriesInBatch.Valid, "MaxTimeSeriesInBatch should be unset when input is nil")
+
+	// The logs fields must also stay unset when provisioning omits them, so a
+	// stray K6_CLOUD_LOGS_* env value cannot survive Apply in the
+	// self-provisioned flow (the fields are programmatic-only).
+	assert.False(t, cfg.LogsPushURL.Valid, "LogsPushURL should be unset when input is nil")
+	assert.False(t, cfg.LogsLevel.Valid, "LogsLevel should be unset when input is nil")
+	assert.False(t, cfg.LogsLimit.Valid, "LogsLimit should be unset when input is nil")
+	assert.False(t, cfg.LogsPushPeriod.Valid, "LogsPushPeriod should be unset when input is nil")
+	assert.False(t, cfg.LogsMessageMaxSize.Valid, "LogsMessageMaxSize should be unset when input is nil")
+	assert.Empty(t, cfg.LogsAllowedLabels, "LogsAllowedLabels should be unset when input is nil")
 }
 
 func TestBuildConfigFromRuntimeConfig_AggregationMinSamplesIgnored(t *testing.T) {
@@ -237,4 +248,30 @@ func TestBuildConfigFromRuntimeConfig_AggregationMinSamplesIgnored(t *testing.T)
 		assert.NotEqual(t, logrus.WarnLevel, e.Level, "unexpected warning logged for intentionally dropped field")
 		assert.NotEqual(t, logrus.ErrorLevel, e.Level, "unexpected error logged for intentionally dropped field")
 	}
+}
+
+// TestApplyExternalLogsConfig verifies the externally-provisioned flow reads
+// the log-push knobs from the K6_CLOUD_LOGS_* env vars into the config (the
+// fields are not env-bound on cloudapi.Config, so cmd reads them explicitly).
+func TestApplyExternalLogsConfig(t *testing.T) {
+	t.Parallel()
+
+	gs := &state.GlobalState{Env: map[string]string{
+		"K6_CLOUD_LOGS_PUSH_URL":         "https://api.k6.io/logs/v1/test_runs/42",
+		"K6_CLOUD_LOGS_LEVEL":            "info",
+		"K6_CLOUD_LOGS_LIMIT":            "900",
+		"K6_CLOUD_LOGS_PUSH_PERIOD":      "3s",
+		"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE": "10000",
+		"K6_CLOUD_LOGS_ALLOWED_LABELS":   "lz,level,test_run_id",
+	}}
+
+	var conf cloudapi.Config
+	require.NoError(t, applyExternalLogsConfig(gs, &conf))
+
+	assert.Equal(t, null.StringFrom("https://api.k6.io/logs/v1/test_runs/42"), conf.LogsPushURL)
+	assert.Equal(t, null.StringFrom("info"), conf.LogsLevel)
+	assert.Equal(t, null.IntFrom(900), conf.LogsLimit)
+	assert.Equal(t, types.NewNullDuration(3*time.Second, true), conf.LogsPushPeriod)
+	assert.Equal(t, null.IntFrom(10000), conf.LogsMessageMaxSize)
+	assert.Equal(t, []string{"lz", "level", "test_run_id"}, conf.LogsAllowedLabels)
 }

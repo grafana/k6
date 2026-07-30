@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mstoykov/envconfig"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -103,8 +104,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		}
 		test.preInitState.RuntimeOptions.Env[testRunIDKey] = conf.PushRefID.String
 		gs.Logger.Debug("using PushRefID, skipping CreateTestRun")
-		// Externally-provisioned run: the logs config and token are already
-		// on conf from the environment. The run id is the PushRefID.
+		// Externally-provisioned run: the run id is the PushRefID.
 		configureCloudLogPusher(gs, conf, conf.PushRefID.String)
 		return nil
 	}
@@ -207,10 +207,18 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 // values the self-provision flow obtains from the provisioning response.
 // It requires both-or-neither and, when both are present, sets them on conf
 // (so downstream consumers such as the log pusher see them) and bakes them
-// into the serialized cloud config that the Output reads.
+// into the serialized cloud config that the Output reads. It also reads the
+// K6_CLOUD_LOGS_* log-push config, which the external flow supplies the same
+// way.
 func applyExternalProvisioningCreds(
 	gs *state.GlobalState, test *loadedAndConfiguredTest, conf *cloudapi.Config,
 ) error {
+	// The log-push config is env-supplied for an external run and likewise not
+	// env-bound on the Config, so read it explicitly here (before the checks
+	// below, which require the token when a logs URL is set).
+	if err := applyExternalLogsConfig(gs, conf); err != nil {
+		return err
+	}
 	pushURL := gs.Env["K6_CLOUD_METRICS_PUSH_URL"]
 	token := gs.Env["K6_CLOUD_TEST_RUN_TOKEN"]
 	if (pushURL == "") != (token == "") {
@@ -236,6 +244,41 @@ func applyExternalProvisioningCreds(
 		test.derivedConfig.Collectors = make(map[string]json.RawMessage)
 	}
 	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
+	return nil
+}
+
+// externalLogsConfig mirrors the K6_CLOUD_LOGS_* env vars an external
+// orchestrator uses to hand the log-push settings to a local k6. These are
+// read explicitly (the Logs* fields are not env-bound on cloudapi.Config) so a
+// stray env value can't override the run-scoped logs config in the
+// self-provisioned flow.
+type externalLogsConfig struct {
+	PushURL       null.String        `envconfig:"K6_CLOUD_LOGS_PUSH_URL"`
+	Level         null.String        `envconfig:"K6_CLOUD_LOGS_LEVEL"`
+	Limit         null.Int           `envconfig:"K6_CLOUD_LOGS_LIMIT"`
+	PushPeriod    types.NullDuration `envconfig:"K6_CLOUD_LOGS_PUSH_PERIOD"`
+	MsgMaxSize    null.Int           `envconfig:"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE"`
+	AllowedLabels []string           `envconfig:"K6_CLOUD_LOGS_ALLOWED_LABELS"`
+}
+
+// applyExternalLogsConfig reads the K6_CLOUD_LOGS_* env vars into conf for the
+// externally-provisioned flow, where there is no provisioning response to
+// supply them. It uses the same envconfig parsing as GetConsolidatedConfig, so
+// malformed values fail the same way.
+func applyExternalLogsConfig(gs *state.GlobalState, conf *cloudapi.Config) error {
+	var elc externalLogsConfig
+	if err := envconfig.Process("", &elc, func(key string) (string, bool) {
+		v, ok := gs.Env[key]
+		return v, ok
+	}); err != nil {
+		return err
+	}
+	conf.LogsPushURL = elc.PushURL
+	conf.LogsLevel = elc.Level
+	conf.LogsLimit = elc.Limit
+	conf.LogsPushPeriod = elc.PushPeriod
+	conf.LogsMessageMaxSize = elc.MsgMaxSize
+	conf.LogsAllowedLabels = elc.AllowedLabels
 	return nil
 }
 

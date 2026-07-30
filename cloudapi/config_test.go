@@ -90,17 +90,31 @@ func TestConfig_NewFieldsNotPickedUpByEnvconfig(t *testing.T) {
 
 	// Set env vars with every plausible name a user might guess.
 	envVars := map[string]string{
-		"K6_CLOUD_METRICS_PUSH_URL": "foo",
-		"K6_CLOUD_TEST_RUN_TOKEN":   "bar",
-		"K6_CLOUD_METRICSPUSHURL":   "foo",
-		"K6_CLOUD_TESTRUNTOKEN":     "bar",
+		"K6_CLOUD_METRICS_PUSH_URL":      "foo",
+		"K6_CLOUD_TEST_RUN_TOKEN":        "bar",
+		"K6_CLOUD_METRICSPUSHURL":        "foo",
+		"K6_CLOUD_TESTRUNTOKEN":          "bar",
+		"K6_CLOUD_LOGS_PUSH_URL":         "https://stray.example/logs",
+		"K6_CLOUD_LOGS_LEVEL":            "debug",
+		"K6_CLOUD_LOGS_LIMIT":            "5",
+		"K6_CLOUD_LOGS_PUSH_PERIOD":      "9s",
+		"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE": "42",
+		"K6_CLOUD_LOGS_ALLOWED_LABELS":   "stray",
 	}
 
 	config, _, err := GetConsolidatedConfig(nil, envVars, "", nil)
 	require.NoError(t, err)
 
+	// The scoped push creds and the log-push config are all programmatic-only,
+	// so none of these env vars are picked up by envconfig.
 	assert.Equal(t, null.String{}, config.MetricsPushURL)
 	assert.Equal(t, null.String{}, config.TestRunToken)
+	assert.Equal(t, null.String{}, config.LogsPushURL)
+	assert.Equal(t, null.String{}, config.LogsLevel)
+	assert.Equal(t, null.Int{}, config.LogsLimit)
+	assert.Equal(t, types.NullDuration{}, config.LogsPushPeriod)
+	assert.Equal(t, null.Int{}, config.LogsMessageMaxSize)
+	assert.Empty(t, config.LogsAllowedLabels)
 }
 
 func TestConfig_Apply_MergesNewFields(t *testing.T) {
@@ -144,33 +158,6 @@ func TestConfig_Apply_MergesNewFields(t *testing.T) {
 			assert.Equal(t, tc.wantRunToken, got.TestRunToken)
 		})
 	}
-}
-
-// TestConfig_LogsFieldsFromEnvconfig verifies the log-push config
-// fields are read from the environment via envconfig (K6_CLOUD_LOGS_*)
-// so an external orchestrator that provisioned a run can hand the log
-// push settings to a local k6.
-func TestConfig_LogsFieldsFromEnvconfig(t *testing.T) {
-	t.Parallel()
-
-	envVars := map[string]string{
-		"K6_CLOUD_LOGS_PUSH_URL":         "https://api.k6.io/logs/v1/test_runs/42",
-		"K6_CLOUD_LOGS_LEVEL":            "info",
-		"K6_CLOUD_LOGS_LIMIT":            "900",
-		"K6_CLOUD_LOGS_PUSH_PERIOD":      "3s",
-		"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE": "10000",
-		"K6_CLOUD_LOGS_ALLOWED_LABELS":   "lz,level,test_run_id",
-	}
-
-	config, _, err := GetConsolidatedConfig(nil, envVars, "", nil)
-	require.NoError(t, err)
-
-	assert.Equal(t, null.StringFrom("https://api.k6.io/logs/v1/test_runs/42"), config.LogsPushURL)
-	assert.Equal(t, null.StringFrom("info"), config.LogsLevel)
-	assert.Equal(t, null.IntFrom(900), config.LogsLimit)
-	assert.Equal(t, types.NewNullDuration(3*time.Second, true), config.LogsPushPeriod)
-	assert.Equal(t, null.IntFrom(10000), config.LogsMessageMaxSize)
-	assert.Equal(t, []string{"lz", "level", "test_run_id"}, config.LogsAllowedLabels)
 }
 
 func TestConfig_Apply_MergesLogsFields(t *testing.T) {

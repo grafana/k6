@@ -59,16 +59,19 @@ type Config struct {
 	// no test run id, and we may still need an identifier to correlate all the things.
 	PushRefID null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
 
-	// Log-push configuration for `k6 cloud run --local-execution`. Supplied
-	// by the provisioning API's runtime_config.logs (self-provisioned) or
-	// by an external orchestrator via env (externally-provisioned). Consumed
-	// by cmd to configure the cloud log pusher; env-only, not serialised.
-	LogsPushURL        null.String        `json:"-" envconfig:"K6_CLOUD_LOGS_PUSH_URL"`
-	LogsLevel          null.String        `json:"-" envconfig:"K6_CLOUD_LOGS_LEVEL"`
-	LogsLimit          null.Int           `json:"-" envconfig:"K6_CLOUD_LOGS_LIMIT"`
-	LogsPushPeriod     types.NullDuration `json:"-" envconfig:"K6_CLOUD_LOGS_PUSH_PERIOD"`
-	LogsMessageMaxSize null.Int           `json:"-" envconfig:"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE"`
-	LogsAllowedLabels  []string           `json:"-" envconfig:"K6_CLOUD_LOGS_ALLOWED_LABELS"`
+	// Log-push configuration for `k6 cloud run --local-execution`. Like the
+	// scoped push creds above, these are programmatic-only (no envconfig tag):
+	// the self-provisioned flow sets them from the provisioning API's
+	// runtime_config.logs, while the externally-provisioned flow reads the
+	// K6_CLOUD_LOGS_* env vars explicitly in cmd (applyExternalLogsConfig), so
+	// a stray env value can't override the run-scoped values. Consumed by cmd
+	// to configure the cloud log pusher; never serialised.
+	LogsPushURL        null.String        `json:"-"`
+	LogsLevel          null.String        `json:"-"`
+	LogsLimit          null.Int           `json:"-"`
+	LogsPushPeriod     types.NullDuration `json:"-"`
+	LogsMessageMaxSize null.Int           `json:"-"`
+	LogsAllowedLabels  []string           `json:"-"`
 
 	// Defines the max allowed number of time series in a single batch.
 	MaxTimeSeriesInBatch null.Int `json:"maxTimeSeriesInBatch" envconfig:"K6_CLOUD_MAX_TIME_SERIES_IN_BATCH"`
