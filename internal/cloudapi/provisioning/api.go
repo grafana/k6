@@ -80,7 +80,8 @@ type SecretsConfig struct {
 }
 
 // LogsConfig holds the log-push configuration from the provisioning
-// API's runtime_config.logs object.
+// API's runtime_config.logs object. tail_url is intentionally omitted:
+// --local-execution pushes logs, it doesn't tail them.
 type LogsConfig struct {
 	PushURL           string
 	Level             string
