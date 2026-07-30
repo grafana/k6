@@ -228,7 +228,7 @@ func (out *Output) Start() error {
 		// env case (internal/cmd/outputs_cloud.go); this is the defensive
 		// backstop for any other source (e.g. a hand-written cloud config).
 		if out.config.MetricsPushURL.Valid != out.config.TestRunToken.Valid {
-			return fmt.Errorf(
+			return errors.New(
 				"both K6_CLOUD_METRICS_PUSH_URL and K6_CLOUD_TEST_RUN_TOKEN " +
 					"must be set together")
 		}
