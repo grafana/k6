@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -29,6 +30,8 @@ export default async function() {
     await page.goto('https://quickpizza.grafana.com/test.k6.io/');
     await page.screenshot({ path: `example-chromium.png` });
     await context.clearPermissions();
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

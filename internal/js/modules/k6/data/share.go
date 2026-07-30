@@ -67,6 +67,16 @@ func (s wrappedSharedArray) deepFreeze(rt *sobek.Runtime, val sobek.Value) error
 		return nil
 	}
 
+	// Primitives (strings, numbers, booleans) are already immutable in
+	// JavaScript, so there is nothing to freeze.
+	// Skipping them also avoids a costly no-op: deep-freezing a large string
+	// would otherwise wrap it in a String object and iterate over every one
+	// of its character indices in the loop below, allocating enormous amounts
+	// of memory on every access.
+	if _, ok := val.(*sobek.Object); !ok {
+		return nil
+	}
+
 	_, err := s.freeze(sobek.Undefined(), val)
 	if err != nil {
 		return err

@@ -68,6 +68,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 		"resources/rs-test-templates.js",
 		"resources/rs-utils.js",
 		"resources/test-utils.js",
+		"resources/recording-streams.js",
 	}
 	for _, file := range files {
 		compileAndRun(t, rt, webPlatformTestSuite+"/streams", file)

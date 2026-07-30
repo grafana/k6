@@ -659,6 +659,12 @@ func TestOptionsEnv(t *testing.T) {
 			"true":  null.BoolFrom(true),
 			"false": null.BoolFrom(false),
 		},
+		{"HandleSummaryTimeout", "K6_HANDLE_SUMMARY_TIMEOUT"}: {
+			"":     types.NullDuration{},
+			"10s":  types.NullDurationFrom(10 * time.Second),
+			"3m":   types.NullDurationFrom(3 * time.Minute),
+			"300s": types.NullDurationFrom(300 * time.Second),
+		},
 		// Thresholds
 		// External
 	}

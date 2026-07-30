@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
+	sobekencoding "github.com/grafana/sobek-webapi-encoding"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/errext"
@@ -392,26 +393,30 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 }
 
 // registerGlobals registers the globals for the runtime.
-// e.g. timers and webcrypto.
+// e.g. timers, webcrypto, and encoding.
 func registerGlobals(vuImpl *moduleVUImpl) error {
 	err := timers.SetupGlobally(vuImpl)
 	if err != nil {
 		return err
 	}
 
-	return webcrypto.SetupGlobally(vuImpl)
+	err = webcrypto.SetupGlobally(vuImpl)
+	if err != nil {
+		return err
+	}
+
+	return sobekencoding.RegisterGlobally(vuImpl.runtime)
 }
 
 func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.FieldLogger) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
-	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
-	err := rt.Set("__ENV", env)
-	if err != nil {
+	if err := setupEnvObject(rt, b.preInitState.RuntimeOptions.Env, b.preInitState.FeatureFlags); err != nil {
 		return err
 	}
+
+	var err error
 	err = rt.Set("__VU", vuID)
 	if err != nil {
 		return err

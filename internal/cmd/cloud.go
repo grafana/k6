@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -62,6 +61,58 @@ func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 		return fmt.Errorf("%s: %w.\n%w", prefix, errMissingStackID, errCloudAuth)
 	}
 	return nil
+}
+
+// newCloudV6ClientFromConfig builds a v6 cloud API client from the on-disk and
+// environment configuration. It verifies that a complete login is configured
+// (using authPrefix in the error message) and wires the resolved stack ID into
+// the client. It returns the client alongside the consolidated cloud config.
+func newCloudV6ClientFromConfig(
+	gs *state.GlobalState, authPrefix string,
+) (*cloudapiv6.Client, cloudapi.Config, error) {
+	currentDiskConf, err := readDiskConfig(gs)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		currentDiskConf.Collectors["cloud"], gs.Env, "", nil)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+	if warn != "" {
+		gs.Logger.Warn(warn)
+	}
+
+	if err := checkCloudLoginFor(cloudConfig, authPrefix); err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	client, err := cloudapiv6.NewClient(
+		gs.Logger,
+		cloudConfig.Token.String,
+		cloudConfig.Hostv6.String,
+		build.Version,
+		cloudConfig.Timeout.TimeDuration(),
+	)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	return client, cloudConfig, nil
+}
+
+// cloudStackName returns a human-readable name for the configured stack,
+// falling back to "stack-<id>" when the stack URL is not available.
+func cloudStackName(conf cloudapi.Config) string {
+	if conf.StackURL.Valid {
+		return conf.StackURL.String
+	}
+	return fmt.Sprintf("stack-%d", conf.StackID.Int64)
 }
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -295,7 +346,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 
 	ticker := time.NewTicker(time.Millisecond * 2000)
 	if c.showCloudLogs {
-		refID := strconv.FormatInt(int64(testRunID), 10)
+		refID := strconv.FormatInt(testRunID, 10)
 		go func() {
 			logger.Debug("Connecting to cloud logs server...")
 			if err := cloudConfig.StreamLogsToLogger(globalCtx, logger, refID, 0); err != nil {
@@ -442,6 +493,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	projectCmd := getCmdCloudProject(c)
 	cloudCmd.AddCommand(projectCmd)
 
+	loadZoneCmd := getCmdCloudLoadZone(c)
+	cloudCmd.AddCommand(loadZoneCmd)
+
 	testCmd := getCmdCloudTest(c)
 	cloudCmd.AddCommand(testCmd)
 
@@ -463,33 +517,18 @@ func prepCloudTestRun(
 	ctx context.Context, gs *state.GlobalState,
 	client *cloudapiv6.Client,
 	cloudConfig *cloudapi.Config, tmpCloudConfig map[string]any, arc *lib.Archive,
-) (int32, error) {
-	toInt32 := func(v int64) (int32, error) {
-		if v < math.MinInt32 || v > math.MaxInt32 {
-			return 0, fmt.Errorf("value %d overflows int32", v)
-		}
-		return int32(v), nil
-	}
-
-	stackID, err := toInt32(cloudConfig.StackID.Int64)
-	if err != nil {
+) (int64, error) {
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
 		return 0, err
 	}
-	client.SetStackID(stackID)
 
-	projectID, err := toInt32(cloudConfig.ProjectID.Int64)
-	if err != nil {
-		return 0, err
-	}
+	projectID := cloudConfig.ProjectID.Int64
 
 	if projectID == 0 {
 		if err := resolveAndSetProjectID(gs, cloudConfig, tmpCloudConfig, arc); err != nil {
 			return 0, err
 		}
-		projectID, err = toInt32(cloudConfig.ProjectID.Int64)
-		if err != nil {
-			return 0, err
-		}
+		projectID = cloudConfig.ProjectID.Int64
 	}
 
 	if err := client.ValidateOptions(ctx, projectID, arc.Options); err != nil {
@@ -550,11 +589,11 @@ func resolveAndSetProjectID(
 	return nil
 }
 
-func resolveCloudTestURL(stackURL string, testID int32) (string, error) {
+func resolveCloudTestURL(stackURL string, testID int64) (string, error) {
 	u, err := url.Parse(stackURL)
 	if err != nil {
 		return "", fmt.Errorf("invalid stack URL: %w", err)
 	}
 
-	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(int64(testID), 10)).String(), nil
+	return u.JoinPath("a", "k6-app", "tests", strconv.FormatInt(testID, 10)).String(), nil
 }
