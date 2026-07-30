@@ -27,9 +27,20 @@ jobs:
       matrix:
 #        go: [stable, tip]
         go: [stable]
-#        platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
-        platform: [ubuntu-latest]
+        platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
+#        platform: [ubuntu-latest]
+        include:
+          - platform: ubuntu-latest
+            docker: true
+          - platform: ubuntu-24.04-arm
+            docker: true
+          - platform: windows-latest
+            docker: false
+          - platform: macos-latest
+            docker: false
     runs-on: ${{ matrix.platform }}
+    env:
+      TEST_OUTPUT_DIR: ${{ github.workspace }}/e2e-output
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -52,12 +63,6 @@ jobs:
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
-      - name: Install chromium
-        # This is only needed on arm images, chromium comes preinstalled on amd64 runner images.
-        if: contains(matrix.platform, 'arm')
-        run: |
-          sudo apt update && sudo apt install chromium-browser
-          chromium --version
       - name: Build k6
         run: |
           which go
@@ -65,41 +70,46 @@ jobs:
 
           go build .
           ./k6 version
-      - name: Build docker image
-        run: docker buildx build --target with-browser --load -t k6-browser:test .
-#      - name: Run E2E tests
-#        run: |
-#          set -x
-#          if [ "$RUNNER_OS" == "Linux" ] && [ "$RUNNER_ARCH" == "X64" ]; then
-#            export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
-#          fi
-#          export K6_BROWSER_HEADLESS=true
-#          export K6_NO_USAGE_REPORT=true
-#          for f in examples/browser/*.js; do
-#            if [ "$f" == "examples/browser/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
-#              echo "skipping $f on Windows"
-#              continue
-#            fi
-#            ./k6 run -q "$f"
-#          done
-      - name: Run E2E tests
+      - name: Prepare Output Directory
+        run: |
+          mkdir -p "${{ env.TEST_OUTPUT_DIR }}"
+          chmod 777 "${{ env.TEST_OUTPUT_DIR }}"
+      - name: Run E2E tests - On host
+        if: matrix.docker == false
         run: |
           set -x
-          TEST_OUTPUT_DIR=${{ github.workspace }}/e2e-output
+          export K6_BROWSER_HEADLESS=true
+          export K6_NO_USAGE_REPORT=true
+          export E2E_OUTPUT_PATH=${{ env.TEST_OUTPUT_DIR }}
 
-          mkdir "$TEST_OUTPUT_DIR"
-          chmod 777 "$TEST_OUTPUT_DIR"
+          for f in examples/browser/*.js; do
+            if [ "$f" == "examples/browser/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
+              echo "skipping $f on Windows"
+              continue
+            fi
+            ./k6 run -q "$f"
+          done
+
+      - name: Build docker image
+        if: matrix.docker == true
+        run: docker buildx build --target with-browser --load -t k6-browser:test .
+      - name: Run E2E tests - In Docker
+        if: matrix.docker == true
+        run: |
+          set -x
 
           cd examples/browser
           for f in *.js; do
+            # E2E_OUTPUT_PATH controls where the screenshot test stores the screenshot.
+            # By default it writes into the home directory, which we can't mount to without breaking Chrome.
             docker run --rm \
               --pull never \
               --env K6_NO_USAGE_REPORT=true \
               --env E2E_OUTPUT_PATH=/output \
               -v "$PWD:/tests" \
-              -v "$TEST_OUTPUT_DIR:/output" \
+              -v "${{ env.TEST_OUTPUT_DIR }}:/output" \
             k6-browser:test run -q "/tests/$f"
           done
       - name: Check screenshot
         # TODO: Do something more sophisticated?
-        run: test -s "${{ github.workspace }}/e2e-output"
+        run: test -s "${{ env.TEST_OUTPUT_DIR }}/screenshot.png"
