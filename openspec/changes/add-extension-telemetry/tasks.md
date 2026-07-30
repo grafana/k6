@@ -29,21 +29,21 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
 
 ## Importable extension telemetry
 
-- [ ] 3. **Record and report an imported extension** (spec: "Report used catalog extensions" / "Used public import is reported", "Importable extension usage is recorded", "Extension record shape" / "Entry carries module, version, and kind", "Extension telemetry respects the existing opt-out" / "No separate flag is required")
+- [ ] 3. **Record and report an imported extension** (spec: "Report used catalog extensions" / "Used public import is reported", "Importable extension usage is recorded", "Extension record shape" / "Entry carries module, version, and type", "Extension telemetry respects the existing opt-out" / "No separate flag is required")
   - Prereq: task 2's `K6_USAGE_REPORT_URL` seam and the `TestRunReportsExtensions` table.
-  - Row: GIVEN the stand-in catalog lists `M_import`, WHEN `k6 run` runs a script importing `k6/x/testimport`, THEN the report's `extensions` holds one entry `{M_import, version, kind: "js"}`.
+  - Row: GIVEN the stand-in catalog lists `M_import`, WHEN `k6 run` runs a script importing `k6/x/testimport`, THEN the report's `extensions` holds one entry `{M_import, version, type: "js"}`.
   - Test setup: register the in-tree `k6/x/testimport` extension once through a `sync.Once` (mirror `registerTestSubcommandExtensions` in `internal/cmd/subcommand_test.go:416`), because `ext.Register` panics on a duplicate name/type and the registry is process-global; every later run-table extension (tasks 5, 11) registers through that same once.
   - Red: it fails because `js/modules/resolution.go` deliberately drops `k6/x/*` imports and no code assembles `extensions`.
-  - Implement: in `js/modules/resolution.go`, at the cached resolution site, record the resolved registry entry (`ext.Get(ext.JSExtension)[name]`, identified by registry membership, not by the `k6/x/` name) into a new `extensions` bucket on the `usage.Usage` collector via a generic `Values(key, any)` method added beside `Strings`/`Uint64`; leave the `modules` list unchanged. In `internal/cmd/report.go`, keep `createReport` and turn `reportUsage` into the shared transport (it takes a `create` closure, sends bounded, and debug-logs the outcome) with `postUsageReport` as the inner POST; add `resolveExtensions`/`filterExtensions` to read the recorded `*ext.Extension` entries back out of the bucket and emit `{module, version, kind}` straight off each entry, with no re-resolution.
-  - By construction (no separate row): `version` is empty for an in-tree test extension because it carries no build dependency, so assert `module` and `kind` and treat `version` as the verbatim `ext.Extension.Version`. Because the reporting code reads the running binary, an xk6 build and a provisioning build report identically, so build-method independence needs no row.
+  - Implement: in `js/modules/resolution.go`, at the cached resolution site, record the resolved registry entry (`ext.Get(ext.JSExtension)[name]`, identified by registry membership, not by the `k6/x/` name) into a new `extensions` bucket on the `usage.Usage` collector via a generic `Values(key, any)` method added beside `Strings`/`Uint64`; leave the `modules` list unchanged. In `internal/cmd/report.go`, keep `createReport` and turn `reportUsage` into the shared transport (it takes a `create` closure, sends bounded, and debug-logs the outcome) with `postUsageReport` as the inner POST; add `resolveExtensions`/`filterExtensions` to read the recorded `*ext.Extension` entries back out of the bucket and emit `{module, version, type}` straight off each entry, with no re-resolution.
+  - By construction (no separate row): `version` is empty for an in-tree test extension because it carries no build dependency, so assert `module` and `type` and treat `version` as the verbatim `ext.Extension.Version`. Because the reporting code reads the running binary, an xk6 build and a provisioning build report identically, so build-method independence needs no row.
   - Verify: `go test -race ./internal/cmd/tests/ -run TestRunReportsExtensions` red then green; `make lint` clean.
 
 - [ ] 4. **De-duplicate a module imported by many VUs** (spec: "A module imported by many VUs is recorded once")
   - Prereq: task 3's recording and `filterExtensions`.
   - Row: GIVEN the catalog lists `M_import`, WHEN `k6 run --vus 5 --iterations 5` runs a script importing `k6/x/testimport`, THEN `extensions` holds exactly one `js` entry for `M_import`.
   - Red: it fails if recording happens per import rather than once per module.
-  - Implement: de-duplicate per (module, kind) inside `filterExtensions`. Recording at the cached resolution site already collapses repeated VU imports; this makes the guarantee explicit at assembly.
-  - By construction (no separate row): because dedup is per (module, kind), a single module used as both an import and an output would yield two entries, one per kind. The in-tree harness cannot make one module resolve to both an import path and an output constructor name, so dual-purpose coexistence needs no row.
+  - Implement: de-duplicate per (module, type) inside `filterExtensions`. Recording at the cached resolution site already collapses repeated VU imports; this makes the guarantee explicit at assembly.
+  - By construction (no separate row): because dedup is per (module, type), a single module used as both an import and an output would yield two entries, one per type. The in-tree harness cannot make one module resolve to both an import path and an output constructor name, so dual-purpose coexistence needs no row.
   - Verify: `go test -race ./internal/cmd/tests/ -run TestRunReportsExtensions` red then green; `make lint` clean.
 
 - [ ] 5. **Report each of several imported extensions** (spec: "Multiple imported extensions are each reported")
@@ -90,8 +90,8 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
 
 - [ ] 11. **Report a selected output extension** (spec: "Output extension usage is reported" / "Catalogued output extension is reported")
   - Prereq: task 3's `resolveExtensions`/`filterExtensions`, task 7's filter (output rides the same bucket and filter).
-  - Row: GIVEN the catalog lists `M_output`, WHEN `k6 run --out testoutput` runs a script, THEN `extensions` holds one entry `{M_output, version, kind: "output"}`. Register an in-tree output extension via `output.RegisterExtension` and list its resolved path in the stand-in catalog.
-  - Red: it fails because output extensions are never recorded. Make it pass by recording the resolved output extension entry (`ext.Get(ext.OutputExtension)[name]`) into the `extensions` bucket via `usage.Values` in `internal/cmd/outputs.go` when the output is an extension; `resolveExtensions`/`filterExtensions` then handle it uniformly, and its kind (`output`) comes straight off the recorded entry. Leave the built-in `outputs` recording untouched.
+  - Row: GIVEN the catalog lists `M_output`, WHEN `k6 run --out testoutput` runs a script, THEN `extensions` holds one entry `{M_output, version, type: "output"}`. Register an in-tree output extension via `output.RegisterExtension` and list its resolved path in the stand-in catalog.
+  - Red: it fails because output extensions are never recorded. Make it pass by recording the resolved output extension entry (`ext.Get(ext.OutputExtension)[name]`) into the `extensions` bucket via `usage.Values` in `internal/cmd/outputs.go` when the output is an extension; `resolveExtensions`/`filterExtensions` then handle it uniformly, and its type (`output`) comes straight off the recorded entry. Leave the built-in `outputs` recording untouched.
   - Verify: `go test -race ./internal/cmd/tests/ -run TestRunReportsExtensions` red then green; `make lint` clean.
 
 - [ ] 12. **Drop a non-catalog output extension** (spec: "Non-catalog output extension is dropped")
@@ -102,7 +102,7 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
 
 - [ ] 13. **Leave built-in outputs unchanged** (spec: "Built-in output is unchanged")
   - Prereq: task 11's output recording.
-  - Row: GIVEN a built-in output such as `json`, WHEN `k6 run --out json` runs a script, THEN the report holds no `kind: "output"` entry AND `outputs` still lists `json`.
+  - Row: GIVEN a built-in output such as `json`, WHEN `k6 run --out json` runs a script, THEN the report holds no `type: "output"` entry AND `outputs` still lists `json`.
   - Guard: passes because built-ins are classified by the built-in output enum and never enter the extensions bucket; it exists to fail if output recording ever broadens to all outputs instead of output-registry members. This is what keeps the literal-registered `web-dashboard` out of the bucket. Keep the built-in path in `internal/cmd/outputs.go` unchanged.
   - Verify: `go test -race ./internal/cmd/tests/ -run TestRunReportsExtensions` green on arrival; `make lint` clean.
 
@@ -110,7 +110,7 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
 
 - [ ] 14. **Report a baked-in subcommand run** (spec: "Subcommand extension usage is reported" / "Catalogued subcommand run is reported", "At most one usage report per invocation")
   - Prereq: task 2's `K6_USAGE_REPORT_URL` seam and `postUsageReport`, task 1's `catalogModulePaths`.
-  - Row: create `TestSubcommandReportsUsage` with its first row, mirroring task 2's setup. GIVEN the catalog lists `M_sub` for a baked-in subcommand `testsub`, WHEN the user runs `k6 x testsub`, THEN the stand-in server receives exactly one report `{M_sub, version, kind: "subcommand"}`.
+  - Row: create `TestSubcommandReportsUsage` with its first row, mirroring task 2's setup. GIVEN the catalog lists `M_sub` for a baked-in subcommand `testsub`, WHEN the user runs `k6 x testsub`, THEN the stand-in server receives exactly one report `{M_sub, version, type: "subcommand"}`.
   - Red: it fails because no subcommand reports. Make it pass at the root `execute` seam in `internal/cmd/root.go`: run the command with cobra's `ExecuteC` (which returns the executed leaf command and its error) and call a new `reportSubcommandUsage(gs, executed)` in `internal/cmd/subcommand.go`. It reports only when `executed.Name()` is a registered subcommand extension (`ext.Get(ext.SubcommandExtension)`), whether the command exited zero or non-zero, without touching the command's run hook. It builds the report with a `createSubcommandReport` (identity fields `k6_version`, `is_ci`, `goos`, `goarch` via the shared `addEnvironmentInfo`, plus the entry) and sends it through the shared `reportUsage`, keeping the entry only if its module path is in the set returned by `catalogModulePaths(ctx, gs)` (task 1, the same shared cache-then-fetch helper the run path uses), with `ctx` bounded like the run report.
   - By construction (no separate row): the baked-in report is tested end to end here; a provisioned subcommand reports once from the child that runs it, because the host never builds the command for an extension it lacks, so the provisioned-child once-only case holds without a row the single-binary harness cannot drive.
   - Verify: `go test -race ./internal/cmd/tests/ -run TestSubcommandReportsUsage` red then green; `make lint` clean.
@@ -144,7 +144,7 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
 - [ ] 19. **Document the new field** (spec: "Report used catalog extensions in the usage report")
   - Prereq: tasks 1-18 (document the shipped behaviour). Docs, not code: no test row.
   - The public [usage collection page](https://grafana.com/docs/k6/latest/set-up/usage-collection/) states "Only k6 built-in JavaScript modules and outputs are considered. Private modules and custom extensions are excluded.", which this change makes false.
-  - Implement: update that page in grafana/k6-docs to document the `extensions` field (`{module, version, kind}`), its public-catalog-only scope, that `k6 x` invocations of extension subcommands now send a usage report of their own, and that the existing opt-out (env var and config file) covers all of it.
+  - Implement: update that page in grafana/k6-docs to document the `extensions` field (`{module, version, type}`), its public-catalog-only scope, that `k6 x` invocations of extension subcommands now send a usage report of their own, and that the existing opt-out (env var and config file) covers all of it.
   - Verify: the k6-docs PR is open and linked from the implementation PR; the release-notes entry lands in the next release's notes, which the repo compiles in a single release PR rather than per feature PR.
 
 ## Hardening
@@ -157,7 +157,7 @@ Tasks are ordered so each builds on the last. The two groundwork tasks have no d
 
 - [ ] 21. **Count nested and shadowed subcommand runs correctly** (spec: "Subcommand extension usage is reported" / "Nested subcommand invocation is reported under its extension", "Builtin sharing an extension's name is not reported")
   - Prereq: task 14's subcommand report.
-  - Rows: GIVEN a baked-in catalogued subcommand `testnest` whose command has a child `child`, WHEN the user runs `k6 x testnest child`, THEN the stand-in server receives exactly one report listing `testnest`'s module path with kind `subcommand`. GIVEN a baked-in subcommand extension named `version` listed in the catalog, WHEN the user runs the builtin `k6 version`, THEN the stand-in server receives no request.
+  - Rows: GIVEN a baked-in catalogued subcommand `testnest` whose command has a child `child`, WHEN the user runs `k6 x testnest child`, THEN the stand-in server receives exactly one report listing `testnest`'s module path with type `subcommand`. GIVEN a baked-in subcommand extension named `version` listed in the catalog, WHEN the user runs the builtin `k6 version`, THEN the stand-in server receives no request.
   - Red: both fail because the report matches the executed command's bare name: cobra returns the deepest command it ran, so a nested child misses the registry while a builtin sharing an extension's name hits it. Make them pass by resolving the extension from the direct child of the root-level `x` command on the executed command's parent chain.
   - Verify: `go test -race ./internal/cmd/tests/ -run "TestNestedSubcommandReportsUsage|TestBuiltinNamedSubcommandExtensionIsNotReported"` red then green; `make lint` clean.
 

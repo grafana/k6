@@ -13,7 +13,7 @@ The field MUST contain only extensions present in the public registry catalog. E
 #### Scenario: Used public import is reported
 - **GIVEN** the stand-in catalog lists the module path that `k6/x/sql` resolves to
 - **WHEN** `k6 run` executes a script that imports `k6/x/sql`
-- **THEN** the report `extensions` contains one entry for that module path with kind `js`
+- **THEN** the report `extensions` contains one entry for that module path with type `js`
 
 #### Scenario: Compiled-but-unused extension is not reported
 - **GIVEN** a catalogued extension compiled into the binary, and a script that imports, selects, and invokes nothing
@@ -23,7 +23,7 @@ The field MUST contain only extensions present in the public registry catalog. E
 
 ### Requirement: Importable extension usage is recorded
 
-Importable JS extensions (Go extensions registered in the binary, today imported under the `k6/x/` prefix) that are resolved during a run MUST be recorded for reporting. This reverses the current behaviour, where `k6/x/` modules are deliberately excluded from usage collection. An import MUST be identified as an extension by membership in the extension registry rather than by its name, so detection keeps working if extensions are ever imported under a name that is not prefixed with `k6/x/`. Recording MUST happen at the same cached resolution site as built-in modules, so each distinct extension module is recorded once regardless of how many VUs import it. The report-assembly step MUST de-duplicate extension entries per (module, kind), so a module recorded more than once on one surface appears once.
+Importable JS extensions (Go extensions registered in the binary, today imported under the `k6/x/` prefix) that are resolved during a run MUST be recorded for reporting. This reverses the current behaviour, where `k6/x/` modules are deliberately excluded from usage collection. An import MUST be identified as an extension by membership in the extension registry rather than by its name, so detection keeps working if extensions are ever imported under a name that is not prefixed with `k6/x/`. Recording MUST happen at the same cached resolution site as built-in modules, so each distinct extension module is recorded once regardless of how many VUs import it. The report-assembly step MUST de-duplicate extension entries per (module, type), so a module recorded more than once on one surface appears once.
 
 #### Scenario: A module imported by many VUs is recorded once
 - **GIVEN** the stand-in catalog lists the module path behind `k6/x/sql`
@@ -37,12 +37,12 @@ Importable JS extensions (Go extensions registered in the binary, today imported
 
 ### Requirement: Extension record shape
 
-Each entry in the `extensions` field MUST identify the extension by its Go module path and MUST include its version and its kind. The module path and the version MUST come from the binary build information, the same source as `k6 version`. The kind MUST be one of `js`, `output`, or `subcommand`.
+Each entry in the `extensions` field MUST identify the extension by its Go module path and MUST include its version and its type. The module path and the version MUST come from the binary build information, the same source as `k6 version`. The type MUST be one of `js`, `output`, or `subcommand`.
 
-#### Scenario: Entry carries module, version, and kind
+#### Scenario: Entry carries module, version, and type
 - **GIVEN** the stand-in catalog lists the module path behind an imported `k6/x/sql`
 - **WHEN** `k6 run` builds the report
-- **THEN** the entry reports that module path, the version taken verbatim from build info (empty for an in-tree test extension, which carries no build dependency), and kind `js`
+- **THEN** the entry reports that module path, the version taken verbatim from build info (empty for an in-tree test extension, which carries no build dependency), and type `js`
 
 <!-- Phase 2: Filtering -->
 
@@ -110,17 +110,17 @@ Extension telemetry MUST NOT introduce a separate opt-out. It MUST be suppressed
 
 Subcommand extensions (`k6 x <name>`) MUST report their usage through the same shared usage-report mechanism every command uses: the same collector, transport, opt-out, and bounded, debug-logged, never-failing send, not a bespoke path. The report is sent from the seam that runs the command and thus learns which command actually ran, reporting only when that command belongs to a registered subcommand extension: cobra returns the deepest command it executed, so the extension MUST be resolved from the direct child of the root-level `x` command on the executed command's parent chain, never from the executed command's bare name. A nested invocation (`k6 x <name> <child>`) counts toward its extension, and a builtin command sharing a registered extension's name is never reported. A baked-in subcommand reports in-process; a provisioned subcommand reports from the provisioned child that runs it, because the host never builds the command for an extension it lacks and so never reports. The report MUST be sent whether the subcommand exited zero or non-zero, since telemetry counts the invocation regardless of outcome, and MUST NOT alter the command's own run hook. Only subcommands present in the registry catalog MUST be reported.
 
-Reporting the subcommand name, version, and kind is sufficient. The subcommand's own arguments or internal behaviour are out of scope. The subcommand report carries the identifying fields the run report already sends that do not depend on a run (`k6_version`, `is_ci`, `goos`, `goarch`) alongside the `extensions` entry, and omits the run-only execution stats (`duration`, `iterations`, `vus_max`, `executors`) that require a run scheduler.
+Reporting the subcommand name, version, and type is sufficient. The subcommand's own arguments or internal behaviour are out of scope. The subcommand report carries the identifying fields the run report already sends that do not depend on a run (`k6_version`, `is_ci`, `goos`, `goarch`) alongside the `extensions` entry, and omits the run-only execution stats (`duration`, `iterations`, `vus_max`, `executors`) that require a run scheduler.
 
 #### Scenario: Catalogued subcommand run is reported
 - **GIVEN** the stand-in catalog lists the module path behind a baked-in subcommand `testsub`
 - **WHEN** the user runs `k6 x testsub`
-- **THEN** the stand-in server receives exactly one report listing that module path with kind `subcommand`
+- **THEN** the stand-in server receives exactly one report listing that module path with type `subcommand`
 
 #### Scenario: Nested subcommand invocation is reported under its extension
 - **GIVEN** the stand-in catalog lists the module path behind a baked-in subcommand `testnest` whose command has a child `child`
 - **WHEN** the user runs `k6 x testnest child`
-- **THEN** the stand-in server receives exactly one report listing `testnest`'s module path with kind `subcommand`
+- **THEN** the stand-in server receives exactly one report listing `testnest`'s module path with type `subcommand`
 
 #### Scenario: Builtin sharing an extension's name is not reported
 - **GIVEN** a baked-in subcommand extension named `version`, listed in the stand-in catalog
@@ -148,14 +148,14 @@ Reporting the subcommand name, version, and kind is sufficient. The subcommand's
 
 ### Requirement: Output extension usage is reported
 
-Output extensions (a third-party `--out` provided by an `xk6-output-*` extension) that a run selects MUST be reported with kind `output`, filtered against the public catalog by module path like every other surface. An output MUST be identified as an extension by membership in the output registry (`ext.Get(ext.OutputExtension)`), not by the built-in output enum, so built-in outputs, including the literal-registered `web-dashboard`, keep their current reporting and never reach the `extensions` bucket. Usage MUST be recorded at the point the output is selected and constructed (`internal/cmd/outputs.go`), leaving the existing built-in `outputs` list untouched.
+Output extensions (a third-party `--out` provided by an `xk6-output-*` extension) that a run selects MUST be reported with type `output`, filtered against the public catalog by module path like every other surface. An output MUST be identified as an extension by membership in the output registry (`ext.Get(ext.OutputExtension)`), not by the built-in output enum, so built-in outputs, including the literal-registered `web-dashboard`, keep their current reporting and never reach the `extensions` bucket. Usage MUST be recorded at the point the output is selected and constructed (`internal/cmd/outputs.go`), leaving the existing built-in `outputs` list untouched.
 
 The public registry catalog lists no output extensions today, so in production no output is reported until the catalog lists them. The code path is built now so it activates automatically once they are catalogued; adding output extensions to the catalog is tracked separately.
 
 #### Scenario: Catalogued output extension is reported
 - **GIVEN** the stand-in catalog lists the module path that an output extension `testoutput` resolves to
 - **WHEN** `k6 run --out testoutput` executes a script
-- **THEN** the report `extensions` contains one entry for that module path with kind `output`
+- **THEN** the report `extensions` contains one entry for that module path with type `output`
 
 #### Scenario: Non-catalog output extension is dropped
 - **GIVEN** the stand-in catalog omits the module path behind `testoutput`
@@ -165,7 +165,7 @@ The public registry catalog lists no output extensions today, so in production n
 #### Scenario: Built-in output is unchanged
 - **GIVEN** a built-in output such as `json`
 - **WHEN** `k6 run --out json` executes a script and reports usage
-- **THEN** the report contains no `extensions` entry of kind `output`
+- **THEN** the report contains no `extensions` entry of type `output`
 - **AND** the `outputs` field still lists `json`
 
 <!-- Existing-behaviour preservation -->
@@ -195,14 +195,14 @@ Extension usage MUST be reported identically whether the running binary was prod
 
 Every behaviour in this capability MUST be verified by integration tests that drive real k6 commands through the standard command test harness (`internal/cmd/tests`, `NewGlobalTestState`) and assert on the usage report that is actually sent, not on internal functions. Unit tests of report internals MUST NOT be the means of verifying these behaviours. The tests MUST be table-driven, with exactly two tables, one per command surface (`k6 run` and `k6 x`), each iterating over the scenario vectors above, rather than a separate verbose test function per scenario. Nothing may be mocked: extensions register through the normal `modules.Register` / `output.RegisterExtension` / `ext.Register` paths, and both the catalog and the report endpoint are real local HTTP servers, so no report leaves the test process.
 
-Each scenario above is an acceptance criterion and MUST be exercised end to end through a real `k6 run` or `k6 x` invocation, except four cases the single-binary harness cannot drive, which hold by construction: the exact `version` value in the record-shape scenario (a test extension is absent from build deps, so its version resolves to empty; the test asserts `module` and `kind` and treats `version` as the verbatim `ext.Extension.Version`), the provisioned-child once-only scenario (provisioning runs a separately built binary the harness cannot produce; the baked-in once-only is tested end to end and the provisioned child holds because the host never builds the command for an extension it lacks), build-method independence (the reporting code reads the running binary, so xk6 and provisioning report identically), and a same-module extension used as both an import and an output (an import resolves to its package path and an output to its constructor's function name, converging only for a real external dependency, so the harness cannot make one in-tree module match both; the (module, kind) de-duplication handles it by construction, and there is no separate scenario for it). The shared-catalog groundwork scenario is a behaviour-preserving refactor verified by the existing `k6 x` catalog tests, separate from the two telemetry tables.
+Each scenario above is an acceptance criterion and MUST be exercised end to end through a real `k6 run` or `k6 x` invocation, except four cases the single-binary harness cannot drive, which hold by construction: the exact `version` value in the record-shape scenario (a test extension is absent from build deps, so its version resolves to empty; the test asserts `module` and `type` and treats `version` as the verbatim `ext.Extension.Version`), the provisioned-child once-only scenario (provisioning runs a separately built binary the harness cannot produce; the baked-in once-only is tested end to end and the provisioned child holds because the host never builds the command for an extension it lacks), build-method independence (the reporting code reads the running binary, so xk6 and provisioning report identically), and a same-module extension used as both an import and an output (an import resolves to its package path and an output to its constructor's function name, converging only for a real external dependency, so the harness cannot make one in-tree module match both; the (module, type) de-duplication handles it by construction, and there is no separate scenario for it). The shared-catalog groundwork scenario is a behaviour-preserving refactor verified by the existing `k6 x` catalog tests, separate from the two telemetry tables.
 
 To make the sent report observable, a test MUST enable reporting (the harness disables it by default) and point the report endpoint at a local stand-in server via the new `K6_USAGE_REPORT_URL` env var, then assert on the received JSON. Catalog membership MUST be controlled through the existing `K6_PROVISION_CATALOG_URL` override, pointed at a stand-in catalog whose `module` fields match each test extension's resolved module path. For the private-fork case, the stand-in catalog MUST map the public import name to the real catalogued module path while the in-tree fork resolves to a different module path, so the drop is exercised by the module-path mismatch rather than by a missing catalog entry. The single new env var (`K6_USAGE_REPORT_URL`, the overridable report endpoint) is the only production addition the tests require beyond the feature itself; the catalog reuses the existing override, and no other production code or comments may change for testing.
 
 #### Scenario: A reported behaviour is exercised end to end
 - **GIVEN** the command test harness with reporting enabled, the report endpoint pointed at a local server, and the stand-in catalog listing a used extension
 - **WHEN** `k6 run` executes a script that imports that extension
-- **THEN** the test asserts the received report's `extensions` contains it with its module, version, and kind
+- **THEN** the test asserts the received report's `extensions` contains it with its module, version, and type
 
 #### Scenario: Opt-out is verified by the absence of a request
 - **GIVEN** `K6_NO_USAGE_REPORT=true` and the endpoint pointed at a local server
