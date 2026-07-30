@@ -182,6 +182,52 @@ func TestPusher_TestRunIDLabelKept(t *testing.T) {
 	<-listenDone
 }
 
+// TestPusher_EmptyAllowedLabelsKeepsTestRunID guards the empty-slice edge: an
+// explicitly empty K6_CLOUD_LOGS_ALLOWED_LABELS decodes to a non-nil []string{},
+// which must still keep the required test_run_id label rather than strip every
+// label from the stream.
+func TestPusher_EmptyAllowedLabelsKeepsTestRunID(t *testing.T) {
+	t.Parallel()
+
+	recvCh := make(chan string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		select {
+		case recvCh <- string(b):
+		default:
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	p := New(testutils.NewLogger(t))
+	p.SetConfig(Config{
+		PushURL:       srv.URL,
+		Token:         "tok",
+		TestRunID:     "run-empty-labels",
+		PushPeriod:    20 * time.Millisecond,
+		AllowedLabels: []string{}, // non-nil empty, as envconfig decodes ""
+	})
+	require.NoError(t, p.Fire(&logrus.Entry{Time: time.Now(), Level: logrus.InfoLevel, Message: "hello"}))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	listenDone := make(chan struct{})
+	go func() {
+		p.Listen(ctx)
+		close(listenDone)
+	}()
+
+	select {
+	case body := <-recvCh:
+		assert.Contains(t, body, `"test_run_id":"run-empty-labels"`)
+	case <-time.After(2 * time.Second):
+		t.Fatal("no push received from the pusher")
+	}
+
+	cancel()
+	<-listenDone
+}
+
 // TestPusher_Drain covers the pre-notify drain: after entries are pushed while
 // the run is open, Drain returns without hanging, drives Listen to return even
 // though ctx was never cancelled, and is idempotent on a second call.

@@ -628,6 +628,36 @@ export default function() { console.log('hello from the vu'); };`
 		assert.Contains(t, bodies[0], `"test_run_id":"`+pushRefID+`"`)
 	})
 
+	t.Run("externally-provisioned run keeps test_run_id with empty allowed labels", func(t *testing.T) {
+		t.Parallel()
+
+		rec := &logPushRecorder{}
+		const pushRefID = "99999"
+
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^" + logsPushPath + "$": http.HandlerFunc(rec.handler),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = pushRefID
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = srv.URL + logsPushPath
+		ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v1/metrics"
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "ext-token"
+		// An explicitly empty allow-list decodes to []string{}; the required
+		// test_run_id label must still survive rather than be stripped.
+		ts.Env["K6_CLOUD_LOGS_ALLOWED_LABELS"] = ""
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		assert.Contains(t, bodies[0], `"test_run_id":"`+pushRefID+`"`,
+			"test_run_id must survive an empty K6_CLOUD_LOGS_ALLOWED_LABELS")
+	})
+
 	t.Run("does not register the pusher with --no-cloud-logs", func(t *testing.T) {
 		t.Parallel()
 

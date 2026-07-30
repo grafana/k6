@@ -242,11 +242,13 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 
 // allowedLabelsWithTestRunID ensures the required test_run_id label survives
 // the loki hook's label filtering, which drops any label not in the allow-list
-// when that list is non-empty. An empty list keeps all labels, so it is
-// returned unchanged.
+// when that list is non-empty. An empty list must normalise to nil: the loki
+// hook treats nil as "keep all labels", whereas a non-nil empty slice (which
+// an explicitly empty K6_CLOUD_LOGS_ALLOWED_LABELS decodes to) means "keep
+// none" and would strip test_run_id from the stream, getting the push 401'd.
 func allowedLabelsWithTestRunID(allowed []string) []string {
 	if len(allowed) == 0 {
-		return allowed
+		return nil
 	}
 	if slices.Contains(allowed, testRunIDLabel) {
 		return allowed
