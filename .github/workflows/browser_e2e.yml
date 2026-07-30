@@ -25,10 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-#        go: [stable, tip]
-        go: [stable]
+        go: [stable, tip]
         platform: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, macos-latest]
-#        platform: [ubuntu-latest]
         include:
           - platform: ubuntu-latest
             docker: true
