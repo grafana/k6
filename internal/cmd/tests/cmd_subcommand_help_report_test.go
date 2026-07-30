@@ -30,7 +30,7 @@ func TestHelpInvocationReportsUsage(t *testing.T) {
 		{
 			"module":  testSubModule,
 			"version": ext.Get(ext.SubcommandExtension)["testsub"].Version,
-			"kind":    "subcommand",
+			"type":    "subcommand",
 		},
 	}
 

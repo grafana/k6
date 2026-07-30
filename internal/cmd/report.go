@@ -17,11 +17,11 @@ import (
 )
 
 // extensionEntry identifies a used extension in the usage report by its Go
-// module path, along with its version and kind.
+// module path, along with its version and type.
 type extensionEntry struct {
 	Module  string `json:"module"`
 	Version string `json:"version"`
-	Kind    string `json:"kind"`
+	Type    string `json:"type"`
 }
 
 // newExtensionEntry builds the usage-report entry for a registered extension.
@@ -29,7 +29,7 @@ func newExtensionEntry(e *ext.Extension) extensionEntry {
 	return extensionEntry{
 		Module:  e.Path,
 		Version: e.Version,
-		Kind:    e.Type.String(),
+		Type:    e.Type.String(),
 	}
 }
 
@@ -109,7 +109,7 @@ func resolveExtensions(m map[string]any, catalog func() map[string]struct{}) {
 
 // filterExtensions turns the recorded used extensions into report entries,
 // keeping only those whose module path is advertised in the public catalog and
-// de-duplicating per (module, kind).
+// de-duplicating per (module, type).
 func filterExtensions(used []any, public map[string]struct{}) []extensionEntry {
 	seen := make(map[[2]string]struct{}, len(used))
 	entries := make([]extensionEntry, 0, len(used))
