@@ -14,6 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/v2/internal/lib/testutils"
 )
 
 func TestSyslogFromConfigLine(t *testing.T) {
@@ -286,5 +288,70 @@ func TestLokiHeaders(t *testing.T) {
 		require.Equal(t, []string{"hello world"}, headers["Test"])
 	default:
 		t.Fatal("No logs were received from loki before hook has finished")
+	}
+}
+
+// TestNewLokiHookClampsNonPositiveOptions verifies that non-positive Limit,
+// PushPeriod and MsgMaxSize fall back to the built-in defaults (with a warning)
+// instead of panicking. These values can only arrive programmatically — e.g.
+// via K6_CLOUD_LOGS_* or a backend logs config — which bypass the config-line
+// validation that otherwise rejects them.
+func TestNewLokiHookClampsNonPositiveOptions(t *testing.T) {
+	t.Parallel()
+
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+
+	receivedData := make(chan string, 1)
+	srv := httptest.NewServer(
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+			b, err := io.ReadAll(req.Body)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			select {
+			case receivedData <- string(b):
+			default:
+			}
+		}),
+	)
+	defer srv.Close()
+
+	// Without the clamp these panic in Listen — make([]tmpMsg, limit) and
+	// time.NewTicker(pushPeriod) — and on push (msgMaxSize slicing).
+	h, err := NewLokiHook(logger, LokiHookOptions{
+		Addr:       srv.URL,
+		Limit:      -5,
+		PushPeriod: -1 * time.Second,
+		MsgMaxSize: -10,
+	})
+	require.NoError(t, err)
+
+	// Each bad value is warned about (and falls back to its default).
+	entries := hook.Drain()
+	assert.True(t, testutils.LogContains(entries, logrus.WarnLevel, "limit"),
+		"expected a warning about the negative limit")
+	assert.True(t, testutils.LogContains(entries, logrus.WarnLevel, "push period"),
+		"expected a warning about the negative push period")
+	assert.True(t, testutils.LogContains(entries, logrus.WarnLevel, "message size"),
+		"expected a warning about the negative message size")
+
+	// Listen must not panic, and the entry is pushed using the defaults.
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := new(sync.WaitGroup)
+	now := time.Now()
+	wg.Go(func() {
+		require.NoError(t, h.Fire(&logrus.Entry{Time: now, Level: logrus.InfoLevel, Message: "clamp message"}))
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	})
+	h.Listen(ctx)
+	wg.Wait()
+
+	select {
+	case data := <-receivedData:
+		require.Contains(t, data, "clamp message")
+	default:
+		t.Fatal("no logs received; hook did not push with clamped defaults")
 	}
 }

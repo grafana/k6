@@ -70,14 +70,29 @@ func NewLokiHook(fallbackLogger logrus.FieldLogger, opts LokiHookOptions) (Async
 	if opts.Addr != "" {
 		h.addr = opts.Addr
 	}
-	if opts.PushPeriod != 0 {
+	// Limit, PushPeriod and MsgMaxSize fall back to their defaults on a
+	// non-positive value. Negatives can only arrive programmatically
+	// (K6_CLOUD_LOGS_* / a backend logs config bypass the config-line
+	// validation) and would otherwise panic in Listen — make([]tmpMsg, limit)
+	// and time.NewTicker(pushPeriod) — or on push (msgMaxSize slicing); warn so
+	// a bad value is visible.
+	if opts.PushPeriod > 0 {
 		h.pushPeriod = opts.PushPeriod
+	} else if opts.PushPeriod < 0 && fallbackLogger != nil {
+		fallbackLogger.WithField("pushPeriod", opts.PushPeriod).
+			Warn("negative loki push period; using default")
 	}
-	if opts.Limit != 0 {
+	if opts.Limit > 0 {
 		h.limit = opts.Limit
+	} else if opts.Limit < 0 && fallbackLogger != nil {
+		fallbackLogger.WithField("limit", opts.Limit).
+			Warn("negative loki limit; using default")
 	}
-	if opts.MsgMaxSize != 0 {
+	if opts.MsgMaxSize > 0 {
 		h.msgMaxSize = opts.MsgMaxSize
+	} else if opts.MsgMaxSize < 0 && fallbackLogger != nil {
+		fallbackLogger.WithField("msgMaxSize", opts.MsgMaxSize).
+			Warn("negative loki message size; using default")
 	}
 	if opts.Level != "" {
 		levels, err := parseLevels(opts.Level)
