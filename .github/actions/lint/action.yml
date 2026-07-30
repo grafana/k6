@@ -4,10 +4,13 @@ description: Run golangci-lint with the k6 ruleset
 runs:
   using: composite
   steps:
+    - name: Resolve Go versions
+      id: go_versions
+      uses: ./.github/actions/go-versions
     - name: Install Go
-      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+      uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
       with:
-        go-version: 1.26.x
+        go-version: ${{ steps.go_versions.outputs.current }}
         check-latest: true
     - name: Get golangci-lint version and download rules
       shell: bash
@@ -27,7 +30,7 @@ runs:
         echo "GolangCIVersion=$(head -n 1 "${{ github.action_path }}/.golangci.yml" | tr -d '# ')" >> "${GITHUB_OUTPUT}"
       id: getenv
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
       with:
         version: ${{ steps.getenv.outputs.GolangCIVersion }}
         args: "--config=${{ github.action_path }}/.golangci.yml"

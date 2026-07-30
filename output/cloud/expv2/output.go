@@ -48,6 +48,9 @@ type Output struct {
 	requestMetadatasCollector insightsOutput.RequestMetadatasCollector
 	requestMetadatasFlusher   insightsOutput.RequestMetadatasFlusher
 
+	metricsHTTPClient metricsHTTPClient // optional override
+	metricsURL        string            // optional override
+
 	// wg tracks background goroutines
 	wg sync.WaitGroup
 
@@ -85,6 +88,19 @@ func (o *Output) SetTestRunID(id string) {
 	o.testRunID = id
 }
 
+// SetMetricsHTTPClient injects a metricsHTTPClient for metric pushes.
+// Used by the provisioning-mode flow to provide a Bearer-authenticated
+// HTTP layer.
+func (o *Output) SetMetricsHTTPClient(c metricsHTTPClient) {
+	o.metricsHTTPClient = c
+}
+
+// SetMetricsURL injects an explicit metrics push URL. Used by the
+// provisioning-mode flow where the URL comes from the API.
+func (o *Output) SetMetricsURL(url string) {
+	o.metricsURL = url
+}
+
 // SetTestRunStopCallback receives the function that
 // that stops the engine when it is called.
 // It should be called on critical errors.
@@ -106,7 +122,26 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.testRunID)
+	// The metrics client always pushes to an explicit URL. In provisioning
+	// mode both the HTTP client and URL are injected via the setters;
+	// otherwise we derive the legacy /v2/metrics/<testRunID> URL from the
+	// cloud client. The two must be set together — one without the other is
+	// a misconfiguration rather than a silent fallback.
+	switch {
+	case o.metricsHTTPClient != nil && o.metricsURL != "":
+		// Both injected (provisioning mode); use as-is.
+	case o.metricsHTTPClient == nil && o.metricsURL == "":
+		o.metricsURL, err = deriveMetricsURL(o.cloudClient.BaseURL(), o.testRunID)
+		if err != nil {
+			return fmt.Errorf("failed to derive the metrics push URL: %w", err)
+		}
+		o.metricsHTTPClient = o.cloudClient
+	default:
+		return errors.New("metrics push client misconfigured: " +
+			"metricsHTTPClient and metricsURL must be set together")
+	}
+
+	mc, err := newMetricsClientWithURL(o.metricsHTTPClient, o.metricsURL)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}

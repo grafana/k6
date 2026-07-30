@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -22,7 +22,7 @@ var _ MappedNullable = &AllowedLoadZoneToUpdateApiModel{}
 // AllowedLoadZoneToUpdateApiModel struct for AllowedLoadZoneToUpdateApiModel
 type AllowedLoadZoneToUpdateApiModel struct {
 	// ID of the load zone.
-	Id                   int32 `json:"id"`
+	Id                   int64 `json:"id"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -32,7 +32,7 @@ type _AllowedLoadZoneToUpdateApiModel AllowedLoadZoneToUpdateApiModel
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAllowedLoadZoneToUpdateApiModel(id int32) *AllowedLoadZoneToUpdateApiModel {
+func NewAllowedLoadZoneToUpdateApiModel(id int64) *AllowedLoadZoneToUpdateApiModel {
 	this := AllowedLoadZoneToUpdateApiModel{}
 	this.Id = id
 	return &this
@@ -47,9 +47,9 @@ func NewAllowedLoadZoneToUpdateApiModelWithDefaults() *AllowedLoadZoneToUpdateAp
 }
 
 // GetId returns the Id field value
-func (o *AllowedLoadZoneToUpdateApiModel) GetId() int32 {
+func (o *AllowedLoadZoneToUpdateApiModel) GetId() int64 {
 	if o == nil {
-		var ret int32
+		var ret int64
 		return ret
 	}
 
@@ -58,7 +58,7 @@ func (o *AllowedLoadZoneToUpdateApiModel) GetId() int32 {
 
 // GetIdOk returns a tuple with the Id field value
 // and a boolean to check if the value has been set.
-func (o *AllowedLoadZoneToUpdateApiModel) GetIdOk() (*int32, bool) {
+func (o *AllowedLoadZoneToUpdateApiModel) GetIdOk() (*int64, bool) {
 	if o == nil {
 		return nil, false
 	}
@@ -66,7 +66,7 @@ func (o *AllowedLoadZoneToUpdateApiModel) GetIdOk() (*int32, bool) {
 }
 
 // SetId sets field value
-func (o *AllowedLoadZoneToUpdateApiModel) SetId(v int32) {
+func (o *AllowedLoadZoneToUpdateApiModel) SetId(v int64) {
 	o.Id = v
 }
 
