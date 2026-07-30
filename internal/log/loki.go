@@ -274,39 +274,47 @@ func (h *lokiHook) Listen(ctx context.Context) {
 		}
 	}()
 
+	// appendEntry buffers one entry into msgs, or counts it as dropped once the
+	// per-push-period limit is reached. It mutates the count, dropped and msgs
+	// loop state, so it must run only on the main goroutine — never while the
+	// push goroutine is swapping msgs and resetting the counters.
+	appendEntry := func(entry *logrus.Entry) {
+		if count == h.limit {
+			dropped++
+
+			return
+		}
+
+		// Arguably we can directly generate the final marshalled version of the labels right here
+		// through sorting the entry.Data, removing additionalparams from it and then dumping it
+		// as the final marshal and appending level and h.labels after it.
+		// If we reuse some kind of big enough `[]byte` buffer we can also possibly skip on some
+		// of allocation. Combined with the cutoff part and directly pushing in the final data
+		// type this can be really a lot faster and to use a lot less memory
+		labels := make(map[string]string, len(entry.Data)+1)
+		for k, v := range entry.Data {
+			labels[k] = fmt.Sprint(v) // TODO optimize ?
+		}
+		for _, params := range h.labels {
+			labels[params[0]] = params[1]
+		}
+		labels["level"] = entry.Level.String()
+		msg := h.filterLabels(labels, entry.Message) // TODO we can do this while constructing
+		// have the cutoff here ?
+		// if we cutoff here we can cut somewhat on the backbuffers and optimize the inserting
+		// in/creating of the final Streams that we push
+		msgs[count] = tmpMsg{
+			labels: labels,
+			msg:    msg,
+			t:      entry.Time.UnixNano(),
+		}
+		count++
+	}
+
 	for {
 		select {
 		case entry := <-h.ch:
-			if count == h.limit {
-				dropped++
-
-				continue
-			}
-
-			// Arguably we can directly generate the final marshalled version of the labels right here
-			// through sorting the entry.Data, removing additionalparams from it and then dumping it
-			// as the final marshal and appending level and h.labels after it.
-			// If we reuse some kind of big enough `[]byte` buffer we can also possibly skip on some
-			// of allocation. Combined with the cutoff part and directly pushing in the final data
-			// type this can be really a lot faster and to use a lot less memory
-			labels := make(map[string]string, len(entry.Data)+1)
-			for k, v := range entry.Data {
-				labels[k] = fmt.Sprint(v) // TODO optimize ?
-			}
-			for _, params := range h.labels {
-				labels[params[0]] = params[1]
-			}
-			labels["level"] = entry.Level.String()
-			msg := h.filterLabels(labels, entry.Message) // TODO we can do this while constructing
-			// have the cutoff here ?
-			// if we cutoff here we can cut somewhat on the backbuffers and optimize the inserting
-			// in/creating of the final Streams that we push
-			msgs[count] = tmpMsg{
-				labels: labels,
-				msg:    msg,
-				t:      entry.Time.UnixNano(),
-			}
-			count++
+			appendEntry(entry)
 		case t := <-ticker.C:
 			ch := make(chan int64)
 			pushCh <- ch
