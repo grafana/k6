@@ -97,6 +97,9 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	}
 
 	if conf.PushRefID.Valid && conf.PushRefID.String != "" {
+		if err := applyExternalProvisioningCreds(gs, test, &conf); err != nil {
+			return err
+		}
 		test.preInitState.RuntimeOptions.Env[testRunIDKey] = conf.PushRefID.String
 		gs.Logger.Debug("using PushRefID, skipping CreateTestRun")
 		return nil
@@ -184,6 +187,42 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	}
 	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
 
+	return nil
+}
+
+// applyExternalProvisioningCreds handles the externally-provisioned
+// `--local-execution` flow, signalled by K6_CLOUD_PUSH_REF_ID: an external
+// service created and started the run and hands its scoped push credentials
+// to this local k6 via env. It reads K6_CLOUD_METRICS_PUSH_URL and
+// K6_CLOUD_TEST_RUN_TOKEN explicitly here — they are deliberately NOT
+// env-bound on cloudapi.Config, so a stray env var can never override the
+// values the self-provision flow obtains from the provisioning response.
+// It requires both-or-neither and, when both are present, sets them on conf
+// (so downstream consumers such as the log pusher see them) and bakes them
+// into the serialized cloud config that the Output reads.
+func applyExternalProvisioningCreds(
+	gs *state.GlobalState, test *loadedAndConfiguredTest, conf *cloudapi.Config,
+) error {
+	pushURL := gs.Env["K6_CLOUD_METRICS_PUSH_URL"]
+	token := gs.Env["K6_CLOUD_TEST_RUN_TOKEN"]
+	if (pushURL == "") != (token == "") {
+		return errors.New("both K6_CLOUD_METRICS_PUSH_URL and " +
+			"K6_CLOUD_TEST_RUN_TOKEN must be set together")
+	}
+	if pushURL == "" {
+		return nil
+	}
+
+	conf.MetricsPushURL = null.StringFrom(pushURL)
+	conf.TestRunToken = null.StringFrom(token)
+	raw, err := cloudConfToRawMessage(*conf)
+	if err != nil {
+		return fmt.Errorf("could not serialize cloud configuration: %w", err)
+	}
+	if test.derivedConfig.Collectors == nil {
+		test.derivedConfig.Collectors = make(map[string]json.RawMessage)
+	}
+	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
 	return nil
 }
 
