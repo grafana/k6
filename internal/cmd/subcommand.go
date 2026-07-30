@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"cmp"
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -83,6 +83,27 @@ Run "k6 x explore" to see the full list of official and community-provided subco
 	return cmd
 }
 
+// reportSubcommandUsage reports usage for a subcommand extension after it runs.
+// It is called with the command cobra actually executed, whether that command
+// succeeded or failed, so a subcommand that exits non-zero is still counted. It
+// reports only for a name backed by a registered subcommand extension, so the
+// catch-all `x` help, `k6 run`, completions, and provisioning stubs are ignored.
+func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
+	if executed == nil {
+		return
+	}
+	extension, ok := ext.Get(ext.SubcommandExtension)[executed.Name()]
+	if !ok {
+		return
+	}
+	if conf, err := readEnvConfig(gs.Env); err != nil || conf.NoUsageReport.Bool {
+		return
+	}
+	reportUsage(gs.Ctx, gs, func(ctx context.Context) map[string]any {
+		return createSubcommandReport(ctx, gs, extension)
+	})
+}
+
 // registryStubs returns cobra stubs for registry-advertised subcommands not
 // already provided by baked-in extensions. The stubs only exist so `k6 x`
 // help can advertise the wider catalog; invoking one drops into the regular
@@ -107,7 +128,7 @@ func registryStubs(gs *state.GlobalState, baked []*cobra.Command) []*cobra.Comma
 		gs.Logger.WithError(err).Debug("k6 extension catalog")
 	}
 	if subs == nil && first == 0 { // first == 0: not TAB completion, network allowed
-		url := cmp.Or(gs.Env[state.ProvisionCatalogURL], defaultCatalogURL())
+		url := catalogURL(gs)
 		_, _ = fmt.Fprint(gs.Stderr, "Loading the subcommand list...")
 		tail := "\n\n"
 		if gs.Stderr.IsTTY {
