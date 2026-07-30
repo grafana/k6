@@ -50,8 +50,7 @@ func FetchK6Token(ctx context.Context, apiBase, accessToken string) (string, err
 		return "", fmt.Errorf("could not read the response from %s: %w", apiBase, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("%s returned status %d: %s",
-			requestURL, resp.StatusCode, stripControlChars(string(raw)))
+		return "", accountError(requestURL, resp.StatusCode, raw)
 	}
 
 	var account struct {
@@ -63,7 +62,31 @@ func FetchK6Token(ctx context.Context, apiBase, accessToken string) (string, err
 		return "", fmt.Errorf("could not parse the account response from %s: %w", apiBase, err)
 	}
 	if account.Token.Key == "" {
-		return "", fmt.Errorf("%s returned no k6 API token", requestURL)
+		return "", fmt.Errorf(
+			"%s returned no k6 API token; open the k6 app on your stack once to have one created",
+			requestURL)
 	}
 	return account.Token.Key, nil
+}
+
+// accountError explains a failed account read. The two most likely causes — the
+// app not being installed, and the user lacking permission to mint CLI tokens —
+// are indistinguishable from the status code alone, so the server's own message
+// is kept alongside the hint rather than replaced by it.
+func accountError(requestURL string, status int, body []byte) error {
+	detail := strings.TrimSpace(stripControlChars(string(body)))
+	if detail == "" {
+		detail = "no details given"
+	}
+
+	var hint string
+	switch status {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		hint = "; the login may lack permission to read k6 tokens" +
+			" — check that your Grafana user has the gcx User role"
+	case http.StatusNotFound:
+		hint = "; the k6 app may not be installed on this stack"
+	}
+
+	return fmt.Errorf("%s returned status %d%s: %s", requestURL, status, hint, detail)
 }

@@ -52,6 +52,30 @@ func TestFetchK6TokenErrors(t *testing.T) {
 			},
 			wantErr: "status 401",
 		},
+		"unauthorized names the permission": {
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusUnauthorized)
+			},
+			wantErr: "gcx User role",
+		},
+		"forbidden names the permission": {
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+			},
+			wantErr: "gcx User role",
+		},
+		"not found blames the missing app": {
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNotFound)
+			},
+			wantErr: "k6 app may not be installed",
+		},
+		"empty body still reports the status": {
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+			},
+			wantErr: "no details given",
+		},
 		"no token in response": {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				writeJSON(t, w, map[string]any{"token": map[string]string{"key": ""}})

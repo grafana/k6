@@ -49,7 +49,13 @@ func loginWithOAuth(gs *state.GlobalState, stackInput string) (string, string, e
 	result, err := flow.Run(ctx)
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
-		return "", "", fmt.Errorf("timed out after %s waiting for the browser login to complete", oauthLoginTimeout)
+		// Nothing reaches k6 when the login page itself fails to load, so the
+		// timeout is the only place the likely causes can be surfaced.
+		return "", "", fmt.Errorf(
+			"timed out after %s waiting for the browser login; if the browser showed an error instead of a"+
+				" login page, check that the Grafana Assistant app is installed on %s and that your user has"+
+				" the gcx User role",
+			oauthLoginTimeout, stack)
 	case err != nil:
 		return "", "", fmt.Errorf("browser login failed: %w", err)
 	}
