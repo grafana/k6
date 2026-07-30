@@ -2,22 +2,20 @@ package browser
 
 import (
 	"context"
-	"errors"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 )
 
 // errInitContext is returned when a browser module API is used in the init
-// context (module top-level / setup), where there is no VU iteration to operate
-// in and VU.State() is nil. Surfacing it as a normal error/rejection keeps an
-// init-context call from nil-dereferencing VU.State(): for promise-wrapped APIs
-// that dereference would happen inside the promise() goroutine, an unrecovered
-// panic that crashes the whole k6 process.
+// context, where there is no VU iteration to operate in and VU.State() is nil.
+// Reporting it as a plain error keeps such a call from nil-dereferencing
+// VU.State() and taking k6 down with it.
 // See https://github.com/grafana/k6/issues/6178.
-var errInitContext = errors.New(
+var errInitContext = k6common.NewInitContextError(
 	"the browser module can only be used in the iteration context " +
 		"(e.g. the default function), not in the init context",
 )
@@ -41,9 +39,9 @@ type moduleVU struct {
 
 // browser returns the VU browser instance for the current iteration.
 func (vu moduleVU) browser() (*common.Browser, error) {
-	// Guard the init context (State is nil), so sync browser APIs
-	// (e.g. isConnected, userAgent, version) fail with a clear error instead of
-	// nil-dereferencing VU.State(). See errInitContext / #6178.
+	// There's no iteration to resolve a browser for in the init context, where
+	// State is nil. This is the shared path behind the synchronous browser APIs
+	// (isConnected, userAgent, version). See errInitContext.
 	if vu.State() == nil {
 		return nil, errInitContext
 	}

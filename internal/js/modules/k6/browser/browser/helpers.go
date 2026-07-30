@@ -90,10 +90,10 @@ func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) 
 //   - Otherwise, rejects the promise with the error fn returns.
 func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 	p, resolve, reject := promises.New(vu)
-	// Browser APIs require a VU iteration to run in. In the init context
-	// VU.State() is nil; reject here (on the JS thread) rather than letting fn
-	// nil-dereference State inside the goroutine below, which would be an
-	// unrecovered panic that crashes the whole k6 process. See #6178.
+	// Reject here, on the event loop, when called in the init context: fn and
+	// the browser APIs it drives expect a VU iteration, and their nil
+	// VU.State() dereference would happen in the goroutine below, where nothing
+	// recovers it, so it would crash the whole k6 process. See errInitContext.
 	if vu.State() == nil {
 		reject(k6ext.BrowserError(errInitContext))
 		return p
