@@ -115,13 +115,12 @@ func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byt
 // backend status becomes "initializing" (signalling that k6 can begin
 // local execution). Returns an error if the test run reaches "aborted"
 // or "completed" first. Cancellable via context. Logs status transitions
-// at Info level once per change.
+// at Debug level once per change.
 //
 // If pollInterval is <= 0 the defaultWaitPollInterval is used.
 func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int64, pollInterval time.Duration) error {
 	if pollInterval <= 0 {
 		pollInterval = defaultWaitPollInterval
-		c.logger.WithField("interval", pollInterval).Info("using default poll interval")
 	}
 
 	var lastStatus string
@@ -157,7 +156,7 @@ func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int64, pollI
 		default:
 			// created, queued, or any unrecognised state — keep polling.
 			if status != lastStatus {
-				c.logger.WithField("status", progress.FormatStatus()).Info("test status")
+				c.logger.WithField("status", progress.FormatStatus()).Debug("test status")
 				lastStatus = status
 			}
 		}
