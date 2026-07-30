@@ -55,7 +55,9 @@ func addEnvironmentInfo(m map[string]any, lookupEnv func(string) (string, bool))
 // scheduler and recorded usage, keeping only the used extensions advertised in
 // the public catalog. It is the run report k6 has always sent, with the
 // extensions field added.
-func createReport(u *usage.Usage, execScheduler *execution.Scheduler, catalog map[string]struct{}) map[string]any {
+func createReport(
+	u *usage.Usage, execScheduler *execution.Scheduler, catalog func() map[string]struct{},
+) map[string]any {
 	execState := execScheduler.GetState()
 	m := u.Map()
 
@@ -83,23 +85,24 @@ func createSubcommandReport(ctx context.Context, gs *state.GlobalState, extensio
 	m := make(map[string]any)
 	addEnvironmentInfo(m, envLookup(gs.Env))
 	m["extensions"] = []any{extension}
-	resolveExtensions(m, catalogModulePaths(ctx, gs))
+	resolveExtensions(m, func() map[string]struct{} { return catalogModulePaths(ctx, gs) })
 
 	return m
 }
 
 // resolveExtensions replaces the used extensions recorded under "extensions" in
 // usage with report entries, keeping only those advertised in the public
-// catalog. Fail closed: dropping the raw list first means an empty catalog
-// reports no extensions rather than leaking it, and the key stays omitted when
-// nothing survives instead of sending [].
-func resolveExtensions(m map[string]any, catalog map[string]struct{}) {
+// catalog. The catalog func runs only when extensions were recorded, so a run
+// that used none never fetches the catalog. Fail closed: dropping the raw list
+// first means an empty catalog reports no extensions rather than leaking it,
+// and the key stays omitted when nothing survives instead of sending [].
+func resolveExtensions(m map[string]any, catalog func() map[string]struct{}) {
 	used, ok := m["extensions"].([]any)
 	if !ok {
 		return
 	}
 	delete(m, "extensions")
-	if entries := filterExtensions(used, catalog); len(entries) > 0 {
+	if entries := filterExtensions(used, catalog()); len(entries) > 0 {
 		m["extensions"] = entries
 	}
 }

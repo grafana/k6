@@ -86,22 +86,72 @@ Run "k6 x explore" to see the full list of official and community-provided subco
 // reportSubcommandUsage reports usage for a subcommand extension after it runs.
 // It is called with the command cobra actually executed, whether that command
 // succeeded or failed, so a subcommand that exits non-zero is still counted. It
-// reports only for a name backed by a registered subcommand extension, so the
-// catch-all `x` help, `k6 run`, completions, and provisioning stubs are ignored.
+// reports only for a command backed by a registered subcommand extension, so
+// the catch-all `x` help, `k6 run`, builtins sharing an extension's name,
+// completions, and provisioning stubs are ignored. A nested invocation
+// (`k6 x <name> <child>`) counts toward the extension that owns the child.
+// Displaying an extension's help counts too, whether requested with the flag
+// (`k6 x <name> --help`) or the help command (`k6 help x <name>`).
 func reportSubcommandUsage(gs *state.GlobalState, executed *cobra.Command) {
-	if executed == nil {
-		return
-	}
-	extension, ok := ext.Get(ext.SubcommandExtension)[executed.Name()]
+	extension, ok := subcommandExtension(helpTarget(executed))
 	if !ok {
 		return
 	}
-	if conf, err := readEnvConfig(gs.Env); err != nil || conf.NoUsageReport.Bool {
+	// The opt-out honors both sources that reach this path, the config file
+	// and the env var, with the env winning like on the run path. An
+	// unreadable source fails closed by skipping the send.
+	fileConf, err := readDiskConfig(gs)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Skipping the usage report")
+		return
+	}
+	envConf, err := readEnvConfig(gs.Env)
+	if err != nil {
+		gs.Logger.WithError(err).Debug("Skipping the usage report")
+		return
+	}
+	if fileConf.Apply(envConf).NoUsageReport.Bool {
 		return
 	}
 	reportUsage(gs.Ctx, gs, func(ctx context.Context) map[string]any {
 		return createSubcommandReport(ctx, gs, extension)
 	})
+}
+
+// helpTarget resolves the root help command to the command whose help it
+// displayed, so `k6 help x <name>` counts toward the extension like
+// `k6 x <name> --help` does. Any other command passes through unchanged. The
+// lookup repeats the one cobra's help command ran on its positional args,
+// which its flag set still holds after execution.
+func helpTarget(executed *cobra.Command) *cobra.Command {
+	if executed == nil || executed.Name() != "help" ||
+		!executed.HasParent() || executed.Parent().HasParent() {
+		return executed
+	}
+	target, _, err := executed.Root().Find(executed.Flags().Args())
+	if err != nil {
+		return executed
+	}
+	return target
+}
+
+// subcommandExtension resolves the executed command to the registered
+// subcommand extension it belongs to: the direct child of the root-level `x`
+// command on the executed command's parent chain. Matching by position rather
+// than by the executed command's bare name keeps a builtin sharing an
+// extension's name unreported and lets a nested invocation count toward its
+// extension. cobra returns the deepest command it ran, so the walk climbs from
+// there.
+func subcommandExtension(executed *cobra.Command) (*ext.Extension, bool) {
+	for cmd := executed; cmd != nil && cmd.HasParent(); cmd = cmd.Parent() {
+		parent := cmd.Parent()
+		if parent.Name() != "x" || parent.Parent() == nil || parent.Parent().HasParent() {
+			continue
+		}
+		extension, ok := ext.Get(ext.SubcommandExtension)[cmd.Name()]
+		return extension, ok
+	}
+	return nil, false
 }
 
 // registryStubs returns cobra stubs for registry-advertised subcommands not

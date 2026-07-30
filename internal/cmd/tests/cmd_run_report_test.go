@@ -88,6 +88,7 @@ func TestRunReportsExtensions(t *testing.T) {
 		optOut              bool
 		wantExtensions      []map[string]any
 		wantNoExtensionsKey bool
+		wantNoCatalogFetch  bool
 		wantOutputs         []any
 	}{
 		{
@@ -95,10 +96,13 @@ func TestRunReportsExtensions(t *testing.T) {
 			script: `export default function() {};`,
 		},
 		{
+			// A run that used no extensions has nothing to filter, so the
+			// catalog must not be consulted at all.
 			name:                "compiled but unused extension omits the extensions key",
 			script:              `export default function() {};`,
 			catalog:             `{"k6/x/testimport": {"module":"` + testImportModule + `"}}`,
 			wantNoExtensionsKey: true,
+			wantNoCatalogFetch:  true,
 		},
 		{
 			name:    "used public import is reported",
@@ -267,6 +271,10 @@ func TestRunReportsExtensions(t *testing.T) {
 			}
 
 			require.True(t, reported.Load(), "expected the usage report to reach the configured endpoint")
+
+			if tc.wantNoCatalogFetch {
+				require.False(t, catalogHit.Load(), "expected no catalog fetch when the run used no extensions")
+			}
 
 			if tc.wantOutputs != nil {
 				raw, ok := gotBody.Load().([]byte)
