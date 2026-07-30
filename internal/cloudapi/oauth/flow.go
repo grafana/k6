@@ -103,9 +103,6 @@ type Flow struct {
 	// OpenInBrowser. A non-nil error only downgrades the UX: the URL is
 	// printed for the user to open manually.
 	OpenBrowser func(string) error
-
-	stateOnce  sync.Once
-	stateValue string
 }
 
 // Run opens the browser and blocks until the user completes the login, ctx is
@@ -130,15 +127,17 @@ func (f *Flow) Run(ctx context.Context) (*Result, error) {
 	}
 	// The server takes ownership of the listener and closes it on shutdown.
 
-	pkce, err := newPKCE()
+	sess, err := newSession()
 	if err != nil {
 		_ = listener.Close()
 		return nil, err
 	}
 
 	resultCh := make(chan *Result, 1)
-	errCh := make(chan error, 1)
-	server := f.serveCallback(ctx, listener, pkce, resultCh, errCh)
+	// Room for both senders — the callback handler and the serving goroutine —
+	// so neither can block forever on a full channel.
+	errCh := make(chan error, 2)
+	server := f.serveCallback(ctx, listener, sess, resultCh, errCh)
 	defer func() {
 		// A fresh context: ctx may already be cancelled, and the shutdown
 		// needs a deadline of its own.
@@ -147,17 +146,17 @@ func (f *Flow) Run(ctx context.Context) (*Result, error) {
 		_ = server.Shutdown(shutdownCtx) //nolint:contextcheck // see above
 	}()
 
-	authURL := f.authURL(port, pkce.challenge)
+	authURL := f.authURL(port, sess)
 
-	fmt.Fprintf(out, "Opening your browser to authenticate with Grafana Cloud.\n")
+	fmt.Fprintln(out, "Opening your browser to authenticate with Grafana Cloud.")
 	fmt.Fprintf(out, "If it doesn't open, visit:\n  %s\n\n", authURL)
-	fmt.Fprintf(out, "Verification code: %s\n", pkce.verificationCode())
-	fmt.Fprintf(out, "Check that it matches the code shown in the browser before approving.\n\n")
+	fmt.Fprintf(out, "Verification code: %s\n", sess.verificationCode())
+	fmt.Fprint(out, "Check that it matches the code shown in the browser before approving.\n\n")
 
 	if err := openBrowser(authURL); err != nil {
 		fmt.Fprintf(out, "(Could not open a browser automatically: %v)\n", err)
 	}
-	fmt.Fprintf(out, "Waiting for you to complete the login...\n")
+	fmt.Fprintln(out, "Waiting for you to complete the login...")
 
 	select {
 	case result := <-resultCh:
@@ -169,13 +168,13 @@ func (f *Flow) Run(ctx context.Context) (*Result, error) {
 	}
 }
 
-func (f *Flow) authURL(port int, codeChallenge string) string {
+func (f *Flow) authURL(port int, sess session) string {
 	base := strings.TrimSuffix(f.StackURL, "/")
 
 	q := url.Values{}
 	q.Set("callback_port", fmt.Sprint(port))
-	q.Set("state", f.state())
-	q.Set("code_challenge", codeChallenge)
+	q.Set("state", sess.state)
+	q.Set("code_challenge", sess.challenge)
 	q.Set("code_challenge_method", "S256")
 	if hostname, err := os.Hostname(); err == nil && hostname != "" {
 		q.Set("device_name", hostname)
@@ -189,19 +188,10 @@ func (f *Flow) authURL(port int, codeChallenge string) string {
 	return base + authPagePath + "?" + q.Encode()
 }
 
-// state is set once per Flow so that authURL and the callback handler agree on
-// it without threading it through every call.
-func (f *Flow) state() string {
-	f.stateOnce.Do(func() {
-		f.stateValue = randomHex()
-	})
-	return f.stateValue
-}
-
 // serveCallback starts a single-use callback server. Replayed callbacks get a
 // 410, so an authorization code cannot be redeemed twice.
 func (f *Flow) serveCallback(
-	ctx context.Context, listener net.Listener, pkce pkceParams,
+	ctx context.Context, listener net.Listener, sess session,
 	resultCh chan<- *Result, errCh chan<- error,
 ) *http.Server {
 	var once sync.Once
@@ -211,7 +201,7 @@ func (f *Flow) serveCallback(
 		handled := false
 		once.Do(func() {
 			handled = true
-			f.handleCallback(ctx, w, r, pkce, resultCh, errCh)
+			f.handleCallback(ctx, w, r, sess, resultCh, errCh)
 		})
 		if !handled {
 			http.Error(w, "This login has already been completed.", http.StatusGone)
@@ -231,7 +221,7 @@ func (f *Flow) serveCallback(
 }
 
 func (f *Flow) handleCallback(
-	ctx context.Context, w http.ResponseWriter, r *http.Request, pkce pkceParams,
+	ctx context.Context, w http.ResponseWriter, r *http.Request, sess session,
 	resultCh chan<- *Result, errCh chan<- error,
 ) {
 	fail := func(err error, userMessage string) {
@@ -241,7 +231,9 @@ func (f *Flow) handleCallback(
 
 	q := r.URL.Query()
 
-	if got := q.Get("state"); got != f.state() {
+	// An empty expected state cannot happen (newSession fails instead), but
+	// comparing it would make the check vacuous, so it is rejected explicitly.
+	if got := q.Get("state"); sess.state == "" || got != sess.state {
 		fail(errors.New("state mismatch: the login response did not come from the request k6 started"),
 			"Invalid state parameter.")
 		return
@@ -273,7 +265,7 @@ func (f *Flow) handleCallback(
 		}
 	}
 
-	exchanged, err := exchangeCode(ctx, proxyEndpoint, code, pkce.verifier)
+	exchanged, err := exchangeCode(ctx, proxyEndpoint, code, sess.verifier)
 	if err != nil {
 		fail(err, "Could not exchange the authorization code for a token.")
 		return
@@ -345,7 +337,11 @@ func trustedClient() *http.Client {
 	return &http.Client{
 		Timeout: 30 * time.Second,
 		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
-			if err := validateGrafanaURL(req.URL.Scheme + "://" + req.URL.Host); err != nil {
+			// Stricter than the endpoint check: a redirect target is entirely
+			// server-chosen, so the local-address exemption does not apply.
+			// Otherwise a redirect could hand the bearer token to any process
+			// listening on this machine.
+			if err := validateGrafanaHost(req.URL.Scheme + "://" + req.URL.Host); err != nil {
 				return fmt.Errorf("blocked a redirect to an untrusted URL: %w", err)
 			}
 			return nil
@@ -358,34 +354,61 @@ func grafanaHostSuffixes() []string {
 	return []string{".grafana.net", ".grafana-dev.net", ".grafana-ops.net"}
 }
 
-// validateGrafanaURL rejects any URL that is not an HTTPS Grafana Cloud host
-// (or a local address, for development). Everything the browser hands back is
+// validateGrafanaURL rejects any URL that is not an HTTPS Grafana Cloud host,
+// allowing local addresses so that the flow can be pointed at a development
+// server or a test double. Everything the browser hands back is
 // attacker-influenced, so it is all checked before k6 sends a token to it.
 func validateGrafanaURL(raw string) error {
-	if raw == "" {
-		return errors.New("URL is empty")
-	}
-	u, err := url.Parse(raw)
-	if err != nil {
-		return fmt.Errorf("malformed URL: %w", err)
-	}
-	if u.Host == "" {
-		return errors.New("URL has no host")
-	}
-
-	hostname := u.Hostname()
-	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
+	if isLocalURL(raw) {
 		return nil
+	}
+	return validateGrafanaHost(raw)
+}
+
+// validateGrafanaHost is validateGrafanaURL without the local-address
+// exemption, for URLs that no legitimate local setup would produce.
+func validateGrafanaHost(raw string) error {
+	u, err := parseNonEmptyURL(raw)
+	if err != nil {
+		return err
 	}
 	if u.Scheme != "https" {
 		return fmt.Errorf("URL must use HTTPS, got %q", u.Scheme)
 	}
+	hostname := u.Hostname()
 	for _, suffix := range grafanaHostSuffixes() {
 		if strings.HasSuffix(hostname, suffix) {
 			return nil
 		}
 	}
 	return fmt.Errorf("host %q is not a Grafana Cloud domain", hostname)
+}
+
+func isLocalURL(raw string) bool {
+	u, err := parseNonEmptyURL(raw)
+	if err != nil {
+		return false
+	}
+	switch u.Hostname() {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
+func parseNonEmptyURL(raw string) (*url.URL, error) {
+	if raw == "" {
+		return nil, errors.New("URL is empty")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("malformed URL: %w", err)
+	}
+	if u.Host == "" {
+		return nil, errors.New("URL has no host")
+	}
+	return u, nil
 }
 
 func listenOnCallbackPort(ctx context.Context) (net.Listener, int, error) {
@@ -400,46 +423,62 @@ func listenOnCallbackPort(ctx context.Context) (net.Listener, int, error) {
 		callbackPortFirst, callbackPortLast)
 }
 
-// pkceParams holds one login's PKCE secret and its public challenge.
-type pkceParams struct {
+// session holds the secrets for a single login: the CSRF state, and the PKCE
+// verifier with its public challenge.
+type session struct {
+	state     string
 	verifier  string
 	challenge string
 }
 
-func newPKCE() (pkceParams, error) {
+// newSession generates a login's secrets, and fails the login if it cannot.
+// Nothing here has a safe fallback: an empty state would make the CSRF check
+// vacuous, and a guessable verifier would defeat PKCE.
+func newSession() (session, error) {
+	state, err := randomBytes()
+	if err != nil {
+		return session{}, fmt.Errorf("could not generate a login state: %w", err)
+	}
+	verifier, err := randomBytes()
+	if err != nil {
+		return session{}, fmt.Errorf("could not generate a PKCE verifier: %w", err)
+	}
+
+	sess := session{
+		state:    hex.EncodeToString(state),
+		verifier: base64.RawURLEncoding.EncodeToString(verifier),
+	}
+	sess.challenge = sess.challengeFor()
+	return sess, nil
+}
+
+// challengeFor derives the public PKCE challenge from the verifier. Only the
+// challenge is sent to the browser; the verifier is held back until the
+// exchange, which is what stops an intercepted authorization code from being
+// redeemed by anyone else.
+func (s session) challengeFor() string {
+	sum := sha256.Sum256([]byte(s.verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func randomBytes() ([]byte, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		return pkceParams{}, fmt.Errorf("could not generate a PKCE verifier: %w", err)
+		return nil, err
 	}
-	verifier := base64.RawURLEncoding.EncodeToString(b)
-	sum := sha256.Sum256([]byte(verifier))
-	return pkceParams{
-		verifier:  verifier,
-		challenge: base64.RawURLEncoding.EncodeToString(sum[:]),
-	}, nil
+	return b, nil
 }
 
 // verificationCode is a short, human-comparable digest of the challenge. The
 // browser shows the same code, so the user can confirm they are approving the
 // login this terminal started and not one an attacker induced.
-func (p pkceParams) verificationCode() string {
-	raw, err := base64.RawURLEncoding.DecodeString(p.challenge)
+func (s session) verificationCode() string {
+	raw, err := base64.RawURLEncoding.DecodeString(s.challenge)
 	if err != nil || len(raw) < 4 {
-		return p.challenge
+		return s.challenge
 	}
 	h := hex.EncodeToString(raw[:4])
 	return h[:4] + "-" + h[4:]
-}
-
-func randomHex() string {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		// crypto/rand does not fail in practice, and a login that cannot
-		// generate state must not fall back to a predictable value: the
-		// mismatch check will reject the callback.
-		return ""
-	}
-	return hex.EncodeToString(b)
 }
 
 // stripControlChars keeps server-supplied text from injecting control

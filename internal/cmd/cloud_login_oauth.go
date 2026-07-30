@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.k6.io/k6/v2/cmd/state"
@@ -37,7 +39,10 @@ func loginWithOAuth(gs *state.GlobalState, stackInput string) (string, string, e
 
 	flow := &oauth.Flow{StackURL: stack, Out: gs.Stdout}
 	result, err := flow.Run(ctx)
-	if err != nil {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return "", "", fmt.Errorf("timed out after %s waiting for the browser login to complete", oauthLoginTimeout)
+	case err != nil:
 		return "", "", fmt.Errorf("browser login failed: %w", err)
 	}
 
@@ -48,18 +53,16 @@ func loginWithOAuth(gs *state.GlobalState, stackInput string) (string, string, e
 	// The browser reports which stack it authenticated against. It should be
 	// the one k6 sent the user to, but the token belongs to whichever it names,
 	// so that one wins.
-	if result.StackURL != "" && result.StackURL != stack {
-		gs.Logger.Warnf("Logged in to %s rather than the requested %s", result.StackURL, stack)
-		stack = result.StackURL
+	if reported := normalizeStackURL(result.StackURL); result.StackURL != "" && !strings.EqualFold(reported, stack) {
+		gs.Logger.Warnf("Logged in to %s rather than the requested %s", reported, stack)
+		stack = reported
 	}
 
-	// The stack is tried as a fallback in case it serves the k6 app plugin's
-	// resource API to the access token directly, without the proxy.
-	token, host, err := oauth.FetchK6Token(ctx, []string{result.APIBase(), stack}, result.AccessToken)
+	token, err := oauth.FetchK6Token(ctx, result.APIBase(), result.AccessToken)
 	if err != nil {
 		return "", "", fmt.Errorf("could not read your k6 API token: %w", err)
 	}
-	gs.Logger.Debugf("Read the k6 API token via %s", host)
+	gs.Logger.Debugf("Read the k6 API token via %s", result.APIBase())
 
 	return token, stack, nil
 }

@@ -113,6 +113,10 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	case oauthInput.Bool:
 		gs := c.globalState
 
+		if tokenInput.Valid {
+			return errors.New("--token cannot be combined with --oauth, which obtains a token for you")
+		}
+
 		token, stack, err := loginWithOAuth(gs, stackInput.String)
 		if err != nil {
 			return err
