@@ -204,7 +204,7 @@ func (opts *LokiHookOptions) parseArgs(line string) error {
 //
 // TODO benchmark this
 //
-//nolint:funlen
+//nolint:funlen,gocognit
 func (h *lokiHook) Listen(ctx context.Context) {
 	var (
 		msgs       = make([]tmpMsg, h.limit)
@@ -311,6 +311,26 @@ func (h *lokiHook) Listen(ctx context.Context) {
 		count++
 	}
 
+	// drainQueued flushes entries still buffered in h.ch into msgs without
+	// blocking. Called on shutdown so the final push includes everything Fire
+	// already accepted; best-effort, it does not wait for entries still being
+	// Fired concurrently with the shutdown.
+	drainQueued := func() {
+		for {
+			select {
+			case entry, ok := <-h.ch:
+				if !ok {
+					// h.ch is never closed today; this guards a future close
+					// from spinning on nil receives.
+					return
+				}
+				appendEntry(entry)
+			default:
+				return
+			}
+		}
+	}
+
 	for {
 		select {
 		case entry := <-h.ch:
@@ -321,6 +341,8 @@ func (h *lokiHook) Listen(ctx context.Context) {
 			ch <- t.Add(-(h.pushPeriod / 2)).UnixNano()
 			<-ch
 		case <-ctx.Done():
+			drainQueued()
+
 			ch := make(chan int64)
 			pushCh <- ch
 			ch <- time.Now().Add(time.Second).UnixNano()
