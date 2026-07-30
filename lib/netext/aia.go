@@ -228,7 +228,9 @@ func loadCachedAIACert(rawURL string) (*x509.Certificate, bool) {
 		return nil, false
 	}
 	entry := raw.(*aiaCacheEntry) //nolint:forcetypeassert
-	if time.Since(entry.storedAt) > aiaCacheEntryTTL {
+	// Evict on TTL expiry or when the cert itself is past NotAfter — an expired
+	// intermediate won't validate anyway, and holding it would just waste retries.
+	if time.Since(entry.storedAt) > aiaCacheEntryTTL || time.Now().After(entry.cert.NotAfter) {
 		aiaIntermediateCache.Delete(rawURL)
 		return nil, false
 	}
