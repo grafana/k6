@@ -136,7 +136,7 @@ func TestNestedSubcommandReportsUsage(t *testing.T) {
 		{
 			"module":  testNestModule,
 			"version": ext.Get(ext.SubcommandExtension)["testnest"].Version,
-			"kind":    "subcommand",
+			"type":    "subcommand",
 		},
 	}
 

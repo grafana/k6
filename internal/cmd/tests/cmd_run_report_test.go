@@ -112,7 +112,7 @@ func TestRunReportsExtensions(t *testing.T) {
 				{
 					"module":  testImportModule,
 					"version": ext.Get(ext.JSExtension)["k6/x/testimport"].Version,
-					"kind":    "js",
+					"type":    "js",
 				},
 			},
 		},
@@ -125,7 +125,7 @@ func TestRunReportsExtensions(t *testing.T) {
 				{
 					"module":  testImportModule,
 					"version": ext.Get(ext.JSExtension)["k6/x/testimport"].Version,
-					"kind":    "js",
+					"type":    "js",
 				},
 			},
 		},
@@ -137,12 +137,12 @@ func TestRunReportsExtensions(t *testing.T) {
 				{
 					"module":  testImportModule,
 					"version": ext.Get(ext.JSExtension)["k6/x/testimport"].Version,
-					"kind":    "js",
+					"type":    "js",
 				},
 				{
 					"module":  testImportModule2,
 					"version": ext.Get(ext.JSExtension)["k6/x/testimport2"].Version,
-					"kind":    "js",
+					"type":    "js",
 				},
 			},
 		},
@@ -155,7 +155,7 @@ func TestRunReportsExtensions(t *testing.T) {
 				{
 					"module":  ext.Get(ext.OutputExtension)["testoutput"].Path,
 					"version": ext.Get(ext.OutputExtension)["testoutput"].Version,
-					"kind":    "output",
+					"type":    "output",
 				},
 			},
 		},
@@ -186,7 +186,7 @@ func TestRunReportsExtensions(t *testing.T) {
 				{
 					"module":  testImportModule2,
 					"version": ext.Get(ext.JSExtension)["k6/x/testimport2"].Version,
-					"kind":    "js",
+					"type":    "js",
 				},
 			},
 		},
@@ -286,7 +286,7 @@ func TestRunReportsExtensions(t *testing.T) {
 				require.NoError(t, json.Unmarshal(raw, &report))
 				require.Equal(t, tc.wantOutputs, report.Outputs, "expected the built-in output to stay listed under outputs")
 				for _, e := range report.Extensions {
-					require.NotEqual(t, "output", e["kind"], "expected no output-kind extension entry for a built-in output")
+					require.NotEqual(t, "output", e["type"], "expected no output-type extension entry for a built-in output")
 				}
 			}
 
