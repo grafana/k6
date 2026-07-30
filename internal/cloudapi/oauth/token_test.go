@@ -1,7 +1,6 @@
 package oauth
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -33,7 +32,7 @@ func TestFetchK6Token(t *testing.T) {
 		writeJSON(t, w, map[string]any{"token": map[string]string{"key": "k6-api-token"}})
 	})
 
-	token, err := FetchK6Token(context.Background(), server.URL+proxyAPIPath, "gat_test")
+	token, err := FetchK6Token(t.Context(), server.URL+proxyAPIPath, "gat_test")
 	require.NoError(t, err)
 	assert.Equal(t, "k6-api-token", token)
 	assert.Equal(t, "Bearer gat_test", *gotAuth)
@@ -72,7 +71,7 @@ func TestFetchK6TokenErrors(t *testing.T) {
 			t.Parallel()
 
 			server, _ := newFakeK6Plugin(t, tc.handler)
-			_, err := FetchK6Token(context.Background(), server.URL+proxyAPIPath, "gat_test")
+			_, err := FetchK6Token(t.Context(), server.URL+proxyAPIPath, "gat_test")
 			require.ErrorContains(t, err, tc.wantErr)
 		})
 	}
@@ -83,7 +82,7 @@ func TestFetchK6TokenRefusesUntrustedHost(t *testing.T) {
 
 	// The access token must never be sent to a host outside Grafana Cloud, even
 	// though the endpoint it came from was supplied by the browser.
-	_, err := FetchK6Token(context.Background(), "https://evil.example.com", "gat_test")
+	_, err := FetchK6Token(t.Context(), "https://evil.example.com", "gat_test")
 	require.ErrorContains(t, err, "not a Grafana Cloud domain")
 }
 
@@ -94,7 +93,7 @@ func TestFetchK6TokenErrorOmitsTheAccessToken(t *testing.T) {
 		w.WriteHeader(http.StatusForbidden)
 	})
 
-	_, err := FetchK6Token(context.Background(), server.URL+proxyAPIPath, "gat_secret_value")
+	_, err := FetchK6Token(t.Context(), server.URL+proxyAPIPath, "gat_secret_value")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "gat_secret_value", "errors are logged, so must not carry the token")
 }

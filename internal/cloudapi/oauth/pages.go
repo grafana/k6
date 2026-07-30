@@ -5,9 +5,10 @@ import (
 	"net/http"
 )
 
-// The browser tab is left on one of these pages once the callback is handled,
-// so the outcome is visible where the user's attention already is.
-var callbackPage = template.Must(template.New("callback").Parse(`<!DOCTYPE html>
+// callbackPageHTML is the page the browser tab is left on once the callback is
+// handled, so the outcome is visible where the user's attention already is.
+// Rendered through html/template, which escapes the server-supplied error.
+const callbackPageHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -37,21 +38,26 @@ var callbackPage = template.Must(template.New("callback").Parse(`<!DOCTYPE html>
 </main>
 </body>
 </html>
-`))
+`
 
 func writeSuccessPage(w http.ResponseWriter) {
-	renderCallbackPage(w, http.StatusOK, "")
+	writePage(w, http.StatusOK, "")
 }
 
 func writeErrorPage(w http.ResponseWriter, message string) {
-	renderCallbackPage(w, http.StatusBadRequest, stripControlChars(message))
+	writePage(w, http.StatusBadRequest, stripControlChars(message))
 }
 
-func renderCallbackPage(w http.ResponseWriter, status int, errMessage string) {
+// writePage renders the callback page. The template is parsed per call rather
+// than once at package level: it is a compile-time constant parsed in
+// microseconds, and this runs at most once per login.
+func writePage(w http.ResponseWriter, status int, errMessage string) {
+	tmpl := template.Must(template.New("callback").Parse(callbackPageHTML))
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
-	// The error is escaped by html/template. A render failure has no useful
-	// recovery: the flow's outcome is already decided and reported on the
-	// channels, and only this cosmetic page is lost.
-	_ = callbackPage.Execute(w, struct{ Error string }{Error: errMessage})
+	// A failed render or write has no useful recovery: the login's outcome is
+	// already decided and reported on the flow's channels, and only this
+	// cosmetic page is lost.
+	_ = tmpl.Execute(w, struct{ Error string }{Error: errMessage})
 }

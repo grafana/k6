@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.k6.io/k6/v2/cmd/state"
+	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/cloudapi/oauth"
 )
 
@@ -37,7 +38,14 @@ func loginWithOAuth(gs *state.GlobalState, stackInput string) (string, string, e
 	ctx, cancel := context.WithTimeout(gs.Ctx, oauthLoginTimeout)
 	defer cancel()
 
-	flow := &oauth.Flow{StackURL: stack, Out: gs.Stdout}
+	flow := &oauth.Flow{
+		StackURL: stack,
+		Out:      gs.Stdout,
+		// Labels the token in the user's Grafana device list. The machine's
+		// hostname would be more useful, but k6 forbids the os package outside
+		// its own wrappers, and it has none for this.
+		DeviceName: "k6/" + build.Version,
+	}
 	result, err := flow.Run(ctx)
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):

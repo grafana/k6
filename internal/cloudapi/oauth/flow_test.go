@@ -41,7 +41,9 @@ func newFakeGrafana(t *testing.T) *fakeGrafana {
 			Code         string `json:"code"`
 			CodeVerifier string `json:"code_verifier"`
 		}
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		// assert, not require: this runs on the server's goroutine, where
+		// FailNow is not allowed.
+		assert.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		f.seenVerifier = body.CodeVerifier
 
 		if f.exchange != nil {
@@ -61,11 +63,16 @@ func newFakeGrafana(t *testing.T) *fakeGrafana {
 
 // visit plays the part of the browser: it reads the parameters off the auth URL
 // and redirects to k6's callback, as the login page does once the user approves.
+//
+// It runs on its own goroutine, so it asserts rather than requiring: FailNow
+// may only be called from the test goroutine.
 func (f *fakeGrafana) visit(t *testing.T, authURL string) {
 	t.Helper()
 
 	u, err := url.Parse(authURL)
-	require.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return
+	}
 	q := u.Query()
 	f.seenChallenge = q.Get("code_challenge")
 	f.seenState = q.Get("state")
@@ -81,15 +88,18 @@ func (f *fakeGrafana) visit(t *testing.T, authURL string) {
 
 	callbackURL := "http://127.0.0.1:" + q.Get("callback_port") + "/callback?" + callback.Encode()
 	resp, err := http.Get(callbackURL) //nolint:noctx // short-lived test request
-	require.NoError(t, err)
+	if !assert.NoError(t, err) {
+		return
+	}
 	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, resp.Body)
 }
 
+// writeJSON is called from server handlers, so it asserts rather than requiring.
 func writeJSON(t *testing.T, w http.ResponseWriter, body any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
-	require.NoError(t, json.NewEncoder(w).Encode(body))
+	assert.NoError(t, json.NewEncoder(w).Encode(body))
 }
 
 // runFlow drives a Flow against fake, returning what Run returned.
@@ -99,13 +109,13 @@ func runFlow(t *testing.T, fake *fakeGrafana, mutate func(*Flow)) (*Result, erro
 	flow := &Flow{
 		StackURL:    fake.server.URL,
 		Out:         io.Discard,
-		OpenBrowser: func(authURL string) error { go fake.visit(t, authURL); return nil },
+		OpenBrowser: func(_ context.Context, authURL string) error { go fake.visit(t, authURL); return nil },
 	}
 	if mutate != nil {
 		mutate(flow)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	return flow.Run(ctx)
 }
@@ -162,7 +172,7 @@ func TestCallbackRejectsEmptyExpectedState(t *testing.T) {
 	recorder := httptest.NewRecorder()
 
 	flow.handleCallback(
-		context.Background(),
+		t.Context(),
 		recorder,
 		httptest.NewRequest(http.MethodGet, "/callback?code=auth-code", nil),
 		session{}, // no state, as a failed generation would leave it
@@ -262,10 +272,10 @@ func TestFlowRunHonoursCancellation(t *testing.T) {
 	flow := &Flow{
 		StackURL:    fake.server.URL,
 		Out:         io.Discard,
-		OpenBrowser: func(string) error { return nil }, // the user never completes the login
+		OpenBrowser: func(context.Context, string) error { return nil }, // never completed by the user
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := flow.Run(ctx)
@@ -295,7 +305,7 @@ func TestCallbackIsSingleUse(t *testing.T) {
 	flow := &Flow{
 		StackURL: fake.server.URL,
 		Out:      io.Discard,
-		OpenBrowser: func(authURL string) error {
+		OpenBrowser: func(_ context.Context, authURL string) error {
 			u, err := url.Parse(authURL)
 			require.NoError(t, err)
 			q := u.Query()
@@ -315,7 +325,7 @@ func TestCallbackIsSingleUse(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	_, err := flow.Run(ctx)
 	require.NoError(t, err)

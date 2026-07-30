@@ -27,7 +27,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -61,8 +60,9 @@ func DefaultScopes() []string {
 // Result is the outcome of a successful login.
 type Result struct {
 	// AccessToken is the Grafana access token (gat_*). Short-lived, and only
-	// used to read the k6 personal API token.
-	AccessToken string
+	// used to read the k6 personal API token. Never serialized: k6 persists the
+	// k6 API token, not this one.
+	AccessToken string `json:"-"`
 
 	// Email identifies the authenticated user, for display.
 	Email string
@@ -96,13 +96,18 @@ type Flow struct {
 	// Scopes to request. Defaults to DefaultScopes().
 	Scopes []string
 
-	// Out receives the user-facing progress messages. Defaults to os.Stderr.
+	// DeviceName labels the token in the user's Grafana device list, so they
+	// can tell later which login created it. Omitted when empty.
+	DeviceName string
+
+	// Out receives the user-facing progress messages, including the URL to open
+	// if the browser does not. Messages are dropped when nil.
 	Out io.Writer
 
 	// OpenBrowser launches a URL in the user's browser. Defaults to
 	// OpenInBrowser. A non-nil error only downgrades the UX: the URL is
 	// printed for the user to open manually.
-	OpenBrowser func(string) error
+	OpenBrowser func(context.Context, string) error
 }
 
 // Run opens the browser and blocks until the user completes the login, ctx is
@@ -114,7 +119,7 @@ func (f *Flow) Run(ctx context.Context) (*Result, error) {
 
 	out := f.Out
 	if out == nil {
-		out = os.Stderr
+		out = io.Discard
 	}
 	openBrowser := f.OpenBrowser
 	if openBrowser == nil {
@@ -138,25 +143,21 @@ func (f *Flow) Run(ctx context.Context) (*Result, error) {
 	// so neither can block forever on a full channel.
 	errCh := make(chan error, 2)
 	server := f.serveCallback(ctx, listener, sess, resultCh, errCh)
-	defer func() {
-		// A fresh context: ctx may already be cancelled, and the shutdown
-		// needs a deadline of its own.
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = server.Shutdown(shutdownCtx) //nolint:contextcheck // see above
-	}()
+	defer shutdown(ctx, server)
 
 	authURL := f.authURL(port, sess)
 
-	fmt.Fprintln(out, "Opening your browser to authenticate with Grafana Cloud.")
-	fmt.Fprintf(out, "If it doesn't open, visit:\n  %s\n\n", authURL)
-	fmt.Fprintf(out, "Verification code: %s\n", sess.verificationCode())
-	fmt.Fprint(out, "Check that it matches the code shown in the browser before approving.\n\n")
+	// Progress messages are advisory. A terminal that cannot be written to is
+	// not a reason to fail a login, so the write errors are dropped.
+	_, _ = fmt.Fprintln(out, "Opening your browser to authenticate with Grafana Cloud.")
+	_, _ = fmt.Fprintf(out, "If it doesn't open, visit:\n  %s\n\n", authURL)
+	_, _ = fmt.Fprintf(out, "Verification code: %s\n", sess.verificationCode())
+	_, _ = fmt.Fprint(out, "Check that it matches the code shown in the browser before approving.\n\n")
 
-	if err := openBrowser(authURL); err != nil {
-		fmt.Fprintf(out, "(Could not open a browser automatically: %v)\n", err)
+	if err := openBrowser(ctx, authURL); err != nil {
+		_, _ = fmt.Fprintf(out, "(Could not open a browser automatically: %v)\n", err)
 	}
-	fmt.Fprintln(out, "Waiting for you to complete the login...")
+	_, _ = fmt.Fprintln(out, "Waiting for you to complete the login...")
 
 	select {
 	case result := <-resultCh:
@@ -176,8 +177,8 @@ func (f *Flow) authURL(port int, sess session) string {
 	q.Set("state", sess.state)
 	q.Set("code_challenge", sess.challenge)
 	q.Set("code_challenge_method", "S256")
-	if hostname, err := os.Hostname(); err == nil && hostname != "" {
-		q.Set("device_name", hostname)
+	if f.DeviceName != "" {
+		q.Set("device_name", f.DeviceName)
 	}
 	scopes := f.Scopes
 	if len(scopes) == 0 {
@@ -186,6 +187,17 @@ func (f *Flow) authURL(port int, sess session) string {
 	q.Set("scopes", strings.Join(scopes, ","))
 
 	return base + authPagePath + "?" + q.Encode()
+}
+
+// shutdown stops the callback server and releases its port.
+//
+// The login's context is usually already cancelled by the time this runs — a
+// timeout is one of the ways a login ends — so cancellation is stripped from it
+// and the shutdown gets a deadline of its own.
+func shutdown(ctx context.Context, server *http.Server) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_ = server.Shutdown(ctx)
 }
 
 // serveCallback starts a single-use callback server. Replayed callbacks get a
@@ -304,7 +316,10 @@ func exchangeCode(ctx context.Context, endpoint, code, verifier string) (*exchan
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := trustedClient().Do(req)
+	// The endpoint comes from the browser, so it is tainted — but the caller has
+	// already run it through validateGrafanaURL, and trustedClient re-checks
+	// every redirect target, so the request cannot leave Grafana Cloud.
+	resp, err := trustedClient().Do(req) //nolint:gosec // G704: endpoint is allowlisted above
 	if err != nil {
 		return nil, fmt.Errorf("token exchange request failed: %w", err)
 	}

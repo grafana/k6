@@ -36,7 +36,10 @@ func FetchK6Token(ctx context.Context, apiBase, accessToken string) (string, err
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := trustedClient().Do(req)
+	// apiBase derives from the browser's login response, so it is tainted — but
+	// validateGrafanaURL above has confined it to Grafana Cloud, and
+	// trustedClient re-checks every redirect target.
+	resp, err := trustedClient().Do(req) //nolint:gosec // G704: apiBase is allowlisted above
 	if err != nil {
 		return "", fmt.Errorf("could not reach %s: %w", apiBase, err)
 	}
