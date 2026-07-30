@@ -335,7 +335,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 
 	returnedVUs := make(chan struct{})
 	waitOnProgressChannel := make(chan struct{})
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel, regCancel := getDurationContexts(parentCtx, duration, gracefulStop)
 
 	vusPool := newActiveVUPool(varr.executionState)
 
@@ -346,6 +346,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		// first close the vusPool so we wait for the gracefulShutdown
 		vusPool.Close()
 		cancel()
+		regCancel()
 		activeVUsWg.Wait()
 		<-waitOnProgressChannel
 	}()
