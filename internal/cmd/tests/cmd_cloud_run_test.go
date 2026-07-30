@@ -772,6 +772,29 @@ export default function() { console.log('hello from the vu'); };`
 		assert.Empty(t, bodies, "no cloud log push should happen when the run errors out")
 	})
 
+	// A logs push URL in the externally-provisioned flow is useless without the
+	// scoped token; it must error rather than silently stream nothing.
+	t.Run("errors when a logs push URL is set without a token", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = "99999"
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = "http://logs.invalid/push"
+		// No K6_CLOUD_TEST_RUN_TOKEN (nor the K6_CLOUD_METRICS_PUSH_URL it
+		// pairs with), so there is no token to authenticate the logs push.
+		ts.ExpectedExitCode = -1
+
+		srv := getTestServer(t, map[string]http.Handler{})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		out := ts.Stdout.String() + ts.Stderr.String()
+		assert.Contains(t, out, "K6_CLOUD_LOGS_PUSH_URL requires K6_CLOUD_TEST_RUN_TOKEN")
+	})
+
 	// A5/A6 (log): the legacy `k6 run --out=cloud` path must not register a
 	// cloud log pusher at all (log streaming is a --local-execution feature).
 	t.Run("does not register the pusher for k6 run --out=cloud", func(t *testing.T) {

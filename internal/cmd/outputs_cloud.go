@@ -217,6 +217,11 @@ func applyExternalProvisioningCreds(
 		return errors.New("both K6_CLOUD_METRICS_PUSH_URL and " +
 			"K6_CLOUD_TEST_RUN_TOKEN must be set together")
 	}
+	// A logs push URL is authenticated with the same scoped token, so reject a
+	// logs URL supplied without it rather than silently streaming nothing.
+	if token == "" && conf.LogsPushURL.Valid && conf.LogsPushURL.String != "" {
+		return errors.New("K6_CLOUD_LOGS_PUSH_URL requires K6_CLOUD_TEST_RUN_TOKEN")
+	}
 	if pushURL == "" {
 		return nil
 	}
