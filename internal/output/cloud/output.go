@@ -223,11 +223,22 @@ func (out *Output) Start() error {
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
 
-		// Provisioning-mode setup. PushRefID flows don't set
-		// MetricsPushURL, so this block is normally skipped for them.
-		// The explicit !PushRefID.Valid guard is defensive against a
-		// future cmd-layer regression that populates both fields.
-		if out.config.MetricsPushURL.Valid && out.config.TestRunToken.Valid && !out.config.PushRefID.Valid {
+		// Exactly one of the scoped push creds set is a misconfiguration.
+		// The cmd layer already validates this for the externally-provisioned
+		// env case (internal/cmd/outputs_cloud.go); this is the defensive
+		// backstop for any other source (e.g. a hand-written cloud config).
+		if out.config.MetricsPushURL.Valid != out.config.TestRunToken.Valid {
+			return fmt.Errorf(
+				"both K6_CLOUD_METRICS_PUSH_URL and K6_CLOUD_TEST_RUN_TOKEN " +
+					"must be set together")
+		}
+
+		// Provisioning-mode push. Armed whenever the scoped push credentials
+		// are present: either k6 self-provisioned (no PushRefID) or an external
+		// service provisioned the run and its creds were injected into the
+		// cloud config by the cmd layer (PushRefID set; that service owns
+		// create/start/notify).
+		if out.config.MetricsPushURL.Valid && out.config.TestRunToken.Valid {
 			if err := out.lazyInitProvisioning(); err != nil {
 				return err
 			}
@@ -498,8 +509,12 @@ func (out *Output) lazyInitProvisioning() error {
 		)
 	}
 
-	// Lazy-construct the provisioning notifier (used at end-of-test).
-	if out.provisioningNotifier == nil {
+	// Lazy-construct the provisioning notifier (end-of-test notify).
+	// Skipped when PushRefID is set: an external service owns the run
+	// lifecycle, so k6 never notifies (testFinished returns early on
+	// PushRefID) and the notifier would be unused. Invariant: a nil
+	// notifier with provisioningMode true implies PushRefID is set.
+	if out.provisioningNotifier == nil && !out.config.PushRefID.Valid {
 		// The stack ID is required and passed as int64; provisioning.NewClient
 		// enforces the int32 X-Stack-Id boundary internally.
 		c, err := provisioning.NewClient(
