@@ -80,7 +80,7 @@ jobs:
           set -x
           export K6_BROWSER_HEADLESS=true
           export K6_NO_USAGE_REPORT=true
-          export E2E_OUTPUT_PATH=${{ env.TEST_OUTPUT_DIR }}
+          export E2E_OUTPUT_PATH="${{ env.TEST_OUTPUT_DIR }}"
 
           for f in examples/browser/*.js; do
             if [ "$f" == "examples/browser/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
