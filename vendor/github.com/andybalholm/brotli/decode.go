@@ -2175,12 +2175,9 @@ func decoderDecompressStream(s *Reader, available_in *uint, next_in *[]byte, ava
 		case stateInitialize:
 			s.max_backward_distance = (1 << s.window_bits) - windowGap
 
-			/* Allocate memory for both block_type_trees and block_len_trees. */
-			s.block_type_trees = make([]huffmanCode, (3 * (huffmanMaxSize258 + huffmanMaxSize26)))
-
 			if s.block_type_trees == nil {
-				result = decoderErrorAllocBlockTypeTrees
-				break
+				/* Allocate memory for both block_type_trees and block_len_trees. */
+				s.block_type_trees = make([]huffmanCode, (3 * (huffmanMaxSize258 + huffmanMaxSize26)))
 			}
 
 			s.block_len_trees = s.block_type_trees[3*huffmanMaxSize258:]
@@ -2368,17 +2365,9 @@ func decoderDecompressStream(s *Reader, available_in *uint, next_in *[]byte, ava
 					break
 				}
 
-				if !decoderHuffmanTreeGroupInit(s, &s.literal_hgroup, numLiteralSymbols, numLiteralSymbols, s.num_literal_htrees) {
-					allocation_success = false
-				}
-
-				if !decoderHuffmanTreeGroupInit(s, &s.insert_copy_hgroup, numCommandSymbols, numCommandSymbols, s.num_block_types[1]) {
-					allocation_success = false
-				}
-
-				if !decoderHuffmanTreeGroupInit(s, &s.distance_hgroup, num_distance_codes, max_distance_symbol, s.num_dist_htrees) {
-					allocation_success = false
-				}
+				decoderHuffmanTreeGroupInit(&s.literal_hgroup, numLiteralSymbols, numLiteralSymbols, s.num_literal_htrees)
+				decoderHuffmanTreeGroupInit(&s.insert_copy_hgroup, numCommandSymbols, numCommandSymbols, s.num_block_types[1])
+				decoderHuffmanTreeGroupInit(&s.distance_hgroup, num_distance_codes, max_distance_symbol, s.num_dist_htrees)
 
 				if !allocation_success {
 					return saveErrorCode(s, decoderErrorAllocTreeGroups)

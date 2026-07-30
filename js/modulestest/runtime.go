@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/sobek"
+	sobekencoding "github.com/grafana/sobek-webapi-encoding"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/internal/js/compiler"
 	"go.k6.io/k6/v2/internal/js/eventloop"
@@ -59,6 +60,7 @@ func NewRuntime(t testing.TB) *Runtime {
 	}
 	require.NoError(t, timers.SetupGlobally(vu))
 	require.NoError(t, webcrypto.SetupGlobally(vu))
+	require.NoError(t, sobekencoding.RegisterGlobally(vu.RuntimeField))
 	// let's cancel again in case it has changed
 	t.Cleanup(func() { result.CancelContext() })
 	return result

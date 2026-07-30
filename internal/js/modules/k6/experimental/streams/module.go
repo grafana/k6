@@ -17,6 +17,11 @@ type (
 	// ModuleInstance is the module instance that will be created for each VU.
 	ModuleInstance struct {
 		vu modules.VU
+
+		exports modules.Exports
+
+		writableStreamPrototype              *sobek.Object
+		writableStreamDefaultWriterPrototype *sobek.Object
 	}
 )
 
@@ -33,18 +38,60 @@ func New() *RootModule {
 
 // NewModuleInstance creates a new instance of the module for a specific VU.
 func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &ModuleInstance{
-		vu: vu,
+	mi := &ModuleInstance{vu: vu}
+	rt := vu.Runtime()
+
+	// Convert the writable stream constructors once per VU. Besides keeping the exported
+	// constructor identities stable, this gives the implementation canonical prototypes that
+	// cannot be replaced by a caller-controlled `this` value.
+	writableStreamConstructor, err := newWebIDLConstructor(rt, "WritableStream", mi.NewWritableStream)
+	if err != nil {
+		throw(rt, err)
+	}
+	writableStreamDefaultWriterConstructor, err := newWebIDLConstructor(
+		rt,
+		"WritableStreamDefaultWriter",
+		mi.NewWritableStreamDefaultWriter,
+	)
+	if err != nil {
+		throw(rt, err)
+	}
+
+	mi.writableStreamPrototype = constructorPrototype(rt, writableStreamConstructor)
+	mi.writableStreamDefaultWriterPrototype = constructorPrototype(rt, writableStreamDefaultWriterConstructor)
+	if err := installWritableStreamPrototype(rt, mi.writableStreamPrototype); err != nil {
+		throw(rt, err)
+	}
+	if err := installWritableStreamDefaultWriterPrototype(rt, mi.writableStreamDefaultWriterPrototype); err != nil {
+		throw(rt, err)
+	}
+	mi.exports = modules.Exports{Named: map[string]any{
+		"ReadableStream":              mi.NewReadableStream,
+		"CountQueuingStrategy":        mi.NewCountQueuingStrategy,
+		"ReadableStreamDefaultReader": mi.NewReadableStreamDefaultReader,
+		"WritableStream":              writableStreamConstructor,
+		"WritableStreamDefaultWriter": writableStreamDefaultWriterConstructor,
+	}}
+
+	return mi
+}
+
+func constructorPrototype(rt *sobek.Runtime, constructor sobek.Value) *sobek.Object {
+	return constructor.ToObject(rt).Get("prototype").ToObject(rt)
+}
+
+func requireNewTarget(rt *sobek.Runtime, call sobek.ConstructorCall, name string) {
+	// Web IDL interface constructors must be invoked with `new`. Rejecting every ordinary
+	// function call also prevents a caller-controlled `this` value from being used as an
+	// instance prototype.
+	if call.NewTarget == nil {
+		throw(rt, newTypeError(rt, name+" constructor must be called with new"))
 	}
 }
 
 // Exports returns the module exports, that will be available in the runtime.
 func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{Named: map[string]any{
-		"ReadableStream":              mi.NewReadableStream,
-		"CountQueuingStrategy":        mi.NewCountQueuingStrategy,
-		"ReadableStreamDefaultReader": mi.NewReadableStreamDefaultReader,
-	}}
+	return mi.exports
 }
 
 // NewReadableStream is the constructor for the ReadableStream object.
@@ -134,6 +181,109 @@ func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 
 	return streamObj
 }
+
+// NewWritableStream is the constructor for the WritableStream object.
+func (mi *ModuleInstance) NewWritableStream(call sobek.ConstructorCall) *sobek.Object {
+	rt := mi.vu.Runtime()
+	requireNewTarget(rt, call, "WritableStream")
+
+	return newWritableStream(mi.vu, call, mi.writableStreamDefaultWriterPrototype)
+}
+
+func newWritableStream(
+	vu modules.VU,
+	call sobek.ConstructorCall,
+	writerPrototype *sobek.Object,
+) *sobek.Object {
+	rt := vu.Runtime()
+
+	var (
+		// 1. If underlyingSink is missing, set it to null.
+		underlyingSink *sobek.Object
+
+		err                error
+		strategy           *sobek.Object
+		underlyingSinkDict UnderlyingSink
+	)
+
+	// We look for the queuing strategy first, and validate it before the underlying sink,
+	// in order to match the specification's argument conversion order and pass the Web
+	// Platform Tests constructor tests.
+	strategy = initializeStrategy(rt, call)
+
+	// 2. Let underlyingSinkDict be underlyingSink, converted to an IDL value of type UnderlyingSink.
+	if len(call.Arguments) > 0 && !sobek.IsUndefined(call.Arguments[0]) {
+		// We first assert that it is an object (requirement).
+		if !isObject(call.Arguments[0]) {
+			throw(rt, newTypeError(rt, "underlyingSink must be an object"))
+		}
+
+		// Then we try to convert it to an UnderlyingSink.
+		underlyingSink = call.Arguments[0].ToObject(rt)
+		underlyingSinkDict, err = NewUnderlyingSinkFromObject(rt, underlyingSink)
+		if err != nil {
+			throw(rt, err)
+		}
+	}
+
+	// 3. If underlyingSinkDict["type"] exists, throw a RangeError exception.
+	if underlyingSinkDict.Type != nil && !sobek.IsUndefined(underlyingSinkDict.Type) {
+		throw(rt, newRangeError(rt, "'type' is not supported by WritableStream"))
+	}
+
+	// 4. Perform ! InitializeWritableStream(this).
+	stream := &WritableStream{
+		runtime:         rt,
+		vu:              vu,
+		writerPrototype: writerPrototype,
+	}
+	stream.initialize()
+
+	// 5. Let sizeAlgorithm be ! ExtractSizeAlgorithm(strategy).
+	sizeAlgorithm := extractSizeAlgorithm(rt, strategy)
+
+	// 6. Let highWaterMark be ? ExtractHighWaterMark(strategy, 1).
+	highWaterMark := extractHighWaterMark(rt, strategy, 1)
+
+	// 7. Perform ? SetUpWritableStreamDefaultControllerFromUnderlyingSink(...).
+	stream.setupWritableStreamDefaultControllerFromUnderlyingSink(
+		underlyingSink,
+		underlyingSinkDict,
+		highWaterMark,
+		sizeAlgorithm,
+	)
+
+	return stream.toObject(call.This.Prototype())
+}
+
+// NewWritableStreamDefaultWriter is the constructor for the [WritableStreamDefaultWriter] object.
+//
+// [WritableStreamDefaultWriter]: https://streams.spec.whatwg.org/#writablestreamdefaultwriter
+func (mi *ModuleInstance) NewWritableStreamDefaultWriter(call sobek.ConstructorCall) *sobek.Object {
+	rt := mi.vu.Runtime()
+	requireNewTarget(rt, call, "WritableStreamDefaultWriter")
+
+	if len(call.Arguments) != 1 {
+		throw(rt, newTypeError(rt, "WritableStreamDefaultWriter takes a single argument"))
+	}
+
+	stream := writableStreamFromValue(rt, call.Argument(0))
+	if stream == nil {
+		throw(rt, newTypeError(rt, "WritableStreamDefaultWriter argument must be a WritableStream"))
+	}
+
+	// 1. Perform ? SetUpWritableStreamDefaultWriter(this, stream).
+	writer := &WritableStreamDefaultWriter{}
+	writer.setup(stream)
+
+	object, err := NewWritableStreamDefaultWriterObject(writer, call.This.Prototype())
+	if err != nil {
+		throw(rt, err)
+	}
+
+	return object
+}
+
 func defaultSizeFunc(_ sobek.Value) (float64, error) { return 1.0, nil }
 
 func initializeStrategy(rt *sobek.Runtime, call sobek.ConstructorCall) *sobek.Object {

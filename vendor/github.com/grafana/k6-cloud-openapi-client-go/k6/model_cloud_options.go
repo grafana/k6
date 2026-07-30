@@ -3,7 +3,7 @@ Grafana Cloud k6
 
 HTTP API for interacting with Grafana Cloud k6.
 
-API version: 1.9.1
+API version: 1.12.0
 Contact: info@grafana.com
 */
 
@@ -21,7 +21,7 @@ var _ MappedNullable = &CloudOptions{}
 // CloudOptions struct for CloudOptions
 type CloudOptions struct {
 	// ID of a project where the test belongs.
-	ProjectID            *int32 `json:"projectID,omitempty"`
+	ProjectID            *int64 `json:"projectID,omitempty"`
 	AdditionalProperties map[string]interface{}
 }
 
@@ -45,9 +45,9 @@ func NewCloudOptionsWithDefaults() *CloudOptions {
 }
 
 // GetProjectID returns the ProjectID field value if set, zero value otherwise.
-func (o *CloudOptions) GetProjectID() int32 {
+func (o *CloudOptions) GetProjectID() int64 {
 	if o == nil || IsNil(o.ProjectID) {
-		var ret int32
+		var ret int64
 		return ret
 	}
 	return *o.ProjectID
@@ -55,7 +55,7 @@ func (o *CloudOptions) GetProjectID() int32 {
 
 // GetProjectIDOk returns a tuple with the ProjectID field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *CloudOptions) GetProjectIDOk() (*int32, bool) {
+func (o *CloudOptions) GetProjectIDOk() (*int64, bool) {
 	if o == nil || IsNil(o.ProjectID) {
 		return nil, false
 	}
@@ -71,8 +71,8 @@ func (o *CloudOptions) HasProjectID() bool {
 	return false
 }
 
-// SetProjectID gets a reference to the given int32 and assigns it to the ProjectID field.
-func (o *CloudOptions) SetProjectID(v int32) {
+// SetProjectID gets a reference to the given int64 and assigns it to the ProjectID field.
+func (o *CloudOptions) SetProjectID(v int64) {
 	o.ProjectID = &v
 }
 

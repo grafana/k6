@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	defaultLoadTestID int32 = 456
-	defaultTestRunID  int32 = 123
+	defaultLoadTestID int64 = 456
+	defaultTestRunID  int64 = 123
 )
 
 // Server is a test HTTP server for the v6 cloud API.
@@ -39,7 +39,7 @@ type Server struct {
 type Config struct {
 	// TestRunID is the id reported by the start-test response and used
 	// in the test-run routes. Defaults to [defaultTestRunID] when zero.
-	TestRunID int32
+	TestRunID int64
 
 	// ProgressCallback returns the [cloudapi.TestProgress] reported by
 	// each test fetch. When nil, a finished passing run is reported.
@@ -55,6 +55,9 @@ type Config struct {
 
 	// LoadTests is the load test list returned by the load-tests endpoint.
 	LoadTests []cloudapi.LoadTest
+
+	// LoadZones is the load zone list returned by the load-zones endpoint.
+	LoadZones []cloudapi.LoadZone
 }
 
 // NewServer creates a test server that serves v6 API endpoints.
@@ -70,6 +73,7 @@ func NewServer(t *testing.T, cfg Config) *Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /cloud/v6/projects", s.handleListProjects)
 	mux.HandleFunc("GET /cloud/v6/projects/{projectID}/load_tests", s.handleListLoadTests)
+	mux.HandleFunc("GET /cloud/v6/load_zones", s.handleListLoadZones)
 	mux.HandleFunc("POST /cloud/v6/validate_options", s.handleValidateOptions)
 	mux.HandleFunc("POST /cloud/v6/projects/{projectID}/load_tests", func(w http.ResponseWriter, r *http.Request) {
 		if s.cfg.InspectArchive != nil {
@@ -115,7 +119,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
-	projectID, err := strconv.ParseInt(r.PathValue("projectID"), 10, 32)
+	projectID, err := strconv.ParseInt(r.PathValue("projectID"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid project ID", http.StatusBadRequest)
 		return
@@ -123,19 +127,32 @@ func (s *Server) handleListLoadTests(w http.ResponseWriter, r *http.Request) {
 
 	tests := make([]k6cloud.LoadTestApiModel, 0, len(s.cfg.LoadTests))
 	for _, test := range s.cfg.LoadTests {
-		if test.ProjectID != int32(projectID) {
+		if test.ProjectID != projectID {
 			continue
 		}
 		tests = append(tests, *k6cloud.NewLoadTestApiModel(
 			test.ID,
 			test.ProjectID,
 			test.Name,
-			*k6cloud.NewNullableInt32(nil),
+			*k6cloud.NewNullableInt64(nil),
 			test.Created,
 			test.Updated,
 		))
 	}
 	res := k6cloud.NewLoadTestListResponse(tests)
+	writeJSON(w, http.StatusOK, res)
+}
+
+func (s *Server) handleListLoadZones(w http.ResponseWriter, _ *http.Request) {
+	zones := make([]k6cloud.LoadZoneApiModel, len(s.cfg.LoadZones))
+	for i, zone := range s.cfg.LoadZones {
+		m := k6cloud.NewLoadZoneApiModel(
+			zone.ID, zone.Name, zone.K6LoadZoneID,
+			zone.Available, *k6cloud.NewNullableString(nil), zone.Public,
+		)
+		zones[i] = *m
+	}
+	res := k6cloud.NewLoadZonesListApiModel(zones)
 	writeJSON(w, http.StatusOK, res)
 }
 
@@ -166,7 +183,7 @@ func (s *Server) handleStartTest(w http.ResponseWriter, _ *http.Request) {
 	res.SetTestRunDetailsPageUrl(fmt.Sprintf("https://stack.grafana.com/a/k6-app/runs/%d", s.cfg.TestRunID))
 	// SDK decoder requires these keys on the other end even when empty.
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
-	res.SetResultDetails(map[string]any{})
+	res.SetResultDetails(*k6cloud.NewResultDetailsApiModel(""))
 	res.SetOptions(map[string]any{})
 	writeJSON(w, http.StatusOK, res)
 }
@@ -190,7 +207,7 @@ func (s *Server) handleGetTestRun(w http.ResponseWriter, _ *http.Request) {
 	res.SetStatusHistory(cloudapi.ToStatusModel(tp.StatusHistory))
 	// SDK decoder requires these keys on the other end even when empty.
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
-	res.SetResultDetails(map[string]any{})
+	res.SetResultDetails(k6cloud.ResultDetailsApiModelAsTestRunApiModelResultDetails(k6cloud.NewResultDetailsApiModel("")))
 	res.SetOptions(map[string]any{})
 	writeJSON(w, http.StatusOK, res)
 }
