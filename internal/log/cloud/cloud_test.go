@@ -2,9 +2,11 @@ package cloudlog
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -135,6 +137,106 @@ func TestPusher_FireNeverBlocks(t *testing.T) {
 	}
 
 	assert.Equal(t, int64(overflow), p.dropped.Load())
+}
+
+// TestPusher_ReportsDroppedLogs proves the front-buffer drop counter is
+// surfaced rather than silently discarded, even when the loki hook's own
+// per-batch limit is already exhausted: the notice must bypass that limit. The
+// limit is set well below the number of forwarded entries so a naive push
+// (subject to the limit) would drop the notice itself.
+//
+// It also asserts push ordering: the notice shares the "warning" stream with
+// the loki hook's own limit-drop message, so across pushes that stream's
+// timestamps must be non-decreasing, otherwise Loki with unordered_writes=false
+// rejects the older write.
+func TestPusher_ReportsDroppedLogs(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu       sync.Mutex
+		requests []string // request bodies, in the order the server received them
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		b, _ := io.ReadAll(req.Body)
+		mu.Lock()
+		requests = append(requests, string(b))
+		mu.Unlock()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	const overflow = 7
+
+	p := New(testutils.NewLogger(t))
+	p.SetConfig(Config{
+		PushURL:   srv.URL,
+		Token:     "tok",
+		TestRunID: "run-dropped",
+		// Deliberately far below bufferCap: forwarding the buffered entries
+		// exhausts the loki per-batch limit, so the notice must bypass it.
+		Limit:      10,
+		PushPeriod: time.Hour, // only the shutdown push
+	})
+
+	// Overflow the buffer before Listen consumes anything, so exactly `overflow`
+	// entries are dropped by Fire.
+	for range bufferCap + overflow {
+		require.NoError(t, p.Fire(&logrus.Entry{Time: time.Now(), Level: logrus.InfoLevel, Message: "x"}))
+	}
+	require.Equal(t, int64(overflow), p.dropped.Load())
+
+	ctx := t.Context()
+	listenDone := make(chan struct{})
+	go func() {
+		p.Listen(ctx)
+		close(listenDone)
+	}()
+
+	require.NoError(t, p.Drain(context.Background()))
+	select {
+	case <-listenDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Listen did not return after Drain")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	assert.Contains(t, strings.Join(requests, ""),
+		"dropped 7 log messages because the cloud log buffer was full",
+		"the front-buffer drop count must survive the loki per-batch limit")
+
+	// Collect the "warning" stream timestamps in the order they were pushed and
+	// assert they never go backwards across requests.
+	type lokiPush struct {
+		Streams []struct {
+			Stream map[string]string `json:"stream"`
+			Values [][]string        `json:"values"`
+		} `json:"streams"`
+	}
+	var warnTS []int64
+	for _, body := range requests {
+		var lp lokiPush
+		require.NoError(t, json.Unmarshal([]byte(body), &lp))
+		for _, s := range lp.Streams {
+			if s.Stream["level"] != logrus.WarnLevel.String() {
+				continue
+			}
+			for _, v := range s.Values {
+				require.GreaterOrEqual(t, len(v), 1)
+				ts, err := strconv.ParseInt(v[0], 10, 64)
+				require.NoError(t, err)
+				warnTS = append(warnTS, ts)
+			}
+		}
+	}
+	require.GreaterOrEqual(t, len(warnTS), 2,
+		"expected both the loki limit-drop warning and the cloud-buffer notice")
+	for i := 1; i < len(warnTS); i++ {
+		assert.GreaterOrEqual(t, warnTS[i], warnTS[i-1],
+			"warning-stream timestamps must not go backwards across pushes "+
+				"(an out-of-order write is rejected by Loki with unordered_writes=false)")
+	}
 }
 
 // TestPusher_TestRunIDLabelKept locks the backend's hard requirement: even

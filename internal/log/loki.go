@@ -418,6 +418,28 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 	return pushMsg
 }
 
+// PushNotice synchronously pushes a single warning line to loki, exempt from
+// the per-batch limit the main push loop enforces. It surfaces out-of-band
+// drops (for example an upstream buffer overflow) that must not be lost to that
+// limit. The line carries the hook's configured labels, so it is not rejected
+// for a missing test_run_id.
+func (h *lokiHook) PushNotice(message string) error {
+	pushMsg := new(lokiPushMessage)
+	pushMsg.maxSize = h.msgMaxSize
+	pushMsg.add(tmpMsg{
+		labels: h.droppedLabels,
+		msg:    message,
+		t:      time.Now().UnixNano(),
+	})
+
+	var b bytes.Buffer
+	if _, err := pushMsg.WriteTo(&b); err != nil {
+		return err
+	}
+
+	return h.push(b)
+}
+
 func (h *lokiHook) push(b bytes.Buffer) error {
 	body := b.Bytes()
 
