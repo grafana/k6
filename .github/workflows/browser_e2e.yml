@@ -104,7 +104,7 @@ jobs:
               --pull never \
               --env K6_NO_USAGE_REPORT=true \
               --env E2E_OUTPUT_PATH=/output \
-              -v "$PWD:/tests" \
+              -v "$PWD:/tests:ro" \
               -v "${{ env.TEST_OUTPUT_DIR }}:/output" \
             k6-browser:test run -q "/tests/$f"
           done
