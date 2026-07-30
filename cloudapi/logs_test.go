@@ -214,6 +214,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 		wsurl := strings.TrimPrefix(tb.ServerHTTP.URL, "http://")
 		return Config{
 			LogsTailURL: null.NewString(fmt.Sprintf("ws://%s/api/v1/tail", wsurl), false),
+			Token:       null.NewString("fake-token", true),
 		}
 	}
 
@@ -236,7 +237,10 @@ func TestStreamLogsToLogger(t *testing.T) {
 		defer cancel()
 
 		tb := httpmultibin.NewHTTPMultiBin(t)
-		logtailHandleFunc(tb, func(conn *websocket.Conn, _ *http.Request) {
+		logtailHandleFunc(tb, func(conn *websocket.Conn, req *http.Request) {
+			assert.Equal(t, "token fake-token", req.Header.Get("Authorization"))
+			assert.Equal(t, "ref_id", req.Header.Get("X-K6testrun-Id"))
+
 			rawmsg := json.RawMessage(generateLogline("stream1", 1598282752000000000, "logline1"))
 			err := conn.WriteJSON(rawmsg)
 			require.NoError(t, err)
