@@ -432,13 +432,17 @@ func (m *provisioningNotifierMock) NotifyTestRunCompleted(_ context.Context, tes
 
 // logDrainerMock implements the output's logDrainer for tests. onDrain, when
 // set, runs inside Drain so a test can observe ordering relative to notify.
+// ctxErr records ctx.Err() at call time so a test can assert the drain wasn't
+// handed an already-expired context.
 type logDrainerMock struct {
 	called  atomic.Bool
+	ctxErr  error
 	onDrain func()
 }
 
-func (m *logDrainerMock) Drain(_ context.Context) error {
+func (m *logDrainerMock) Drain(ctx context.Context) error {
 	m.called.Store(true)
+	m.ctxErr = ctx.Err()
 	if m.onDrain != nil {
 		m.onDrain()
 	}
@@ -859,6 +863,40 @@ func TestOutputStopWithTestError_PushRefID_DrainsLogs(t *testing.T) {
 		assert.True(t, drainerMock.called.Load(), "Drain must run on the PushRefID path too")
 		assert.False(t, notifierMock.called.Load(), "PushRefID path must not notify")
 		assert.False(t, clientMock.testFinishedCalled, "PushRefID path must not call TestFinished")
+	})
+}
+
+// TestOutputStopWithTestError_ZeroTimeoutDrainsWithoutDeadline guards that
+// K6_CLOUD_TIMEOUT=0 ("no timeout", as the other cloud clients treat it) does
+// not hand the drain an already-expired context, which would skip the flush
+// and let notify race it.
+func TestOutputStopWithTestError_ZeroTimeoutDrainsWithoutDeadline(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+		drainerMock := &logDrainerMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NewNullDuration(0, true), // K6_CLOUD_TIMEOUT=0
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           drainerMock,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		assert.True(t, drainerMock.called.Load(), "Drain must be called")
+		assert.NoError(t, drainerMock.ctxErr,
+			"drain context must not be already expired when the timeout is 0 (no timeout)")
 	})
 }
 

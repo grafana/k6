@@ -354,13 +354,13 @@ func (out *Output) StopWithTestError(testErr error) error {
 
 	// Flush buffered cloud logs before notify: once the run is notified
 	// complete the backend rejects late log pushes, so the final batch would
-	// be lost. Best-effort and bounded by the configured request timeout.
+	// be lost. The push is already bounded by the loki hook's own HTTP client
+	// timeout, so the drain just waits for it on a fresh context — fresh
+	// because the run's context is already cancelled at shutdown.
 	if out.logDrainer != nil {
-		dctx, cancel := context.WithTimeout(context.Background(), out.config.Timeout.TimeDuration())
-		if err := out.logDrainer.Drain(dctx); err != nil {
+		if err := out.logDrainer.Drain(context.Background()); err != nil {
 			out.logger.WithError(err).Warn("could not drain cloud logs before notify")
 		}
-		cancel()
 	}
 
 	out.logger.Debug("Metric emission stopped, calling cloud API...")
