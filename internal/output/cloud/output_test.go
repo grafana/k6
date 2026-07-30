@@ -826,6 +826,42 @@ func TestOutputStopWithTestError_DrainsLogsBeforeNotify(t *testing.T) {
 	})
 }
 
+// TestOutputStopWithTestError_PushRefID_DrainsLogs guards that the cloud log
+// drain runs even on the externally-provisioned (PushRefID) path, where notify
+// is skipped. If a future change tied the drain to notify, this flow would
+// silently lose its final log batch and no other test would catch it.
+func TestOutputStopWithTestError_PushRefID_DrainsLogs(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+		drainerMock := &logDrainerMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				PushRefID:      null.StringFrom("99999"),
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NullDurationFrom(60 * time.Second),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           drainerMock,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		// Drain runs even though the PushRefID path skips notify/TestFinished.
+		assert.True(t, drainerMock.called.Load(), "Drain must run on the PushRefID path too")
+		assert.False(t, notifierMock.called.Load(), "PushRefID path must not notify")
+		assert.False(t, clientMock.testFinishedCalled, "PushRefID path must not call TestFinished")
+	})
+}
+
 // TestOutputStopWithTestError_NilLogDrainerStillNotifies covers the
 // --out cloud / --no-cloud-logs case: with no drainer set, Stop neither
 // panics nor skips notify.
