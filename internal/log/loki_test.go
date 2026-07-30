@@ -355,3 +355,21 @@ func TestNewLokiHookClampsNonPositiveOptions(t *testing.T) {
 		t.Fatal("no logs received; hook did not push with clamped defaults")
 	}
 }
+
+// TestLokiFromConfigLineEmptyAddr documents that `--log-output=loki=` (an empty
+// URL) is rejected up front by the config parser rather than silently falling
+// back to the default endpoint — so there is no empty-address case reaching the
+// constructor. Bare `loki` still uses the default. This is unchanged from
+// before the NewLokiHook extraction, since parseArgs still runs strvals.Parse
+// first.
+func TestLokiFromConfigLineEmptyAddr(t *testing.T) {
+	t.Parallel()
+
+	_, err := LokiFromConfigLine(nil, "loki=")
+	require.Error(t, err, "an empty loki address must be rejected, not defaulted")
+	assert.Contains(t, err.Error(), "no value")
+
+	bare, err := LokiFromConfigLine(nil, "loki")
+	require.NoError(t, err)
+	assert.NotEmpty(t, bare.(*lokiHook).addr, "bare loki uses the default endpoint")
+}
