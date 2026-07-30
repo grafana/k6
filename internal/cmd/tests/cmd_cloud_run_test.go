@@ -632,12 +632,14 @@ export default function() { console.log('hello from the vu'); };`
 		t.Parallel()
 
 		ts := makeTestState(t, script, []string{"--local-execution", "--no-cloud-logs"})
-		setupLocalExecutionProvMock(t, ts)
+		rec := setupLocalExecutionProvMock(t, ts)
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		assert.Nil(t, ts.CloudLogPusher,
 			"cloud log pusher should not be registered when --no-cloud-logs is set")
+		_, bodies := rec.snapshot()
+		assert.Empty(t, bodies, "no logs should be pushed when --no-cloud-logs is set")
 	})
 
 	t.Run("does not register the pusher for non-local-execution", func(t *testing.T) {
