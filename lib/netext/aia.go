@@ -178,8 +178,8 @@ func buildVerifyConnFn() func(tls.ConnectionState) error {
 	}
 }
 
-// The depth limit bounds HTTP fetches, not queue pops — chains where the server sends
-// many certs plus one AIA URL would otherwise exhaust the counter without ever fetching.
+// The depth limit bounds HTTP fetches, not queue pops — cached items keep flowing even
+// after we stop issuing new fetches.
 func fetchAIAIntermediates(
 	certs []*x509.Certificate, httpClient *http.Client, logger logrus.FieldLogger,
 ) []*x509.Certificate {
@@ -190,7 +190,7 @@ func fetchAIAIntermediates(
 	queue := make([]*x509.Certificate, 0, len(certs))
 	queue = append(queue, certs...)
 
-	for len(queue) > 0 && fetches < aiaMaxFetchDepth {
+	for len(queue) > 0 {
 		cert := queue[0]
 		queue = queue[1:]
 
@@ -203,7 +203,7 @@ func fetchAIAIntermediates(
 			issuer, ok := loadCachedAIACert(rawURL)
 			if !ok {
 				if fetches >= aiaMaxFetchDepth {
-					break
+					continue
 				}
 				fetches++
 				var err error
