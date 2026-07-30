@@ -869,6 +869,38 @@ export default function() {
 		assert.NotContains(t, all, "debug-line-must-be-filtered",
 			"debug-level lines must be filtered out by the configured level (info)")
 	})
+
+	// A logged secret must reach the cloud only in redacted form: the
+	// secrets-redaction hook runs before the pusher observes an entry
+	// (root.go), so the push never carries the raw value. Guards that
+	// property end to end.
+	t.Run("redacts secrets before pushing logs", func(t *testing.T) {
+		t.Parallel()
+
+		const secret = "super-secret-value"
+		secretScript := `
+import secrets from "k6/secrets";
+export const options = { cloud: { name: 'Test cloud logs', projectID: 123456 } };
+export default async function() {
+	const s = await secrets.get("mykey");
+	console.log("the secret is " + s);
+};`
+		ts := makeTestState(t, secretScript, []string{
+			"--local-execution", "--no-cloud-secrets",
+			"--secret-source=mock=mykey=" + secret,
+		})
+		rec := setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		all := strings.Join(bodies, "\n")
+		assert.Contains(t, all, "***SECRET_REDACTED***",
+			"the log line should reach the cloud only in redacted form")
+		assert.NotContains(t, all, secret,
+			"the raw secret must never reach the cloud log push")
+	})
 }
 
 // logsPushPath is the path the local-execution mocks use for the cloud
