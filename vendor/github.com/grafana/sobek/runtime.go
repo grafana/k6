@@ -193,9 +193,8 @@ type Runtime struct {
 
 	fieldNameMapper FieldNameMapper
 
-	vm    *vm
-	hash  *maphash.Hash
-	idSeq uint64
+	vm   *vm
+	hash *maphash.Hash
 
 	modules          map[ModuleRecord]ModuleInstance
 	moduleNamespaces map[ModuleRecord]*namespaceObject
@@ -2936,19 +2935,6 @@ func growCap(newSize, oldSize, oldCap int) int {
 			return cap
 		}
 	}
-}
-
-func (r *Runtime) genId() (ret uint64) {
-	if r.hash == nil {
-		h := r.getHash()
-		r.idSeq = h.Sum64()
-	}
-	if r.idSeq == 0 {
-		r.idSeq = 1
-	}
-	ret = r.idSeq
-	r.idSeq++
-	return
 }
 
 func (r *Runtime) setGlobal(name unistring.String, v Value, strict bool) {
