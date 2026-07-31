@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mstoykov/envconfig"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -17,6 +18,7 @@ import (
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
+	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
@@ -102,6 +104,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		}
 		test.preInitState.RuntimeOptions.Env[testRunIDKey] = conf.PushRefID.String
 		gs.Logger.Debug("using PushRefID, skipping CreateTestRun")
+		// Externally-provisioned run: the run id is the PushRefID.
+		configureCloudLogPusher(gs, conf, conf.PushRefID.String)
 		return nil
 	}
 
@@ -177,6 +181,10 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		})
 	}
 
+	// Configure the log pusher for the self-provisioned run. The run id is
+	// the provisioning result's TestRunID.
+	configureCloudLogPusher(gs, conf, strconv.FormatInt(result.TestRunID, 10))
+
 	// Serialise overridden Config back into the collectors map (existing pattern).
 	raw, err := cloudConfToRawMessage(conf)
 	if err != nil {
@@ -199,15 +207,28 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 // values the self-provision flow obtains from the provisioning response.
 // It requires both-or-neither and, when both are present, sets them on conf
 // (so downstream consumers such as the log pusher see them) and bakes them
-// into the serialized cloud config that the Output reads.
+// into the serialized cloud config that the Output reads. It also reads the
+// K6_CLOUD_LOGS_* log-push config, which the external flow supplies the same
+// way.
 func applyExternalProvisioningCreds(
 	gs *state.GlobalState, test *loadedAndConfiguredTest, conf *cloudapi.Config,
 ) error {
+	// The log-push config is env-supplied for an external run and likewise not
+	// env-bound on the Config, so read it explicitly here (before the checks
+	// below, which require the token when a logs URL is set).
+	if err := applyExternalLogsConfig(gs, conf); err != nil {
+		return err
+	}
 	pushURL := gs.Env["K6_CLOUD_METRICS_PUSH_URL"]
 	token := gs.Env["K6_CLOUD_TEST_RUN_TOKEN"]
 	if (pushURL == "") != (token == "") {
 		return errors.New("both K6_CLOUD_METRICS_PUSH_URL and " +
 			"K6_CLOUD_TEST_RUN_TOKEN must be set together")
+	}
+	// A logs push URL is authenticated with the same scoped token, so reject a
+	// logs URL supplied without it rather than silently streaming nothing.
+	if token == "" && conf.LogsPushURL.Valid && conf.LogsPushURL.String != "" {
+		return errors.New("K6_CLOUD_LOGS_PUSH_URL requires K6_CLOUD_TEST_RUN_TOKEN")
 	}
 	if pushURL == "" {
 		return nil
@@ -223,6 +244,41 @@ func applyExternalProvisioningCreds(
 		test.derivedConfig.Collectors = make(map[string]json.RawMessage)
 	}
 	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
+	return nil
+}
+
+// externalLogsConfig mirrors the K6_CLOUD_LOGS_* env vars an external
+// orchestrator uses to hand the log-push settings to a local k6. These are
+// read explicitly (the Logs* fields are not env-bound on cloudapi.Config) so a
+// stray env value can't override the run-scoped logs config in the
+// self-provisioned flow.
+type externalLogsConfig struct {
+	PushURL       null.String        `envconfig:"K6_CLOUD_LOGS_PUSH_URL"`
+	Level         null.String        `envconfig:"K6_CLOUD_LOGS_LEVEL"`
+	Limit         null.Int           `envconfig:"K6_CLOUD_LOGS_LIMIT"`
+	PushPeriod    types.NullDuration `envconfig:"K6_CLOUD_LOGS_PUSH_PERIOD"`
+	MsgMaxSize    null.Int           `envconfig:"K6_CLOUD_LOGS_MESSAGE_MAX_SIZE"`
+	AllowedLabels []string           `envconfig:"K6_CLOUD_LOGS_ALLOWED_LABELS"`
+}
+
+// applyExternalLogsConfig reads the K6_CLOUD_LOGS_* env vars into conf for the
+// externally-provisioned flow, where there is no provisioning response to
+// supply them. It uses the same envconfig parsing as GetConsolidatedConfig, so
+// malformed values fail the same way.
+func applyExternalLogsConfig(gs *state.GlobalState, conf *cloudapi.Config) error {
+	var elc externalLogsConfig
+	if err := envconfig.Process("", &elc, func(key string) (string, bool) {
+		v, ok := gs.Env[key]
+		return v, ok
+	}); err != nil {
+		return err
+	}
+	conf.LogsPushURL = elc.PushURL
+	conf.LogsLevel = elc.Level
+	conf.LogsLimit = elc.Limit
+	conf.LogsPushPeriod = elc.PushPeriod
+	conf.LogsMessageMaxSize = elc.MsgMaxSize
+	conf.LogsAllowedLabels = elc.AllowedLabels
 	return nil
 }
 
@@ -326,5 +382,62 @@ func buildConfigFromRuntimeConfig(
 	// expv2 has no min-samples aggregation knob; adding one would
 	// require changes to output/cloud/expv2/{collect.go, flush.go}.
 
+	// logs.push_url (string) → LogsPushURL
+	if v := rc.Logs.PushURL; v != "" {
+		cfg.LogsPushURL = null.StringFrom(v)
+	}
+	// logs.level (string) → LogsLevel
+	if v := rc.Logs.Level; v != "" {
+		cfg.LogsLevel = null.StringFrom(v)
+	}
+	// logs.limit (int32) → LogsLimit
+	if v := rc.Logs.Limit; v != 0 {
+		cfg.LogsLimit = null.IntFrom(int64(v))
+	}
+	// logs.push_period_seconds (string) → LogsPushPeriod (NullDuration)
+	if v := rc.Logs.PushPeriodSeconds; v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.LogsPushPeriod = types.NewNullDuration(d, true)
+		} else {
+			logger.WithError(err).WithField("field", "push_period_seconds").
+				Warn("invalid duration in runtime_config; using default")
+		}
+	}
+	// logs.message_max_size (int32) → LogsMessageMaxSize
+	if v := rc.Logs.MessageMaxSize; v != 0 {
+		cfg.LogsMessageMaxSize = null.IntFrom(int64(v))
+	}
+	// logs.allowed_labels ([]string) → LogsAllowedLabels
+	if v := rc.Logs.AllowedLabels; len(v) > 0 {
+		cfg.LogsAllowedLabels = v
+	}
+
 	return cfg
+}
+
+// configureCloudLogPusher points the registered cloud log pusher at the
+// run. It is a no-op unless the pusher was registered (i.e.
+// --local-execution without --no-cloud-logs).
+func configureCloudLogPusher(gs *state.GlobalState, conf cloudapi.Config, testRunID string) {
+	if gs.CloudLogPusher == nil {
+		return
+	}
+	gs.CloudLogPusher.SetConfig(logPusherConfig(conf, testRunID))
+}
+
+// logPusherConfig translates the resolved cloudapi.Config log-push fields
+// into the cloud log pusher's config. testRunID is the run identifier used
+// as the required test_run_id stream label: result.TestRunID in the
+// self-provisioned flow, PushRefID in the externally-provisioned flow.
+func logPusherConfig(conf cloudapi.Config, testRunID string) cloudlog.Config {
+	return cloudlog.Config{
+		PushURL:       conf.LogsPushURL.String,
+		Token:         conf.TestRunToken.String,
+		TestRunID:     testRunID,
+		Level:         conf.LogsLevel.String,
+		Limit:         int(conf.LogsLimit.Int64),
+		PushPeriod:    conf.LogsPushPeriod.TimeDuration(),
+		MsgMaxSize:    int(conf.LogsMessageMaxSize.Int64),
+		AllowedLabels: conf.LogsAllowedLabels,
+	}
 }
