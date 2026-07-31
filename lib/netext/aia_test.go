@@ -1,18 +1,21 @@
 package netext
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -79,11 +82,7 @@ func TestWrapTLSConfigForAIAFetching_HappyPath(t *testing.T) {
 
 	tlsSrv := leafOnlyTLSServer(t, chain)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.RootPool},
-		nullLogger(),
-		nil,
-	)
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	require.NoError(t, err, "AIA fetching should resolve the incomplete chain")
 	_ = resp.Body.Close()
@@ -104,11 +103,7 @@ func TestWrapTLSConfigForAIAFetching_CompleteChainPassesThrough(t *testing.T) {
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.RootPool},
-		nullLogger(),
-		nil,
-	)
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
 	resp, err := testHTTPClient(t, wrappedCfg).Get(srv.URL) //nolint:noctx
 	require.NoError(t, err, "complete chain should succeed without any AIA fetch")
 	_ = resp.Body.Close()
@@ -136,7 +131,7 @@ func TestWrapTLSConfigForAIAFetching_InsecureSkipVerifyUnchanged(t *testing.T) {
 	t.Parallel()
 
 	cfg := &tls.Config{InsecureSkipVerify: true}
-	result := WrapTLSConfigForAIAFetching(cfg, nullLogger(), nil)
+	result := NewAIAFetcher(nil).Wrap(cfg, nullLogger())
 	assert.Same(t, cfg, result, "wrapper must return the original config when InsecureSkipVerify is set")
 }
 
@@ -154,10 +149,9 @@ func TestWrapTLSConfigForAIAFetching_UnreachableAIAURL(t *testing.T) {
 	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	fastClient := &http.Client{Timeout: 500 * time.Millisecond}
-	wrappedCfg := WrapTLSConfigForAIAFetching(
+	wrappedCfg := (&AIAFetcher{httpClient: fastClient}).Wrap(
 		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
-		fastClient,
 	)
 
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
@@ -181,10 +175,9 @@ func TestWrapTLSConfigForAIAFetching_FetchTimeout(t *testing.T) {
 
 	const shortTimeout = 100 * time.Millisecond
 	fastClient := &http.Client{Timeout: shortTimeout}
-	wrappedCfg := WrapTLSConfigForAIAFetching(
+	wrappedCfg := (&AIAFetcher{httpClient: fastClient}).Wrap(
 		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
-		fastClient,
 	)
 
 	start := time.Now()
@@ -210,11 +203,7 @@ func TestWrapTLSConfigForAIAFetching_AIAReturnsHTTPError(t *testing.T) {
 	chain := buildChainWithAIA(t, errSrv.URL+"/ca.der")
 	tlsSrv := leafOnlyTLSServer(t, chain)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.RootPool},
-		nullLogger(),
-		nil,
-	)
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
 
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	closeBody(resp)
@@ -234,11 +223,7 @@ func TestWrapTLSConfigForAIAFetching_MalformedAIACert(t *testing.T) {
 	chain := buildChainWithAIA(t, garbageSrv.URL+"/ca.der")
 	tlsSrv := leafOnlyTLSServer(t, chain)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.RootPool},
-		nullLogger(),
-		nil,
-	)
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
 
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	closeBody(resp)
@@ -261,7 +246,7 @@ func TestFetchCertFromAIAURL_PKCS7ResponseLogsWarn(t *testing.T) {
 	logger, hook := logtest.NewNullLogger()
 	logger.SetLevel(logrus.WarnLevel)
 
-	cert, err := fetchCertFromAIAURL(srv.URL, aiaHTTPClient, logger)
+	cert, err := NewAIAFetcher(nil).fetchCertFromAIAURL(srv.URL, logger)
 	require.Error(t, err)
 	assert.Nil(t, cert)
 
@@ -301,12 +286,10 @@ func TestWrapTLSConfigForAIAFetching_CircularAIAReferences(t *testing.T) {
 
 	tlsSrv := leafOnlyTLSServer(t, chain)
 
-	// Fast client bounds the test duration if the seen-map protection were bypassed.
 	fastClient := &http.Client{Timeout: 2 * time.Second}
-	wrappedCfg := WrapTLSConfigForAIAFetching(
+	wrappedCfg := (&AIAFetcher{httpClient: fastClient}).Wrap(
 		&tls.Config{RootCAs: chain.RootPool},
 		nullLogger(),
-		fastClient,
 	)
 
 	start := time.Now()
@@ -319,6 +302,69 @@ func TestWrapTLSConfigForAIAFetching_CircularAIAReferences(t *testing.T) {
 	assert.Contains(t, err.Error(), "certificate signed by unknown authority")
 }
 
+// AIA fetches must go through the dialer passed to NewAIAFetcher — a dialer that always
+// errors makes the AIA fetch fail, leaving the chain incomplete.
+func TestAIAFetcher_UsesProvidedDialer(t *testing.T) {
+	t.Parallel()
+
+	h := &tlstest.AIAHandler{}
+	aiaSrv := startAIAServer(t, h)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER)
+
+	tlsSrv := leafOnlyTLSServer(t, chain)
+
+	var dialCount int
+	failingDial := func(_ context.Context, _, _ string) (net.Conn, error) {
+		dialCount++
+		return nil, errors.New("dial refused by test")
+	}
+
+	wrappedCfg := NewAIAFetcher(failingDial).Wrap(
+		&tls.Config{RootCAs: chain.RootPool},
+		nullLogger(),
+	)
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	closeBody(resp)
+	require.Error(t, err, "AIA fetch must use the provided dialer; when it fails, chain verification fails")
+	assert.Contains(t, err.Error(), "certificate signed by unknown authority")
+	assert.Positive(t, dialCount, "expected the provided dialer to be called for the AIA fetch")
+}
+
+// Two fetchers must not share cache or singleflight state — one Runner's AIA state
+// must not leak into another Runner running in the same process.
+func TestAIAFetcher_CacheIsolatedBetweenFetchers(t *testing.T) {
+	t.Parallel()
+
+	var aiaHits int32
+	handler := &tlstest.AIAHandler{}
+	aiaSrv := startAIAServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&aiaHits, 1)
+		handler.ServeHTTP(w, r)
+	}))
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
+	handler.SetCert(chain.IntermediateDER)
+
+	tlsSrv := leafOnlyTLSServer(t, chain)
+
+	fetcherA := NewAIAFetcher(nil)
+	fetcherB := NewAIAFetcher(nil)
+
+	// Fetcher A warms its cache.
+	respA, errA := testHTTPClient(t, fetcherA.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(tlsSrv.URL) //nolint:noctx
+	require.NoError(t, errA)
+	_ = respA.Body.Close()
+	hitsAfterA := atomic.LoadInt32(&aiaHits)
+	require.Equal(t, int32(1), hitsAfterA, "fetcher A should have fetched once")
+
+	// Fetcher B, independently, must hit the AIA server again — no shared cache.
+	respB, errB := testHTTPClient(t, fetcherB.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(tlsSrv.URL) //nolint:noctx
+	require.NoError(t, errB)
+	_ = respB.Body.Close()
+	hitsAfterB := atomic.LoadInt32(&aiaHits)
+	assert.Equal(t, int32(2), hitsAfterB, "fetcher B must fetch independently; caches are not shared across fetchers")
+}
+
 func TestWrapTLSConfigForAIAFetching_HostnameMismatchRejected(t *testing.T) {
 	t.Parallel()
 
@@ -329,13 +375,12 @@ func TestWrapTLSConfigForAIAFetching_HostnameMismatchRejected(t *testing.T) {
 
 	tlsSrv := leafOnlyTLSServer(t, chain)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
+	wrappedCfg := NewAIAFetcher(nil).Wrap(
 		&tls.Config{
 			RootCAs:    chain.RootPool,
 			ServerName: "wrong.example.com", // deliberately wrong
 		},
 		nullLogger(),
-		nil,
 	)
 
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
@@ -394,11 +439,7 @@ func BenchmarkTLSHandshake_AIANotNeeded(b *testing.B) {
 	srv.StartTLS()
 	b.Cleanup(srv.Close)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.RootPool},
-		nullLogger(),
-		nil,
-	)
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
 	client := newBenchClient(wrappedCfg)
 
 	b.ResetTimer()
@@ -419,11 +460,7 @@ func BenchmarkTLSHandshake_AIAWarmCache(b *testing.B) {
 
 	tlsSrv := leafOnlyTLSServer(b, chain)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.RootPool},
-		nullLogger(),
-		nil,
-	)
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
 
 	// Prime the cache with one request before timing starts.
 	primer := newBenchClient(wrappedCfg)
@@ -451,18 +488,14 @@ func BenchmarkTLSHandshake_AIAColdCache(b *testing.B) {
 
 	tlsSrv := leafOnlyTLSServer(b, chain)
 
-	wrappedCfg := WrapTLSConfigForAIAFetching(
-		&tls.Config{RootCAs: chain.RootPool},
-		nullLogger(),
-		nil,
-	)
+	fetcher := NewAIAFetcher(nil)
+	wrappedCfg := fetcher.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
 
 	client := newBenchClient(wrappedCfg)
 
 	b.ResetTimer()
 	for b.Loop() {
-		// Evict the cached intermediate so each iteration pays the full HTTP fetch cost.
-		aiaIntermediateCache.Delete(aiaURL)
+		fetcher.cache.Delete(aiaURL) // force a cold fetch on every iteration
 
 		resp, err := client.Get(tlsSrv.URL) //nolint:noctx
 		require.NoError(b, err)

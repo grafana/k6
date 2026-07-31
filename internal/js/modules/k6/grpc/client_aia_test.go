@@ -37,10 +37,10 @@ func TestBuildTLSConfig_AIAWithCustomCACerts(t *testing.T) {
 
 	// VU config has no RootCAs — the user relies on per-connect cacerts.
 	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12}
-	wrappedVU := netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
+	wrappedVU := netext.NewAIAFetcher(nil).Wrap(vuCfg, nullLogger())
 
 	rootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.RootDER})
-	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{rootPEM}, true, false, nullLogger())
+	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{rootPEM}, netext.NewAIAFetcher(nil), false, nullLogger())
 	require.NoError(t, err)
 
 	tlsCfg.ServerName = "localhost"
@@ -80,10 +80,14 @@ func TestBuildTLSConfig_InsecureSkipVerifyIsHonoured(t *testing.T) {
 			}
 			parent := vuCfg
 			if aiaEnabled {
-				parent = netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
+				parent = netext.NewAIAFetcher(nil).Wrap(vuCfg, nullLogger())
 			}
 
-			tlsCfg, err := buildTLSConfig(parent, nil, nil, [][]byte{otherRootPEM}, aiaEnabled, true, nullLogger())
+			var aiaFetcher *netext.AIAFetcher
+			if aiaEnabled {
+				aiaFetcher = netext.NewAIAFetcher(nil)
+			}
+			tlsCfg, err := buildTLSConfig(parent, nil, nil, [][]byte{otherRootPEM}, aiaFetcher, true, nullLogger())
 			require.NoError(t, err)
 			require.True(t, tlsCfg.InsecureSkipVerify, "user asked to skip verification; must be honoured")
 			tlsCfg.ServerName = "localhost"
@@ -121,9 +125,9 @@ func TestBuildTLSConfig_AIARejectsMismatchedCACert(t *testing.T) {
 	otherRootPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: otherChain.RootDER})
 
 	vuCfg := &tls.Config{MinVersion: tls.VersionTLS12}
-	wrappedVU := netext.WrapTLSConfigForAIAFetching(vuCfg, nullLogger(), nil)
+	wrappedVU := netext.NewAIAFetcher(nil).Wrap(vuCfg, nullLogger())
 
-	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{otherRootPEM}, true, false, nullLogger())
+	tlsCfg, err := buildTLSConfig(wrappedVU, nil, nil, [][]byte{otherRootPEM}, netext.NewAIAFetcher(nil), false, nullLogger())
 	require.NoError(t, err)
 	tlsCfg.ServerName = "localhost"
 
