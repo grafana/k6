@@ -7,7 +7,7 @@ export const options = {
       executor: 'shared-iterations',
       options: {
         browser: {
-            type: 'chromium',
+          type: 'chromium',
         },
       },
     },
@@ -24,8 +24,8 @@ export default async function() {
   try {
     await page.goto('https://quickpizza.grafana.com/test.k6.io/');
 
-	const outputPath = __ENV.E2E_OUTPUT_PATH || '.'
-  	await page.screenshot({ path: `${outputPath}/screenshot.png` });
+    const outputPath = __ENV.E2E_OUTPUT_PATH || '.';
+    await page.screenshot({ path: `${outputPath}/screenshot.png` });
     // TODO: Assert this somehow. Upload as CI artifact or just an external `ls`?
     // Maybe even do a fuzzy image comparison against a preset known good screenshot?
   } catch (error) {
