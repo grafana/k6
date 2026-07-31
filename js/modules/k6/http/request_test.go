@@ -1386,6 +1386,51 @@ func TestRequestArrayBufferBody(t *testing.T) {
 	}
 }
 
+func TestRequestObjectBodyNullValues(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	sr := tb.Replacer.Replace
+
+	testCases := []struct {
+		name, body, expected string
+	}{
+		{"Null", `{a: null}`, "a="},
+		{"Undefined", `{a: undefined}`, "a="},
+		{"Mixed", `{a: null, b: "text", c: 5}`, "a=&b=text&c=5"},
+		{"Array", `{a: ["one", null, "two"]}`, "a=one&a=&a=two"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := rt.RunString(sr(fmt.Sprintf(`
+			var res = http.post("HTTPBIN_URL/post", %s);
+			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+			if (res.request.body !== %q) {
+				throw new Error("wrong body: " + res.request.body)
+			}
+			`, tc.body, tc.expected)))
+			assert.NoError(t, err)
+		})
+	}
+
+	t.Run("Multipart", func(t *testing.T) {
+		tb.Mux.HandleFunc("/post-multipart", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.NoError(t, r.ParseMultipartForm(1<<20))
+			_, err := fmt.Fprintf(w, "a=%q", r.FormValue("a"))
+			require.NoError(t, err)
+		}))
+
+		_, err := rt.RunString(sr(`
+		var res = http.post("HTTPBIN_URL/post-multipart", {a: null, f: http.file("data", "test.txt")});
+		if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+		if (res.body !== 'a=""') { throw new Error("wrong body: " + res.body) }
+		`))
+		assert.NoError(t, err)
+	})
+}
+
 func TestRequestCompression(t *testing.T) {
 	t.Parallel()
 	ts := newTestCase(t)
