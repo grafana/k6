@@ -442,7 +442,7 @@ func TestWaitForTestRunReady_LogsTransitionsOnce(t *testing.T) {
 		{Status: v6.StatusInitializing},
 	})
 
-	logger, hook := testutils.NewLoggerWithHook(t, logrus.InfoLevel)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.DebugLevel)
 	client, err := NewClient(logger, "test-token", srv.URL, "0.42.0", 7, 5*time.Second)
 	require.NoError(t, err)
 
@@ -450,10 +450,10 @@ func TestWaitForTestRunReady_LogsTransitionsOnce(t *testing.T) {
 	require.NoError(t, err)
 
 	entries := hook.Drain()
-	// Filter to only info-level entries with a "status" field.
+	// Filter to only debug-level entries with a "status" field.
 	var statusEntries []logrus.Entry
 	for _, e := range entries {
-		if e.Level == logrus.InfoLevel {
+		if e.Level == logrus.DebugLevel {
 			if _, ok := e.Data["status"]; ok {
 				statusEntries = append(statusEntries, e)
 			}
