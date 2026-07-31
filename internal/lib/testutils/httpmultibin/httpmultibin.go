@@ -365,9 +365,8 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// http/1.1-only HTTPS server. ForceAttemptHTTP2 tells net/http to negotiate HTTP/2 even
 	// when a custom DialContext/TLSClientConfig is set (see Go issue #14275).
 	//
-	// Clone the server TLS config before widening NextProtos: http2Srv.TLS and tlsConfig are
-	// the same pointer (assigned above), so mutating it in place would change the server's
-	// advertised protocols after StartTLS() has already been called.
+	// Clone the shared TLS config before widening NextProtos so the client-only protocol list
+	// does not leak into other users of the config.
 	clientTLSConfig := tlsConfig.Clone()
 	clientTLSConfig.NextProtos = []string{http2.NextProtoTLS, "http/1.1"}
 	transport := &http.Transport{
