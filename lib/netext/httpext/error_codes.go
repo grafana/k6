@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -94,12 +95,18 @@ func http2ErrCodeOffset(code http2.ErrCode) errCode {
 }
 
 // http2ErrCodeByName maps the textual form produced by http2.ErrCode.String()
-// (e.g. "PROTOCOL_ERROR") back to its code. Only the spec-defined codes are
-// recognized; anything else returns false.
+// (e.g. "PROTOCOL_ERROR") back to its code. Unknown numeric codes are also
+// recognized so they remain in the appropriate unknown HTTP/2 error bucket.
 func http2ErrCodeByName(name string) (http2.ErrCode, bool) {
 	for code := http2.ErrCodeNo; code <= http2.ErrCodeHTTP11Required; code++ {
 		if code.String() == name {
 			return code, true
+		}
+	}
+	const unknownCodePrefix = "unknown error code 0x"
+	if strings.HasPrefix(name, unknownCodePrefix) {
+		if value, err := strconv.ParseUint(strings.TrimPrefix(name, unknownCodePrefix), 16, 32); err == nil {
+			return http2.ErrCode(value), true
 		}
 	}
 	return 0, false
@@ -108,8 +115,9 @@ func http2ErrCodeByName(name string) (http2.ErrCode, bool) {
 // errorCodeForHTTP2Message classifies an HTTP/2 error by the text of its
 // Error() method. All HTTP/2 error types from both golang.org/x/net/http2 and
 // Go's stdlib net/http/internal/http2 produce the same Error() strings, so
-// this single path handles every Go version uniformly. Only spec-defined error
-// codes are recognized; an unknown code falls through.
+// this single path handles every Go version uniformly. Spec-defined codes are
+// mapped to specific buckets, and unknown numeric codes retain their unknown
+// HTTP/2 error bucket.
 func errorCodeForHTTP2Message(msg string) (errCode, string, bool) {
 	switch {
 	case strings.HasPrefix(msg, "stream error: "):
