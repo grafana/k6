@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -25,25 +26,61 @@ const (
 	aiaCacheEntryTTL = 24 * time.Hour
 )
 
-// Separate from k6's test transport: AIA fetches must not be measured as test traffic, and
-// using HTTPS here would create a circular dependency (a cert to fetch a cert).
-var aiaHTTPClient = &http.Client{ //nolint:gochecknoglobals
-	Timeout: aiaFetchTimeout,
-}
-
 var (
 	systemCertPoolOnce sync.Once      //nolint:gochecknoglobals
 	cachedSystemPool   *x509.CertPool //nolint:gochecknoglobals
 )
 
-var (
-	aiaIntermediateCache sync.Map           //nolint:gochecknoglobals
-	aiaFetchGroup        singleflight.Group //nolint:gochecknoglobals
-)
-
 type aiaCacheEntry struct {
 	cert     *x509.Certificate
 	storedAt time.Time
+}
+
+// DialContextFunc matches net.Dialer.DialContext / lib.DialContexter.DialContext.
+type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+
+// AIAFetcher fetches missing intermediate certificates via AIA. One instance per Runner
+// keeps the cache and singleflight group isolated across in-process test runs.
+type AIAFetcher struct {
+	httpClient *http.Client
+	cache      sync.Map
+	fetchGroup singleflight.Group
+}
+
+// NewAIAFetcher binds the fetcher's HTTP client to dial so AIA fetches respect the
+// caller's blocking lists, host overrides and resolver. Nil dial uses net's default —
+// intended for tests only.
+func NewAIAFetcher(dial DialContextFunc) *AIAFetcher {
+	return &AIAFetcher{
+		httpClient: &http.Client{
+			Timeout: aiaFetchTimeout,
+			Transport: &http.Transport{
+				DialContext:       dial,
+				DisableKeepAlives: true,
+			},
+		},
+	}
+}
+
+// Wrap returns a *tls.Config whose verification callbacks fetch missing intermediates
+// via AIA when the server presents an incomplete chain. Returned unchanged when
+// InsecureSkipVerify is already set.
+func (f *AIAFetcher) Wrap(cfg *tls.Config, logger logrus.FieldLogger) *tls.Config {
+	if cfg.InsecureSkipVerify {
+		return cfg
+	}
+
+	newCfg := cfg.Clone()
+
+	// Suppresses Go's built-in verification so we can interpose AIA fetching;
+	// hostname verification is restored in buildVerifyConnFn.
+	newCfg.InsecureSkipVerify = true
+
+	// Callbacks read newCfg.RootCAs at handshake time (not capture-at-wrap-time) so
+	// callers can modify RootCAs after wrapping and have the change take effect.
+	newCfg.VerifyPeerCertificate = f.buildVerifyPeerFn(newCfg, logger)
+	newCfg.VerifyConnection = buildVerifyConnFn()
+	return newCfg
 }
 
 // Returns nil on failure so x509.VerifyOptions falls through to Go's default system-pool
@@ -60,35 +97,9 @@ func getSystemCertPool(logger logrus.FieldLogger) *x509.CertPool {
 	return cachedSystemPool
 }
 
-// WrapTLSConfigForAIAFetching returns a *tls.Config that fetches missing intermediate
-// certificates via AIA when the server presents an incomplete chain. Go's crypto/tls
-// doesn't do this; browsers do. Pass nil httpClient to use the default 10-second client.
-// Returned unchanged when InsecureSkipVerify is already true.
-func WrapTLSConfigForAIAFetching(cfg *tls.Config, logger logrus.FieldLogger, httpClient *http.Client) *tls.Config {
-	if cfg.InsecureSkipVerify {
-		return cfg
-	}
-	if httpClient == nil {
-		httpClient = aiaHTTPClient
-	}
-
-	newCfg := cfg.Clone()
-
-	// Suppresses Go's built-in verification so we can interpose AIA fetching;
-	// hostname verification is restored in buildVerifyConnFn.
-	newCfg.InsecureSkipVerify = true
-
-	// Callbacks read newCfg.RootCAs at handshake time (not capture-at-wrap-time) so
-	// callers can modify RootCAs after wrapping and have the change take effect.
-	newCfg.VerifyPeerCertificate = buildVerifyPeerFn(newCfg, logger, httpClient)
-	newCfg.VerifyConnection = buildVerifyConnFn()
-	return newCfg
-}
-
-func buildVerifyPeerFn(
+func (f *AIAFetcher) buildVerifyPeerFn(
 	cfg *tls.Config,
 	logger logrus.FieldLogger,
-	httpClient *http.Client,
 ) func([][]byte, [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
 		if len(rawCerts) == 0 {
@@ -120,15 +131,14 @@ func buildVerifyPeerFn(
 			// Hostname verification runs in buildVerifyConnFn where cs.ServerName is available.
 		}
 
-		return verifyWithAIA(certs, opts, intermediates, httpClient, logger)
+		return f.verifyWithAIA(certs, opts, intermediates, logger)
 	}
 }
 
-func verifyWithAIA(
+func (f *AIAFetcher) verifyWithAIA(
 	certs []*x509.Certificate,
 	opts x509.VerifyOptions,
 	intermediates *x509.CertPool,
-	httpClient *http.Client,
 	logger logrus.FieldLogger,
 ) error {
 	_, verifyErr := certs[0].Verify(opts)
@@ -150,7 +160,7 @@ func verifyWithAIA(
 		}
 	}
 
-	for _, cert := range fetchAIAIntermediates(certs, httpClient, logger) {
+	for _, cert := range f.fetchAIAIntermediates(certs, logger) {
 		intermediates.AddCert(cert)
 	}
 
@@ -180,8 +190,8 @@ func buildVerifyConnFn() func(tls.ConnectionState) error {
 
 // The depth limit bounds HTTP fetches, not queue pops — cached items keep flowing even
 // after we stop issuing new fetches.
-func fetchAIAIntermediates(
-	certs []*x509.Certificate, httpClient *http.Client, logger logrus.FieldLogger,
+func (f *AIAFetcher) fetchAIAIntermediates(
+	certs []*x509.Certificate, logger logrus.FieldLogger,
 ) []*x509.Certificate {
 	var fetched []*x509.Certificate
 	seen := make(map[string]bool)
@@ -200,14 +210,14 @@ func fetchAIAIntermediates(
 			}
 			seen[rawURL] = true
 
-			issuer, ok := loadCachedAIACert(rawURL)
+			issuer, ok := f.loadCachedAIACert(rawURL)
 			if !ok {
 				if fetches >= aiaMaxFetchDepth {
 					continue
 				}
 				fetches++
 				var err error
-				issuer, err = fetchAndCacheAIACert(rawURL, httpClient, logger)
+				issuer, err = f.fetchAndCacheAIACert(rawURL, logger)
 				if err != nil {
 					logger.WithError(err).WithField("url", rawURL).Debug("AIA intermediate certificate fetch failed")
 					continue
@@ -222,8 +232,8 @@ func fetchAIAIntermediates(
 	return fetched
 }
 
-func loadCachedAIACert(rawURL string) (*x509.Certificate, bool) {
-	raw, ok := aiaIntermediateCache.Load(rawURL)
+func (f *AIAFetcher) loadCachedAIACert(rawURL string) (*x509.Certificate, bool) {
+	raw, ok := f.cache.Load(rawURL)
 	if !ok {
 		return nil, false
 	}
@@ -231,25 +241,25 @@ func loadCachedAIACert(rawURL string) (*x509.Certificate, bool) {
 	// Evict on TTL expiry or when the cert itself is past NotAfter — an expired
 	// intermediate won't validate anyway, and holding it would just waste retries.
 	if time.Since(entry.storedAt) > aiaCacheEntryTTL || time.Now().After(entry.cert.NotAfter) {
-		aiaIntermediateCache.Delete(rawURL)
+		f.cache.Delete(rawURL)
 		return nil, false
 	}
 	return entry.cert, true
 }
 
-func fetchAndCacheAIACert(
-	rawURL string, httpClient *http.Client, logger logrus.FieldLogger,
+func (f *AIAFetcher) fetchAndCacheAIACert(
+	rawURL string, logger logrus.FieldLogger,
 ) (*x509.Certificate, error) {
-	v, err, _ := aiaFetchGroup.Do(rawURL, func() (any, error) {
+	v, err, _ := f.fetchGroup.Do(rawURL, func() (any, error) {
 		// Re-check under the singleflight barrier: an earlier waiter may have populated it.
-		if cert, ok := loadCachedAIACert(rawURL); ok {
+		if cert, ok := f.loadCachedAIACert(rawURL); ok {
 			return cert, nil
 		}
-		cert, err := fetchCertFromAIAURL(rawURL, httpClient, logger)
+		cert, err := f.fetchCertFromAIAURL(rawURL, logger)
 		if err != nil {
 			return nil, err
 		}
-		aiaIntermediateCache.Store(rawURL, &aiaCacheEntry{cert: cert, storedAt: time.Now()})
+		f.cache.Store(rawURL, &aiaCacheEntry{cert: cert, storedAt: time.Now()})
 		return cert, nil
 	})
 	if err != nil {
@@ -258,8 +268,8 @@ func fetchAndCacheAIACert(
 	return v.(*x509.Certificate), nil //nolint:forcetypeassert
 }
 
-func fetchCertFromAIAURL(
-	rawURL string, httpClient *http.Client, logger logrus.FieldLogger,
+func (f *AIAFetcher) fetchCertFromAIAURL(
+	rawURL string, logger logrus.FieldLogger,
 ) (*x509.Certificate, error) {
 	// VerifyPeerCertificate provides no context to thread through; use our own timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), aiaFetchTimeout)
@@ -270,7 +280,7 @@ func fetchCertFromAIAURL(
 		return nil, fmt.Errorf("building AIA request: %w", err)
 	}
 
-	resp, err := httpClient.Do(req) //nolint:gosec // G107: URL is from a server-presented cert AIA extension
+	resp, err := f.httpClient.Do(req) //nolint:gosec // G107: URL is from a server-presented cert AIA extension
 	if err != nil {
 		return nil, fmt.Errorf("fetching AIA certificate: %w", err)
 	}

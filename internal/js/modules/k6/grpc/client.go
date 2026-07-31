@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/netext/grpcext"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/netext"
 
 	"github.com/bufbuild/protocompile"
@@ -152,7 +153,7 @@ func decryptPrivateKey(key, password []byte) ([]byte, error) {
 
 func buildTLSConfig(
 	parentConfig *tls.Config, certificate, key []byte, caCertificates [][]byte,
-	aiaEnabled, insecureSkipVerify bool, logger logrus.FieldLogger,
+	aiaFetcher *netext.AIAFetcher, insecureSkipVerify bool, logger logrus.FieldLogger,
 ) (*tls.Config, error) {
 	var cp *x509.CertPool
 	if len(caCertificates) > 0 {
@@ -186,15 +187,15 @@ func buildTLSConfig(
 		tlsCfg.Certificates = []tls.Certificate{cert}
 	}
 	// Re-wrap so the verification closure reads this config's RootCAs, not the VU's.
-	if aiaEnabled {
-		tlsCfg = netext.WrapTLSConfigForAIAFetching(tlsCfg, logger, nil)
+	if aiaFetcher != nil {
+		tlsCfg = aiaFetcher.Wrap(tlsCfg, logger)
 	}
 	return tlsCfg, nil
 }
 
 func buildTLSConfigFromMap(
 	parentConfig *tls.Config, tlsConfigMap map[string]any,
-	aiaEnabled, insecureSkipVerify bool, logger logrus.FieldLogger,
+	aiaFetcher *netext.AIAFetcher, insecureSkipVerify bool, logger logrus.FieldLogger,
 ) (*tls.Config, error) {
 	var cert, key, pass []byte
 	var ca [][]byte
@@ -227,7 +228,16 @@ func buildTLSConfigFromMap(
 			ca = [][]byte{[]byte(caCertStr)}
 		}
 	}
-	return buildTLSConfig(parentConfig, cert, key, ca, aiaEnabled, insecureSkipVerify, logger)
+	return buildTLSConfig(parentConfig, cert, key, ca, aiaFetcher, insecureSkipVerify, logger)
+}
+
+// buildTLSConfigForConnect builds the per-connect TLS config from the state and TLS map.
+func buildTLSConfigForConnect(parent *tls.Config, tlsMap map[string]any, state *lib.State) (*tls.Config, error) {
+	var aiaFetcher *netext.AIAFetcher
+	if state.Options.TLSAIAFetch.Bool {
+		aiaFetcher = netext.NewAIAFetcher(state.Dialer.DialContext)
+	}
+	return buildTLSConfigFromMap(parent, tlsMap, aiaFetcher, state.Options.InsecureSkipTLSVerify.Bool, state.Logger)
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
@@ -248,9 +258,8 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	if !p.IsPlaintext {
 		tlsCfg := state.TLSConfig.Clone()
 		if len(p.TLS) > 0 {
-			aiaEnabled := state.Options.TLSAIAFetch.Bool
-			insecureSkipVerify := state.Options.InsecureSkipTLSVerify.Bool
-			if tlsCfg, err = buildTLSConfigFromMap(tlsCfg, p.TLS, aiaEnabled, insecureSkipVerify, state.Logger); err != nil {
+			tlsCfg, err = buildTLSConfigForConnect(tlsCfg, p.TLS, state)
+			if err != nil {
 				return false, err
 			}
 		}

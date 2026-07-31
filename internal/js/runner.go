@@ -59,6 +59,9 @@ type Runner struct {
 	RPSLimit       *rate.Limiter
 	RunTags        *metrics.TagSet
 
+	// aiaFetcher owns the AIA cache + HTTP client when tlsAIAFetch is enabled.
+	aiaFetcher *netext.AIAFetcher
+
 	console    *console
 	setupData  []byte
 	BufferPool *lib.BufferPool
@@ -104,8 +107,22 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 	}
 
 	err := r.SetOptions(r.Bundle.Options)
+	if err != nil {
+		return r, err
+	}
 
-	return r, err
+	// AIA dialer mirrors the per-VU dialer minus LocalIPs so AIA fetches respect the
+	// user's blocking rules / host overrides / resolver.
+	runnerDialer := &netext.Dialer{
+		Dialer:           r.BaseDialer,
+		Resolver:         r.Resolver,
+		Blacklist:        r.Bundle.Options.BlacklistIPs,
+		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
+		Hosts:            r.Bundle.Options.Hosts.Trie,
+	}
+	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
+
+	return r, nil
 }
 
 // MakeArchive creates an Archive of the runner. There should be a corresponding NewFromArchive() function
@@ -196,7 +213,7 @@ func (r *Runner) newVU(
 		tlsConfig.NameToCertificate = nameToCert //nolint:staticcheck
 	}
 	if r.Bundle.Options.TLSAIAFetch.Bool {
-		tlsConfig = netext.WrapTLSConfigForAIAFetching(tlsConfig, r.preInitState.Logger, nil) //nolint:contextcheck
+		tlsConfig = r.aiaFetcher.Wrap(tlsConfig, r.preInitState.Logger) //nolint:contextcheck
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
