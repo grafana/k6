@@ -104,8 +104,8 @@ func http2ErrCodeByName(name string) (http2.ErrCode, bool) {
 		}
 	}
 	const unknownCodePrefix = "unknown error code 0x"
-	if strings.HasPrefix(name, unknownCodePrefix) {
-		if value, err := strconv.ParseUint(strings.TrimPrefix(name, unknownCodePrefix), 16, 32); err == nil {
+	if after, ok := strings.CutPrefix(name, unknownCodePrefix); ok {
+		if value, err := strconv.ParseUint(after, 16, 32); err == nil {
 			return http2.ErrCode(value), true
 		}
 	}
