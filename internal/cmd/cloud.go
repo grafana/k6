@@ -63,6 +63,58 @@ func checkCloudLoginFor(conf cloudapi.Config, prefix string) error {
 	return nil
 }
 
+// newCloudV6ClientFromConfig builds a v6 cloud API client from the on-disk and
+// environment configuration. It verifies that a complete login is configured
+// (using authPrefix in the error message) and wires the resolved stack ID into
+// the client. It returns the client alongside the consolidated cloud config.
+func newCloudV6ClientFromConfig(
+	gs *state.GlobalState, authPrefix string,
+) (*cloudapiv6.Client, cloudapi.Config, error) {
+	currentDiskConf, err := readDiskConfig(gs)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		currentDiskConf.Collectors["cloud"], gs.Env, "", nil)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+	if warn != "" {
+		gs.Logger.Warn(warn)
+	}
+
+	if err := checkCloudLoginFor(cloudConfig, authPrefix); err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	client, err := cloudapiv6.NewClient(
+		gs.Logger,
+		cloudConfig.Token.String,
+		cloudConfig.Hostv6.String,
+		build.Version,
+		cloudConfig.Timeout.TimeDuration(),
+	)
+	if err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	if err := client.SetStackID(cloudConfig.StackID.Int64); err != nil {
+		return nil, cloudapi.Config{}, err
+	}
+
+	return client, cloudConfig, nil
+}
+
+// cloudStackName returns a human-readable name for the configured stack,
+// falling back to "stack-<id>" when the stack URL is not available.
+func cloudStackName(conf cloudapi.Config) string {
+	if conf.StackURL.Valid {
+		return conf.StackURL.String
+	}
+	return fmt.Sprintf("stack-%d", conf.StackID.Int64)
+}
+
 // applyCloudEnvOverrides applies the K6_SHOW_CLOUD_LOGS and K6_EXIT_ON_RUNNING
 // environment variables onto the provided flag values, unless the corresponding
 // CLI flag was explicitly set (in which case it takes precedence).
@@ -437,15 +489,11 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	projectCmd := getCmdCloudProject(gs)
 	cloudCmd.AddCommand(projectCmd)
 
+	loadZoneCmd := getCmdCloudLoadZone(gs)
+	cloudCmd.AddCommand(loadZoneCmd)
+
 	testCmd := getCmdCloudTest(gs)
 	cloudCmd.AddCommand(testCmd)
-
-	// The parent `k6 cloud` command only prints help, but historically exposes
-	// these flags in its usage output; bind them to throwaway values so that
-	// output is preserved.
-	parentShowCloudLogs, parentExitOnRunning := true, false
-	cloudCmd.Flags().SortFlags = false
-	cloudCmd.Flags().AddFlagSet(cloudCmdFlagSet(&parentShowCloudLogs, &parentExitOnRunning))
 
 	// Use custom template similar to root - hardcode flags to avoid showing global flags
 	cloudTemplate := getCloudUsageTemplate()

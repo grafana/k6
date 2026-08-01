@@ -36,6 +36,11 @@ func TestCreateReport(t *testing.T) {
 		}, local.NewController())
 	}
 
+	// A nil func would also work while no case records an extension, but this
+	// stays fail-closed if one ever does: filtering against a nil catalog
+	// drops the extensions instead of panicking.
+	noCatalog := func() map[string]struct{} { return nil }
+
 	t.Run("default (no env)", func(t *testing.T) {
 		t.Parallel()
 
@@ -50,8 +55,7 @@ func TestCreateReport(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 		s.GetState().MarkEnded()
 
-		m := createReport(usage.New(), s)
-		require.NoError(t, err)
+		m := createReport(usage.New(), s, noCatalog)
 
 		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
@@ -72,8 +76,7 @@ func TestCreateReport(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		m := createReport(usage.New(), s)
-		require.NoError(t, err)
+		m := createReport(usage.New(), s, noCatalog)
 
 		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
@@ -94,8 +97,7 @@ func TestCreateReport(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		m := createReport(usage.New(), s)
-		require.NoError(t, err)
+		m := createReport(usage.New(), s, noCatalog)
 
 		assert.Equal(t, build.Version, m["k6_version"])
 		assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
