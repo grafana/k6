@@ -373,3 +373,60 @@ func TestLokiFromConfigLineEmptyAddr(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, bare.(*lokiHook).addr, "bare loki uses the default endpoint")
 }
+
+// TestLokiHookDrainsQueuedEntriesOnShutdown pins that a ctx-cancel shutdown
+// flushes every entry already queued in the hook's channel, not just the ones
+// the run loop happened to consume before the cancel was selected. The entries
+// are pre-loaded and the context is already cancelled, so Listen takes its
+// shutdown branch with the whole batch still queued; without draining the
+// channel it would lose a suffix of them.
+func TestLokiHookDrainsQueuedEntriesOnShutdown(t *testing.T) {
+	t.Parallel()
+
+	const n = 100
+
+	var (
+		mu  sync.Mutex
+		got string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		b, err := io.ReadAll(req.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		mu.Lock()
+		got += string(b)
+		mu.Unlock()
+	}))
+	defer srv.Close()
+
+	// Limit well above n so nothing is limit-dropped, and a long push period so
+	// the shutdown push is the only one.
+	h, err := NewLokiHook(testutils.NewLogger(t), LokiHookOptions{
+		Addr:       srv.URL,
+		Limit:      2 * n,
+		PushPeriod: time.Hour,
+	})
+	require.NoError(t, err)
+
+	// Queue every entry before Listen starts (white-box: this test is in
+	// package log), so the shutdown branch must drain the channel to send them.
+	for i := range n {
+		h.(*lokiHook).ch <- &logrus.Entry{
+			Time:    time.Now(),
+			Level:   logrus.InfoLevel,
+			Message: fmt.Sprintf("msg-%d", i),
+		}
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	h.Listen(ctx)
+
+	mu.Lock()
+	defer mu.Unlock()
+	for i := range n {
+		assert.Contains(t, got, fmt.Sprintf("msg-%d", i), "entry %d was lost on shutdown", i)
+	}
+}

@@ -204,7 +204,7 @@ func (opts *LokiHookOptions) parseArgs(line string) error {
 //
 // TODO benchmark this
 //
-//nolint:funlen
+//nolint:funlen,gocognit
 func (h *lokiHook) Listen(ctx context.Context) {
 	var (
 		msgs       = make([]tmpMsg, h.limit)
@@ -274,45 +274,75 @@ func (h *lokiHook) Listen(ctx context.Context) {
 		}
 	}()
 
+	// appendEntry buffers one entry into msgs, or counts it as dropped once the
+	// per-push-period limit is reached. It mutates the count, dropped and msgs
+	// loop state, so it must run only on the main goroutine — never while the
+	// push goroutine is swapping msgs and resetting the counters.
+	appendEntry := func(entry *logrus.Entry) {
+		if count == h.limit {
+			dropped++
+
+			return
+		}
+
+		// Arguably we can directly generate the final marshalled version of the labels right here
+		// through sorting the entry.Data, removing additionalparams from it and then dumping it
+		// as the final marshal and appending level and h.labels after it.
+		// If we reuse some kind of big enough `[]byte` buffer we can also possibly skip on some
+		// of allocation. Combined with the cutoff part and directly pushing in the final data
+		// type this can be really a lot faster and to use a lot less memory
+		labels := make(map[string]string, len(entry.Data)+1)
+		for k, v := range entry.Data {
+			labels[k] = fmt.Sprint(v) // TODO optimize ?
+		}
+		for _, params := range h.labels {
+			labels[params[0]] = params[1]
+		}
+		labels["level"] = entry.Level.String()
+		msg := h.filterLabels(labels, entry.Message) // TODO we can do this while constructing
+		// have the cutoff here ?
+		// if we cutoff here we can cut somewhat on the backbuffers and optimize the inserting
+		// in/creating of the final Streams that we push
+		msgs[count] = tmpMsg{
+			labels: labels,
+			msg:    msg,
+			t:      entry.Time.UnixNano(),
+		}
+		count++
+	}
+
+	// drainQueued flushes entries still buffered in h.ch into msgs without
+	// blocking. Called on shutdown so the final push includes everything Fire
+	// already accepted; best-effort, it does not wait for entries still being
+	// Fired concurrently with the shutdown.
+	drainQueued := func() {
+		for {
+			select {
+			case entry, ok := <-h.ch:
+				if !ok {
+					// h.ch is never closed today; this guards a future close
+					// from spinning on nil receives.
+					return
+				}
+				appendEntry(entry)
+			default:
+				return
+			}
+		}
+	}
+
 	for {
 		select {
 		case entry := <-h.ch:
-			if count == h.limit {
-				dropped++
-
-				continue
-			}
-
-			// Arguably we can directly generate the final marshalled version of the labels right here
-			// through sorting the entry.Data, removing additionalparams from it and then dumping it
-			// as the final marshal and appending level and h.labels after it.
-			// If we reuse some kind of big enough `[]byte` buffer we can also possibly skip on some
-			// of allocation. Combined with the cutoff part and directly pushing in the final data
-			// type this can be really a lot faster and to use a lot less memory
-			labels := make(map[string]string, len(entry.Data)+1)
-			for k, v := range entry.Data {
-				labels[k] = fmt.Sprint(v) // TODO optimize ?
-			}
-			for _, params := range h.labels {
-				labels[params[0]] = params[1]
-			}
-			labels["level"] = entry.Level.String()
-			msg := h.filterLabels(labels, entry.Message) // TODO we can do this while constructing
-			// have the cutoff here ?
-			// if we cutoff here we can cut somewhat on the backbuffers and optimize the inserting
-			// in/creating of the final Streams that we push
-			msgs[count] = tmpMsg{
-				labels: labels,
-				msg:    msg,
-				t:      entry.Time.UnixNano(),
-			}
-			count++
+			appendEntry(entry)
 		case t := <-ticker.C:
 			ch := make(chan int64)
 			pushCh <- ch
 			ch <- t.Add(-(h.pushPeriod / 2)).UnixNano()
 			<-ch
 		case <-ctx.Done():
+			drainQueued()
+
 			ch := make(chan int64)
 			pushCh <- ch
 			ch <- time.Now().Add(time.Second).UnixNano()
@@ -386,6 +416,28 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 	}
 
 	return pushMsg
+}
+
+// PushNotice synchronously pushes a single warning line to loki, exempt from
+// the per-batch limit the main push loop enforces. It surfaces out-of-band
+// drops (for example an upstream buffer overflow) that must not be lost to that
+// limit. The line carries the hook's configured labels, so it is not rejected
+// for a missing test_run_id.
+func (h *lokiHook) PushNotice(message string) error {
+	pushMsg := new(lokiPushMessage)
+	pushMsg.maxSize = h.msgMaxSize
+	pushMsg.add(tmpMsg{
+		labels: h.droppedLabels,
+		msg:    message,
+		t:      time.Now().UnixNano(),
+	})
+
+	var b bytes.Buffer
+	if _, err := pushMsg.WriteTo(&b); err != nil {
+		return err
+	}
+
+	return h.push(b)
 }
 
 func (h *lokiHook) push(b bytes.Buffer) error {

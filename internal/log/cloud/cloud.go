@@ -12,6 +12,7 @@ package cloudlog
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -210,6 +211,11 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 	// hook so it runs its synchronous final flush, and waits for that to
 	// complete. lokiHook.Fire is a blocking send, so forwarding must happen
 	// while the loki hook is still draining its channel (before lokiCancel).
+	//
+	// reportDropped runs last, after the final flush has been pushed: its
+	// notice shares the "warning" stream with the loki hook's own limit-drop
+	// message, so it must carry the newest timestamp and be pushed after it —
+	// otherwise Loki with unordered_writes=false rejects the older flush write.
 	finish := func() {
 		for {
 			select {
@@ -218,6 +224,7 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 			default:
 				lokiCancel()
 				<-lokiDone
+				p.reportDropped(lokiHook)
 				return
 			}
 		}
@@ -237,6 +244,31 @@ func (p *Pusher) Listen(ctx context.Context) { //nolint:contextcheck
 			finish()
 			return
 		}
+	}
+}
+
+// reportDropped surfaces the entries Fire dropped when the buffer was full, so
+// the loss is visible rather than silent. The count is read once as a shutdown
+// summary; drops after this point are not reported.
+//
+// It uses the loki hook's NoticePusher capability, which pushes the notice
+// immediately and exempt from the hook's per-batch limit — otherwise a full
+// final batch (many buffered entries at shutdown, exactly when drops are
+// likely) would swallow the notice itself.
+func (p *Pusher) reportDropped(h log.AsyncHook) {
+	n := p.dropped.Load()
+	if n == 0 {
+		return
+	}
+
+	np, ok := h.(log.NoticePusher)
+	if !ok {
+		return
+	}
+
+	msg := fmt.Sprintf("k6 dropped %d log messages because the cloud log buffer was full", n)
+	if err := np.PushNotice(msg); err != nil && p.fallbackLogger != nil {
+		p.fallbackLogger.WithError(err).Warn("could not push the dropped-cloud-logs notice")
 	}
 }
 
