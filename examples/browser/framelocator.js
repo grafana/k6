@@ -1,5 +1,6 @@
 import { browser } from 'k6/browser';
-import { check, fail } from 'k6';
+import { check } from 'k6';
+import exec from 'k6/execution';
 
 export const options = {
   scenarios: {
@@ -66,7 +67,12 @@ export default async function () {
     });
 
   } catch (error) {
-    fail(`Browser iteration failed: ${error.message}`);
+    // This script is run as a smoke test in the build workflow to verify the
+    // browser Docker image. exec.test.fail() is used here (instead of fail())
+    // to produce a non-zero exit code on exception, failing that CI check.
+    // error.message is empty for rejected promises, so fall back to error.toString()
+    const message = error.message || error.toString();
+    exec.test.fail(`Browser iteration failed: ${message}`);
   } finally {
     await page.close();
   }
