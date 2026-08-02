@@ -433,7 +433,7 @@ func printCloudTestStatus(gs *state.GlobalState, status string) {
 	}
 }
 
-// cloudCmdFlagSet returns the flag set shared by the cloud run/upload commands,
+// cloudCmdFlagSet returns the flag set used by the cloud run command,
 // binding the --exit-on-running and --show-logs flags to the provided values.
 func cloudCmdFlagSet(showCloudLogs, exitOnRunning *bool) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
