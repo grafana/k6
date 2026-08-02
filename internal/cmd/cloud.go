@@ -160,16 +160,28 @@ func applyCloudEnvOverrides(gs *state.GlobalState, cmd *cobra.Command, showCloud
 	return nil
 }
 
+// cloudTestRunOptions holds the flag values that control how runCloudTest
+// behaves.
+type cloudTestRunOptions struct {
+	// showCloudLogs streams the cloud logs to the terminal while the test runs.
+	showCloudLogs bool
+
+	// exitOnRunning makes the command return as soon as the test reaches the
+	// running status, instead of waiting for it to finish.
+	exitOnRunning bool
+
+	// uploadOnly stops after uploading the test archive, without starting a
+	// test run.
+	uploadOnly bool
+}
+
 // runCloudTest builds the test archive, uploads it to Grafana Cloud, and (unless
-// uploadOnly is set) starts the run and tracks its progress until completion.
+// opts.uploadOnly is set) starts the run and tracks its progress until completion.
 //
 // TODO: split apart some more
 //
 //nolint:funlen,gocognit,cyclop
-func runCloudTest(
-	gs *state.GlobalState, cmd *cobra.Command, args []string,
-	showCloudLogs, exitOnRunning, uploadOnly bool,
-) error {
+func runCloudTest(gs *state.GlobalState, cmd *cobra.Command, args []string, opts cloudTestRunOptions) error {
 	test, err := loadAndConfigureLocalTest(gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
@@ -268,7 +280,7 @@ func runCloudTest(
 		return fmt.Errorf("uploading test: %w", err)
 	}
 
-	if uploadOnly {
+	if opts.uploadOnly {
 		et, err := lib.NewExecutionTuple(test.derivedConfig.ExecutionSegment, test.derivedConfig.ExecutionSegmentSequence)
 		if err != nil {
 			return err
@@ -359,7 +371,7 @@ func runCloudTest(
 	)
 
 	ticker := time.NewTicker(time.Millisecond * 2000)
-	if showCloudLogs {
+	if opts.showCloudLogs {
 		refID := strconv.FormatInt(testRunID, 10)
 		go func() {
 			logger.Debug("Connecting to cloud logs server...")
@@ -381,7 +393,7 @@ func runCloudTest(
 		testProgressLock.Unlock()
 
 		if newTestProgress.IsFinished() ||
-			(exitOnRunning && newTestProgress.IsRunning()) {
+			(opts.exitOnRunning && newTestProgress.IsRunning()) {
 			globalCancel()
 			break
 		}

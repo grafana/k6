@@ -47,7 +47,7 @@ func (c *cmdCloudUpload) preRun(_ *cobra.Command, _ []string) error {
 
 // run is the code that runs when the user executes `k6 cloud upload`
 func (c *cmdCloudUpload) run(cmd *cobra.Command, args []string) error {
-	return runCloudTest(c.globalState, cmd, args, false, false, true)
+	return runCloudTest(c.globalState, cmd, args, cloudTestRunOptions{uploadOnly: true})
 }
 
 func (c *cmdCloudUpload) flagSet() *pflag.FlagSet {

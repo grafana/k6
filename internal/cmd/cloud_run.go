@@ -174,7 +174,10 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	// When running the `k6 cloud run` command explicitly disable the usage report.
 	c.noUsageReport = true
 
-	return runCloudTest(c.gs, cmd, args, c.showCloudLogs, c.exitOnRunning, false)
+	return runCloudTest(c.gs, cmd, args, cloudTestRunOptions{
+		showCloudLogs: c.showCloudLogs,
+		exitOnRunning: c.exitOnRunning,
+	})
 }
 
 func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
