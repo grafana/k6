@@ -1758,3 +1758,39 @@ func TestPingHandlerDeadlock(t *testing.T) {
 	`))
 	assert.NoError(t, err)
 }
+
+func TestRemoveEventListener(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		var handlerToKeepCount = 0
+
+		function handlerToRemove() {
+			call("removed-handler-called")
+		}
+		function handlerToKeep() {
+			handlerToKeepCount++
+			call("kept-handler-count:" + handlerToKeepCount)
+			ws.close()
+		}
+
+		ws.addEventListener("open", () => {
+			ws.addEventListener("pong", handlerToRemove)
+			ws.addEventListener("pong", handlerToKeep)
+			ws.removeEventListener("pong", handlerToRemove)
+
+			ws.removeEventListener("message", handlerToRemove)
+			ws.removeEventListener("error", handlerToRemove)
+
+			ws.ping()
+		})
+	`))
+	require.NoError(t, err)
+
+	recorded := ts.callRecorder.Recorded()
+	assert.NotContains(t, recorded, "removed-handler-called")
+	assert.Contains(t, recorded, "kept-handler-count:1")
+	assert.NotContains(t, recorded, "kept-handler-count:2")
+}
