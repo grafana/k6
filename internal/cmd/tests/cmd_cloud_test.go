@@ -112,6 +112,54 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `test status: Running`)
 	})
 
+	t.Run("TestCloudExitOnRunningEnv", func(t *testing.T) {
+		t.Parallel()
+
+		// Same as TestCloudExitOnRunning, but driven by the environment
+		// variable instead of the CLI flag. Without the override taking
+		// effect, the command would keep polling the mock server forever,
+		// since its progress is always "Running".
+		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--log-output=stdout"},
+			v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
+		ts.Env["K6_EXIT_ON_RUNNING"] = "true"
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `execution: cloud`)
+		assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/runs/123`)
+		assert.Contains(t, stdout, `test status: Running`)
+	})
+
+	t.Run("TestCloudExitOnRunningFlagOverridesEnv", func(t *testing.T) {
+		t.Parallel()
+
+		// An explicitly set CLI flag takes precedence over the environment
+		// variable. If the "false" from the environment won instead, the
+		// command would poll the always-"Running" mock server forever.
+		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--exit-on-running", "--log-output=stdout"},
+			v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
+		ts.Env["K6_EXIT_ON_RUNNING"] = "false"
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `test status: Running`)
+	})
+
+	t.Run("TestCloudExitOnRunningInvalidEnv", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
+		ts.Env["K6_EXIT_ON_RUNNING"] = "invalid"
+		ts.ExpectedExitCode = -1
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `parsing K6_EXIT_ON_RUNNING returned an error`)
+	})
+
 	t.Run("TestCloudURLFromStartResponse", func(t *testing.T) {
 		t.Parallel()
 
