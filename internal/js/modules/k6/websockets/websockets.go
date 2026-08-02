@@ -189,6 +189,8 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 	must(rt, w.obj.DefineDataProperty(
 		"addEventListener", rt.ToValue(w.addEventListener), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineDataProperty(
+		"removeEventListener", rt.ToValue(w.removeEventListener), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, w.obj.DefineDataProperty(
 		"send", rt.ToValue(w.send), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineDataProperty(
 		"ping", rt.ToValue(w.ping), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
@@ -919,16 +921,43 @@ func (w *webSocket) callEventListeners(eventType string) error {
 	return nil
 }
 
-func (w *webSocket) addEventListener(event string, handler func(sobek.Value) (sobek.Value, error)) {
+func (w *webSocket) addEventListener(event string, handler sobek.Value) {
 	// TODO support options https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters
 
-	if handler == nil {
+	if common.IsNullish(handler) {
 		common.Throw(w.vu.Runtime(), fmt.Errorf("handler for event type %q isn't a callable function", event))
 	}
 
-	if err := w.eventListeners.add(event, handler); err != nil {
+	fnCallable, isFunc := sobek.AssertFunction(handler)
+	if !isFunc {
+		common.Throw(w.vu.Runtime(), fmt.Errorf("handler for event type %q isn't a callable function", event))
+	}
+
+	execFn := func(v sobek.Value) (sobek.Value, error) {
+		return fnCallable(sobek.Undefined(), v)
+	}
+
+	entry := listenerEntry{
+		val: handler,
+		fn:  execFn,
+	}
+
+	if err := w.eventListeners.add(event, entry); err != nil {
 		w.vu.State().Logger.Warnf("can't add event handler: %s", err)
 	}
 }
 
-// TODO add remove listeners
+func (w *webSocket) removeEventListener(event string, handler sobek.Value) {
+	if common.IsNullish(handler) {
+		return
+	}
+
+	_, isFunc := sobek.AssertFunction(handler)
+	if !isFunc {
+		return
+	}
+
+	if err := w.eventListeners.remove(event, handler); err != nil {
+		w.vu.State().Logger.Warnf("can't remove event handler: %s", err)
+	}
+}
