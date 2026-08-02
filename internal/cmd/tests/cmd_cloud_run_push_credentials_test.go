@@ -140,6 +140,12 @@ func setupSelfProvisionedRun(
 		m := rc.GetMetrics()
 		m.SetPushUrl(srv.URL + "/v1/metrics")
 		rc.SetMetrics(m)
+		// Point the logs push URL at the mock too: --local-execution activates
+		// the cloud log pusher, which would otherwise egress to the real logs
+		// host baked into DefaultStartLocalExecutionResponse.
+		l := rc.GetLogs()
+		l.SetPushUrl(srv.URL + logsPushPath)
+		rc.SetLogs(l)
 		resp.SetRuntimeConfig(rc)
 		writeProvJSON(w, http.StatusOK, resp)
 	})

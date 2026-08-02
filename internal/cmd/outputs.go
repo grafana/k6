@@ -187,8 +187,20 @@ func createOutputs(
 			}
 		}
 
+		attachCloudLogDrainer(out, gs)
+
 		result = append(result, out)
 	}
 
 	return result, nil
+}
+
+// attachCloudLogDrainer gives the cloud output the local-execution log pusher
+// so it flushes buffered logs before the run is notified complete. The
+// concrete-nil guard avoids handing the output a typed-nil drainer once it is
+// wrapped in an interface.
+func attachCloudLogDrainer(out output.Output, gs *state.GlobalState) {
+	if co, ok := out.(*cloud.Output); ok && gs.CloudLogPusher != nil {
+		co.SetLogDrainer(gs.CloudLogPusher)
+	}
 }
