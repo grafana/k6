@@ -38,11 +38,11 @@ func getCmdCloudUpload(gs *state.GlobalState) *cobra.Command {
 	return uploadCloudCommand
 }
 
-func (c *cmdCloudUpload) preRun(cmd *cobra.Command, _ []string) error {
+func (c *cmdCloudUpload) preRun(_ *cobra.Command, _ []string) error {
 	// The upload command doesn't expose the --show-logs/--exit-on-running flags,
 	// but we still validate the corresponding env variables for wrong values.
-	var showCloudLogs, exitOnRunning bool
-	return applyCloudEnvOverrides(c.globalState, cmd, &showCloudLogs, &exitOnRunning)
+	_, _, err := parseCloudEnvOverrides(c.globalState.Env)
+	return err
 }
 
 // run is the code that runs when the user executes `k6 cloud upload`

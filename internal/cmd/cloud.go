@@ -115,33 +115,47 @@ func cloudStackName(conf cloudapi.Config) string {
 	return fmt.Sprintf("stack-%d", conf.StackID.Int64)
 }
 
+// parseCloudEnvOverrides parses and validates the K6_SHOW_CLOUD_LOGS and
+// K6_EXIT_ON_RUNNING environment variables. A nil result means the
+// corresponding variable is not set.
+//
+// It is also used on its own to validate the variables for wrong values by
+// commands that don't subsequently use them.
+func parseCloudEnvOverrides(env map[string]string) (showCloudLogs, exitOnRunning *bool, err error) {
+	if showCloudLogsEnv, ok := env["K6_SHOW_CLOUD_LOGS"]; ok {
+		showCloudLogsValue, err := strconv.ParseBool(showCloudLogsEnv)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parsing K6_SHOW_CLOUD_LOGS returned an error: %w", err)
+		}
+		showCloudLogs = &showCloudLogsValue
+	}
+
+	if exitOnRunningEnv, ok := env["K6_EXIT_ON_RUNNING"]; ok {
+		exitOnRunningValue, err := strconv.ParseBool(exitOnRunningEnv)
+		if err != nil {
+			return nil, nil, fmt.Errorf("parsing K6_EXIT_ON_RUNNING returned an error: %w", err)
+		}
+		exitOnRunning = &exitOnRunningValue
+	}
+	return showCloudLogs, exitOnRunning, nil
+}
+
 // applyCloudEnvOverrides applies the K6_SHOW_CLOUD_LOGS and K6_EXIT_ON_RUNNING
 // environment variables onto the provided flag values, unless the corresponding
 // CLI flag was explicitly set (in which case it takes precedence).
 //
-// We deliberately parse the env variables, to validate for wrong values, even
-// if we don't subsequently use them.
-//
 // TODO: refactor (https://github.com/grafana/k6/issues/883)
 func applyCloudEnvOverrides(gs *state.GlobalState, cmd *cobra.Command, showCloudLogs, exitOnRunning *bool) error {
-	if showCloudLogsEnv, ok := gs.Env["K6_SHOW_CLOUD_LOGS"]; ok {
-		showCloudLogsValue, err := strconv.ParseBool(showCloudLogsEnv)
-		if err != nil {
-			return fmt.Errorf("parsing K6_SHOW_CLOUD_LOGS returned an error: %w", err)
-		}
-		if !cmd.Flags().Changed("show-logs") {
-			*showCloudLogs = showCloudLogsValue
-		}
+	envShowCloudLogs, envExitOnRunning, err := parseCloudEnvOverrides(gs.Env)
+	if err != nil {
+		return err
 	}
 
-	if exitOnRunningEnv, ok := gs.Env["K6_EXIT_ON_RUNNING"]; ok {
-		exitOnRunningValue, err := strconv.ParseBool(exitOnRunningEnv)
-		if err != nil {
-			return fmt.Errorf("parsing K6_EXIT_ON_RUNNING returned an error: %w", err)
-		}
-		if !cmd.Flags().Changed("exit-on-running") {
-			*exitOnRunning = exitOnRunningValue
-		}
+	if envShowCloudLogs != nil && !cmd.Flags().Changed("show-logs") {
+		*showCloudLogs = *envShowCloudLogs
+	}
+	if envExitOnRunning != nil && !cmd.Flags().Changed("exit-on-running") {
+		*exitOnRunning = *envExitOnRunning
 	}
 	return nil
 }
