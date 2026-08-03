@@ -40,7 +40,7 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 		},
 		{
 			name:               "should have lsp command",
-			wantStdoutContains: "  lsp         Start a TypeScript language server for a k6 script",
+			wantStdoutContains: "  lsp         Start a TypeScript language server for k6 scripts",
 		},
 		{
 			name:               "should have new command",

@@ -204,21 +204,30 @@ The primary prototype workflow exposes a standard stdio LSP command:
 
 ```bash
 k6 lsp test.js
+k6 lsp ./tests
 ```
 
 This command is a supervisor and protocol proxy, not a new implementation of a TypeScript language
 server. It:
 
-1. Loads the entry script and its static import graph with k6's resolver.
+1. Loads one entry script, or recursively discovers scripts in a directory and loads their static
+   import graphs with k6's resolver.
 2. Generates exact `paths` mappings with the shared declaration-discovery code.
 3. Starts a normal TypeScript language server as a child process.
 4. Proxies normal LSP traffic between the editor and that process.
-5. Watches the resolved local source graph and refreshes mappings when an import changes.
+5. Watches the resolved local source graphs and, in directory mode, the discovered directory tree.
 6. Notifies the child language server that its generated configurations changed.
 
-The local graph is polled every 500 milliseconds. The wrapper also refreshes after the editor sends
+The local graphs are polled every 500 milliseconds. The wrapper also refreshes after the editor sends
 `textDocument/didSave` or `workspace/didChangeWatchedFiles`. Refresh requests are debounced so a
-burst of file and editor events produces one k6 dependency scan.
+burst of file and editor events produces one k6 dependency scan. Directory membership is part of the
+polling snapshot, so adding or removing a script regenerates the project.
+
+Directory mode recursively includes `.js`, `.mjs`, `.cjs`, `.ts`, `.mts`, and `.cts` files. It skips
+TypeScript declaration files and the `.git`, `.k6`, and `node_modules` directories. Each discovered
+file remains in the generated TypeScript project even when k6 cannot load it as an entry; k6 warns and
+continues collecting mappings from the other loadable graphs. The selected directory becomes the LSP
+workspace and child-server working directory, even when the command was launched elsewhere.
 
 The wrapper observes the LSP initialization lifecycle. It writes the editor's `initialized`
 notification and the generated-project setting before it sends any synthetic watched-file event.
@@ -287,36 +296,40 @@ prototype therefore creates a temporary conventional `tsconfig.json` bridge in t
 directory. It refuses to start when that file already exists; it never overwrites a project
 configuration. Use the tsgo backend in an existing configured TypeScript project.
 
-`--server auto` tries a project-local or `PATH`-visible `tsgo` first, then
-`typescript-language-server`. `--server-path` can select a particular executable and requires an
-explicit `--server tsgo` or `--server tsserver` so k6 knows which arguments and configuration
+`--server auto` tries a `tsgo` in `node_modules/.bin` at the workspace or one of its ancestors, then a
+`PATH`-visible `tsgo`, and finally `typescript-language-server`. `--server-path` can select a particular
+executable and requires an explicit `--server tsgo` or `--server tsserver` so k6 knows which arguments
+and configuration
 strategy that executable needs.
 
 ### Editor contract
 
-Configure the editor to start this command as a stdio language server from the workspace root:
+Configure the editor to start this command as a stdio language server with an absolute file or
+directory input:
 
 ```text
 /absolute/path/to/k6 lsp /absolute/path/to/test.js
+/absolute/path/to/k6 lsp /absolute/path/to/project
 ```
 
-The entry script is required because it defines the k6 import graph to resolve. stdout contains only
-LSP frames; k6 warnings and child-server logs use stderr. A workspace should run one wrapper for each
-independent entry script whose graph needs different remote or extension declarations.
+File mode uses one entry script to define the k6 import graph. Directory mode combines the graphs of
+all recursively discovered scripts into one generated project and is the natural choice for an editor
+that configures one project-wide language-server command. stdout contains only LSP frames; k6 warnings
+and child-server logs use stderr. Run one wrapper per independent file entry or workspace directory.
 
 For a minimal Neovim configuration, start the wrapper after a JavaScript buffer receives its
-`FileType`, then use `LspAttach` for buffer-local behavior. Deferring startup allows the current
-buffer to become the default entry script:
+`FileType`, then use `LspAttach` for buffer-local behavior. Capture Neovim's initial working directory
+as the directory input so every script in that workspace shares one wrapper:
 
 ```lua
+local root = vim.fs.normalize(vim.fn.getcwd())
+
 vim.api.nvim_create_autocmd("FileType", {
   pattern = { "javascript", "typescript" },
   callback = function(event)
-    local entry = vim.api.nvim_buf_get_name(event.buf)
-    local root = vim.fs.root(entry, { ".git" }) or vim.fs.dirname(entry)
     vim.lsp.start({
       name = "k6",
-      cmd = { "/absolute/path/to/k6", "lsp", entry },
+      cmd = { "/absolute/path/to/k6", "lsp", root },
       cmd_cwd = root,
       root_dir = root,
     }, { bufnr = event.buf })
@@ -334,8 +347,8 @@ vim.api.nvim_create_autocmd("LspAttach", {
 ```
 
 [`examples/typecheck/neovim.lua`](../../examples/typecheck/neovim.lua) provides a complete standalone
-Neovim 0.11 configuration with entry-script selection, workspace attachment, diagnostics, and
-runnable setup instructions.
+Neovim 0.11 configuration with workspace-directory selection, attachment, diagnostics, and runnable
+setup instructions.
 
 VS Code's built-in JavaScript/TypeScript extension talks directly to `tsserver`, not to arbitrary
 stdio LSP commands. Using `k6 lsp` there requires a small generic LSP client extension or a dedicated

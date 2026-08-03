@@ -314,6 +314,27 @@ func TestFindCheckerPrefersProjectLocalTsgo(t *testing.T) {
 	require.Equal(t, localTsgo, checker)
 }
 
+func TestFindCheckerSearchesAncestorNodeModules(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	localTsgo := filepath.Join(ts.Cwd, "node_modules", ".bin", "tsgo")
+	require.NoError(t, ts.FS.MkdirAll(filepath.Dir(localTsgo), 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, localTsgo, nil, 0o755))
+	workspace := filepath.Join(ts.Cwd, "tests", "load")
+	require.NoError(t, ts.FS.MkdirAll(workspace, 0o755))
+
+	command := &typecheckCmd{
+		gs: ts.GlobalState,
+		lookPath: func(string) (string, error) {
+			return "", errors.New("PATH should not be used")
+		},
+	}
+	checker, err := command.findNamedChecker(workspace, "tsgo")
+	require.NoError(t, err)
+	require.Equal(t, localTsgo, checker)
+}
+
 func TestCacheProvidedExtensionDeclaration(t *testing.T) {
 	t.Parallel()
 

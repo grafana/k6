@@ -56,6 +56,12 @@ type checkerInvocation struct {
 	workingDir string
 }
 
+type typecheckProjectEntry struct {
+	scriptPath string
+	imports    []string
+	localFiles []string
+}
+
 type typecheckProject struct {
 	CompilerOptions typecheckCompilerOptions `json:"compilerOptions"`
 	Files           []string                 `json:"files"`
@@ -160,18 +166,47 @@ func (c *typecheckCmd) run(cmd *cobra.Command, args []string) error {
 func (c *typecheckCmd) generateProject(
 	ctx context.Context, cmd *cobra.Command, args []string, cwd, configPath, typesDir string,
 ) ([]string, error) {
-	// The k6 module loader does not yet expose a context-aware API for its own remote fetches.
-	test, err := loadLocalTestWithoutRunner(c.gs, cmd, args) //nolint:contextcheck
-	if err != nil {
-		var unsatisfiedErr binaryIsNotSatisfyingDependenciesError
-		if !errors.As(err, &unsatisfiedErr) {
-			return nil, err
+	return c.generateProjectForEntries(ctx, cmd, args, cwd, configPath, typesDir, false)
+}
+
+func (c *typecheckCmd) generateProjectForEntries(
+	ctx context.Context, cmd *cobra.Command, entries []string, cwd, configPath, typesDir string,
+	continueOnLoadError bool,
+) ([]string, error) {
+	importsSet := make(map[string]struct{})
+	scriptPathsSet := make(map[string]struct{})
+	localFilesSet := make(map[string]struct{})
+	var scriptPaths []string
+
+	addScriptPath := func(scriptPath string) {
+		scriptPath = filepath.Clean(scriptPath)
+		if _, exists := scriptPathsSet[scriptPath]; exists {
+			return
 		}
-		c.gs.Logger.Warnf("the running k6 binary does not provide all script dependencies: %v; "+
-			"extension types can only be extracted from the binary that contains the extension", unsatisfiedErr)
+		scriptPathsSet[scriptPath] = struct{}{}
+		scriptPaths = append(scriptPaths, scriptPath)
+		localFilesSet[scriptPath] = struct{}{}
 	}
 
-	paths, warnings, err := c.resolveTypeMappings(ctx, test.Imports(), typesDir)
+	for _, entry := range entries {
+		projectEntry, err := c.inspectProjectEntry(cmd, entry, cwd, continueOnLoadError)
+		if err != nil {
+			return nil, err
+		}
+		addScriptPath(projectEntry.scriptPath)
+		for _, imported := range projectEntry.imports {
+			importsSet[imported] = struct{}{}
+		}
+		for _, localFile := range projectEntry.localFiles {
+			localFilesSet[localFile] = struct{}{}
+		}
+	}
+
+	imports := make([]string, 0, len(importsSet))
+	for imported := range importsSet {
+		imports = append(imports, imported)
+	}
+	paths, warnings, err := c.resolveTypeMappings(ctx, imports, typesDir)
 	if err != nil {
 		return nil, err
 	}
@@ -179,15 +214,59 @@ func (c *typecheckCmd) generateProject(
 		c.gs.Logger.Warn(warning)
 	}
 
-	scriptPath, err := scriptFilePath(test)
-	if err != nil {
-		return nil, err
-	}
-	project := newTypecheckProject(scriptPath, paths, typeRootCandidates(cwd, scriptPath))
+	project := newTypecheckProjectForFiles(scriptPaths, paths, typeRootCandidatesForFiles(cwd, scriptPaths))
 	if err := writeTypecheckProject(c.gs.FS, configPath, project); err != nil {
 		return nil, err
 	}
-	return localSourcePaths(scriptPath, test.Imports()), nil
+
+	localFiles := make([]string, 0, len(localFilesSet))
+	for localFile := range localFilesSet {
+		localFiles = append(localFiles, localFile)
+	}
+	slices.Sort(localFiles)
+	return localFiles, nil
+}
+
+func (c *typecheckCmd) inspectProjectEntry(
+	cmd *cobra.Command, entry, cwd string, continueOnLoadError bool,
+) (typecheckProjectEntry, error) {
+	fallback := typecheckProjectEntry{scriptPath: absolutePath(cwd, entry)}
+	// The k6 module loader does not yet expose a context-aware API for its own remote fetches.
+	test, err := loadLocalTestWithoutRunner(c.gs, cmd, []string{entry}) //nolint:contextcheck
+	if err != nil {
+		var unsatisfiedErr binaryIsNotSatisfyingDependenciesError
+		switch {
+		case errors.As(err, &unsatisfiedErr):
+			c.gs.Logger.Warnf("the running k6 binary does not provide all script dependencies: %v; "+
+				"extension types can only be extracted from the binary that contains the extension", unsatisfiedErr)
+		case !continueOnLoadError:
+			return typecheckProjectEntry{}, err
+		default:
+			c.gs.Logger.Warnf("could not inspect k6 script %s for type mappings: %v", entry, err)
+			return fallback, nil
+		}
+	}
+	if test == nil {
+		if continueOnLoadError {
+			return fallback, nil
+		}
+		return typecheckProjectEntry{}, fmt.Errorf("load k6 script %s", entry)
+	}
+
+	scriptPath, err := scriptFilePath(test)
+	if err != nil {
+		if continueOnLoadError {
+			c.gs.Logger.Warnf("could not add k6 script %s to the generated project: %v", entry, err)
+			return fallback, nil
+		}
+		return typecheckProjectEntry{}, err
+	}
+	imports := test.Imports()
+	return typecheckProjectEntry{
+		scriptPath: scriptPath,
+		imports:    imports,
+		localFiles: localSourcePaths(scriptPath, imports),
+	}, nil
 }
 
 func (c *typecheckCmd) ensureInPlaceConfigAvailable(configPath string) error {
@@ -283,6 +362,12 @@ func scriptFilePath(test *loadedTest) (string, error) {
 func newTypecheckProject(
 	scriptPath string, paths map[string][]string, typeRoots []string,
 ) typecheckProject {
+	return newTypecheckProjectForFiles([]string{scriptPath}, paths, typeRoots)
+}
+
+func newTypecheckProjectForFiles(
+	scriptPaths []string, paths map[string][]string, typeRoots []string,
+) typecheckProject {
 	return typecheckProject{
 		CompilerOptions: typecheckCompilerOptions{
 			Target:                     "ES2022",
@@ -298,14 +383,23 @@ func newTypecheckProject(
 			TypeRoots:                  typeRoots,
 			Paths:                      paths,
 		},
-		Files: []string{scriptPath},
+		Files: scriptPaths,
 	}
 }
 
 func typeRootCandidates(cwd, scriptPath string) []string {
+	return typeRootCandidatesForFiles(cwd, []string{scriptPath})
+}
+
+func typeRootCandidatesForFiles(cwd string, scriptPaths []string) []string {
 	seen := make(map[string]struct{})
 	var result []string
-	for _, start := range []string{filepath.Dir(scriptPath), cwd} {
+	starts := make([]string, 0, len(scriptPaths)+1)
+	for _, scriptPath := range scriptPaths {
+		starts = append(starts, filepath.Dir(scriptPath))
+	}
+	starts = append(starts, cwd)
+	for _, start := range starts {
 		for directory := filepath.Clean(start); ; directory = filepath.Dir(directory) {
 			candidate := filepath.Join(directory, "node_modules", "@types")
 			if _, ok := seen[candidate]; !ok {
@@ -746,14 +840,20 @@ func (c *typecheckCmd) findNamedChecker(cwd, name string) (string, error) {
 		return absolutePath(cwd, name), nil
 	}
 
-	local := filepath.Join(cwd, "node_modules", ".bin", name)
-	localCandidates := []string{local}
-	if runtime.GOOS == "windows" {
-		localCandidates = append(localCandidates, local+".cmd")
-	}
-	for _, candidate := range localCandidates {
-		if exists, err := fsext.Exists(c.gs.FS, candidate); err == nil && exists {
-			return candidate, nil
+	for directory := filepath.Clean(cwd); ; directory = filepath.Dir(directory) {
+		local := filepath.Join(directory, "node_modules", ".bin", name)
+		localCandidates := []string{local}
+		if runtime.GOOS == "windows" {
+			localCandidates = append(localCandidates, local+".cmd")
+		}
+		for _, candidate := range localCandidates {
+			if exists, err := fsext.Exists(c.gs.FS, candidate); err == nil && exists {
+				return candidate, nil
+			}
+		}
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			break
 		}
 	}
 	checker, err := c.lookPath(name)

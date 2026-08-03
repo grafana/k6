@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"os/exec"
@@ -66,14 +67,20 @@ type lspProjectLocations struct {
 	temporary     bool
 }
 
+type lspInput struct {
+	path      string
+	directory bool
+}
+
 type lspBridgeProject struct {
 	Extends string `json:"extends"`
 }
 
 type lspFileStamp struct {
-	exists  bool
-	size    int64
-	modTime time.Time
+	exists           bool
+	size             int64
+	modTime          time.Time
+	directoryEntries string
 }
 
 type lspFileWatcher struct {
@@ -114,12 +121,12 @@ func getCmdLSP(gs *state.GlobalState) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "lsp [file]",
-		Short: "Start a TypeScript language server for a k6 script",
-		Long: "Generate type mappings for a k6 script, start tsgo's native LSP or the " +
+		Use:   "lsp [path]",
+		Short: "Start a TypeScript language server for k6 scripts",
+		Long: "Generate type mappings for a k6 script or directory, start tsgo's native LSP or the " +
 			"tsserver-backed TypeScript language server, and proxy LSP messages over stdio.",
-		Args:    exactArgsWithMsg(1, "arg should be a path to a JavaScript or TypeScript file"),
-		Example: getExampleText(gs, `  {{.}} lsp script.js`),
+		Args:    exactArgsWithMsg(1, "arg should be a path to a JavaScript or TypeScript file or directory"),
+		Example: getExampleText(gs, "  {{.}} lsp script.js\n  {{.}} lsp ."),
 		RunE:    lsp.run,
 	}
 
@@ -141,26 +148,31 @@ func (c *lspCmd) run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("get working directory: %w", err)
 	}
-
-	invocation, err := c.serverInvocation(cwd)
+	input, err := resolveLSPInput(c.gs.FS, cwd, args[0])
 	if err != nil {
 		return err
 	}
-	locations, err := c.projectLocations(cwd, invocation.kind)
+	workspaceDir := cwd
+	if input.directory {
+		workspaceDir = input.path
+	}
+
+	invocation, err := c.serverInvocation(workspaceDir)
+	if err != nil {
+		return err
+	}
+	locations, err := c.projectLocations(workspaceDir, invocation.kind)
 	if err != nil {
 		return err
 	}
 	defer func() { c.cleanProject(locations) }()
 
-	localFiles, err := c.regenerateProject(cmd.Context(), cmd, args, cwd, locations)
+	watchPaths, err := c.regenerateProject(cmd.Context(), cmd, input, workspaceDir, locations)
 	if err != nil {
 		return err
 	}
-	if err := validateLSPEntryPath(cwd, localFiles[0]); err != nil {
-		return err
-	}
 	if c.inPlace {
-		if err := writeInPlaceConfigMarker(c.gs.FS, cwd, locations.configPath); err != nil {
+		if err := writeInPlaceConfigMarker(c.gs.FS, workspaceDir, locations.configPath); err != nil {
 			return err
 		}
 	}
@@ -171,7 +183,7 @@ func (c *lspCmd) run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return c.proxy(cmd.Context(), cmd, args, invocation, locations, localFiles)
+	return c.proxy(cmd.Context(), cmd, input, invocation, locations, watchPaths)
 }
 
 func (c *lspCmd) serverInvocation(cwd string) (lspServerInvocation, error) {
@@ -290,13 +302,27 @@ func (c *lspCmd) inPlaceProjectLocations(cwd string) (lspProjectLocations, error
 }
 
 func (c *lspCmd) regenerateProject(
-	ctx context.Context, cmd *cobra.Command, args []string, cwd string, locations lspProjectLocations,
+	ctx context.Context, cmd *cobra.Command, input lspInput, cwd string, locations lspProjectLocations,
 ) ([]string, error) {
 	generator := &typecheckCmd{
 		gs:         c.gs,
 		httpClient: c.httpClient,
 	}
-	return generator.generateProject(ctx, cmd, args, cwd, locations.configPath, locations.typesDir)
+	if !input.directory {
+		return generator.generateProject(
+			ctx, cmd, []string{input.path}, cwd, locations.configPath, locations.typesDir)
+	}
+
+	entries, directories, err := discoverLSPScripts(c.gs.FS, input.path)
+	if err != nil {
+		return nil, err
+	}
+	localFiles, err := generator.generateProjectForEntries(
+		ctx, cmd, entries, cwd, locations.configPath, locations.typesDir, true)
+	if err != nil {
+		return nil, err
+	}
+	return mergeLSPWatchPaths(localFiles, directories), nil
 }
 
 func writeLSPBridge(fs fsext.Fs, bridgePath, configPath string) error {
@@ -325,8 +351,8 @@ func (c *lspCmd) cleanProject(locations lspProjectLocations) {
 }
 
 func (c *lspCmd) proxy(
-	ctx context.Context, cmd *cobra.Command, args []string,
-	invocation lspServerInvocation, locations lspProjectLocations, localFiles []string,
+	ctx context.Context, cmd *cobra.Command, input lspInput,
+	invocation lspServerInvocation, locations lspProjectLocations, watchPaths []string,
 ) error {
 	serverCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -340,7 +366,7 @@ func (c *lspCmd) proxy(
 	readiness := newLSPServerReadiness()
 	regenerate := make(chan struct{}, 1)
 	watcher := &lspFileWatcher{fs: c.gs.FS}
-	watcher.update(localFiles)
+	watcher.update(watchPaths)
 	watcherDone := make(chan struct{})
 	go func() {
 		defer close(watcherDone)
@@ -350,7 +376,7 @@ func (c *lspCmd) proxy(
 	go func() {
 		defer close(regenerationDone)
 		c.regenerationLoop(
-			serverCtx, cmd, args, invocation, locations, writer, watcher, readiness, regenerate)
+			serverCtx, cmd, input, invocation, locations, writer, watcher, readiness, regenerate)
 	}()
 
 	proxyDone := make(chan error, 1)
@@ -432,7 +458,7 @@ func (c *lspCmd) startServer(
 }
 
 func (c *lspCmd) regenerationLoop(
-	ctx context.Context, cmd *cobra.Command, args []string,
+	ctx context.Context, cmd *cobra.Command, input lspInput,
 	invocation lspServerInvocation, locations lspProjectLocations,
 	writer *lockedLSPWriter, watcher *lspFileWatcher, readiness *lspServerReadiness,
 	regenerate <-chan struct{},
@@ -441,12 +467,12 @@ func (c *lspCmd) regenerationLoop(
 		if !waitForTypeMappingRefresh(ctx, regenerate) {
 			return
 		}
-		localFiles, err := c.regenerateProject(ctx, cmd, args, invocation.workingDir, locations)
+		watchPaths, err := c.regenerateProject(ctx, cmd, input, invocation.workingDir, locations)
 		if err != nil {
 			c.gs.Logger.Warnf("could not refresh k6 type mappings: %v", err)
 			continue
 		}
-		watcher.update(localFiles)
+		watcher.update(watchPaths)
 		if err := notifyLSPWatchedFiles(writer, readiness, locations); err != nil {
 			c.gs.Logger.Warnf("could not notify TypeScript language server about refreshed mappings: %v", err)
 		}
@@ -514,6 +540,94 @@ func validateLSPEntryPath(cwd, scriptPath string) error {
 	return nil
 }
 
+func resolveLSPInput(fileSystem fsext.Fs, cwd, value string) (lspInput, error) {
+	inputPath := absolutePath(cwd, value)
+	info, err := fileSystem.Stat(inputPath)
+	if err != nil {
+		return lspInput{}, fmt.Errorf("inspect LSP input %s: %w", inputPath, err)
+	}
+	if info.IsDir() {
+		return lspInput{path: inputPath, directory: true}, nil
+	}
+	if !info.Mode().IsRegular() {
+		return lspInput{}, fmt.Errorf("LSP input %s is not a regular file or directory", inputPath)
+	}
+	if err := validateLSPEntryPath(cwd, inputPath); err != nil {
+		return lspInput{}, err
+	}
+	return lspInput{path: inputPath}, nil
+}
+
+func discoverLSPScripts(fileSystem fsext.Fs, root string) ([]string, []string, error) {
+	var scripts []string
+	var directories []string
+	err := fsext.Walk(fileSystem, root, func(path string, info fs.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if info.IsDir() {
+			if path != root && isIgnoredLSPDirectory(info.Name()) {
+				return filepath.SkipDir
+			}
+			directories = append(directories, filepath.Clean(path))
+			return nil
+		}
+		if isLSPSourceFile(info.Name()) {
+			scripts = append(scripts, filepath.Clean(path))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("discover k6 scripts under %s: %w", root, err)
+	}
+	if len(scripts) == 0 {
+		return nil, nil, fmt.Errorf("no JavaScript or TypeScript files found under %s", root)
+	}
+	slices.Sort(scripts)
+	slices.Sort(directories)
+	return scripts, directories, nil
+}
+
+func isIgnoredLSPDirectory(name string) bool {
+	switch name {
+	case ".git", ".k6", "node_modules":
+		return true
+	default:
+		return false
+	}
+}
+
+func isLSPSourceFile(name string) bool {
+	name = strings.ToLower(name)
+	if strings.HasSuffix(name, ".d.ts") || strings.HasSuffix(name, ".d.mts") ||
+		strings.HasSuffix(name, ".d.cts") {
+		return false
+	}
+	switch filepath.Ext(name) {
+	case ".js", ".mjs", ".cjs", ".ts", ".mts", ".cts":
+		return true
+	default:
+		return false
+	}
+}
+
+func mergeLSPWatchPaths(pathGroups ...[]string) []string {
+	seen := make(map[string]struct{})
+	var result []string
+	for _, paths := range pathGroups {
+		for _, path := range paths {
+			path = filepath.Clean(path)
+			if _, exists := seen[path]; exists {
+				continue
+			}
+			seen[path] = struct{}{}
+			result = append(result, path)
+		}
+	}
+	slices.Sort(result)
+	return result
+}
+
 func (w *lspFileWatcher) update(paths []string) {
 	files := make(map[string]lspFileStamp, len(paths))
 	for _, path := range paths {
@@ -562,7 +676,27 @@ func (w *lspFileWatcher) stamp(path string) lspFileStamp {
 	if err != nil {
 		return lspFileStamp{}
 	}
-	return lspFileStamp{exists: true, size: info.Size(), modTime: info.ModTime()}
+	stamp := lspFileStamp{exists: true, size: info.Size(), modTime: info.ModTime()}
+	if !info.IsDir() {
+		return stamp
+	}
+
+	directory, err := w.fs.Open(path)
+	if err != nil {
+		return stamp
+	}
+	entries, readErr := directory.Readdir(-1)
+	_ = directory.Close()
+	if readErr != nil {
+		return stamp
+	}
+	entryNames := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		entryNames = append(entryNames, entry.Name()+":"+entry.Mode().String())
+	}
+	slices.Sort(entryNames)
+	stamp.directoryEntries = strings.Join(entryNames, "\x00")
+	return stamp
 }
 
 type lockedLSPWriter struct {

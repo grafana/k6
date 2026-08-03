@@ -3,14 +3,18 @@ package cmd
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"net/http"
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
+	xk6types "go.k6.io/k6/v2/examples/typecheck/xk6-types"
 	"go.k6.io/k6/v2/internal/cmd/tests"
 	"go.k6.io/k6/v2/lib/fsext"
 )
@@ -164,6 +168,131 @@ func TestLSPDoesNotExposeTypesDirectory(t *testing.T) {
 	require.Nil(t, getCmdLSP(ts.GlobalState).Flags().Lookup("types-dir"))
 }
 
+func TestResolveLSPInput(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	workspace := filepath.Join(ts.Cwd, "workspace")
+	require.NoError(t, ts.FS.MkdirAll(workspace, 0o755))
+	filename := filepath.Join(ts.Cwd, "script.js")
+	require.NoError(t, fsext.WriteFile(ts.FS, filename, []byte("export {};\n"), 0o644))
+
+	input, err := resolveLSPInput(ts.FS, ts.Cwd, "workspace")
+	require.NoError(t, err)
+	require.Equal(t, lspInput{path: workspace, directory: true}, input)
+
+	input, err = resolveLSPInput(ts.FS, ts.Cwd, "script.js")
+	require.NoError(t, err)
+	require.Equal(t, lspInput{path: filename}, input)
+}
+
+func TestDiscoverLSPScripts(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	root := filepath.Join(ts.Cwd, "workspace")
+	for _, directory := range []string{
+		root,
+		filepath.Join(root, "tests"),
+		filepath.Join(root, ".git"),
+		filepath.Join(root, ".k6"),
+		filepath.Join(root, "node_modules", "dependency"),
+	} {
+		require.NoError(t, ts.FS.MkdirAll(directory, 0o755))
+	}
+	for filename, contents := range map[string]string{
+		filepath.Join(root, "main.js"):                                "export {};\n",
+		filepath.Join(root, "tests", "load.ts"):                       "export {};\n",
+		filepath.Join(root, "tests", "helper.mjs"):                    "export {};\n",
+		filepath.Join(root, "tests", "types.d.ts"):                    "export {};\n",
+		filepath.Join(root, "README.md"):                              "not a script\n",
+		filepath.Join(root, ".git", "hook.js"):                        "export {};\n",
+		filepath.Join(root, ".k6", "generated.ts"):                    "export {};\n",
+		filepath.Join(root, "node_modules", "dependency", "index.js"): "export {};\n",
+	} {
+		require.NoError(t, fsext.WriteFile(ts.FS, filename, []byte(contents), 0o644))
+	}
+
+	scripts, directories, err := discoverLSPScripts(ts.FS, root)
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		filepath.Join(root, "main.js"),
+		filepath.Join(root, "tests", "helper.mjs"),
+		filepath.Join(root, "tests", "load.ts"),
+	}, scripts)
+	require.Equal(t, []string{root, filepath.Join(root, "tests")}, directories)
+
+	empty := filepath.Join(ts.Cwd, "empty")
+	require.NoError(t, ts.FS.MkdirAll(empty, 0o755))
+	_, _, err = discoverLSPScripts(ts.FS, empty)
+	require.ErrorContains(t, err, "no JavaScript or TypeScript files found")
+}
+
+func TestLSPRegenerateDirectoryProject(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	root := filepath.Join(ts.Cwd, "workspace")
+	nested := filepath.Join(root, "nested")
+	require.NoError(t, ts.FS.MkdirAll(nested, 0o755))
+	mainFile := filepath.Join(root, "main.js")
+	invalidFile := filepath.Join(root, "invalid.js")
+	nestedFile := filepath.Join(nested, "scenario.ts")
+	require.NoError(t, fsext.WriteFile(ts.FS, mainFile,
+		[]byte(`
+import { greet } from "k6/x/types-example";
+export default function () { greet("k6"); }
+`), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, invalidFile,
+		[]byte("export default function (\n"), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, nestedFile,
+		[]byte("export default function (): void {}\n"), 0o644))
+
+	command := &cobra.Command{}
+	command.Flags().AddFlagSet(runtimeOptionFlagSet(false))
+	locations := lspProjectLocations{
+		configPath: filepath.Join(ts.Cwd, "generated", "tsconfig.json"),
+		typesDir:   filepath.Join(ts.Cwd, "generated", "types"),
+	}
+	lsp := &lspCmd{gs: ts.GlobalState, httpClient: http.DefaultClient}
+	watchPaths, err := lsp.regenerateProject(context.Background(), command,
+		lspInput{path: root, directory: true}, root, locations)
+	require.NoError(t, err)
+	require.Contains(t, watchPaths, root)
+	require.Contains(t, watchPaths, nested)
+	require.Contains(t, watchPaths, mainFile)
+	require.Contains(t, watchPaths, invalidFile)
+	require.Contains(t, watchPaths, nestedFile)
+
+	data, err := fsext.ReadFile(ts.FS, locations.configPath)
+	require.NoError(t, err)
+	var project typecheckProject
+	require.NoError(t, json.Unmarshal(data, &project))
+	require.Equal(t, []string{invalidFile, mainFile, nestedFile}, project.Files)
+	require.Contains(t, project.CompilerOptions.Paths, xk6types.ModuleName)
+
+	addedFile := filepath.Join(root, "added.js")
+	require.NoError(t, fsext.WriteFile(ts.FS, addedFile,
+		[]byte("export default function () {}\n"), 0o644))
+	watchPaths, err = lsp.regenerateProject(context.Background(), command,
+		lspInput{path: root, directory: true}, root, locations)
+	require.NoError(t, err)
+	require.Contains(t, watchPaths, addedFile)
+	data, err = fsext.ReadFile(ts.FS, locations.configPath)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(data, &project))
+	require.Equal(t, []string{addedFile, invalidFile, mainFile, nestedFile}, project.Files)
+
+	require.NoError(t, ts.FS.Remove(addedFile))
+	_, err = lsp.regenerateProject(context.Background(), command,
+		lspInput{path: root, directory: true}, root, locations)
+	require.NoError(t, err)
+	data, err = fsext.ReadFile(ts.FS, locations.configPath)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(data, &project))
+	require.Equal(t, []string{invalidFile, mainFile, nestedFile}, project.Files)
+}
+
 func TestProxyLSPClient(t *testing.T) {
 	t.Parallel()
 
@@ -268,6 +397,11 @@ func TestLSPFileWatcher(t *testing.T) {
 	require.False(t, watcher.changed())
 
 	require.NoError(t, fsext.WriteFile(ts.FS, filename, []byte("export default function () {};\n"), 0o644))
+	require.True(t, watcher.changed())
+	require.False(t, watcher.changed())
+
+	watcher.update([]string{ts.Cwd, filename})
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "added.js"), []byte("export {};\n"), 0o644))
 	require.True(t, watcher.changed())
 	require.False(t, watcher.changed())
 }
