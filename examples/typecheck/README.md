@@ -43,9 +43,9 @@ Go. The classic TypeScript implementation remains supported through the
 `typescript-language-server` adapter over tsserver.
 
 This division can eventually make k6 authoring independent of npm: k6 can provide its built-in and
-extension declarations while invoking a separately distributed tsgo binary. The current prototype
-does not reach that goal yet because the preview tsgo build and declarations for built-in k6 modules
-are installed from npm.
+extension declarations while invoking a separately distributed tsgo binary. tsgo can already be
+installed directly with Go. The current prototype still uses npm for the declarations for built-in
+k6 modules.
 
 The implementation is a proof of concept. It prioritizes automatic editor configuration and accurate
 type discovery over persistent caching and performance. The checked-in JavaScript-header example uses
@@ -56,7 +56,24 @@ Direct `jsr:` import support and decisions about how jslib should be hosted are 
 
 ## Install tsgo
 
-Install the preferred native language server and the declarations for the built-in k6 modules:
+With Go 1.26 or newer, install the preferred native language server directly from
+[Microsoft's typescript-go repository](https://github.com/microsoft/typescript-go):
+
+```bash
+go install github.com/microsoft/typescript-go/cmd/tsgo@latest
+```
+
+Go installs the executable in `GOBIN`, or in `GOPATH/bin` when `GOBIN` is unset. Ensure that
+directory is on `PATH` so `k6 lsp` can find `tsgo`.
+
+The prototype still obtains declarations for k6's built-in modules from npm. Install those
+separately in the project:
+
+```bash
+npm install --save-dev @types/k6
+```
+
+Alternatively, install both the preview tsgo package and the built-in declarations through npm:
 
 ```bash
 npm install --save-dev @typescript/native-preview @types/k6
@@ -292,7 +309,8 @@ Build k6 and install tsgo first:
 
 ```bash
 go build -o ./k6 .
-npm install --save-dev @typescript/native-preview @types/k6
+go install github.com/microsoft/typescript-go/cmd/tsgo@latest
+npm install --save-dev @types/k6
 ```
 
 Then start Neovim from the directory that should become the k6 workspace:
@@ -356,7 +374,8 @@ and select it with `K6_BIN`:
 
 ```bash
 go build -o ./k6-with-types ./examples/typecheck/k6-with-types
-npm install --save-dev @typescript/native-preview @types/k6
+go install github.com/microsoft/typescript-go/cmd/tsgo@latest
+npm install --save-dev @types/k6
 cd examples/typecheck
 K6_BIN="$PWD/../../k6-with-types" nvim -u neovim.lua extension.js
 ```
@@ -381,7 +400,8 @@ the plugin and restarting GoLand:
 
    ```bash
    go build -o ./k6 .
-   npm install --save-dev @typescript/native-preview @types/k6
+   go install github.com/microsoft/typescript-go/cmd/tsgo@latest
+   npm install --save-dev @types/k6
    ```
 
 2. Open **Settings | Languages & Frameworks | Language Servers**, select **+**, and create a

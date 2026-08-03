@@ -139,14 +139,18 @@ requested script.
 
 ## One-time project setup
 
-Install tsgo and the declarations for k6's built-in modules as development dependencies:
+Install tsgo directly from Microsoft's Go source, then install the declarations for k6's built-in
+modules as a development dependency:
 
 ```bash
-npm install --save-dev @typescript/native-preview @types/k6
+go install github.com/microsoft/typescript-go/cmd/tsgo@latest
+npm install --save-dev @types/k6
 ```
 
-These packages are authoring dependencies. k6 does not load them while running a test script. The
-tsserver compatibility backend instead requires `typescript-language-server` and `typescript`.
+The current typescript-go source requires Go 1.26 or newer. Go installs `tsgo` in `GOBIN`, or in
+`GOPATH/bin` when `GOBIN` is unset; that directory must be on `PATH`. `@types/k6` is an authoring
+dependency, and k6 does not load it while running a test script. The tsserver compatibility backend
+instead requires `typescript-language-server` and `typescript`.
 
 No manual declaration installation is needed for AJV. The command follows its advertised types URL,
 downloads the declaration into the generated project, and writes the corresponding `paths` entry.
@@ -238,13 +242,17 @@ needed to keep the generated project current.
 
 ### tsgo backend
 
-The preferred backend is the native TypeScript language server included in
-`@typescript/native-preview`:
+The preferred backend is the native TypeScript language server from
+[Microsoft's typescript-go repository](https://github.com/microsoft/typescript-go):
 
 ```bash
-npm install --save-dev @typescript/native-preview @types/k6
+go install github.com/microsoft/typescript-go/cmd/tsgo@latest
+npm install --save-dev @types/k6
 k6 lsp --server tsgo test.js
 ```
+
+Installing `@typescript/native-preview` remains a supported alternative to building the `tsgo`
+executable with Go.
 
 The child invocation is:
 
