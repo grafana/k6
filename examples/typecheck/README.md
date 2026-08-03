@@ -360,6 +360,70 @@ K6_BIN=<workspace>/k6-with-types
 Once attached, hovering over `greet` should show `(name: string) => string`, and changing
 `greet("k6")` to `greet(42)` should produce a TypeScript diagnostic.
 
+## IntelliJ IDEA and GoLand
+
+The [IntelliJ Platform LSP API](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)
+supports GoLand and the commercial IntelliJ-based IDEs. That API is intended for IntelliJ plugins;
+GoLand does not provide a generic built-in settings page where a user can enter an arbitrary stdio
+language-server command. A future dedicated k6 plugin can use the native API to recognize k6 scripts,
+select an entry point, and launch `k6 lsp`.
+
+For testing the prototype without developing a dedicated plugin, install the
+[LSP4IJ plugin](https://plugins.jetbrains.com/plugin/23257-lsp4ij). LSP4IJ supports user-defined stdio
+language servers and currently requires an IntelliJ-based IDE version 2024.2 or newer. After installing
+the plugin and restarting GoLand:
+
+1. Build k6 and install the preferred backend in the project:
+
+   ```bash
+   go build -o ./k6 .
+   npm install --save-dev @typescript/native-preview @types/k6
+   ```
+
+2. Open **Settings | Languages & Frameworks | Language Servers**, select **+**, and create a
+   user-defined language server.
+3. In the **Server** tab, configure:
+
+   ```text
+   Name:              k6
+   Command:           "$PROJECT_DIR$/k6" lsp --server tsgo "$PROJECT_DIR$/examples/typecheck/totp-jsr.js"
+   Working directory: $PROJECT_DIR$
+   ```
+
+   Keep system environment variables enabled so the wrapper can find project-local or `PATH`-visible
+   tools. The command and entry path are absolute after LSP4IJ expands `$PROJECT_DIR$`. The explicit
+   working directory is important because `k6 lsp` requires its working directory to contain the
+   entry script and searches its `node_modules/.bin` directory for tsgo.
+4. In the **Mappings** tab, associate the JavaScript file type with language ID `javascript`. If the
+   local k6 graph contains TypeScript files, also associate the TypeScript file type or the `*.ts`
+   filename pattern with language ID `typescript`.
+5. Apply the configuration and open the configured entry script. Use the **Language Services** status
+   bar widget or LSP4IJ's **LSP Consoles** tool window to confirm that the `k6` process is running.
+
+Hover over `generateTOTP` in [`totp-jsr.js`](totp-jsr.js), request completion inside its options
+object, or temporarily set `algorithm: "MD5"` to verify hover, completion, and diagnostics. GoLand's
+own JavaScript and TypeScript support can also contribute editor results; the LSP console shows the
+requests and responses handled specifically by `k6 lsp`.
+
+The entry argument is intentionally fixed in the server command. It defines the k6 import graph and
+therefore the generated TypeScript project. Change the command and restart the language server when
+switching to an independent test entry. Avoid starting several k6 definitions with overlapping
+JavaScript mappings in one project, because each definition would provide diagnostics for the same
+files.
+
+For the typed extension example, build the extension-enabled binary and change both the executable
+and entry in the command:
+
+```text
+"$PROJECT_DIR$/k6-with-types" lsp --server tsgo "$PROJECT_DIR$/examples/typecheck/extension.js"
+```
+
+LSP4IJ's
+[user-defined language server documentation](https://github.com/redhat-developer/lsp4ij/blob/main/docs/UserDefinedLanguageServer.md)
+also describes environment variables, project macros, mappings, workspace folders, and protocol
+tracing. No LSP initialization JSON is required for `k6 lsp`; the wrapper injects the generated tsgo
+configuration after the client sends `initialized`.
+
 ## Optional: one-shot and watch type checking
 
 `k6 typecheck` uses the same discovery and project-generation code without starting an editor
