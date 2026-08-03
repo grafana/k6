@@ -189,7 +189,7 @@ func (c *typecheckCmd) generateProjectForEntries(
 	}
 
 	for _, entry := range entries {
-		projectEntry, err := c.inspectProjectEntry(cmd, entry, cwd, continueOnLoadError)
+		projectEntry, err := c.inspectProjectEntry(ctx, cmd, entry, cwd, continueOnLoadError)
 		if err != nil {
 			return nil, err
 		}
@@ -228,7 +228,7 @@ func (c *typecheckCmd) generateProjectForEntries(
 }
 
 func (c *typecheckCmd) inspectProjectEntry(
-	cmd *cobra.Command, entry, cwd string, continueOnLoadError bool,
+	_ context.Context, cmd *cobra.Command, entry, cwd string, continueOnLoadError bool,
 ) (typecheckProjectEntry, error) {
 	fallback := typecheckProjectEntry{scriptPath: absolutePath(cwd, entry)}
 	// The k6 module loader does not yet expose a context-aware API for its own remote fetches.
@@ -385,10 +385,6 @@ func newTypecheckProjectForFiles(
 		},
 		Files: scriptPaths,
 	}
-}
-
-func typeRootCandidates(cwd, scriptPath string) []string {
-	return typeRootCandidatesForFiles(cwd, []string{scriptPath})
 }
 
 func typeRootCandidatesForFiles(cwd string, scriptPaths []string) []string {
