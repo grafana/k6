@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -221,6 +222,40 @@ func TestResolveRemoteDeclarationFromSibling(t *testing.T) {
 	data, err := fsext.ReadFile(ts.FS, filename)
 	require.NoError(t, err)
 	require.Equal(t, declaration, string(data))
+}
+
+func TestResolveRemoteTypeScriptSource(t *testing.T) {
+	t.Parallel()
+
+	const source = "export function value(input: string): string { return input; }\n"
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		requests.Add(1)
+		require.Equal(t, "/scope/package/1.0.0/src/mod.ts", request.URL.Path)
+		_, _ = response.Write([]byte(source))
+	}))
+	defer server.Close()
+
+	ts := tests.NewGlobalTestState(t)
+	command := &typecheckCmd{gs: ts.GlobalState, httpClient: server.Client()}
+	typesDir := filepath.Join(ts.Cwd, ".k6", "types")
+	moduleSpecifier := server.URL + "/scope/package/1.0.0/src/mod.ts"
+
+	filename, found, err := command.resolveRemoteDeclaration(context.Background(), moduleSpecifier, typesDir)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, filepath.Join(typesDir, "remotes", safePathSegment(server.Listener.Addr().String()),
+		"scope", "package", "1.0.0", "src", "mod.ts"), filename)
+
+	data, err := fsext.ReadFile(ts.FS, filename)
+	require.NoError(t, err)
+	require.Equal(t, source, string(data))
+
+	secondFilename, found, err := command.resolveRemoteDeclaration(context.Background(), moduleSpecifier, typesDir)
+	require.NoError(t, err)
+	require.True(t, found)
+	require.Equal(t, filename, secondFilename)
+	require.Equal(t, int32(1), requests.Load())
 }
 
 func TestResolveRemoteDeclarationUsesLegacyCache(t *testing.T) {

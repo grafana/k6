@@ -355,8 +355,8 @@ func (c *typecheckCmd) resolveTypeMappings(
 			}
 			if !found {
 				warnings = append(warnings, fmt.Sprintf(
-					"no TypeScript declaration found for %s; the module must advertise one with "+
-						"X-TypeScript-Types or publish a sibling declaration", imported))
+					"no TypeScript type information found for %s; the module must provide TypeScript source, "+
+						"advertise a declaration with X-TypeScript-Types, or publish a sibling declaration", imported))
 				continue
 			}
 			paths[imported] = []string{declaration}
@@ -383,6 +383,20 @@ func (c *typecheckCmd) resolveRemoteDeclaration(
 	if err != nil {
 		return "", false, fmt.Errorf("parse module URL: %w", err)
 	}
+	if isTypeScriptSourceURL(moduleURL) {
+		cachePath := canonicalRemoteTypeScriptSourcePath(typesDir, moduleURL)
+		if exists, existsErr := fsext.Exists(c.gs.FS, cachePath); existsErr != nil {
+			return "", false, fmt.Errorf("inspect cached TypeScript source %s: %w", cachePath, existsErr)
+		} else if exists {
+			return cachePath, true, nil
+		}
+
+		data, found, fetchErr := c.fetchTypeFile(ctx, moduleURL)
+		if fetchErr != nil || !found {
+			return "", false, fetchErr
+		}
+		return c.cacheRemoteTypes(moduleSpecifier, cachePath, data)
+	}
 
 	for _, candidate := range remoteDeclarationCandidates(typesDir, moduleURL) {
 		if exists, err := fsext.Exists(c.gs.FS, candidate); err != nil {
@@ -397,7 +411,7 @@ func (c *typecheckCmd) resolveRemoteDeclaration(
 		return "", false, err
 	}
 	if found {
-		data, fetched, fetchErr := c.fetchDeclaration(ctx, &typesURL)
+		data, fetched, fetchErr := c.fetchTypeFile(ctx, &typesURL)
 		if fetchErr != nil {
 			return "", false, fetchErr
 		}
@@ -411,7 +425,7 @@ func (c *typecheckCmd) resolveRemoteDeclaration(
 		return "", false, nil
 	}
 
-	data, found, err := c.fetchDeclaration(ctx, siblingTypesURL)
+	data, found, err := c.fetchTypeFile(ctx, siblingTypesURL)
 	if err != nil || !found {
 		return "", false, err
 	}
@@ -423,11 +437,17 @@ func (c *typecheckCmd) cacheRemoteDeclaration(
 	moduleSpecifier string, moduleURL *url.URL, typesDir string, data []byte,
 ) (string, bool, error) {
 	cachePath := canonicalRemoteDeclarationPath(typesDir, moduleURL)
+	return c.cacheRemoteTypes(moduleSpecifier, cachePath, data)
+}
+
+func (c *typecheckCmd) cacheRemoteTypes(
+	moduleSpecifier, cachePath string, data []byte,
+) (string, bool, error) {
 	if err := c.gs.FS.MkdirAll(filepath.Dir(cachePath), 0o755); err != nil {
 		return "", false, fmt.Errorf("create remote types directory: %w", err)
 	}
 	if err := fsext.WriteFile(c.gs.FS, cachePath, data, 0o644); err != nil {
-		return "", false, fmt.Errorf("cache declaration for %s: %w", moduleSpecifier, err)
+		return "", false, fmt.Errorf("cache types for %s: %w", moduleSpecifier, err)
 	}
 	return cachePath, true, nil
 }
@@ -458,6 +478,31 @@ func canonicalRemoteDeclarationPath(typesDir string, moduleURL *url.URL) string 
 			hex.EncodeToString(hash[:6]) + declarationSuffix
 	}
 	return filepath.Join(typesDir, "remotes", host, filepath.FromSlash(modulePath))
+}
+
+func canonicalRemoteTypeScriptSourcePath(typesDir string, moduleURL *url.URL) string {
+	host := safePathSegment(moduleURL.Host)
+	modulePath := safeURLPath(moduleURL.EscapedPath())
+	modulePath, err := url.PathUnescape(modulePath)
+	if err != nil {
+		modulePath = safeURLPath(moduleURL.Path)
+	}
+	modulePath = safeURLPath(modulePath)
+	if moduleURL.RawQuery != "" {
+		hash := sha256.Sum256([]byte(moduleURL.RawQuery))
+		ext := filepath.Ext(modulePath)
+		modulePath = strings.TrimSuffix(modulePath, ext) + "-" + hex.EncodeToString(hash[:6]) + ext
+	}
+	return filepath.Join(typesDir, "remotes", host, filepath.FromSlash(modulePath))
+}
+
+func isTypeScriptSourceURL(moduleURL *url.URL) bool {
+	switch strings.ToLower(filepath.Ext(moduleURL.Path)) {
+	case ".ts", ".mts", ".cts":
+		return true
+	default:
+		return false
+	}
 }
 
 func safeURLPath(value string) string {
@@ -541,14 +586,14 @@ func siblingDeclarationURL(moduleURL *url.URL) *url.URL {
 	return &result
 }
 
-func (c *typecheckCmd) fetchDeclaration(ctx context.Context, typesURL *url.URL) ([]byte, bool, error) {
+func (c *typecheckCmd) fetchTypeFile(ctx context.Context, typesURL *url.URL) ([]byte, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, typesURL.String(), nil)
 	if err != nil {
-		return nil, false, fmt.Errorf("create declaration request: %w", err)
+		return nil, false, fmt.Errorf("create type file request: %w", err)
 	}
 	resp, err := c.httpClient.Do(req) //nolint:gosec // The declaration URL belongs to the imported module.
 	if err != nil {
-		return nil, false, fmt.Errorf("download declaration: %w", err)
+		return nil, false, fmt.Errorf("download type file: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -556,18 +601,18 @@ func (c *typecheckCmd) fetchDeclaration(ctx context.Context, typesURL *url.URL) 
 		return nil, false, nil
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return nil, false, fmt.Errorf("download declaration: server returned %s", resp.Status)
+		return nil, false, fmt.Errorf("download type file: server returned %s", resp.Status)
 	}
 	if resp.ContentLength > maxDeclarationSize {
-		return nil, false, fmt.Errorf("declaration exceeds %d bytes", maxDeclarationSize)
+		return nil, false, fmt.Errorf("type file exceeds %d bytes", maxDeclarationSize)
 	}
 
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxDeclarationSize+1))
 	if err != nil {
-		return nil, false, fmt.Errorf("read declaration: %w", err)
+		return nil, false, fmt.Errorf("read type file: %w", err)
 	}
 	if len(data) > maxDeclarationSize {
-		return nil, false, fmt.Errorf("declaration exceeds %d bytes", maxDeclarationSize)
+		return nil, false, fmt.Errorf("type file exceeds %d bytes", maxDeclarationSize)
 	}
 	return data, true, nil
 }

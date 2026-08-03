@@ -1,9 +1,14 @@
 # k6 type discovery examples
 
-These examples exercise both declaration sources supported by the `k6 lsp` prototype:
+These examples exercise the remote and extension type-discovery cases supported by the `k6 lsp`
+prototype:
 
 - [`remote.js`](remote.js) imports AJV from esm.sh. The public JavaScript response advertises its
   declaration with `X-TypeScript-Types`.
+- [`totp-jsr.js`](totp-jsr.js) imports a TypeScript TOTP implementation directly from JSR, so the
+  runtime module is also its type source.
+- [`totp-jslib.js`](totp-jslib.js) provides the equivalent example with the existing jslib TOTP
+  bundle, which currently does not publish discoverable declarations.
 - [`extension.js`](extension.js) imports an extension whose declaration is embedded in the custom
   k6 binary.
 
@@ -43,10 +48,10 @@ does not reach that goal yet because the preview tsgo build and declarations for
 are installed from npm.
 
 The implementation is a proof of concept. It prioritizes automatic editor configuration and accurate
-type discovery over persistent caching and performance. The checked-in example uses esm.sh, but the
-resolver is not tied to that service: any HTTPS module can advertise a declaration with the
-`X-TypeScript-Types` header. esm.sh can also serve packages from JSR and GitHub, which makes it
-possible to experiment with repository-owned jslib packages without first changing jslib.k6.io.
+type discovery over persistent caching and performance. The checked-in JavaScript-header example uses
+esm.sh, but the resolver is not tied to that service: any HTTPS module can advertise a declaration
+with the `X-TypeScript-Types` header. esm.sh can also serve packages from JSR and GitHub, which makes
+it possible to experiment with repository-owned jslib packages without first changing jslib.k6.io.
 Direct `jsr:` import support and decisions about how jslib should be hosted are separate topics.
 
 ## Install tsgo
@@ -73,7 +78,7 @@ go build -o ./k6 .
 selects a project-local or `PATH`-visible tsgo before considering the tsserver adapter.
 
 `k6 lsp` is a stdio protocol process, not an interactive shell command. The editor starts it and
-exchanges LSP messages over stdin and stdout. k6 discovers declarations, generates a TypeScript
+exchanges LSP messages over stdin and stdout. k6 discovers type information, generates a TypeScript
 project, starts tsgo, and then stays in front of tsgo to refresh the mappings as imports change.
 
 ## Remote declarations from esm.sh
@@ -129,6 +134,83 @@ go run . run --iterations 1 examples/typecheck/remote.js
 
 No local server, development certificate, or custom trust configuration is required. Both the
 runtime JavaScript and declaration use esm.sh's publicly trusted HTTPS endpoint.
+
+## Direct TypeScript from JSR compared with jslib TOTP
+
+The JSR package exports `./src/totp.ts`. The package directory URL ending in `/src` is not itself a
+module, so the complete pinned runtime import is:
+
+```javascript
+import {
+  generateTOTP,
+  verifyTOTP,
+} from "https://jsr.io/@rabbit-company/totp/1.0.1/src/totp.ts";
+```
+
+Unlike a JavaScript response that needs `X-TypeScript-Types`, this response has content type
+`text/typescript` and contains its exported interfaces and function signatures inline. `k6 lsp`
+caches the source with its `.ts` extension and maps the unchanged URL to it. Generate and inspect the
+project with:
+
+```bash
+go run . typecheck --generate-only examples/typecheck/totp-jsr.js
+```
+
+The generated mapping has this shape:
+
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "https://jsr.io/@rabbit-company/totp/1.0.1/src/totp.ts": [
+        "/tmp/k6-types-755373299/types/remotes/jsr.io/@rabbit-company/totp/1.0.1/src/totp.ts"
+      ]
+    }
+  }
+}
+```
+
+Open [`totp-jsr.js`](totp-jsr.js) through the Neovim setup and hover over `generateTOTP`. Completion
+should include the typed `digits`, `algorithm`, `timeStep`, `timestamp`, and `window` options. For a
+quick diagnostic, temporarily change `{ digits: 6 }` to `{ algorithm: "MD5" }`; tsgo should reject
+it because the package permits only SHA-1, SHA-256, or SHA-512.
+
+[`totp-jslib.js`](totp-jslib.js) performs the same generate-and-verify operation through the current
+jslib module:
+
+```javascript
+import { TOTP } from "https://jslib.k6.io/totp/1.0.0/index.js";
+```
+
+The runtime APIs differ as follows:
+
+| Capability | JSR `@rabbit-company/totp` | `jslib.k6.io/totp` |
+| --- | --- | --- |
+| API shape | Typed functions and option objects | `TOTP` constructor with `gen()` and `verify()` methods |
+| Algorithms | SHA-1, SHA-256, and SHA-512 | SHA-1 |
+| Verification window | Configurable; one step on either side by default | Current time step only |
+| Secret and URI helpers | `generateTOTPSecret()` and `generateTOTPURI()` | Not provided |
+| Type delivery | Inline, versioned TypeScript source | Bundled JavaScript without `X-TypeScript-Types` or `index.d.ts` |
+
+Both examples execute against the same fixed Base32 secret and check that a six-digit code can be
+generated and verified. Run them independently:
+
+```bash
+go run . run --iterations 1 examples/typecheck/totp-jsr.js
+go run . run --iterations 1 examples/typecheck/totp-jslib.js
+```
+
+Type discovery intentionally produces different results. The JSR example receives hover,
+completion, navigation, and diagnostics directly from the cached `.ts` source. The jslib example
+continues to run, but TypeScript reports an unresolved module because that release does not advertise
+or publish a declaration:
+
+```bash
+go run . typecheck --generate-only examples/typecheck/totp-jslib.js
+```
+
+This comparison demonstrates why declarations traveling with the module remove the need for a
+separate central `@types` package while leaving the runtime import unchanged.
 
 ## Extension declarations from the binary
 

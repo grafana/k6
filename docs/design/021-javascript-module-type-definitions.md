@@ -436,18 +436,22 @@ Both `k6 lsp` and the optional `k6 typecheck` helper use the same discovery impl
 For each HTTPS module, the command checks sources in this order:
 
 1. the canonical cache below `<generated-types-dir>/remotes/<host>/`;
-2. the earlier URL-shaped layout below `<generated-types-dir>/`, retained for compatibility with
-   existing generated projects;
-3. the module's `X-TypeScript-Types` HTTP response header;
-4. a declaration beside the JavaScript, such as `index.d.ts` for `index.js`.
+2. for JavaScript declarations, the earlier URL-shaped layout below `<generated-types-dir>/`,
+   retained for compatibility with existing generated projects;
+3. for a `.ts`, `.mts`, or `.cts` URL, the module's TypeScript source itself;
+4. the module's `X-TypeScript-Types` HTTP response header;
+5. a declaration beside the JavaScript, such as `index.d.ts` for `index.js`.
 
-Downloaded declarations are limited to 10 MiB and written under the canonical cache. Cache paths are
-derived without allowing URL path traversal outside the types directory. An exact `paths` mapping is
-emitted only when a declaration is found. Missing declarations produce warnings and remain visible
-as normal TypeScript resolution errors.
+Downloaded declarations and TypeScript sources are limited to 10 MiB and written under the canonical
+cache. Cache paths are derived without allowing URL path traversal outside the types directory. An
+exact `paths` mapping is emitted only when type information is found. Missing types produce warnings
+and remain visible as normal TypeScript resolution errors.
 
-This initial implementation expects a self-contained entry declaration. Recursively downloading
-relative imports from a multi-file declaration graph is future work.
+This initial implementation expects a self-contained entry declaration or TypeScript source file.
+Recursively downloading relative imports from a multi-file type graph is future work. The checked-in
+JSR TOTP example is a self-contained `.ts` module and demonstrates direct TypeScript source mapping;
+the companion jslib example demonstrates the unresolved result for JavaScript without advertised or
+sibling declarations.
 
 ### Extension-provided declarations
 
