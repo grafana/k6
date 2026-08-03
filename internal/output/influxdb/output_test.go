@@ -133,6 +133,50 @@ func TestOutput(t *testing.T) {
 	})
 }
 
+func TestOutputWritesToURLPathPrefix(t *testing.T) {
+	t.Parallel()
+
+	var (
+		mu      sync.Mutex
+		gotPath string
+	)
+	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/ping" {
+			mu.Lock()
+			gotPath = r.URL.Path
+			mu.Unlock()
+		}
+		rw.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	registry := metrics.NewRegistry()
+	metric, err := registry.NewMetric("test_gauge", metrics.Gauge)
+	require.NoError(t, err)
+
+	o, err := newOutput(output.Params{
+		Logger:         testutils.NewLogger(t),
+		ConfigArgument: ts.URL + "/influxdbA/k6db",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "k6db", o.Config.DB.String)
+	require.Equal(t, ts.URL+"/influxdbA", o.Config.Addr.String)
+
+	require.NoError(t, o.Start())
+	o.AddMetricSamples([]metrics.SampleContainer{metrics.Samples{
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{Metric: metric, Tags: registry.RootTagSet()},
+			Time:       time.Now(),
+			Value:      1.0,
+		},
+	}})
+	require.NoError(t, o.Stop())
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, "/influxdbA/write", gotPath)
+}
+
 func TestOutputFlushMetricsConcurrency(t *testing.T) {
 	t.Parallel()
 
