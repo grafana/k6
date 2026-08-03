@@ -284,7 +284,7 @@ to overwrite an existing `tsconfig.json`.
 ## Neovim
 
 [`neovim.lua`](neovim.lua) is a standalone configuration for Neovim 0.11 or newer. It uses the
-built-in LSP client and starts one `k6 lsp` process for the selected entry script. No
+built-in LSP client and starts one `k6 lsp` process for the selected workspace directory. No
 `nvim-lspconfig` plugin is required. A `FileType` autocommand starts or reuses the process;
 `LspAttach` configures each buffer after the k6 client attaches.
 
@@ -295,25 +295,34 @@ go build -o ./k6 .
 npm install --save-dev @typescript/native-preview @types/k6
 ```
 
-Then launch Neovim from the repository root:
+Then start Neovim from the directory that should become the k6 workspace:
 
 ```bash
-K6_BIN="$PWD/k6" \
-nvim -u examples/typecheck/neovim.lua examples/typecheck/remote.js
+cd examples/typecheck
+K6_BIN="$PWD/../../k6" nvim -u neovim.lua remote.js
 ```
 
-The configuration recognizes two optional environment variables:
+If the intended k6 binary is already on `PATH`, omit `K6_BIN` as well.
 
-- `K6_BIN` is the absolute k6 executable to launch. It defaults to `<workspace>/k6`.
+The configuration recognizes three optional environment variables:
+
+- `K6_BIN` selects a specific k6 executable. When unset, the configuration uses `k6` from `PATH`,
+  falling back to `<workspace>/k6`.
+- `K6_LSP_ROOT` overrides the workspace directory passed to `k6 lsp`. Set it only when the desired
+  workspace differs from the directory in which Neovim was started.
 - `K6_LSP_SERVER` optionally selects `tsgo` or `tsserver`; it defaults to `tsgo`.
 
-Entry selection happens inside the `FileType` callback rather than while `init.lua` is loading. This
-also works when Neovim starts with a directory or session and the k6 script is opened later. The first
-JavaScript or TypeScript buffer that starts the client becomes the k6 import-graph entry point.
+Workspace selection happens inside the `FileType` callback rather than while `init.lua` is loading.
+This also works when Neovim starts with a directory or session and a k6 script is opened later. All
+JavaScript and TypeScript buffers below the selected directory reuse one client. The k6 wrapper
+recursively discovers their import graphs and updates the generated project when scripts are added or
+removed.
 
-The callback sets both `root_dir` and `cmd_cwd` to the nearest Git root. This is important because
-`k6 lsp` requires its working directory to be an ancestor of the entry script and searches that
-directory's `node_modules/.bin` for tsgo.
+The callback sets both `root_dir` and `cmd_cwd` to the selected workspace, which is also passed to
+`k6 lsp`. k6 searches it and its ancestors for
+`node_modules/.bin/tsgo`. Starting Neovim in `examples/typecheck`, as above, avoids scanning every
+JavaScript and TypeScript file in the k6 repository. Use `K6_LSP_ROOT` when Neovim must instead be
+started from another directory.
 
 Buffer-local behavior is configured in Neovim's
 [`LspAttach`](https://neovim.io/doc/user/lsp/#lsp-attach) autocommand. The handler verifies that the
@@ -338,23 +347,18 @@ normal Neovim configuration, disable it for this test to avoid duplicate diagnos
 
 To adapt the example into an existing `init.lua`, keep the `FileType` startup and `LspAttach`
 configuration autocommands, then replace the environment-variable defaults with the preferred k6
-binary and entry-script selection policy.
+binary and workspace-directory selection policy.
 
 ### Neovim with the typed extension
 
 The extension example needs the extension-enabled binary, not the ordinary `./k6` build. Build it
-and use the dedicated [`neovim-extension.lua`](neovim-extension.lua) configuration:
+and select it with `K6_BIN`:
 
 ```bash
 go build -o ./k6-with-types ./examples/typecheck/k6-with-types
 npm install --save-dev @typescript/native-preview @types/k6
-nvim -u examples/typecheck/neovim-extension.lua examples/typecheck/extension.js
-```
-
-That configuration delegates to `neovim.lua` after setting the extension-enabled binary:
-
-```text
-K6_BIN=<workspace>/k6-with-types
+cd examples/typecheck
+K6_BIN="$PWD/../../k6-with-types" nvim -u neovim.lua extension.js
 ```
 
 Once attached, hovering over `greet` should show `(name: string) => string`, and changing
@@ -365,8 +369,8 @@ Once attached, hovering over `greet` should show `(name: string) => string`, and
 The [IntelliJ Platform LSP API](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)
 supports GoLand and the commercial IntelliJ-based IDEs. That API is intended for IntelliJ plugins;
 GoLand does not provide a generic built-in settings page where a user can enter an arbitrary stdio
-language-server command. A future dedicated k6 plugin can use the native API to recognize k6 scripts,
-select an entry point, and launch `k6 lsp`.
+language-server command. A future dedicated k6 plugin can use the native API to recognize k6 scripts
+and launch `k6 lsp` for the project directory.
 
 For testing the prototype without developing a dedicated plugin, install the
 [LSP4IJ plugin](https://plugins.jetbrains.com/plugin/23257-lsp4ij). LSP4IJ supports user-defined stdio
@@ -381,41 +385,49 @@ the plugin and restarting GoLand:
    ```
 
 2. Open **Settings | Languages & Frameworks | Language Servers**, select **+**, and create a
-   user-defined language server.
+   user-defined language server. The **TypeScript Language Server** template can seed the mappings,
+   but replace its name and command rather than launching `typescript-language-server` directly.
 3. In the **Server** tab, configure:
 
    ```text
-   Name:              k6
-   Command:           "$PROJECT_DIR$/k6" lsp --server tsgo "$PROJECT_DIR$/examples/typecheck/totp-jsr.js"
-   Working directory: $PROJECT_DIR$
+   Name:    k6
+   Command: "$PROJECT_DIR$/k6" lsp --server tsgo "$PROJECT_DIR$/examples/typecheck"
    ```
 
-   Keep system environment variables enabled so the wrapper can find project-local or `PATH`-visible
-   tools. The command and entry path are absolute after LSP4IJ expands `$PROJECT_DIR$`. The explicit
-   working directory is important because `k6 lsp` requires its working directory to contain the
-   entry script and searches its `node_modules/.bin` directory for tsgo.
+   Keep system environment variables enabled. LSP4IJ expands `$PROJECT_DIR$` before launch. The input
+   directory becomes the k6 LSP workspace regardless of GoLand's process working directory, and k6
+   searches that directory and its ancestors for `node_modules/.bin/tsgo` before searching `PATH`.
+   In a normal k6 project, pass `"$PROJECT_DIR$"`; the narrower example directory keeps this repository
+   demonstration focused.
 4. In the **Mappings** tab, associate the JavaScript file type with language ID `javascript`. If the
    local k6 graph contains TypeScript files, also associate the TypeScript file type or the `*.ts`
    filename pattern with language ID `typescript`.
-5. Apply the configuration and open the configured entry script. Use the **Language Services** status
-   bar widget or LSP4IJ's **LSP Consoles** tool window to confirm that the `k6` process is running.
+5. Apply the configuration and open a script below the configured directory. Use the
+   **Language Services** status bar widget or LSP4IJ's **LSP Consoles** tool window to confirm that the
+   `k6` process is running.
 
 Hover over `generateTOTP` in [`totp-jsr.js`](totp-jsr.js), request completion inside its options
 object, or temporarily set `algorithm: "MD5"` to verify hover, completion, and diagnostics. GoLand's
 own JavaScript and TypeScript support can also contribute editor results; the LSP console shows the
 requests and responses handled specifically by `k6 lsp`.
 
-The entry argument is intentionally fixed in the server command. It defines the k6 import graph and
-therefore the generated TypeScript project. Change the command and restart the language server when
-switching to an independent test entry. Avoid starting several k6 definitions with overlapping
-JavaScript mappings in one project, because each definition would provide diagnostics for the same
-files.
+Directory mode recursively discovers JavaScript and TypeScript files, combines their k6 import graphs,
+and watches both file contents and directory membership. New and removed scripts therefore update the
+generated TypeScript project without changing the GoLand command. It skips `node_modules`, `.git`,
+`.k6`, and declaration files. A script that cannot be loaded as a k6 entry remains in the TypeScript
+project while k6 logs a warning and continues processing the other scripts.
 
-For the typed extension example, build the extension-enabled binary and change both the executable
-and entry in the command:
+File mode remains available when a workspace should expose only one graph:
 
 ```text
-"$PROJECT_DIR$/k6-with-types" lsp --server tsgo "$PROJECT_DIR$/examples/typecheck/extension.js"
+"$PROJECT_DIR$/k6" lsp --server tsgo "$PROJECT_DIR$/examples/typecheck/totp-jsr.js"
+```
+
+For the typed extension example, build the extension-enabled binary and change the executable in the
+directory command:
+
+```text
+"$PROJECT_DIR$/k6-with-types" lsp --server tsgo "$PROJECT_DIR$/examples/typecheck"
 ```
 
 LSP4IJ's
