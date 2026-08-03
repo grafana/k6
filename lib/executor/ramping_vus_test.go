@@ -6,17 +6,21 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func TestRampingVUsConfigValidation(t *testing.T) {
@@ -1209,4 +1213,104 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRampingVUsVUStartError(t *testing.T) {
+	t.Parallel()
+
+	// The executor needs to start VUs immediately, which exercises the
+	// VU-start failure path once the planned VU buffer is exhausted.
+	config := RampingVUsConfig{
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+		StartVUs:   null.IntFrom(2),
+		Stages: []Stage{
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(2)},
+		},
+	}
+
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error { return nil })
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
+	// The fix emits the failure at error level, but setupExecutor's hook
+	// only captures warn-level entries, so attach a dedicated error hook.
+	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
+	test.executor.GetLogger().Logger.AddHook(errorHook)
+
+	// Reproduce a "system overload" condition: drain every planned VU so the
+	// executor cannot fetch one when it tries to start VUs.
+	maxVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(test.state.ExecutionTuple))
+	for range maxVUs {
+		_, err := test.state.GetPlannedVU(test.executor.GetLogger(), false)
+		require.NoError(t, err)
+	}
+
+	engineOut := make(chan metrics.SampleContainer, 1000)
+	errCh := make(chan error, 1)
+	go func() { errCh <- test.executor.Run(test.ctx, engineOut) }()
+
+	// Run must finish; a hang here would mean the VU-start failure was swallowed.
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("executor did not stop after a VU-start failure")
+	}
+
+	require.True(t,
+		testutils.LogContains(errorHook.Drain(), logrus.ErrorLevel, "Cannot start a VU"),
+		"expected a 'Cannot start a VU' error to be logged",
+	)
+}
+
+// TestRampingVUsVUStartErrorMultiStage checks that, with a multi-stage ramp,
+// the executor stops after the first VU-start failure instead of carrying on
+// into later stages and reporting the same failure once per stage.
+func TestRampingVUsVUStartErrorMultiStage(t *testing.T) {
+	t.Parallel()
+
+	// A multi-stage ramp tries to schedule VUs across several stages; the
+	// executor must abort at the first VU-start failure, not at every stage.
+	config := RampingVUsConfig{
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+		StartVUs:   null.IntFrom(1),
+		Stages: []Stage{
+			{Duration: types.NullDurationFrom(500 * time.Millisecond), Target: null.IntFrom(2)},
+			{Duration: types.NullDurationFrom(500 * time.Millisecond), Target: null.IntFrom(3)},
+		},
+	}
+
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error { return nil })
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
+	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
+	test.executor.GetLogger().Logger.AddHook(errorHook)
+
+	// Drain every planned VU so the executor cannot fetch one when it starts VUs.
+	maxVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(test.state.ExecutionTuple))
+	for range maxVUs {
+		_, err := test.state.GetPlannedVU(test.executor.GetLogger(), false)
+		require.NoError(t, err)
+	}
+
+	engineOut := make(chan metrics.SampleContainer, 1000)
+	errCh := make(chan error, 1)
+	go func() { errCh <- test.executor.Run(test.ctx, engineOut) }()
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("executor did not stop after a VU-start failure")
+	}
+
+	var startErrors int
+	for _, entry := range errorHook.Drain() {
+		if entry.Level == logrus.ErrorLevel && strings.Contains(entry.Message, "Cannot start a VU") {
+			startErrors++
+		}
+	}
+	require.Equal(t, 1, startErrors,
+		"the VU-start failure should be reported once; a repeated report means the executor kept going into later stages instead of stopping")
 }
