@@ -57,7 +57,6 @@ type webVitalKey struct {
 type webVitalSample struct {
 	sample k6metrics.Sample
 	name   string
-	spanID string
 	rating string
 }
 
@@ -389,7 +388,6 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		NumEntries     json.Number
 		NavigationType string
 		URL            string
-		SpanID         string
 	}{}
 
 	if err := json.Unmarshal([]byte(object), &wv); err != nil {
@@ -425,7 +423,6 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 			Time:       time.Now(),
 		},
 		name:   wv.Name,
-		spanID: wv.SpanID,
 		rating: wv.Rating,
 	}
 	fs.bufferedWebVitalsMu.Unlock()
@@ -447,7 +444,7 @@ func (fs *FrameSession) flushWebVitals() {
 		})
 
 		_, span := TraceEvent(
-			fs.ctx, fs.targetID.String(), "web_vital", wv.spanID, trace.WithAttributes(
+			fs.ctx, fs.targetID.String(), "web_vital", trace.WithAttributes(
 				attribute.String("web_vital.name", wv.name),
 				attribute.Float64("web_vital.value", wv.sample.Value),
 				attribute.String("web_vital.rating", wv.rating),
@@ -906,34 +903,12 @@ func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
 		fs.mainFrameSpan.End()
 	}
 
+	// The web_vital events for this page are correlated to this navigation span
+	// on the Go side when the per-page buffer is flushed (see flushWebVitals),
+	// so there is no need to inject a span id into the page.
 	_, fs.mainFrameSpan = TraceNavigation(
 		fs.ctx, fs.targetID.String(),
 	)
-
-	spanID := fs.mainFrameSpan.SpanContext().SpanID().String()
-
-	// Set k6SpanId property in the page so it can be retrieved when pushing
-	// the Web Vitals events from the page execution context and used to
-	// correlate them with the navigation span to which they belong to.
-	setSpanIDProp := func() {
-		js := fmt.Sprintf("window.k6SpanId = '%s';", spanID)
-		err := newFrame.EvaluateGlobal(fs.ctx, js)
-		if err != nil {
-			fs.logger.Debugf(
-				"FrameSession:onFrameNavigated", "error on evaluating window.k6SpanId: %v", err,
-			)
-		}
-	}
-
-	// Executing a CDP command in the event parsing goroutine might deadlock in some cases.
-	// For example a deadlock happens if the content loaded in the frame that has navigated
-	// includes a JavaScript initiated dialog which we have to explicitly accept or dismiss
-	// (see onEventJavascriptDialogOpening). In that case our EvaluateGlobal call can't be
-	// executed, as the browser is waiting for us to accept/dismiss the JS dialog, but we
-	// can't act on that because the event parsing goroutine is stuck in onFrameNavigated.
-	// Because in this case the action is to set an attribute to the global object (window)
-	// it should be safe to just execute this in a separate goroutine.
-	go setSpanIDProp()
 }
 
 func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequestedNavigation) {
