@@ -405,8 +405,7 @@ the plugin and restarting GoLand:
    ```
 
 2. Open **Settings | Languages & Frameworks | Language Servers**, select **+**, and create a
-   user-defined language server. The **TypeScript Language Server** template can seed the mappings,
-   but replace its name and command rather than launching `typescript-language-server` directly.
+   user-defined language server.
 3. In the **Server** tab, configure:
 
    ```text
@@ -423,11 +422,12 @@ the plugin and restarting GoLand:
    local k6 graph contains TypeScript files, also associate the TypeScript file type or the `*.ts`
    filename pattern with language ID `typescript`.
 5. Apply the configuration and open a script below the configured directory. Use the
-   **Language Services** status bar widget or LSP4IJ's **LSP Consoles** tool window to confirm that the
+   **Language Services** status bar widget or LSP4IJ's **Language Servers** tool window to confirm that the
    `k6` process is running.
 
 Hover over `generateTOTP` in [`totp-jsr.js`](totp-jsr.js), request completion inside its options
-object, or temporarily set `algorithm: "MD5"` to verify hover, completion, and diagnostics. GoLand's
+object, or temporarily set `algorithm: "MD5"` to verify hover, completion, and diagnostics. Note that GoLand may
+treat a space as an input for completion e.g. `{␣` may fail to resolve completion options. GoLand's
 own JavaScript and TypeScript support can also contribute editor results; the LSP console shows the
 requests and responses handled specifically by `k6 lsp`.
 
