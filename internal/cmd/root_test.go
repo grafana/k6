@@ -39,12 +39,20 @@ func TestRootCommandHelpDisplayCommands(t *testing.T) {
 			wantStdoutContains: "  inspect     Inspect a script or archive",
 		},
 		{
+			name:               "should have lsp command",
+			wantStdoutContains: "  lsp         Start a TypeScript language server for a k6 script",
+		},
+		{
 			name:               "should have new command",
 			wantStdoutContains: "  new         Create a test",
 		},
 		{
 			name:               "should have run command",
 			wantStdoutContains: "  run         Run a test",
+		},
+		{
+			name:               "should have typecheck command",
+			wantStdoutContains: "  typecheck   Type-check a k6 script",
 		},
 		{
 			name:               "should have x command",

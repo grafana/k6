@@ -1,5 +1,6 @@
 /k6
 /k6.exe
+/k6-with-types
 /dist
 /pkg-build
 /internal/lib/summary/machinereadable/k6-summary
@@ -7,6 +8,11 @@
 /internal/js/modules/k6/experimental/streams/tests/wpt
 /internal/js/modules/k6/webcrypto/tests/wpt/
 /.protoc
+/.k6/
+tsconfig.k6.*.json
+/examples/typecheck/.k6/
+/examples/typecheck/k6
+/examples/typecheck/tsconfig.json
 
 .vscode
 *.sublime-workspace

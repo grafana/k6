@@ -33,6 +33,17 @@ type Module interface {
 	NewModuleInstance(VU) Instance
 }
 
+// TypeScriptTypeProvider can be implemented by a JavaScript module to expose
+// its TypeScript declarations to k6 authoring tools. The returned declaration
+// must describe the module's public exports as a self-contained external
+// module.
+//
+// Implementations will typically return a declaration embedded in the Go
+// binary with go:embed.
+type TypeScriptTypeProvider interface {
+	TypeScriptTypes() []byte
+}
+
 // Instance is what a module needs to return
 type Instance interface {
 	Exports() Exports

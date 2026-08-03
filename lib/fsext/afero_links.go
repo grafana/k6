@@ -39,6 +39,11 @@ func ReadDir(fs Fs, dirname string) ([]fs.FileInfo, error) {
 	return afero.ReadDir(fs, dirname)
 }
 
+// TempDir creates a new temporary directory in dir with pattern in its name.
+func TempDir(fs Fs, dir, pattern string) (string, error) {
+	return afero.TempDir(fs, dir, pattern)
+}
+
 // NewOsFs returns a new wrapps os.Fs
 func NewOsFs() Fs {
 	return afero.NewOsFs()
