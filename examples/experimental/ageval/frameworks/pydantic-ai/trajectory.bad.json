@@ -1,0 +1,18 @@
+{
+    "input": "Was invoice INV-123 for alice@example.com paid?",
+    "output": "I'm not sure that invoice is paid. The customer record cust_123 looks unpaid to me.",
+    "model": "claude-haiku-4-5",
+    "toolCalls": [
+        {
+            "name": "get_invoice",
+            "input": {
+                "invoice_id": "INV-999"
+            },
+            "output": "{\"error\": \"not found\"}"
+        }
+    ],
+    "usage": {
+        "inputTokens": 1480,
+        "outputTokens": 96
+    }
+}
