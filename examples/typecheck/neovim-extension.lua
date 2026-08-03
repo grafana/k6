@@ -12,8 +12,4 @@ local root = vim.fs.normalize(vim.fs.joinpath(examples_dir, "..", ".."))
 if vim.env.K6_BIN == nil or vim.env.K6_BIN == "" then
   vim.env.K6_BIN = vim.fs.joinpath(root, "k6-with-types")
 end
-if vim.env.K6_LSP_ENTRY == nil or vim.env.K6_LSP_ENTRY == "" then
-  vim.env.K6_LSP_ENTRY = vim.fs.joinpath(examples_dir, "extension.js")
-end
-
 dofile(vim.fs.joinpath(examples_dir, "neovim.lua"))

@@ -1,6 +1,6 @@
 # k6 type discovery examples
 
-These examples exercise both declaration sources supported by the `k6 typecheck` prototype:
+These examples exercise both declaration sources supported by the `k6 lsp` prototype:
 
 - [`remote.js`](remote.js) imports AJV from esm.sh. The public JavaScript response advertises its
   declaration with `X-TypeScript-Types`.
@@ -32,23 +32,49 @@ workflow work without registering that extension in a central repository first.
 
 `@types/k6` is still used by this prototype for k6's built-in modules. This might change in the future.
 
-Other notes:
-* This still depends on tsserver/tsgo - reimplementing this is completely outside the scope here. While tsgo is now in golang - it doesn't have proper public golang API and it seems it might never have any. Future development might actually use tsgo plugin extensions or more integrated versions. This is skipped for this demo in order to support both and because tsgo doesn't support this currently.
-* With the above it will actually be possible to have completely npm independent usage.
-* The current implementation tries not to break anything for the user and to be as close to zero-config(after initial IDE/editor setup) as possible - it just use k6.
-* There is no try to do good caching or to be fast - we are going for PoC.
-* The current prototype uses esm.sh, but making this work for jslib will be fairly simple. Even more importantly it will be fairly simple to let esm.sh work with the jslibs directly from their repos wihtout any need for us to host jslib. Discussion on hosting jslibs is separate. But this does allow also easier third party hosting - they can just have github repo and use esm.sh.
-* Same as the above for jsr (which is accesible from esm.sh) - we are not discussing support jsr:@someone/something here.
+The prototype deliberately delegates language features to TypeScript instead of implementing a new
+k6 language server. Its preferred backend is tsgo, the native TypeScript language server written in
+Go. The classic TypeScript implementation remains supported through the
+`typescript-language-server` adapter over tsserver.
 
-## Install a TypeScript checker
+This division can eventually make k6 authoring independent of npm: k6 can provide its built-in and
+extension declarations while invoking a separately distributed tsgo binary. The current prototype
+does not reach that goal yet because the preview tsgo build and declarations for built-in k6 modules
+are installed from npm.
 
-Install the native TypeScript checker and the declarations for the built-in k6 modules:
+The implementation is a proof of concept. It prioritizes automatic editor configuration and accurate
+type discovery over persistent caching and performance. The checked-in example uses esm.sh, but the
+resolver is not tied to that service: any HTTPS module can advertise a declaration with the
+`X-TypeScript-Types` header. esm.sh can also serve packages from JSR and GitHub, which makes it
+possible to experiment with repository-owned jslib packages without first changing jslib.k6.io.
+Direct `jsr:` import support and decisions about how jslib should be hosted are separate topics.
+
+## Install tsgo
+
+Install the preferred native language server and the declarations for the built-in k6 modules:
 
 ```bash
 npm install --save-dev @typescript/native-preview @types/k6
 ```
 
-Use `typescript` instead of `@typescript/native-preview` to run `tsc` rather than `tsgo`.
+The alternative tsserver backend is documented below and requires `typescript-language-server` and
+`typescript` instead.
+
+## Start the language server
+
+Build k6, then configure an LSP client to launch `k6 lsp` from the repository root:
+
+```bash
+go build -o ./k6 .
+./k6 lsp --server tsgo examples/typecheck/remote.js
+```
+
+`--server tsgo` makes the preferred backend explicit. The default `--server auto` behavior also
+selects a project-local or `PATH`-visible tsgo before considering the tsserver adapter.
+
+`k6 lsp` is a stdio protocol process, not an interactive shell command. The editor starts it and
+exchanges LSP messages over stdin and stdout. k6 discovers declarations, generates a TypeScript
+project, starts tsgo, and then stays in front of tsgo to refresh the mappings as imports change.
 
 ## Remote declarations from esm.sh
 
@@ -72,43 +98,30 @@ The first response should contain:
 x-typescript-types: https://esm.sh/ajv@6.12.5/lib/ajv.d.ts
 ```
 
-Generate the TypeScript project without running a checker:
-
-```bash
-go run . typecheck --generate-only examples/typecheck/remote.js
-```
-
-The command prints a random project directory such as `/tmp/k6-types-755373299`. Its
-`tsconfig.json` contains an exact mapping from the unchanged esm.sh import to the downloaded AJV
-declaration:
+When `k6 lsp` starts for this script, its generated `tsconfig.json` contains an exact mapping from
+the unchanged esm.sh import to the downloaded AJV declaration:
 
 ```json
 {
   "compilerOptions": {
     "paths": {
       "https://esm.sh/ajv@6.12.5?bundle": [
-        "/tmp/k6-types-755373299/types/remotes/esm.sh/ajv@6.12.5-<query-hash>.d.ts"
+        "/tmp/k6-lsp-755373299/types/remotes/esm.sh/ajv@6.12.5-<query-hash>.d.ts"
       ]
     }
   }
 }
 ```
 
-Run discovery and type checking together:
-
-```bash
-go run . typecheck examples/typecheck/remote.js
-```
-
-To prove that AJV's declaration is active, temporarily change the schema passed to `ajv.compile()`
-in `remote.js` to a number:
+Open the script using the Neovim setup below and hover over `Ajv` or `compile` to confirm that tsgo
+loaded the declaration. To test diagnostics, temporarily change the schema to a number:
 
 ```javascript
 const validate = ajv.compile(42);
 ```
 
-Running the command again should report that `number` is not assignable to AJV's schema parameter.
-Restore the original schema, then run the k6 script once to verify runtime loading independently:
+tsgo should report that `number` is not assignable to AJV's schema parameter. Restore the original
+schema, then run the k6 script once to verify runtime loading independently:
 
 ```bash
 go run . run --iterations 1 examples/typecheck/remote.js
@@ -117,116 +130,39 @@ go run . run --iterations 1 examples/typecheck/remote.js
 No local server, development certificate, or custom trust configuration is required. Both the
 runtime JavaScript and declaration use esm.sh's publicly trusted HTTPS endpoint.
 
-## Generated project location
-
-By default, each invocation creates and retains a complete project at a random path such as:
-
-```text
-/tmp/k6-types-755373299/
-├── tsconfig.json
-└── types/
-    ├── extensions/...
-    └── remotes/...
-```
-
-The command prints the exact directory and configuration path. The random project prevents one run
-from overwriting another and makes it easy to inspect exactly what was given to the checker. It is
-not deleted automatically.
-
-To keep the generated state with the script instead, pass `--in-place`. This writes
-`./tsconfig.json` and `.k6/types/` below the current working directory:
-
-```bash
-go run . typecheck --generate-only --in-place examples/typecheck/remote.js
-```
-
-`--tsconfig` and `--types-dir` can override either path explicitly.
-
-The implicit in-place target refuses to overwrite an existing user-owned `tsconfig.json`. It writes
-`.k6/tsconfig.generated` so subsequent k6 invocations can safely identify and update their own
-configuration. Passing `--tsconfig ./tsconfig.json` explicitly opts into replacing another file.
-
-To keep the checker and k6 declaration mappings updated as files change, run:
-
-```bash
-go run . typecheck --watch examples/typecheck/remote.js
-go run . typecheck --in-place --watch examples/typecheck/remote.js
-```
-
-The first form watches a randomly named temporary project. The second keeps `./tsconfig.json` and
-`.k6/types/` in the repository root. `--watch` cannot be combined with `--generate-only`.
-
 ## Extension declarations from the binary
 
 [`xk6-types/extension.go`](xk6-types/extension.go) embeds its adjacent `index.d.ts`, implements
 `modules.TypeScriptTypeProvider`, and registers `k6/x/types-example`. The small
 [`k6-with-types`](k6-with-types/main.go) entry point imports that extension into a real k6 binary.
 
-Generate and inspect the project:
-
-```bash
-go run ./examples/typecheck/k6-with-types \
-  typecheck --generate-only examples/typecheck/extension.js
-```
-
-The generated configuration contains an exact mapping similar to:
+When launched through the extension-enabled binary, `k6 lsp` extracts the declaration and generates
+an exact mapping similar to:
 
 ```json
 {
   "compilerOptions": {
     "paths": {
       "k6/x/types-example": [
-        "/tmp/k6-types-755373299/types/extensions/k6-x-types-example/index.d.ts"
+        "/tmp/k6-lsp-755373299/types/extensions/k6-x-types-example/index.d.ts"
       ]
     }
   }
 }
 ```
 
-The declaration at that target did not come from the network or source checkout. `k6 typecheck`
-asked the registered module in the running binary for it and copied the embedded bytes into the
-generated project. Running the command without `--generate-only` invokes the selected checker:
-
-```bash
-go run ./examples/typecheck/k6-with-types \
-  typecheck examples/typecheck/extension.js
-```
+The declaration at that target did not come from the network or source checkout. `k6 lsp` asked the
+registered module in the running binary for it and copied the embedded bytes into the generated
+project before starting tsgo.
 
 The binary is part of type resolution. Running the repository's ordinary `./k6` against
 `extension.js` cannot extract this declaration because that binary does not register
 `k6/x/types-example`. This applies equally to `typecheck`, `--watch`, and `lsp`: always launch the
 custom binary containing the extension whose embedded declaration is needed.
 
-## Use the generated project directly
+## Inspect the generated LSP project
 
-The command already runs the checker with `--project`. For diagnosis, copy the printed
-configuration path into a manual command:
-
-```bash
-tsgo --project /tmp/k6-types-755373299/tsconfig.json --traceResolution
-```
-
-Running `tsgo remote.js` or `tsc remote.js` does not load the generated project and will report URL
-imports as unresolved.
-
-## Run the language-server wrapper
-
-Build the prototype command and install the native language server:
-
-```bash
-go build -o ./k6 .
-npm install --save-dev @typescript/native-preview @types/k6
-```
-
-Configure an LSP client to launch this command from the repository root:
-
-```bash
-./k6 lsp --server tsgo examples/typecheck/remote.js
-```
-
-This is a stdio protocol process, so running it directly in a terminal waits silently for LSP input.
-It is not an interactive shell command. During the session, inspect the generated state from another
-terminal:
+During an editor session, inspect the generated state from another terminal:
 
 ```bash
 find /tmp -maxdepth 2 -path '/tmp/k6-lsp-*/tsconfig.json' -print
@@ -284,17 +220,14 @@ K6_BIN="$PWD/k6" \
 nvim -u examples/typecheck/neovim.lua examples/typecheck/remote.js
 ```
 
-The environment variables are intentionally explicit:
+The configuration recognizes two optional environment variables:
 
 - `K6_BIN` is the absolute k6 executable to launch. It defaults to `<workspace>/k6`.
-- `K6_LSP_ENTRY` optionally identifies the entry script whose complete k6 import graph is resolved.
-  Without it, the first JavaScript or TypeScript buffer that starts the client becomes the entry.
 - `K6_LSP_SERVER` optionally selects `tsgo` or `tsserver`; it defaults to `tsgo`.
 
 Entry selection happens inside the `FileType` callback rather than while `init.lua` is loading. This
-also works when Neovim starts with a directory or session and the k6 script is opened later.
-`K6_LSP_ENTRY` is useful only when that first buffer is a helper module or a different test should be
-the graph root.
+also works when Neovim starts with a directory or session and the k6 script is opened later. The first
+JavaScript or TypeScript buffer that starts the client becomes the k6 import-graph entry point.
 
 The callback sets both `root_dir` and `cmd_cwd` to the nearest Git root. This is important because
 `k6 lsp` requires its working directory to be an ancestor of the entry script and searches that
@@ -315,16 +248,11 @@ Inside Neovim, verify the connection with:
 ```vim
 :checkhealth vim.lsp
 :lua =vim.lsp.get_clients({ name = "k6" })
-:K6LspInfo
 ```
 
-`K6LspInfo` prints the exact binary, entry script, workspace root, backend, and attached client
-count. Check its `binary` field first when an extension import has no types.
-
-Use `K` for hover, `grn` for rename, `grr` for references, and `CTRL-X CTRL-O` for completion. These
-are Neovim's built-in LSP mappings and omnifunc. If a separate JavaScript/TypeScript language server
-is enabled in the normal Neovim configuration, disable it for this test to avoid duplicate
-diagnostics.
+Use `K` for hover, `gd` for definition, `grn` for rename, `grr` for references, and
+`CTRL-X CTRL-O` for completion. If a separate JavaScript/TypeScript language server is enabled in the
+normal Neovim configuration, disable it for this test to avoid duplicate diagnostics.
 
 To adapt the example into an existing `init.lua`, keep the `FileType` startup and `LspAttach`
 configuration autocommands, then replace the environment-variable defaults with the preferred k6
@@ -341,13 +269,49 @@ npm install --save-dev @typescript/native-preview @types/k6
 nvim -u examples/typecheck/neovim-extension.lua examples/typecheck/extension.js
 ```
 
-That configuration delegates to `neovim.lua` after setting:
+That configuration delegates to `neovim.lua` after setting the extension-enabled binary:
 
 ```text
 K6_BIN=<workspace>/k6-with-types
-K6_LSP_ENTRY=<workspace>/examples/typecheck/extension.js
 ```
 
-Once attached, `:K6LspInfo` must report `k6-with-types` in the binary path. Hovering over `greet`
-should show `(name: string) => string`, and changing `greet("k6")` to `greet(42)` should produce a
-TypeScript diagnostic.
+Once attached, hovering over `greet` should show `(name: string) => string`, and changing
+`greet("k6")` to `greet(42)` should produce a TypeScript diagnostic.
+
+## Optional: one-shot and watch type checking
+
+`k6 typecheck` uses the same discovery and project-generation code without starting an editor
+language server. It is useful for experiments, CI, and inspecting the exact project given to tsgo,
+but it is not the primary workflow demonstrated here.
+
+Run discovery and checking once:
+
+```bash
+go run . typecheck examples/typecheck/remote.js
+```
+
+Generate a project without invoking a checker:
+
+```bash
+go run . typecheck --generate-only examples/typecheck/remote.js
+```
+
+By default, this retains a project under `/tmp/k6-types-<random>/`. Pass `--in-place` to write
+`./tsconfig.json` and `.k6/types/` in the current working directory. The implicit in-place target
+refuses to overwrite a user-owned `tsconfig.json`; `--tsconfig` is the explicit opt-in replacement.
+
+For continuous command-line checking:
+
+```bash
+go run . typecheck --watch examples/typecheck/remote.js
+```
+
+The child tsgo process receives `--project <generated-config> --watch`, while k6 watches the local
+import graph and regenerates declaration mappings when imports change. `--watch` cannot be combined
+with `--generate-only`.
+
+To inspect resolution manually, use the configuration path printed by `k6 typecheck`:
+
+```bash
+tsgo --project /tmp/k6-types-755373299/tsconfig.json --traceResolution
+```

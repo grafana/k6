@@ -38,7 +38,6 @@ type lspCmd struct {
 	server     string
 	serverPath string
 	inPlace    bool
-	typesDir   string
 
 	httpClient *http.Client
 	lookPath   func(string) (string, error)
@@ -129,8 +128,6 @@ func getCmdLSP(gs *state.GlobalState) *cobra.Command {
 		"language server backend: auto, tsgo, or tsserver")
 	flags.StringVar(&lsp.serverPath, "server-path", lsp.serverPath,
 		"override the language server executable path")
-	flags.StringVar(&lsp.typesDir, "types-dir", lsp.typesDir,
-		"override the generated declaration directory")
 	flags.BoolVar(&lsp.inPlace, "in-place", false,
 		"write tsconfig.json locally and declarations under .k6/types")
 	flags.SortFlags = false
@@ -263,11 +260,7 @@ func (c *lspCmd) projectLocations(cwd string, kind lspServerKind) (lspProjectLoc
 	locations.projectDir = projectDir
 	locations.temporary = true
 	locations.configPath = filepath.Join(locations.projectDir, lspConfigName)
-	if c.typesDir == "" {
-		locations.typesDir = filepath.Join(locations.projectDir, "types")
-	} else {
-		locations.typesDir = absolutePath(cwd, c.typesDir)
-	}
+	locations.typesDir = filepath.Join(locations.projectDir, "types")
 
 	return locations, nil
 }
@@ -276,10 +269,7 @@ func (c *lspCmd) inPlaceProjectLocations(cwd string) (lspProjectLocations, error
 	locations := lspProjectLocations{
 		projectDir: cwd,
 		configPath: filepath.Join(cwd, lspConfigName),
-		typesDir:   absolutePath(cwd, c.typesDir),
-	}
-	if c.typesDir == "" {
-		locations.typesDir = filepath.Join(cwd, typecheckInPlaceDir, "types")
+		typesDir:   filepath.Join(cwd, typecheckInPlaceDir, "types"),
 	}
 	exists, err := fsext.Exists(c.gs.FS, locations.configPath)
 	if err != nil {

@@ -41,7 +41,6 @@ type typecheckCmd struct {
 
 	checker      string
 	configPath   string
-	typesDir     string
 	inPlace      bool
 	generateOnly bool
 	watch        bool
@@ -101,8 +100,6 @@ func getCmdTypecheck(gs *state.GlobalState) *cobra.Command {
 		"TypeScript checker to run: auto, tsgo, tsc, or an executable path")
 	flags.StringVar(&typecheck.configPath, "tsconfig", typecheck.configPath,
 		"path for the generated TypeScript configuration")
-	flags.StringVar(&typecheck.typesDir, "types-dir", typecheck.typesDir,
-		"override the generated declaration directory")
 	flags.BoolVar(&typecheck.inPlace, "in-place", false,
 		"write tsconfig.json locally and declarations under .k6/types")
 	flags.BoolVar(&typecheck.generateOnly, "generate-only", false,
@@ -245,7 +242,7 @@ func isMarkedInPlaceConfig(fs fsext.Fs, cwd, configPath string) (bool, error) {
 func (c *typecheckCmd) outputLocations(cwd string) (projectDir, configPath, typesDir string, err error) {
 	if c.inPlace {
 		projectDir = cwd
-	} else if c.configPath == "" || c.typesDir == "" {
+	} else {
 		projectDir, err = fsext.TempDir(c.gs.FS, "", typecheckTempDirPattern)
 		if err != nil {
 			return "", "", "", fmt.Errorf("create temporary TypeScript project: %w", err)
@@ -257,17 +254,10 @@ func (c *typecheckCmd) outputLocations(cwd string) (projectDir, configPath, type
 	} else {
 		configPath = absolutePath(cwd, c.configPath)
 	}
-	if c.typesDir == "" {
-		if c.inPlace {
-			typesDir = filepath.Join(cwd, typecheckInPlaceDir, "types")
-		} else {
-			typesDir = filepath.Join(projectDir, "types")
-		}
+	if c.inPlace {
+		typesDir = filepath.Join(cwd, typecheckInPlaceDir, "types")
 	} else {
-		typesDir = absolutePath(cwd, c.typesDir)
-	}
-	if projectDir == "" {
-		projectDir = filepath.Dir(configPath)
+		typesDir = filepath.Join(projectDir, "types")
 	}
 	return projectDir, configPath, typesDir, nil
 }
@@ -364,13 +354,9 @@ func (c *typecheckCmd) resolveTypeMappings(
 				continue
 			}
 			if !found {
-				expected := typesDir
-				if moduleURL, parseErr := url.Parse(imported); parseErr == nil {
-					expected = canonicalRemoteDeclarationPath(typesDir, moduleURL)
-				}
 				warnings = append(warnings, fmt.Sprintf(
-					"no TypeScript declaration found for %s; cache one at %s or select a populated cache with --types-dir",
-					imported, expected))
+					"no TypeScript declaration found for %s; the module must advertise one with "+
+						"X-TypeScript-Types or publish a sibling declaration", imported))
 				continue
 			}
 			paths[imported] = []string{declaration}
@@ -380,10 +366,8 @@ func (c *typecheckCmd) resolveTypeMappings(
 				return nil, nil, err
 			}
 			if !found {
-				expected := extensionDeclarationCandidates(typesDir, imported, "")[0]
 				warnings = append(warnings, fmt.Sprintf(
-					"no TypeScript declaration found for extension %s; cache one at %s or select a populated cache with --types-dir",
-					imported, expected))
+					"no TypeScript declaration found for extension %s; the extension must embed one", imported))
 				continue
 			}
 			paths[imported] = []string{declaration}

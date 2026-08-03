@@ -81,6 +81,13 @@ func TestTypecheckOutputLocations(t *testing.T) {
 	})
 }
 
+func TestTypecheckDoesNotExposeTypesDirectory(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	require.Nil(t, getCmdTypecheck(ts.GlobalState).Flags().Lookup("types-dir"))
+}
+
 func TestTypecheckInPlaceDoesNotImplicitlyOverwriteConfig(t *testing.T) {
 	t.Parallel()
 
@@ -310,7 +317,6 @@ export default function () {
 	cmd.SetArgs([]string{
 		"--generate-only",
 		"--tsconfig", "generated/tsconfig.json",
-		"--types-dir", "generated/types",
 		"extension.js",
 	})
 	require.NoError(t, cmd.Execute())

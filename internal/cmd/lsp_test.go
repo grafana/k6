@@ -157,6 +157,13 @@ func TestLSPProjectLocations(t *testing.T) {
 	})
 }
 
+func TestLSPDoesNotExposeTypesDirectory(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	require.Nil(t, getCmdLSP(ts.GlobalState).Flags().Lookup("types-dir"))
+}
+
 func TestProxyLSPClient(t *testing.T) {
 	t.Parallel()
 
