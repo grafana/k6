@@ -385,15 +385,32 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	c.printTestStatus(testProgress.FormatStatus())
 
 	if testProgress.ThresholdsFailed() {
-		//nolint:staticcheck
-		return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
+		return errext.WithExitCodeIfNone(
+			errors.New(withFailureDetails("Thresholds have been crossed", testProgress.ResultMessage, testURL)),
+			exitcodes.ThresholdsHaveFailed,
+		)
 	}
 	if testProgress.TestFailed() {
-		//nolint:staticcheck
-		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
+		return errext.WithExitCodeIfNone(
+			errors.New(withFailureDetails("The test has failed", testProgress.ResultMessage, testURL)),
+			exitcodes.CloudTestRunFailed,
+		)
 	}
 
 	return nil
+}
+
+// withFailureDetails appends the API's failure description and the test run
+// URL to a final error message, so the last line of output tells the user why
+// the run failed and where to see the full breakdown.
+func withFailureDetails(msg, details, testURL string) string {
+	if details != "" && !strings.EqualFold(details, msg) {
+		msg += ": " + details
+	}
+	if testURL != "" {
+		msg += ", details at " + testURL
+	}
+	return msg
 }
 
 func (c *cmdCloud) printTestStatus(status string) {
