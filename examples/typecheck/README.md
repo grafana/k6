@@ -419,6 +419,57 @@ K6_BIN="$PWD/../../k6-with-types" nvim -u neovim.lua extension.js
 Once attached, hovering over `greet` should show `(name: string) => string`, and changing
 `greet("k6")` to `greet(42)` should produce a TypeScript diagnostic.
 
+## Visual Studio Code
+
+VS Code's built-in JavaScript and TypeScript support does not launch arbitrary stdio LSP commands.
+The simplest setup is therefore to have k6 generate the TypeScript project in the workspace and let
+VS Code's built-in language service load that `tsconfig.json`.
+
+For the ordinary k6 examples, build k6 from the repository root, generate the project inside the
+example directory, and open that directory in VS Code:
+
+```bash
+go build -o ./k6 .
+cd examples/typecheck
+../../k6 typecheck --generate-only --in-place remote.js
+code .
+```
+
+Open [`remote.js`](remote.js), then hover over `Ajv` or use completion on its API. The generated
+`tsconfig.json` selects the script and `.k6/types/` contains k6's built-in declarations and any
+discovered remote or extension declarations. VS Code notices changes to those files; rerun the
+generation command after changing imports. Do not edit the generated configuration because the next
+k6 invocation replaces it.
+
+The xk6-icmp example must use the extension-enabled binary. Its build must happen inside the nested
+`k6-with-icmp` module:
+
+```bash
+cd examples/typecheck/k6-with-icmp
+go build -o ../../../k6-with-icmp .
+cd ..
+../../k6-with-icmp typecheck --generate-only --in-place icmp.js
+code .
+```
+
+Open [`icmp.js`](icmp.js) and hover over `pingAsync`, request completion inside its options object,
+or temporarily use an invalid `preferred_ip_version` value to confirm that VS Code loaded the
+declaration extracted from the custom binary. Generating the project does not send ICMP packets.
+
+This setup uses VS Code's built-in TypeScript service rather than the `k6 lsp` process. Connecting
+VS Code to `k6 lsp` itself requires a VS Code extension built with the
+[`vscode-languageclient`](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide)
+library. That client should start the following command with the selected workspace as its working
+directory and register JavaScript and TypeScript document selectors:
+
+```text
+/absolute/path/to/k6-with-icmp lsp --server tsgo /absolute/path/to/workspace
+```
+
+Do not configure VS Code's `typescript.tsdk` or `typescript.tsserver.path` setting to point at k6;
+those settings select a TypeScript SDK or tsserver implementation, while `k6 lsp` speaks the standard
+Language Server Protocol.
+
 ## IntelliJ IDEA and GoLand
 
 The [IntelliJ Platform LSP API](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html)
