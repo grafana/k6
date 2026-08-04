@@ -11,6 +11,8 @@ prototype:
   bundle, which currently does not publish discoverable declarations.
 - [`extension.js`](extension.js) imports an extension whose declaration is embedded in the custom
   k6 binary.
+- [`icmp.js`](icmp.js) imports the real `k6/x/icmp` runtime through a thin adapter that embeds the
+  declaration published by `xk6-icmp`.
 
 Run all commands from the repository root.
 
@@ -251,6 +253,49 @@ The binary is part of type resolution. Running the repository's ordinary `./k6` 
 `extension.js` cannot extract this declaration because that binary does not register
 `k6/x/types-example`. This applies equally to `typecheck`, `--watch`, and `lsp`: always launch the
 custom binary containing the extension whose embedded declaration is needed.
+
+### Real xk6-icmp extension
+
+[`xk6-icmp/extension.go`](xk6-icmp/extension.go) delegates runtime behavior to
+[`grafana/xk6-icmp`](https://github.com/grafana/xk6-icmp) v0.3.3 and embeds that release's unchanged
+[`index.d.ts`](xk6-icmp/index.d.ts). The adapter only adds `modules.TypeScriptTypeProvider`; the
+`ping` and `pingAsync` implementations still come from the real extension.
+
+Both the adapter and [`k6-with-icmp`](k6-with-icmp/main.go) are separate nested Go modules. This
+keeps xk6-icmp and its transitive dependencies out of k6's root `go.mod` and `vendor` directory.
+Because `k6-with-icmp` is a nested module, build it from its own directory:
+
+```bash
+cd examples/typecheck/k6-with-icmp
+go build -o ../../../k6-with-icmp .
+cd ../../..
+```
+
+Do not run `go build ./examples/typecheck/k6-with-icmp` from the repository root; the root module
+does not contain packages inside that nested module. Use the resulting binary for type checking or
+as the editor's language server:
+
+```bash
+./k6-with-icmp typecheck --generate-only examples/typecheck/icmp.js
+./k6-with-icmp lsp --server tsgo examples/typecheck/icmp.js
+```
+
+The generated project maps `k6/x/icmp` to a declaration extracted from the custom binary:
+
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "k6/x/icmp": [
+        "/tmp/k6-lsp-755373299/types/extensions/k6-x-icmp/_devel_/index.d.ts"
+      ]
+    }
+  }
+}
+```
+
+Type checking and LSP startup do not send ICMP packets. Running [`icmp.js`](icmp.js) does, and the
+host may require permission to open ICMP sockets.
 
 ## Inspect the generated LSP project
 
