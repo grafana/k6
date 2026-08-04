@@ -78,6 +78,8 @@ directory:
 /tmp/k6-lsp-755373299/
 ├── tsconfig.json
 └── types/
+    ├── builtin/
+    │   └── k6/...
     ├── remotes/
     │   └── <host>/...
     └── extensions/
@@ -111,7 +113,10 @@ For the AJV example, `k6 lsp` generates a configuration with this abbreviated sh
     "skipLibCheck": false,
     "allowImportingTsExtensions": true,
     "types": ["k6"],
+    "typeRoots": ["/tmp/k6-lsp-755373299/types/builtin", "<project @types roots>"],
     "paths": {
+      "k6": ["/tmp/k6-lsp-755373299/types/builtin/k6/index.d.ts"],
+      "k6/http": ["/tmp/k6-lsp-755373299/types/builtin/k6/http/index.d.ts"],
       "https://esm.sh/ajv@6.12.5?bundle": [
         "/tmp/k6-lsp-755373299/types/remotes/esm.sh/ajv@6.12.5-<query-hash>.d.ts"
       ]
@@ -129,8 +134,10 @@ The relevant settings are:
   TypeScript transformation.
 - `moduleResolution: "Bundler"` accepts application-defined module mappings without imposing the
   Node.js runtime's resolution rules.
-- `types: ["k6"]` loads the built-in k6 API declarations from `@types/k6`.
-- `paths` maps the exact runtime specifier to the declaration cached in this project.
+- `types: ["k6"]` loads the built-in k6 API declarations embedded in the k6 binary.
+- `typeRoots` selects the materialized built-in package while retaining project `@types` packages.
+- `paths` maps built-in modules and exact remote or extension runtime specifiers to declarations in
+  this project.
 - `files` selects the script that was passed to `k6 lsp` even though the generated project is
   under `/tmp`.
 
@@ -139,18 +146,16 @@ requested script.
 
 ## One-time project setup
 
-Install tsgo directly from Microsoft's Go source, then install the declarations for k6's built-in
-modules as a development dependency:
+Install tsgo directly from Microsoft's Go source:
 
 ```bash
 go install github.com/microsoft/typescript-go/cmd/tsgo@latest
-npm install --save-dev @types/k6
 ```
 
 The current typescript-go source requires Go 1.26 or newer. Go installs `tsgo` in `GOBIN`, or in
-`GOPATH/bin` when `GOBIN` is unset; that directory must be on `PATH`. `@types/k6` is an authoring
-dependency, and k6 does not load it while running a test script. The tsserver compatibility backend
-instead requires `typescript-language-server` and `typescript`.
+`GOPATH/bin` when `GOBIN` is unset; that directory must be on `PATH`. k6 materializes its embedded
+built-in declarations in the generated project. The tsserver compatibility backend instead requires
+`typescript-language-server` and `typescript`.
 
 No manual declaration installation is needed for AJV. The command follows its advertised types URL,
 downloads the declaration into the generated project, and writes the corresponding `paths` entry.
@@ -247,7 +252,6 @@ The preferred backend is the native TypeScript language server from
 
 ```bash
 go install github.com/microsoft/typescript-go/cmd/tsgo@latest
-npm install --save-dev @types/k6
 k6 lsp --server tsgo test.js
 ```
 
@@ -289,7 +293,7 @@ The JavaScript `tsserver` process uses its own protocol rather than LSP. Editors
 the `typescript-language-server` adapter:
 
 ```bash
-npm install --save-dev typescript typescript-language-server @types/k6
+npm install --save-dev typescript typescript-language-server
 k6 lsp --server tsserver test.js
 ```
 
@@ -395,11 +399,11 @@ k6 typecheck --generate-only test.js
 ```
 
 The generated project contains an explicit `files` entry for the script and absolute declaration
-targets. It records every ancestor `node_modules/@types` directory as a `typeRoots` candidate, so
-moving `tsconfig.json` into `/tmp` does not hide the project's `@types/k6` dependency. It also
-disables `skipLibCheck`, so a missing built-in declaration or an invalid downloaded declaration is
-reported at its source instead of degrading into misleading inferred types. The generated project
-is machine-local and should be regenerated rather than moved between workspaces.
+targets. Its first `typeRoots` entry selects the built-in declarations materialized from the k6
+binary; later entries preserve any project `@types` packages. It also disables `skipLibCheck`, so an
+invalid built-in or downloaded declaration is reported at its source instead of degrading into
+misleading inferred types. The generated project is machine-local and should be regenerated rather
+than moved between workspaces.
 
 To generate `./tsconfig.json` and `.k6/types/` in the working directory instead:
 
@@ -548,8 +552,9 @@ generated `tsconfig.json`; the next refresh will replace generated mappings.
 
 ### Built-in k6 imports cannot be found
 
-Install `@types/k6` and retain `"types": ["k6"]`. If the declaration refers to `k6/browser`, its
-browser types also come from this package.
+Regenerate the project with the same k6 binary that starts the LSP. The configuration should retain
+`"types": ["k6"]`, list `<generated-types-dir>/builtin` first in `typeRoots`, and map the imported
+built-in module to its declaration below `<generated-types-dir>/builtin/k6`.
 
 ### Completion works but k6 fails at runtime
 

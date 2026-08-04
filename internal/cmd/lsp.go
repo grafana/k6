@@ -123,8 +123,9 @@ func getCmdLSP(gs *state.GlobalState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "lsp [path]",
 		Short: "Start a TypeScript language server for k6 scripts",
-		Long: "Generate type mappings for a k6 script or directory, start tsgo's native LSP or the " +
-			"tsserver-backed TypeScript language server, and proxy LSP messages over stdio.",
+		Long: "Generate built-in declarations and type mappings for a k6 script or directory, start " +
+			"tsgo's native LSP or the tsserver-backed TypeScript language server, and proxy LSP messages " +
+			"over stdio.",
 		Args:    exactArgsWithMsg(1, "arg should be a path to a JavaScript or TypeScript file or directory"),
 		Example: getExampleText(gs, "  {{.}} lsp script.js\n  {{.}} lsp ."),
 		RunE:    lsp.run,

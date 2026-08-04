@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os/exec"
@@ -94,8 +95,8 @@ func getCmdTypecheck(gs *state.GlobalState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "typecheck [file]",
 		Short: "Type-check a k6 script",
-		Long: "Resolve a k6 script's dependencies, generate a TypeScript project with type mappings " +
-			"for remote and extension modules, and run tsgo or tsc against it.",
+		Long: "Resolve a k6 script's dependencies, generate a TypeScript project with built-in " +
+			"declarations and type mappings for remote and extension modules, and run tsgo or tsc against it.",
 		Args:    exactArgsWithMsg(1, "arg should be a path to a JavaScript or TypeScript file"),
 		Example: getExampleText(gs, `  {{.}} typecheck script.js`),
 		RunE:    typecheck.run,
@@ -213,8 +214,14 @@ func (c *typecheckCmd) generateProjectForEntries(
 	for _, warning := range warnings {
 		c.gs.Logger.Warn(warning)
 	}
+	builtinTypes, err := materializeBuiltinK6Types(c.gs.FS, typesDir)
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(paths, builtinTypes.paths)
 
-	project := newTypecheckProjectForFiles(scriptPaths, paths, typeRootCandidatesForFiles(cwd, scriptPaths))
+	typeRoots := append([]string{builtinTypes.typeRoot}, typeRootCandidatesForFiles(cwd, scriptPaths)...)
+	project := newTypecheckProjectForFiles(scriptPaths, paths, typeRoots)
 	if err := writeTypecheckProject(c.gs.FS, configPath, project); err != nil {
 		return nil, err
 	}

@@ -49,7 +49,13 @@ export default function () {
 	require.Equal(t, []string{filepath.Join(ts.Cwd, "script.js")}, project.Files)
 	require.Equal(t, "Bundler", project.CompilerOptions.ModuleResolution)
 	require.Equal(t, []string{"k6"}, project.CompilerOptions.Types)
-	require.Empty(t, project.CompilerOptions.Paths)
+	httpTypes := project.CompilerOptions.Paths["k6/http"]
+	require.Len(t, httpTypes, 1)
+	require.Contains(t, project.CompilerOptions.TypeRoots,
+		filepath.Dir(filepath.Dir(filepath.Dir(httpTypes[0]))))
+	httpDeclaration, err := fsext.ReadFile(ts.FS, httpTypes[0])
+	require.NoError(t, err)
+	require.Contains(t, string(httpDeclaration), "export function get")
 	require.Contains(t, ts.Stdout.String(), configPath)
 }
 

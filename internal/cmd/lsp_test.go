@@ -270,6 +270,15 @@ export default function () { greet("k6"); }
 	require.NoError(t, json.Unmarshal(data, &project))
 	require.Equal(t, []string{invalidFile, mainFile, nestedFile}, project.Files)
 	require.Contains(t, project.CompilerOptions.Paths, xk6types.ModuleName)
+	require.NotEmpty(t, project.CompilerOptions.TypeRoots)
+	require.Equal(t, filepath.Join(locations.typesDir, "builtin"), project.CompilerOptions.TypeRoots[0])
+	httpTypes := project.CompilerOptions.Paths["k6/http"]
+	require.Equal(t, []string{
+		filepath.Join(locations.typesDir, "builtin", "k6", "http", "index.d.ts"),
+	}, httpTypes)
+	httpDeclaration, err := fsext.ReadFile(ts.FS, httpTypes[0])
+	require.NoError(t, err)
+	require.Contains(t, string(httpDeclaration), "export function get")
 
 	addedFile := filepath.Join(root, "added.js")
 	require.NoError(t, fsext.WriteFile(ts.FS, addedFile,
