@@ -1690,3 +1690,44 @@ func TestAnyWithNotCommonTypes(t *testing.T) {
 		`))
 	require.NoError(t, err)
 }
+
+// TestAsyncInvokeCloseDoesNotPanic ensures that calling client.close() while an
+// asyncInvoke is still in flight cannot nil-deref the underlying connection.
+//
+// Before the fix, AsyncInvoke's goroutine read c.conn after Close set it to nil,
+// panicking the process:
+//
+//	panic: runtime error: invalid memory address or nil pointer dereference
+//	go.k6.io/k6/v2/internal/lib/netext/grpcext.(*Conn).Invoke(0x0, ...)
+func TestAsyncInvokeCloseDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	// Delay the RPC so close() definitely races with the in-flight invoke.
+	ts.httpBin.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+		time.Sleep(100 * time.Millisecond)
+		return &grpc_testing.Empty{}, nil
+	}
+
+	_, err := ts.Run(`
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");
+	`)
+	require.NoError(t, err)
+	ts.ToVUContext()
+
+	_, err = ts.RunOnEventLoop(`
+		client.connect("GRPCBIN_ADDR");
+		var settled = false;
+		var p = client.asyncInvoke("grpc.testing.TestService/EmptyCall", {}).then(
+			function() { settled = true; },
+			function() { settled = true; }
+		);
+		client.close();
+		p;
+		if (!settled) {
+			throw new Error("asyncInvoke promise did not settle after close");
+		}
+	`)
+	require.NoError(t, err)
+}
