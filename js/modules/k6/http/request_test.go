@@ -1418,14 +1418,15 @@ func TestRequestObjectBodyNullValues(t *testing.T) {
 	t.Run("Multipart", func(t *testing.T) {
 		tb.Mux.HandleFunc("/post-multipart", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.NoError(t, r.ParseMultipartForm(1<<20))
-			_, err := fmt.Fprintf(w, "a=%q", r.FormValue("a"))
+			require.Equal(t, []string{""}, r.MultipartForm.Value["a"])
+			_, err := w.Write([]byte("ok"))
 			require.NoError(t, err)
 		}))
 
 		_, err := rt.RunString(sr(`
 		var res = http.post("HTTPBIN_URL/post-multipart", {a: null, f: http.file("data", "test.txt")});
 		if (res.status != 200) { throw new Error("wrong status: " + res.status) }
-		if (res.body !== 'a=""') { throw new Error("wrong body: " + res.body) }
+		if (res.body !== "ok") { throw new Error("wrong body: " + res.body) }
 		`))
 		assert.NoError(t, err)
 	})
