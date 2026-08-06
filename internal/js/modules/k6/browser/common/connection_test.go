@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/tests/ws"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
+	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -76,6 +79,89 @@ func TestConnectionSendRecv(t *testing.T) {
 			require.NoError(t, err)
 		}
 	})
+}
+
+// A target rejected by onTargetAttachedToTarget must be released
+// (Runtime.runIfWaitingForDebugger) and detached from
+// (Target.detachFromTarget); otherwise this connection's
+// waitForDebuggerOnStart hold keeps the target paused for every other
+// client of the browser.
+func TestConnectionRejectedTarget(t *testing.T) {
+	t.Parallel()
+
+	const rejectedSessionID = "session_id_0123456789"
+
+	attachedEvent := fmt.Sprintf(`
+	{
+		"sessionId": %q,
+		"targetInfo": {
+			"targetId": "target_id_0123456789",
+			"type": "page",
+			"title": "",
+			"url": "about:blank",
+			"attached": true,
+			"browserContextId": "browser_context_id_0123456789"
+		},
+		"waitingForDebugger": true
+	}`, rejectedSessionID)
+
+	received := make(chan cdproto.Message, 16)
+	handler := func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
+		if msg.Method == "" {
+			return
+		}
+		received <- *msg
+		if msg.Method == cdproto.MethodType(cdproto.CommandTargetSetDiscoverTargets) {
+			writeCh <- cdproto.Message{
+				Method: cdproto.EventTargetAttachedToTarget,
+				Params: jsontext.Value(attachedEvent),
+			}
+			writeCh <- cdproto.Message{
+				ID:     msg.ID,
+				Result: jsontext.Value([]byte("{}")),
+			}
+		}
+	}
+
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, nil))
+
+	ctx := context.Background()
+	u, err := url.Parse(server.ServerHTTP.URL)
+	require.NoError(t, err)
+	wsURL := fmt.Sprintf("ws://%s/cdp", u.Host)
+	rejectAll := func(*target.EventAttachedToTarget) bool { return false }
+	conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), rejectAll)
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+
+	action := target.SetDiscoverTargets(true)
+	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
+
+	timeout := time.After(5 * time.Second)
+	var gotRunIfWaiting, gotDetach bool
+	for !gotRunIfWaiting || !gotDetach {
+		select {
+		case msg := <-received:
+			switch msg.Method {
+			case cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger):
+				require.Equal(t, target.SessionID(rejectedSessionID), msg.SessionID)
+				gotRunIfWaiting = true
+			case cdproto.MethodType(target.CommandDetachFromTarget):
+				// Target.detachFromTarget is a browser-level command: the
+				// session goes in the params, not in the message session ID.
+				require.Empty(t, msg.SessionID)
+				var params target.DetachFromTargetParams
+				require.NoError(t, jsonv2.Unmarshal(msg.Params, &params, defaultJSONV2Options))
+				require.Equal(t, target.SessionID(rejectedSessionID), params.SessionID)
+				gotDetach = true
+			}
+		case <-timeout:
+			t.Fatalf(
+				"timed out waiting for the rejected target to be released: runIfWaitingForDebugger=%t detachFromTarget=%t",
+				gotRunIfWaiting, gotDetach,
+			)
+		}
+	}
 }
 
 func TestConnectionCreateSession(t *testing.T) {

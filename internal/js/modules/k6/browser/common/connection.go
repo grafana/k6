@@ -369,6 +369,7 @@ func (c *Connection) recvLoop() {
 				ok := c.onTargetAttachedToTarget(eva)
 				if !ok {
 					c.stopWaitingForDebugger(sid)
+					c.detachFromTarget(sid)
 					continue
 				}
 			}
@@ -467,6 +468,31 @@ func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
 	err := c.send(c.ctx, msg, nil, nil)
 	if err != nil {
 		c.logger.Errorf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
+	}
+}
+
+// detachFromTarget detaches the connection from the target's session.
+// A rejected target must not stay attached, since an attached client
+// keeps holding the target back.
+//
+// Target.detachFromTarget is a browser-level command: the session to
+// detach goes in the params, not in the message's session ID.
+//
+// Like stopWaitingForDebugger, this operation is best-effort, so we
+// don't return an error.
+func (c *Connection) detachFromTarget(sid target.SessionID) {
+	buf, err := jsonv2.Marshal(&target.DetachFromTargetParams{SessionID: sid}, defaultJSONV2Options)
+	if err != nil {
+		c.logger.Errorf("Connection:detachFromTarget", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
+		return
+	}
+	msg := &cdproto.Message{
+		ID:     c.msgIDGen.newID(),
+		Method: cdproto.MethodType(target.CommandDetachFromTarget),
+		Params: buf,
+	}
+	if err := c.send(c.ctx, msg, nil, nil); err != nil {
+		c.logger.Errorf("Connection:detachFromTarget", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
 	}
 }
 

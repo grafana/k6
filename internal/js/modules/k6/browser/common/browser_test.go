@@ -189,6 +189,58 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	})
 }
 
+func TestConnectionOnAttachedToTarget(t *testing.T) {
+	t.Parallel()
+
+	const (
+		ownContextID     cdp.BrowserContextID = "own"
+		foreignContextID cdp.BrowserContextID = "foreign"
+	)
+
+	newTestBrowser := func(t *testing.T, withOwnContext bool) *Browser {
+		t.Helper()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+		var err error
+		b.defaultContext, err = NewBrowserContext(k6ext.WithVU(ctx, k6test.NewVU(t)), b, "", nil, nil)
+		require.NoError(t, err)
+		if withOwnContext {
+			b.context, err = NewBrowserContext(k6ext.WithVU(ctx, k6test.NewVU(t)), b, ownContextID, nil, nil)
+			require.NoError(t, err)
+		}
+
+		return b
+	}
+
+	tests := []struct {
+		name            string
+		withOwnContext  bool
+		targetContextID cdp.BrowserContextID
+		want            bool
+	}{
+		{"own_context_target", true, ownContextID, true},
+		{"foreign_target", true, foreignContextID, false},
+		{"foreign_target_without_own_context", false, foreignContextID, false},
+		{"default_context_target", false, "", true},
+		{"default_context_target_with_own_context", true, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			b := newTestBrowser(t, tt.withOwnContext)
+			ev := &target.EventAttachedToTarget{
+				TargetInfo: &target.Info{BrowserContextID: tt.targetContextID},
+			}
+			require.Equal(t, tt.want, b.connectionOnAttachedToTarget(ev))
+		})
+	}
+}
+
 type fakeConn struct {
 	connection
 	execute func(context.Context, string, any, any) error

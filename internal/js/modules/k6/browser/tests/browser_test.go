@@ -351,6 +351,31 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 	require.NoError(t, err, "failed to close page #2")
 }
 
+// A connection that hasn't created a browser context still auto-attaches
+// to every new page with waitForDebuggerOnStart. Unless it releases and
+// detaches from foreign pages, they stay paused and navigation stalls.
+func TestContextlessConnectionDoesNotStallNavigation(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+
+	b2, err := tb.browserType.Connect(context.Background(), tb.context(), tb.wsURL)
+	require.NoError(t, err)
+	t.Cleanup(b2.Close)
+
+	bctx, err := tb.NewContext(nil)
+	require.NoError(t, err)
+	p, err := bctx.NewPage()
+	require.NoError(t, err)
+
+	err = tb.awaitWithTimeout(10*time.Second, func() error {
+		opts := &common.FrameGotoOptions{Timeout: 10 * time.Second}
+		_, err := p.Goto("data:text/html,hello", opts)
+		return err
+	})
+	require.NoError(t, err)
+}
+
 func TestCloseContext(t *testing.T) {
 	t.Parallel()
 

@@ -160,12 +160,16 @@ func (b *Browser) connect() error {
 		return fmt.Errorf("connecting to browser DevTools URL: %w", err)
 	}
 
-	// We don't need to lock this because `connect()` is called only in NewBrowser
-	b.defaultContext, err = NewBrowserContext(b.vuCtx, b, "", DefaultBrowserContextOptions(), b.logger)
+	defaultContext, err := NewBrowserContext(b.vuCtx, b, "", DefaultBrowserContextOptions(), b.logger)
 	if err != nil {
 		return fmt.Errorf("browser connect: %w", err)
 	}
-	b.runOnClose = append(b.runOnClose, b.defaultContext.cleanup)
+	// The connection's recvLoop reads defaultContext through
+	// connectionOnAttachedToTarget, so publish it under contextMu.
+	b.contextMu.Lock()
+	b.defaultContext = defaultContext
+	b.contextMu.Unlock()
+	b.runOnClose = append(b.runOnClose, defaultContext.cleanup)
 
 	return b.initEvents()
 }
@@ -279,7 +283,10 @@ func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget
 	isAllowedBrowserContext := func() bool {
 		b.contextMu.RLock()
 		defer b.contextMu.RUnlock()
-		return b.context == nil || b.context.id == eva.TargetInfo.BrowserContextID
+		if b.context != nil && b.context.id == eva.TargetInfo.BrowserContextID {
+			return true
+		}
+		return b.defaultContext.id == eva.TargetInfo.BrowserContextID
 	}
 
 	return isAllowedBrowserContext()
@@ -295,15 +302,19 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 		browserCtx = b.getDefaultBrowserContextOrMatchedID(targetPage.BrowserContextID)
 	)
 
-	if !b.isAttachedPageValid(ev, browserCtx) {
-		return nil // Ignore this page.
-	}
 	session := b.conn.getSession(ev.SessionID)
 	if session == nil {
 		b.logger.Debugf("Browser:onAttachedToTarget",
 			"session closed before attachToTarget is handled. sid:%v tid:%v",
 			ev.SessionID, targetPage.TargetID)
 		return nil // ignore
+	}
+	if !b.isAttachedPageValid(ev, browserCtx) {
+		// Never ignore an attached target without releasing it: as long as
+		// this client stays attached without resuming the target, the
+		// browser keeps it paused for every other client.
+		detachSession(b.browserCtx, session)
+		return nil // Ignore this page.
 	}
 
 	var (
