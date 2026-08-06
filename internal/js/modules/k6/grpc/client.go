@@ -17,9 +17,12 @@ import (
 	"go.k6.io/k6/v2/internal/lib/netext/grpcext"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext"
 
 	"github.com/bufbuild/protocompile"
 	"github.com/grafana/sobek"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -148,7 +151,10 @@ func decryptPrivateKey(key, password []byte) ([]byte, error) {
 	return key, nil
 }
 
-func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertificates [][]byte) (*tls.Config, error) {
+func buildTLSConfig(
+	parentConfig *tls.Config, certificate, key []byte, caCertificates [][]byte,
+	aiaFetcher *netext.AIAFetcher, insecureSkipVerify bool, logger logrus.FieldLogger,
+) (*tls.Config, error) {
 	var cp *x509.CertPool
 	if len(caCertificates) > 0 {
 		cp, _ = x509.SystemCertPool()
@@ -162,9 +168,12 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 	// Ignoring 'TLS MinVersion is too low' because this tls.Config will inherit MinValue and MaxValue
 	// from the vu state tls.Config
 
+	// Take insecureSkipVerify from the user's option, not parentConfig — the AIA wrapper
+	// forces parentConfig.InsecureSkipVerify to true internally, so inheriting silently
+	// disables verification.
 	tlsCfg := &tls.Config{
 		CipherSuites:       parentConfig.CipherSuites,
-		InsecureSkipVerify: parentConfig.InsecureSkipVerify, //nolint:gosec
+		InsecureSkipVerify: insecureSkipVerify, //nolint:gosec
 		MinVersion:         parentConfig.MinVersion,
 		MaxVersion:         parentConfig.MaxVersion,
 		Renegotiation:      parentConfig.Renegotiation,
@@ -177,10 +186,17 @@ func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertifi
 		}
 		tlsCfg.Certificates = []tls.Certificate{cert}
 	}
+	// Re-wrap so the verification closure reads this config's RootCAs, not the VU's.
+	if aiaFetcher != nil {
+		tlsCfg = aiaFetcher.Wrap(tlsCfg, logger)
+	}
 	return tlsCfg, nil
 }
 
-func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]any) (*tls.Config, error) {
+func buildTLSConfigFromMap(
+	parentConfig *tls.Config, tlsConfigMap map[string]any,
+	aiaFetcher *netext.AIAFetcher, insecureSkipVerify bool, logger logrus.FieldLogger,
+) (*tls.Config, error) {
 	var cert, key, pass []byte
 	var ca [][]byte
 	var err error
@@ -212,7 +228,21 @@ func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]any
 			ca = [][]byte{[]byte(caCertStr)}
 		}
 	}
-	return buildTLSConfig(parentConfig, cert, key, ca)
+	return buildTLSConfig(parentConfig, cert, key, ca, aiaFetcher, insecureSkipVerify, logger)
+}
+
+// buildTLSConfigForConnect builds the per-connect TLS config from the state and TLS map.
+//
+// TODO: this creates a fresh AIAFetcher per grpc.connect() call, so its cache and
+// singleflight group don't carry over between connect calls in the same VU. gRPC's
+// AIA use is niche, so acceptable for now; revisit by threading the Runner-level
+// fetcher through lib.State.
+func buildTLSConfigForConnect(parent *tls.Config, tlsMap map[string]any, state *lib.State) (*tls.Config, error) {
+	var aiaFetcher *netext.AIAFetcher
+	if state.Options.TLSAIAFetch.Bool {
+		aiaFetcher = netext.NewAIAFetcher(state.Dialer.DialContext)
+	}
+	return buildTLSConfigFromMap(parent, tlsMap, aiaFetcher, state.Options.InsecureSkipTLSVerify.Bool, state.Logger)
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
@@ -233,7 +263,8 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	if !p.IsPlaintext {
 		tlsCfg := state.TLSConfig.Clone()
 		if len(p.TLS) > 0 {
-			if tlsCfg, err = buildTLSConfigFromMap(tlsCfg, p.TLS); err != nil {
+			tlsCfg, err = buildTLSConfigForConnect(tlsCfg, p.TLS, state)
+			if err != nil {
 				return false, err
 			}
 		}
