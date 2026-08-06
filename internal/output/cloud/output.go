@@ -69,6 +69,14 @@ type provisioningNotifier interface {
 	NotifyTestRunCompleted(ctx context.Context, testRunID int64, token string, testErr error) error
 }
 
+// logDrainer flushes buffered cloud logs so they reach the backend before the
+// run is notified complete (afterwards the backend rejects late pushes). Kept
+// structural (no import of internal/log/cloud) to avoid coupling the output to
+// that package. Production implementation: *cloudlog.Pusher.
+type logDrainer interface {
+	Drain(context.Context) error
+}
+
 type apiVersion int64
 
 const (
@@ -110,6 +118,10 @@ type Output struct {
 	// lazyInitProvisioning after both deps are constructed; read by
 	// startVersionedOutput and testFinished.
 	provisioningMode bool
+
+	// logDrainer, when set, is flushed before notify so in-run logs land while
+	// the run is still open. nil for --out cloud / --no-cloud-logs.
+	logDrainer logDrainer
 
 	usage *usage.Usage
 }
@@ -228,7 +240,7 @@ func (out *Output) Start() error {
 		// env case (internal/cmd/outputs_cloud.go); this is the defensive
 		// backstop for any other source (e.g. a hand-written cloud config).
 		if out.config.MetricsPushURL.Valid != out.config.TestRunToken.Valid {
-			return fmt.Errorf(
+			return errors.New(
 				"both K6_CLOUD_METRICS_PUSH_URL and K6_CLOUD_TEST_RUN_TOKEN " +
 					"must be set together")
 		}
@@ -315,6 +327,11 @@ func (out *Output) SetArchive(archive *lib.Archive) {
 	out.testArchive = archive
 }
 
+// SetLogDrainer sets the cloud-log drainer flushed before end-of-test notify.
+func (out *Output) SetLogDrainer(d logDrainer) {
+	out.logDrainer = d
+}
+
 var _ output.WithArchive = &Output{}
 
 // Stop gracefully stops all metric emission from the output: when all metric
@@ -333,6 +350,17 @@ func (out *Output) StopWithTestError(testErr error) error {
 	if err != nil {
 		out.logger.WithError(err).Error("An error occurred stopping the output")
 		// to notify the cloud backend we have no return here
+	}
+
+	// Flush buffered cloud logs before notify: once the run is notified
+	// complete the backend rejects late log pushes, so the final batch would
+	// be lost. The push is already bounded by the loki hook's own HTTP client
+	// timeout, so the drain just waits for it on a fresh context — fresh
+	// because the run's context is already cancelled at shutdown.
+	if out.logDrainer != nil {
+		if err := out.logDrainer.Drain(context.Background()); err != nil {
+			out.logger.WithError(err).Warn("could not drain cloud logs before notify")
+		}
 	}
 
 	out.logger.Debug("Metric emission stopped, calling cloud API...")

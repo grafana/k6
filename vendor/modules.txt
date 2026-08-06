@@ -256,7 +256,7 @@ github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.24
 ## explicit; go 1.20
 github.com/mattn/go-isatty
-# github.com/mccutchen/go-httpbin/v2 v2.24.0
+# github.com/mccutchen/go-httpbin/v2 v2.25.0
 ## explicit; go 1.25.0
 github.com/mccutchen/go-httpbin/v2/httpbin
 github.com/mccutchen/go-httpbin/v2/httpbin/digest
@@ -515,7 +515,7 @@ google.golang.org/genproto/googleapis/api/httpbody
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.82.1
+# google.golang.org/grpc v1.83.0
 ## explicit; go 1.25.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
