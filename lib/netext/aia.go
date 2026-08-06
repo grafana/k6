@@ -55,8 +55,8 @@ func NewAIAFetcher(dial DialContextFunc) *AIAFetcher {
 		httpClient: &http.Client{
 			Timeout: aiaFetchTimeout,
 			Transport: &http.Transport{
-				DialContext:       dial,
-				DisableKeepAlives: true,
+				Proxy:       http.ProxyFromEnvironment,
+				DialContext: dial,
 			},
 		},
 	}

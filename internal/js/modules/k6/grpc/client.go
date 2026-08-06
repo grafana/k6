@@ -232,6 +232,11 @@ func buildTLSConfigFromMap(
 }
 
 // buildTLSConfigForConnect builds the per-connect TLS config from the state and TLS map.
+//
+// TODO: this creates a fresh AIAFetcher per grpc.connect() call, so its cache and
+// singleflight group don't carry over between connect calls in the same VU. gRPC's
+// AIA use is niche, so acceptable for now; revisit by threading the Runner-level
+// fetcher through lib.State.
 func buildTLSConfigForConnect(parent *tls.Config, tlsMap map[string]any, state *lib.State) (*tls.Config, error) {
 	var aiaFetcher *netext.AIAFetcher
 	if state.Options.TLSAIAFetch.Bool {

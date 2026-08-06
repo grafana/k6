@@ -107,22 +107,8 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 	}
 
 	err := r.SetOptions(r.Bundle.Options)
-	if err != nil {
-		return r, err
-	}
 
-	// AIA dialer mirrors the per-VU dialer minus LocalIPs so AIA fetches respect the
-	// user's blocking rules / host overrides / resolver.
-	runnerDialer := &netext.Dialer{
-		Dialer:           r.BaseDialer,
-		Resolver:         r.Resolver,
-		Blacklist:        r.Bundle.Options.BlacklistIPs,
-		BlockedHostnames: r.Bundle.Options.BlockedHostnames.Trie,
-		Hosts:            r.Bundle.Options.Hosts.Trie,
-	}
-	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
-
-	return r, nil
+	return r, err
 }
 
 // MakeArchive creates an Archive of the runner. There should be a corresponding NewFromArchive() function
@@ -597,6 +583,17 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	if err := r.setResolver(opts.DNS); err != nil {
 		return err
 	}
+
+	// Rebuild the AIA fetcher against the new options — Blacklist / BlockedHostnames /
+	// Hosts / Resolver may have changed and the fetcher's dialer captures them.
+	runnerDialer := &netext.Dialer{
+		Dialer:           r.BaseDialer,
+		Resolver:         r.Resolver,
+		Blacklist:        opts.BlacklistIPs,
+		BlockedHostnames: opts.BlockedHostnames.Trie,
+		Hosts:            opts.Hosts.Trie,
+	}
+	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
 
 	// FIXME: add tests
 	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)
