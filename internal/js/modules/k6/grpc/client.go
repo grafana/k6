@@ -290,6 +290,9 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 
 // HealthCheck checks if the server side is up and ready to serve responses
 func (c *Client) HealthCheck(svc *string) (*grpcext.HealthCheckResponse, error) {
+	if c.conn == nil {
+		return nil, errors.New("no gRPC connection, you must call connect first")
+	}
 	var service string
 	if svc != nil {
 		service = *svc
