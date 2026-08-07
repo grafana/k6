@@ -180,6 +180,9 @@ func (c *Client) parseRequest(
 
 	formatFormVal := func(v any) string {
 		// TODO: handle/warn about unsupported/nested values
+		if v == nil {
+			return ""
+		}
 		return fmt.Sprintf("%v", v)
 	}
 
