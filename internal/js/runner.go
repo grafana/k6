@@ -557,7 +557,14 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 			formatter = l.Formatter
 			level = l.Level
 		}
-		c, err := newFileConsole(opts.ConsoleOutput.String, formatter, level)
+		// newFileConsole builds a separate logrus.Logger that does not inherit hooks
+		// from the primary logger. Pass the secrets redaction hook explicitly so
+		// consoleOutput cannot write retrieved secrets in plaintext.
+		var secretsHook logrus.Hook
+		if sm := r.preInitState.SecretsManager; sm != nil {
+			secretsHook = sm.Hook()
+		}
+		c, err := newFileConsole(opts.ConsoleOutput.String, formatter, level, secretsHook)
 		if err != nil {
 			return err
 		}
