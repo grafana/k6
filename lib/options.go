@@ -547,6 +547,16 @@ func (o Options) Validate() []error {
 	if o.SetupTimeout.Valid && o.SetupTimeout.Duration <= 0 {
 		validationErrors = append(validationErrors, errors.New("setupTimeout must be positive"))
 	}
+	// batch <= 0 makes http.batch() spawn zero workers and hang forever waiting
+	// for results that will never arrive (see httpext.MakeBatchRequests).
+	if o.Batch.Valid && o.Batch.Int64 < 1 {
+		validationErrors = append(validationErrors,
+			fmt.Errorf("batch must be a positive number but is %d", o.Batch.Int64))
+	}
+	if o.BatchPerHost.Valid && o.BatchPerHost.Int64 < 1 {
+		validationErrors = append(validationErrors,
+			fmt.Errorf("batchPerHost must be a positive number but is %d", o.BatchPerHost.Int64))
+	}
 	return validationErrors
 }
 
