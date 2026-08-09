@@ -1,7 +1,6 @@
 package grpcext
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -70,42 +69,6 @@ func (s *Stream) receive() (msg *dynamicpb.Message, err error) {
 	}
 
 	return nil, err
-}
-
-// convert converts the message to the interface{}
-// which could be returned to the JS
-// there is a lot of marshaling/unmarshaling here, but if we just pass the dynamic message
-// the default Marshaller would be used, which would strip any zero/default values from the JSON.
-// eg. given this message:
-//
-//	message Point {
-//	   double x = 1;
-//		  double y = 2;
-//		  double z = 3;
-//	}
-//
-// and a value like this:
-// msg := Point{X: 6, Y: 4, Z: 0}
-// would result in JSON output:
-// {"x":6,"y":4}
-// rather than the desired:
-// {"x":6,"y":4,"z":0}
-func convert(marshaler protojson.MarshalOptions, msg *dynamicpb.Message) (any, error) {
-	// TODO(olegbespalov): add the test that checks that message is not nil
-
-	raw, err := marshaler.Marshal(msg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal the message: %w", err)
-	}
-
-	var back any
-
-	err = json.Unmarshal(raw, &back)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal the message: %w", err)
-	}
-
-	return back, err
 }
 
 // CloseSend closes the stream

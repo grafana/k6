@@ -10,7 +10,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/v2/internal/lib/netext/grpcext"
-	grpc_testing "go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/v2/js/modulestest"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
