@@ -26,7 +26,9 @@ func TestNew(t *testing.T) {
 
 	logger, hook := testutils.NewLoggerWithHook(t)
 	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
-	o, err := New(logger, cloudapi.Config{APIVersion: null.IntFrom(99)}, c)
+	conf := cloudapi.NewConfig()
+	conf.APIVersion = null.IntFrom(99)
+	o, err := New(logger, conf, c)
 	require.NoError(t, err)
 	require.NotNil(t, o)
 
@@ -45,11 +47,58 @@ func TestNewWithConfigOverwritten(t *testing.T) {
 
 	logger := testutils.NewLogger(t)
 	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
-	conf := cloudapi.Config{Host: null.StringFrom("the-new-host")}
+	conf := cloudapi.NewConfig()
+	conf.Host = null.StringFrom("the-new-host")
 	o, err := New(logger, conf, c)
 	require.NoError(t, err)
 	require.NotNil(t, o)
 	assert.Equal(t, "the-new-host/v1", o.cloudClient.BaseURL())
+}
+
+func TestNewRejectsNonPositivePushSettings(t *testing.T) {
+	t.Parallel()
+
+	logger := testutils.NewLogger(t)
+	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
+
+	tests := []struct {
+		name   string
+		mutate func(*cloudapi.Config)
+		errMsg string
+	}{
+		{
+			name: "zero metric push concurrency",
+			mutate: func(conf *cloudapi.Config) {
+				conf.MetricPushConcurrency = null.IntFrom(0)
+			},
+			errMsg: "metrics push concurrency must be a positive number",
+		},
+		{
+			name: "negative metric push concurrency",
+			mutate: func(conf *cloudapi.Config) {
+				conf.MetricPushConcurrency = null.IntFrom(-1)
+			},
+			errMsg: "metrics push concurrency must be a positive number",
+		},
+		{
+			name: "zero max time series in batch",
+			mutate: func(conf *cloudapi.Config) {
+				conf.MaxTimeSeriesInBatch = null.IntFrom(0)
+			},
+			errMsg: "max allowed number of time series in a single batch must be a positive number",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			conf := cloudapi.NewConfig()
+			tc.mutate(&conf)
+			_, err := New(logger, conf, c)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.errMsg)
+		})
+	}
 }
 
 func TestOutputSetTestRunID(t *testing.T) {
@@ -74,15 +123,14 @@ func TestOutputSetTestRunStopCallback(t *testing.T) {
 func TestOutputCollectSamples(t *testing.T) {
 	t.Parallel()
 
-	conf := cloudapi.Config{
-		Host:                  null.StringFrom("flush-is-disabled"),
-		Token:                 null.StringFrom("a-fake-token"),
-		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
-		// Manually control and trigger the various steps
-		// instead to be time dependent
-		AggregationPeriod:  types.NewNullDuration(1*time.Hour, true),
-		MetricPushInterval: types.NewNullDuration(1*time.Hour, true),
-	}
+	conf := cloudapi.NewConfig()
+	conf.Host = null.StringFrom("flush-is-disabled")
+	conf.Token = null.StringFrom("a-fake-token")
+	conf.AggregationWaitPeriod = types.NewNullDuration(5*time.Second, true)
+	// Manually control and trigger the various steps
+	// instead to be time dependent
+	conf.AggregationPeriod = types.NewNullDuration(1*time.Hour, true)
+	conf.MetricPushInterval = types.NewNullDuration(1*time.Hour, true)
 	logger := testutils.NewLogger(t)
 	cc := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, "v/test", conf.Timeout.TimeDuration())
@@ -566,13 +614,12 @@ func (ff requestMetadatasFlusherFunc) Flush(ctx context.Context) error {
 func TestOutputSetters_OverrideMetricsClientAndURL(t *testing.T) {
 	t.Parallel()
 
-	conf := cloudapi.Config{
-		Host:                  null.StringFrom("host-not-used-for-override"),
-		Token:                 null.StringFrom("a-fake-token"),
-		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
-		AggregationPeriod:     types.NewNullDuration(1*time.Hour, true),
-		MetricPushInterval:    types.NewNullDuration(1*time.Hour, true),
-	}
+	conf := cloudapi.NewConfig()
+	conf.Host = null.StringFrom("host-not-used-for-override")
+	conf.Token = null.StringFrom("a-fake-token")
+	conf.AggregationWaitPeriod = types.NewNullDuration(5*time.Second, true)
+	conf.AggregationPeriod = types.NewNullDuration(1*time.Hour, true)
+	conf.MetricPushInterval = types.NewNullDuration(1*time.Hour, true)
 	logger := testutils.NewLogger(t)
 	o, err := New(logger, conf, nil)
 	require.NoError(t, err)
