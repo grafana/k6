@@ -131,6 +131,7 @@ func TestOutputCollectSamples(t *testing.T) {
 	// instead to be time dependent
 	conf.AggregationPeriod = types.NewNullDuration(1*time.Hour, true)
 	conf.MetricPushInterval = types.NewNullDuration(1*time.Hour, true)
+	conf.TracesEnabled = null.BoolFrom(false)
 	logger := testutils.NewLogger(t)
 	cc := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, "v/test", conf.Timeout.TimeDuration())
@@ -620,6 +621,7 @@ func TestOutputSetters_OverrideMetricsClientAndURL(t *testing.T) {
 	conf.AggregationWaitPeriod = types.NewNullDuration(5*time.Second, true)
 	conf.AggregationPeriod = types.NewNullDuration(1*time.Hour, true)
 	conf.MetricPushInterval = types.NewNullDuration(1*time.Hour, true)
+	conf.TracesEnabled = null.BoolFrom(false)
 	logger := testutils.NewLogger(t)
 	o, err := New(logger, conf, nil)
 	require.NoError(t, err)

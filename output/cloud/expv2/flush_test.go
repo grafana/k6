@@ -453,7 +453,7 @@ func TestMetricsFlusherRejectsNonPositiveConcurrency(t *testing.T) {
 			case err := <-done:
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "batch push concurrency must be a positive number")
-				assert.Equal(t, int64(0), pm.timesCalled())
+				assert.Equal(t, 0, pm.timesCalled())
 			case <-time.After(2 * time.Second):
 				t.Fatal("flush hung with non-positive batchPushConcurrency")
 			}
