@@ -200,8 +200,8 @@ func (c *Collator) Key(buf *Buffer, str []byte) []byte {
 
 // KeyFromString returns the collation key for str.
 // Passing the buffer buf may avoid memory allocations.
-// The returned slice will point to an allocation in Buffer and will retain
-// valid until the next call to buf.ResetKeys().
+// The returned slice will point to an allocation in Buffer and will remain
+// valid until the next call to buf.Reset().
 func (c *Collator) KeyFromString(buf *Buffer, str string) []byte {
 	// See https://www.unicode.org/reports/tr10/#Main_Algorithm for more details.
 	buf.init()
