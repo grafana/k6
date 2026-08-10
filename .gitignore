@@ -1,5 +1,6 @@
 /k6
 /k6.exe
+/k6-extension-api
 /dist
 /pkg-build
 /internal/lib/summary/machinereadable/k6-summary

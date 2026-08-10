@@ -2,31 +2,31 @@ package msgpack
 
 import (
 	"github.com/vmihailenco/msgpack/v5"
-	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6-extension-api"
 )
 
 func init() {
-	modules.Register("k6/x/msgpack", new(MsgPackRoot))
+	extensionapi.Register("k6/x/msgpack", new(MsgPackRoot))
 }
 
 // MsgPackRoot is the root module
 type MsgPackRoot struct{}
 
 type ModuleInstance struct {
-	vu modules.VU
+	vu extensionapi.VU
 }
 
-func (*MsgPackRoot) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*MsgPackRoot) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	return &ModuleInstance{vu: vu}
 }
 
-func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{Default: &MessagePack{vu: mi.vu}}
+func (mi *ModuleInstance) Exports() extensionapi.Exports {
+	return extensionapi.Exports{Default: &MessagePack{vu: mi.vu}}
 }
 
 // MessagePack is the k6 extension imported by the JavaScript
 type MessagePack struct {
-	vu modules.VU
+	vu extensionapi.VU
 }
 
 // Pack encodes a value to MessagePack binary format and returns as ArrayBuffer

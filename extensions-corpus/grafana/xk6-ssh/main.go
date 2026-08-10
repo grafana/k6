@@ -3,9 +3,9 @@ package xk6ssh
 
 import (
 	"github.com/spf13/afero"
-	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6-extension-api"
 )
 
 func init() {
-	modules.Register("k6/x/ssh", &K6SSH{fs: afero.NewOsFs()})
+	extensionapi.Register("k6/x/ssh", &K6SSH{fs: afero.NewOsFs()})
 }

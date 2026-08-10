@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // TODO: Make an ExtensionRegistry?
@@ -96,16 +98,28 @@ func Get(typ ExtensionType) map[string]*Extension {
 	result := make(map[string]*Extension, len(exts))
 
 	maps.Copy(result, exts)
+	if typ == JSExtension {
+		for name, module := range extensionapi.Registered() {
+			if _, exists := result[name]; exists {
+				panic(fmt.Sprintf("extension already registered: %s", name))
+			}
+			path, version := extractModuleInfo(module)
+			result[name] = &Extension{
+				Name:    name,
+				Type:    JSExtension,
+				Module:  module,
+				Path:    path,
+				Version: version,
+			}
+		}
+	}
 
 	return result
 }
 
 // GetAll returns all extensions, sorted by their import path and name.
 func GetAll() []*Extension {
-	mx.RLock()
-	defer mx.RUnlock()
-
-	js, out, subcommand := extensions[JSExtension], extensions[OutputExtension], extensions[SubcommandExtension]
+	js, out, subcommand := Get(JSExtension), Get(OutputExtension), Get(SubcommandExtension)
 	result := make([]*Extension, 0, len(js)+len(out)+len(subcommand))
 
 	for _, e := range js {

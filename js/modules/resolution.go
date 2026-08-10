@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/sobek/ast"
 	"github.com/sirupsen/logrus"
 
+	extensionapi "go.k6.io/k6-extension-api"
 	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/js/compiler"
 	"go.k6.io/k6/v2/internal/loader"
@@ -90,6 +91,9 @@ func (mr *ModuleResolver) initializeGoModule(name string) (sobek.ModuleRecord, e
 		}
 	} else if err := mr.usage.Strings("modules", name); err != nil {
 		mr.logger.WithError(err).Warnf("Error while reporting usage of module %q", name)
+	}
+	if extensionModule, ok := mod.(extensionapi.Module); ok {
+		return &goModule{m: extensionAPIModuleAdapter{module: extensionModule}}, nil
 	}
 	k6m, ok := mod.(Module)
 	if !ok {

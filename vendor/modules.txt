@@ -648,3 +648,7 @@ gopkg.in/validator.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# go.k6.io/k6-extension-api v0.0.0 => ./extension-api
+## explicit; go 1.25.0
+go.k6.io/k6-extension-api
+# go.k6.io/k6-extension-api => ./extension-api
