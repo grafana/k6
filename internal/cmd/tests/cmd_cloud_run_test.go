@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -52,19 +53,9 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			wantStderrContains: "the --local-execution flag is not compatible with the --show-logs flag",
 		},
 		{
-			name:               "--secret-source=cloud is not a valid value",
+			name:               "using --secret-source=cloud without --local-execution should fail",
 			cliArgs:            []string{"--secret-source=cloud"},
-			wantStderrContains: "'cloud' is not a valid value for --secret-source",
-		},
-		{
-			name:               "--secret-source=cloud is not a valid value even with --local-execution",
-			cliArgs:            []string{"--local-execution", "--secret-source=cloud"},
-			wantStderrContains: "'cloud' is not a valid value for --secret-source",
-		},
-		{
-			name:               "using --no-cloud-secrets without --local-execution should fail",
-			cliArgs:            []string{"--no-cloud-secrets"},
-			wantStderrContains: "the --no-cloud-secrets flag can only be used in conjunction with the --local-execution flag",
+			wantStderrContains: "the 'cloud' secret source can only be used with 'k6 cloud run --local-execution'",
 		},
 	}
 
@@ -262,33 +253,91 @@ export default function() {
 	})
 }
 
-func TestCloudRunLocalExecutionNoCloudSecrets(t *testing.T) {
+// TestCloudRunLocalExecutionUserSecretSourceStaysDefault is a regression test for #6093:
+// a single user-configured secret source must remain the implicit 'default' one under
+// 'k6 cloud run --local-execution', so scripts calling secrets.get() keep working.
+func TestCloudRunLocalExecutionUserSecretSourceStaysDefault(t *testing.T) {
 	t.Parallel()
 
 	script := `
+import secrets from "k6/secrets";
+
 export const options = {
   cloud: {
-      name: 'Test no-cloud-secrets',
+      name: 'Hello k6 Cloud!',
       projectID: 123456,
   },
 };
-export default function() {};`
 
-	ts := makeTestState(t, script, []string{"--local-execution", "--no-cloud-secrets"})
+export default async function() {
+	await secrets.get("cool");
+	console.log("resolved from the implicit default source");
+};`
+
+	ts := makeTestState(t, script, []string{
+		"--local-execution", "--log-output=stdout",
+		"--secret-source=mock=cool=sekrit-value",
+	})
+
+	srv := getCloudTestEndChecker(t, 1337, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, "resolved from the implicit default source")
+	assert.NotContains(t, stdout, `no secret source with name "default" is configured`)
+}
+
+// TestCloudRunLocalExecutionOptInCloudSecrets verifies that cloud secrets remain available
+// under 'k6 cloud run --local-execution' when explicitly requested via --secret-source=cloud,
+// configured from the CreateTestRun API response.
+func TestCloudRunLocalExecutionOptInCloudSecrets(t *testing.T) {
+	t.Parallel()
+
+	// Mock the secrets endpoint the cloud API points k6 at.
+	secretsSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer mock-test-run-token", r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"plaintext":"cloud-secret-value"}`))
+	}))
+	t.Cleanup(secretsSrv.Close)
+
+	script := `
+import secrets from "k6/secrets";
+
+export const options = {
+  cloud: {
+      name: 'Hello k6 Cloud!',
+      projectID: 123456,
+  },
+};
+
+export default async function() {
+	const v = await secrets.source("cloud").get("mykey");
+	if (v === "cloud-secret-value") {
+		console.log("cloud secret resolved");
+	}
+};`
+
+	ts := makeTestState(t, script, []string{
+		"--local-execution", "--log-output=stdout", "--secret-source=cloud",
+	})
 
 	testServerHandlerFunc := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprint(resp, `{
+		_, err := fmt.Fprintf(resp, `{
 			"reference_id": "1337",
 			"test_run_token": "mock-test-run-token",
 			"secrets_config": {
-				"endpoint": "https://mock-secrets.example.com/{key}",
+				"endpoint": %q,
 				"response_path": "plaintext"
 			},
 			"config": {
 				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
 			}
-		}`)
+		}`, secretsSrv.URL+"/{key}")
 		assert.NoError(t, err)
 	})
 
@@ -297,8 +346,10 @@ export default function() {};`
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	// --no-cloud-secrets must prevent the cloud source from being registered.
-	assert.Nil(t, ts.CloudSecretSource, "cloud secret source should not be registered when --no-cloud-secrets is set")
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.NotNil(t, ts.CloudSecretSource, "cloud secret source should be registered with --secret-source=cloud")
+	assert.Contains(t, stdout, "cloud secret resolved")
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
