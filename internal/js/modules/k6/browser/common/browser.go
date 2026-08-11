@@ -326,7 +326,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
 		if b.closing.Load() {
 			b.logger.Debugf("Browser:onAttachedToTarget", "new page failed; browser is closing: sid:%v", ev.SessionID)
-			detachSession(b.browserCtx, session)
+			detachSession(session)
 		}
 		return nil // Ignore this page.
 	}
@@ -353,7 +353,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 			)
 		}
 
-		detachSession(b.browserCtx, session)
+		detachSession(session)
 
 		return nil
 	}

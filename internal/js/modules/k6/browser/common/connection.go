@@ -134,9 +134,12 @@ type Connection struct {
 	sessionsMu sync.RWMutex
 	sessions   map[target.SessionID]*Session
 
-	// onTargetAttachedToTarget is called when a new target is attached to the browser.
-	// Returning false will prevent the session from being created.
-	// If onTargetAttachedToTarget is nil, the session will be created.
+	// onTargetAttachedToTarget is called when a new target is attached to
+	// the browser. The target's session is registered before the call, so
+	// that the response to the release below can be routed back to it.
+	// Returning false releases the target: it is resumed and detached from
+	// instead of being adopted. If onTargetAttachedToTarget is nil, every
+	// target is adopted.
 	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool
 }
 
@@ -363,21 +366,21 @@ func (c *Connection) recvLoop() {
 			eva := ev.(*target.EventAttachedToTarget) //nolint:forcetypeassert
 			sid, tid := eva.SessionID, eva.TargetInfo.TargetID
 
-			if c.onTargetAttachedToTarget != nil {
-				// If onTargetAttachedToTarget is set, it will be called to determine
-				// if a session should be created for the target.
-				ok := c.onTargetAttachedToTarget(eva)
-				if !ok {
-					c.stopWaitingForDebugger(sid)
-					continue
-				}
-			}
-
 			c.sessionsMu.Lock()
 			session := NewSession(c.ctx, c, sid, tid, c.logger, c.msgIDGen)
 			c.logger.Debugf("Connection:recvLoop:EventAttachedToTarget", "sid:%v tid:%v wsURL:%q", sid, tid, c.wsURL)
 			c.sessions[sid] = session
 			c.sessionsMu.Unlock()
+
+			if c.onTargetAttachedToTarget != nil {
+				// If onTargetAttachedToTarget is set, it will be called to
+				// determine if the target should be adopted or released.
+				ok := c.onTargetAttachedToTarget(eva)
+				if !ok {
+					detachSession(session)
+					continue
+				}
+			}
 		} else if msg.Method == cdproto.EventTargetDetachedFromTarget {
 			ev, err := cdproto.UnmarshalMessage(&msg)
 			if err != nil {
@@ -445,29 +448,35 @@ func (c *Connection) recvLoop() {
 	}
 }
 
-// stopWaitingForDebugger tells the browser to stop waiting for the
-// debugger to attach to the page's session.
-//
-// Whether we're not sharing pages among browser contexts, Chromium
-// still does so (since we're auto-attaching all browser targets).
-// This means that if we don't stop waiting for the debugger, the
-// browser will wait for the debugger to attach to the new page
-// indefinitely, even if the page is not part of the browser context
-// we're using.
-//
-// We don't return an error because the browser might have already
-// closed the connection. In that case, handling the error would
-// be redundant. This operation is best-effort.
-func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
-	msg := &cdproto.Message{
-		ID:        c.msgIDGen.newID(),
-		SessionID: sid,
-		Method:    cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger),
-	}
-	err := c.send(c.ctx, msg, nil, nil)
-	if err != nil {
-		c.logger.Errorf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
-	}
+// detachSession resumes a rejected target's session, awaits the response,
+// then detaches from it. Detaching alone should release the target, but the
+// browser has a bug where a detached target can stay paused, so the resume
+// must land first — the same workaround as Playwright's CRSession.detach
+// (crConnection.ts). The wait is bounded so an unresponsive target is still
+// detached from. Best-effort: errors are not returned. Target.detachFromTarget
+// is browser-level: the session goes in the params, not the message's
+// session ID.
+func detachSession(session *Session) {
+	go func() {
+		c := session.conn
+		ctx, cancel := context.WithTimeout(c.ctx, DefaultTimeout)
+		defer cancel()
+		_ = session.Execute(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+
+		buf, err := jsonv2.Marshal(&target.DetachFromTargetParams{SessionID: session.id}, defaultJSONV2Options)
+		if err != nil {
+			c.logger.Errorf("Connection:detachSession", "sid:%v wsURL:%q, err:%v", session.id, c.wsURL, err)
+			return
+		}
+		msg := &cdproto.Message{
+			ID:     c.msgIDGen.newID(),
+			Method: cdproto.MethodType(target.CommandDetachFromTarget),
+			Params: buf,
+		}
+		if err := c.send(c.ctx, msg, nil, nil); err != nil {
+			c.logger.Errorf("Connection:detachSession", "sid:%v wsURL:%q, err:%v", session.id, c.wsURL, err)
+		}
+	}()
 }
 
 func (c *Connection) send(
