@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/tests/ws"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
+	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
@@ -76,6 +79,111 @@ func TestConnectionSendRecv(t *testing.T) {
 			require.NoError(t, err)
 		}
 	})
+}
+
+// attachedToTargetEvent returns a Target.attachedToTarget event payload for
+// a paused target, as the browser sends when auto-attaching a new target.
+func attachedToTargetEvent(sessionID target.SessionID, targetType, browserContextID string) string {
+	return fmt.Sprintf(`
+	{
+		"sessionId": %q,
+		"targetInfo": {
+			"targetId": "target_id_0123456789",
+			"type": %q,
+			"title": "",
+			"url": "about:blank",
+			"attached": true,
+			"browserContextId": %q
+		},
+		"waitingForDebugger": true
+	}`, sessionID, targetType, browserContextID)
+}
+
+// newAttachedToTargetServer starts a fake CDP websocket server that records
+// every command it receives and emits the given Target.attachedToTarget
+// event when the client sends Target.setDiscoverTargets.
+func newAttachedToTargetServer(t *testing.T, attachedEvent string) (string, chan cdproto.Message) {
+	t.Helper()
+
+	received := make(chan cdproto.Message, 16)
+	handler := func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
+		if msg.Method == "" {
+			return
+		}
+		received <- *msg
+		if msg.Method == cdproto.MethodType(cdproto.CommandTargetSetDiscoverTargets) {
+			writeCh <- cdproto.Message{
+				Method: cdproto.EventTargetAttachedToTarget,
+				Params: jsontext.Value(attachedEvent),
+			}
+			writeCh <- cdproto.Message{
+				ID:     msg.ID,
+				Result: jsontext.Value([]byte("{}")),
+			}
+		}
+	}
+
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, nil))
+	u, err := url.Parse(server.ServerHTTP.URL)
+	require.NoError(t, err)
+
+	return fmt.Sprintf("ws://%s/cdp", u.Host), received
+}
+
+// requireDetachedOnly consumes the server-received messages until the
+// rejected target's session is detached from, asserting the detach is
+// correctly addressed and that no resume was sent for it. The websocket
+// preserves ordering, so a resume would have arrived before the detach.
+func requireDetachedOnly(t *testing.T, received <-chan cdproto.Message, sid target.SessionID) {
+	t.Helper()
+
+	timeout := time.After(5 * time.Second)
+	var sawResume bool
+	for {
+		select {
+		case msg := <-received:
+			switch msg.Method {
+			case cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger):
+				sawResume = true
+			case cdproto.MethodType(target.CommandDetachFromTarget):
+				// Target.detachFromTarget is a browser-level command: the
+				// session goes in the params, not in the message session ID.
+				require.Empty(t, msg.SessionID)
+				var params target.DetachFromTargetParams
+				require.NoError(t, jsonv2.Unmarshal(msg.Params, &params, defaultJSONV2Options))
+				require.Equal(t, sid, params.SessionID)
+				require.False(t, sawResume, "expected no Runtime.runIfWaitingForDebugger for a rejected target")
+				return
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for the rejected target to be detached from")
+		}
+	}
+}
+
+// TestConnectionRejectedTarget ensures a target rejected by the attach filter
+// is detached from, and only detached from. The browser keeps a new target
+// paused until every client attached with waitForDebuggerOnStart releases it,
+// and detaching drops this client's hold. Like Playwright, rejection sends no
+// separate resume: a client either adopts a target or detaches from it.
+func TestConnectionRejectedTarget(t *testing.T) {
+	t.Parallel()
+
+	const rejectedSessionID = target.SessionID("session_id_0123456789")
+
+	wsURL, received := newAttachedToTargetServer(t,
+		attachedToTargetEvent(rejectedSessionID, "page", "browser_context_id_0123456789"))
+
+	ctx := context.Background()
+	rejectAll := func(*target.EventAttachedToTarget) bool { return false }
+	conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), rejectAll)
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+
+	action := target.SetDiscoverTargets(true)
+	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
+
+	requireDetachedOnly(t, received, rejectedSessionID)
 }
 
 func TestConnectionCreateSession(t *testing.T) {
