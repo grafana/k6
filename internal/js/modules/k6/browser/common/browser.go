@@ -160,12 +160,16 @@ func (b *Browser) connect() error {
 		return fmt.Errorf("connecting to browser DevTools URL: %w", err)
 	}
 
-	// We don't need to lock this because `connect()` is called only in NewBrowser
-	b.defaultContext, err = NewBrowserContext(b.vuCtx, b, "", DefaultBrowserContextOptions(), b.logger)
+	defaultContext, err := NewBrowserContext(b.vuCtx, b, "", DefaultBrowserContextOptions(), b.logger)
 	if err != nil {
 		return fmt.Errorf("browser connect: %w", err)
 	}
-	b.runOnClose = append(b.runOnClose, b.defaultContext.cleanup)
+	// The connection's recvLoop reads defaultContext through
+	// connectionOnAttachedToTarget, so publish it under contextMu.
+	b.contextMu.Lock()
+	b.defaultContext = defaultContext
+	b.contextMu.Unlock()
+	b.runOnClose = append(b.runOnClose, defaultContext.cleanup)
 
 	return b.initEvents()
 }
