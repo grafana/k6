@@ -351,9 +351,13 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 	require.NoError(t, err, "failed to close page #2")
 }
 
-// A connection that hasn't created a browser context still auto-attaches
-// to every new page with waitForDebuggerOnStart. Unless it releases and
-// detaches from foreign pages, they stay paused and navigation stalls.
+// TestContextlessConnectionDoesNotStallNavigation guards against connections
+// freezing each other's pages when they share a browser instance. Every new
+// page starts paused until all auto-attached connections resume it. A
+// connection that hadn't created its browser context yet used to claim other
+// connections' pages without ever resuming them, stalling their navigations
+// until it disconnected. The second connection here never creates a context,
+// which reproduces that state deterministically.
 func TestContextlessConnectionDoesNotStallNavigation(t *testing.T) {
 	t.Parallel()
 

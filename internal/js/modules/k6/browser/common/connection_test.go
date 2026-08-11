@@ -81,11 +81,13 @@ func TestConnectionSendRecv(t *testing.T) {
 	})
 }
 
-// A target rejected by onTargetAttachedToTarget must be released
-// (Runtime.runIfWaitingForDebugger) and detached from
-// (Target.detachFromTarget); otherwise this connection's
-// waitForDebuggerOnStart hold keeps the target paused for every other
-// client of the browser.
+// TestConnectionRejectedTarget ensures a target rejected by the attach filter
+// is both resumed and detached from. Staying attached without resuming keeps
+// the target paused for every client; staying attached after resuming can
+// still stall it later, since the browser waits on all attached clients for
+// some events (e.g. after a crash-reload). Resuming alone is enough to make
+// TestContextlessConnectionDoesNotStallNavigation pass, so this is the only
+// test that catches a missing detach.
 func TestConnectionRejectedTarget(t *testing.T) {
 	t.Parallel()
 
