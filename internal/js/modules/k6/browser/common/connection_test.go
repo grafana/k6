@@ -82,12 +82,10 @@ func TestConnectionSendRecv(t *testing.T) {
 }
 
 // TestConnectionRejectedTarget ensures a target rejected by the attach filter
-// is both resumed and detached from. Staying attached without resuming keeps
-// the target paused for every client; staying attached after resuming can
-// still stall it later, since the browser waits on all attached clients for
-// some events (e.g. after a crash-reload). Resuming alone is enough to make
-// TestContextlessConnectionDoesNotStallNavigation pass, so this is the only
-// test that catches a missing detach.
+// is detached from, and only detached from. The browser keeps a new target
+// paused until every client attached with waitForDebuggerOnStart releases it,
+// and detaching drops this client's hold. Like Playwright, rejection sends no
+// separate resume: a client either adopts a target or detaches from it.
 func TestConnectionRejectedTarget(t *testing.T) {
 	t.Parallel()
 
@@ -140,14 +138,13 @@ func TestConnectionRejectedTarget(t *testing.T) {
 	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
 
 	timeout := time.After(5 * time.Second)
-	var gotRunIfWaiting, gotDetach bool
-	for !gotRunIfWaiting || !gotDetach {
+	var sawResume, gotDetach bool
+	for !gotDetach {
 		select {
 		case msg := <-received:
 			switch msg.Method {
 			case cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger):
-				require.Equal(t, target.SessionID(rejectedSessionID), msg.SessionID)
-				gotRunIfWaiting = true
+				sawResume = true
 			case cdproto.MethodType(target.CommandDetachFromTarget):
 				// Target.detachFromTarget is a browser-level command: the
 				// session goes in the params, not in the message session ID.
@@ -158,12 +155,12 @@ func TestConnectionRejectedTarget(t *testing.T) {
 				gotDetach = true
 			}
 		case <-timeout:
-			t.Fatalf(
-				"timed out waiting for the rejected target to be released: runIfWaitingForDebugger=%t detachFromTarget=%t",
-				gotRunIfWaiting, gotDetach,
-			)
+			t.Fatal("timed out waiting for the rejected target to be detached from")
 		}
 	}
+	// The websocket preserves ordering, so a resume would have arrived
+	// before the detach.
+	require.False(t, sawResume, "expected no Runtime.runIfWaitingForDebugger for a rejected target")
 }
 
 func TestConnectionCreateSession(t *testing.T) {

@@ -14,7 +14,6 @@ import (
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
-	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
@@ -368,7 +367,6 @@ func (c *Connection) recvLoop() {
 				// if a session should be created for the target.
 				ok := c.onTargetAttachedToTarget(eva)
 				if !ok {
-					c.stopWaitingForDebugger(sid)
 					c.detachFromTarget(sid)
 					continue
 				}
@@ -446,40 +444,16 @@ func (c *Connection) recvLoop() {
 	}
 }
 
-// stopWaitingForDebugger tells the browser to stop waiting for the
-// debugger to attach to the page's session.
-//
-// Whether we're not sharing pages among browser contexts, Chromium
-// still does so (since we're auto-attaching all browser targets).
-// This means that if we don't stop waiting for the debugger, the
-// browser will wait for the debugger to attach to the new page
-// indefinitely, even if the page is not part of the browser context
-// we're using.
-//
-// We don't return an error because the browser might have already
-// closed the connection. In that case, handling the error would
-// be redundant. This operation is best-effort.
-func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
-	msg := &cdproto.Message{
-		ID:        c.msgIDGen.newID(),
-		SessionID: sid,
-		Method:    cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger),
-	}
-	err := c.send(c.ctx, msg, nil, nil)
-	if err != nil {
-		c.logger.Errorf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
-	}
-}
-
 // detachFromTarget detaches the connection from the target's session.
-// A rejected target must not stay attached, since an attached client
-// keeps holding the target back.
+// A rejected target must not stay attached: the browser keeps a new
+// target paused until every client attached with waitForDebuggerOnStart
+// releases it, and detaching drops this client's hold.
 //
 // Target.detachFromTarget is a browser-level command: the session to
 // detach goes in the params, not in the message's session ID.
 //
-// Like stopWaitingForDebugger, this operation is best-effort, so we
-// don't return an error.
+// The browser might have already closed the connection or the session,
+// so this operation is best-effort and we don't return an error.
 func (c *Connection) detachFromTarget(sid target.SessionID) {
 	buf, err := jsonv2.Marshal(&target.DetachFromTargetParams{SessionID: sid}, defaultJSONV2Options)
 	if err != nil {

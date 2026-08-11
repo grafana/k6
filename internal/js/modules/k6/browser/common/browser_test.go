@@ -250,9 +250,8 @@ func TestConnectionOnAttachedToTarget(t *testing.T) {
 }
 
 // TestBrowserRejectedTarget ensures a target the connection accepts but the
-// browser rejects (isAttachedPageValid) is both resumed and detached from,
-// like the connection-level rejection in TestConnectionRejectedTarget.
-// Runtime.runIfWaitingForDebugger must target the child session, while
+// browser rejects (isAttachedPageValid) is detached from, and only detached
+// from, like the connection-level rejection in TestConnectionRejectedTarget.
 // Target.detachFromTarget is a browser-level command: the session to detach
 // goes in the params, not in the message's session ID.
 func TestBrowserRejectedTarget(t *testing.T) {
@@ -326,14 +325,13 @@ func TestBrowserRejectedTarget(t *testing.T) {
 	}
 
 	timeout := time.After(5 * time.Second)
-	var gotRunIfWaiting, gotDetach bool
-	for !gotRunIfWaiting || !gotDetach {
+	var sawResume, gotDetach bool
+	for !gotDetach {
 		select {
 		case msg := <-received:
 			switch msg.Method {
 			case cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger):
-				require.Equal(t, target.SessionID(rejectedSessionID), msg.SessionID)
-				gotRunIfWaiting = true
+				sawResume = true
 			case cdproto.MethodType(target.CommandDetachFromTarget):
 				require.Empty(t, msg.SessionID)
 				var params target.DetachFromTargetParams
@@ -342,12 +340,12 @@ func TestBrowserRejectedTarget(t *testing.T) {
 				gotDetach = true
 			}
 		case <-timeout:
-			t.Fatalf(
-				"timed out waiting for the rejected target to be released: runIfWaitingForDebugger=%t detachFromTarget=%t",
-				gotRunIfWaiting, gotDetach,
-			)
+			t.Fatal("timed out waiting for the rejected target to be detached from")
 		}
 	}
+	// The websocket preserves ordering, so a resume would have arrived
+	// before the detach.
+	require.False(t, sawResume, "expected no Runtime.runIfWaitingForDebugger for a rejected target")
 }
 
 type fakeConn struct {

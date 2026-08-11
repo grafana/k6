@@ -310,10 +310,10 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 		return nil // ignore
 	}
 	if !b.isAttachedPageValid(ev, browserCtx) {
-		// Never ignore an attached target without releasing it: as long as
-		// this client stays attached without resuming the target, the
-		// browser keeps it paused for every other client.
-		detachSession(b.browserCtx, session)
+		// Never ignore an attached target without detaching from it: the
+		// browser keeps the target paused until every attached client
+		// releases it, and detaching drops this client's hold.
+		detachSession(session)
 		return nil // Ignore this page.
 	}
 
@@ -333,7 +333,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
 		if b.closing.Load() {
 			b.logger.Debugf("Browser:onAttachedToTarget", "new page failed; browser is closing: sid:%v", ev.SessionID)
-			detachSession(b.browserCtx, session)
+			detachSession(session)
 		}
 		return nil // Ignore this page.
 	}
@@ -360,7 +360,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 			)
 		}
 
-		detachSession(b.browserCtx, session)
+		detachSession(session)
 
 		return nil
 	}

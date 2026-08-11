@@ -969,7 +969,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	default:
 		fs.logger.Debugf("FrameSession:onAttachedToTarget",
 			"unsupported target type %q sid:%v", ti.Type, session.ID())
-		detachSession(fs.teardownCtx, session)
+		detachSession(session)
 	}
 	if err == nil {
 		return
@@ -1020,7 +1020,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 	if fs.page.isClosing() {
 		fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 			"rejected frame; page is closing: tid=%v", ti.TargetID)
-		detachSession(fs.teardownCtx, session)
+		detachSession(session)
 		return nil
 	}
 
@@ -1059,7 +1059,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 		if errors.Is(err, errPageClosing) {
 			fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 				"rejected frame; page is closing: tid=%v", ti.TargetID)
-			detachSession(fs.teardownCtx, session)
+			detachSession(session)
 			return nil
 		}
 		return err
@@ -1073,7 +1073,7 @@ func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) 
 	if fs.page.isClosing() {
 		fs.logger.Debugf("FrameSession:attachWorkerToTarget",
 			"rejected worker; page is closing: tid=%v", ti.TargetID)
-		detachSession(fs.teardownCtx, session)
+		detachSession(session)
 		return nil
 	}
 
@@ -1289,11 +1289,9 @@ func (fs *FrameSession) executionContextForID(
 	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
 }
 
-// detachSession unblocks a target waiting for debugger and detaches from it.
-// Prevents the browser from hanging on rejected targets during close.
-// The resume must target the child session, while the detach is a
-// browser-level command that carries the session ID in its params.
-func detachSession(ctx context.Context, session *Session) {
-	_ = session.ExecuteWithoutExpectationOnReply(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
+// detachSession detaches from a rejected target's session. Detaching also
+// releases this client's waitForDebuggerOnStart hold, letting the target
+// run for its other clients.
+func detachSession(session *Session) {
 	session.conn.detachFromTarget(session.id)
 }

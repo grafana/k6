@@ -355,7 +355,7 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 // freezing each other's pages when they share a browser instance. Every new
 // page starts paused until all auto-attached connections resume it. A
 // connection that hadn't created its browser context yet used to claim other
-// connections' pages without ever resuming them, stalling their navigations
+// connections' pages without ever releasing them, stalling their navigations
 // until it disconnected. The second connection here never creates a context,
 // which reproduces that state deterministically.
 func TestContextlessConnectionDoesNotStallNavigation(t *testing.T) {
