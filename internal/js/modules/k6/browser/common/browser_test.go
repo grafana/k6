@@ -3,16 +3,24 @@ package common
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
+	jsonv2 "github.com/go-json-experiment/json"
+	"github.com/go-json-experiment/json/jsontext"
+	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/tests/ws"
 )
 
 func TestBrowserNewPageInContext(t *testing.T) {
@@ -238,6 +246,107 @@ func TestConnectionOnAttachedToTarget(t *testing.T) {
 			}
 			require.Equal(t, tt.want, b.connectionOnAttachedToTarget(ev))
 		})
+	}
+}
+
+// TestBrowserRejectedTarget ensures a target the connection accepts but the
+// browser rejects (isAttachedPageValid) is both resumed and detached from,
+// like the connection-level rejection in TestConnectionRejectedTarget.
+// Runtime.runIfWaitingForDebugger must target the child session, while
+// Target.detachFromTarget is a browser-level command: the session to detach
+// goes in the params, not in the message's session ID.
+func TestBrowserRejectedTarget(t *testing.T) {
+	t.Parallel()
+
+	const rejectedSessionID = "session_id_0123456789"
+
+	attachedEvent := fmt.Sprintf(`
+	{
+		"sessionId": %q,
+		"targetInfo": {
+			"targetId": "target_id_0123456789",
+			"type": "service_worker",
+			"title": "",
+			"url": "http://example.com/worker.js",
+			"attached": true,
+			"browserContextId": ""
+		},
+		"waitingForDebugger": true
+	}`, rejectedSessionID)
+
+	received := make(chan cdproto.Message, 16)
+	handler := func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
+		if msg.Method == "" {
+			return
+		}
+		received <- *msg
+		if msg.Method == cdproto.MethodType(cdproto.CommandTargetSetDiscoverTargets) {
+			writeCh <- cdproto.Message{
+				Method: cdproto.EventTargetAttachedToTarget,
+				Params: jsontext.Value(attachedEvent),
+			}
+			writeCh <- cdproto.Message{
+				ID:     msg.ID,
+				Result: jsontext.Value([]byte("{}")),
+			}
+		}
+	}
+
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, nil))
+
+	vuCtx, vuCancel := context.WithCancel(context.Background())
+	t.Cleanup(vuCancel)
+	b := newBrowser(context.Background(), vuCtx, vuCancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	var err error
+	b.defaultContext, err = NewBrowserContext(k6ext.WithVU(vuCtx, k6test.NewVU(t)), b, "", nil, nil)
+	require.NoError(t, err)
+
+	u, err := url.Parse(server.ServerHTTP.URL)
+	require.NoError(t, err)
+	conn, err := NewConnection(
+		b.browserCtx, fmt.Sprintf("ws://%s/cdp", u.Host), log.NewNullLogger(), b.connectionOnAttachedToTarget,
+	)
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+	b.conn = conn
+
+	evCh := make(chan Event)
+	conn.on(b.browserCtx, []string{cdproto.EventTargetAttachedToTarget}, evCh)
+
+	action := target.SetDiscoverTargets(true)
+	require.NoError(t, action.Do(cdp.WithExecutor(b.browserCtx, conn)))
+
+	select {
+	case event := <-evCh:
+		ev, ok := event.data.(*target.EventAttachedToTarget)
+		require.True(t, ok)
+		require.NoError(t, b.onAttachedToTarget(ev))
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the attached target event")
+	}
+
+	timeout := time.After(5 * time.Second)
+	var gotRunIfWaiting, gotDetach bool
+	for !gotRunIfWaiting || !gotDetach {
+		select {
+		case msg := <-received:
+			switch msg.Method {
+			case cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger):
+				require.Equal(t, target.SessionID(rejectedSessionID), msg.SessionID)
+				gotRunIfWaiting = true
+			case cdproto.MethodType(target.CommandDetachFromTarget):
+				require.Empty(t, msg.SessionID)
+				var params target.DetachFromTargetParams
+				require.NoError(t, jsonv2.Unmarshal(msg.Params, &params, defaultJSONV2Options))
+				require.Equal(t, target.SessionID(rejectedSessionID), params.SessionID)
+				gotDetach = true
+			}
+		case <-timeout:
+			t.Fatalf(
+				"timed out waiting for the rejected target to be released: runIfWaitingForDebugger=%t detachFromTarget=%t",
+				gotRunIfWaiting, gotDetach,
+			)
+		}
 	}
 }
 

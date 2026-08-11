@@ -1290,9 +1290,10 @@ func (fs *FrameSession) executionContextForID(
 }
 
 // detachSession unblocks a target waiting for debugger and detaches from it.
-// Prevents the browser from hanging on rejected targets during close
+// Prevents the browser from hanging on rejected targets during close.
+// The resume must target the child session, while the detach is a
+// browser-level command that carries the session ID in its params.
 func detachSession(ctx context.Context, session *Session) {
 	_ = session.ExecuteWithoutExpectationOnReply(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-	_ = session.ExecuteWithoutExpectationOnReply(ctx, target.CommandDetachFromTarget,
-		&target.DetachFromTargetParams{SessionID: session.id}, nil)
+	session.conn.detachFromTarget(session.id)
 }
