@@ -14,6 +14,7 @@ import (
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
@@ -444,10 +445,13 @@ func (c *Connection) recvLoop() {
 	}
 }
 
-// detachFromTarget detaches the connection from the target's session.
+// detachFromTarget resumes the target's session and detaches from it.
 // A rejected target must not stay attached: the browser keeps a new
 // target paused until every client attached with waitForDebuggerOnStart
-// releases it, and detaching drops this client's hold.
+// releases it. Detaching should be enough to release the hold, but the
+// browser has a bug where a detached target can stay paused, so resume
+// it first — the same workaround Playwright uses (crConnection.ts,
+// CRSession.detach).
 //
 // Target.detachFromTarget is a browser-level command: the session to
 // detach goes in the params, not in the message's session ID.
@@ -455,6 +459,15 @@ func (c *Connection) recvLoop() {
 // The browser might have already closed the connection or the session,
 // so this operation is best-effort and we don't return an error.
 func (c *Connection) detachFromTarget(sid target.SessionID) {
+	resume := &cdproto.Message{
+		ID:        c.msgIDGen.newID(),
+		SessionID: sid,
+		Method:    cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger),
+	}
+	if err := c.send(c.ctx, resume, nil, nil); err != nil {
+		c.logger.Errorf("Connection:detachFromTarget", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
+	}
+
 	buf, err := jsonv2.Marshal(&target.DetachFromTargetParams{SessionID: sid}, defaultJSONV2Options)
 	if err != nil {
 		c.logger.Errorf("Connection:detachFromTarget", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)

@@ -130,11 +130,12 @@ func newAttachedToTargetServer(t *testing.T, attachedEvent string) (string, chan
 	return fmt.Sprintf("ws://%s/cdp", u.Host), received
 }
 
-// requireDetachedOnly consumes the server-received messages until the
-// rejected target's session is detached from, asserting the detach is
-// correctly addressed and that no resume was sent for it. The websocket
-// preserves ordering, so a resume would have arrived before the detach.
-func requireDetachedOnly(t *testing.T, received <-chan cdproto.Message, sid target.SessionID) {
+// requireResumeThenDetach consumes the server-received messages until the
+// rejected target's session is detached from, asserting the target was
+// resumed first and that both messages are correctly addressed. The
+// websocket preserves ordering, so the resume must arrive before the
+// detach.
+func requireResumeThenDetach(t *testing.T, received <-chan cdproto.Message, sid target.SessionID) {
 	t.Helper()
 
 	timeout := time.After(5 * time.Second)
@@ -144,6 +145,8 @@ func requireDetachedOnly(t *testing.T, received <-chan cdproto.Message, sid targ
 		case msg := <-received:
 			switch msg.Method {
 			case cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger):
+				// The resume targets the paused session directly.
+				require.Equal(t, sid, msg.SessionID)
 				sawResume = true
 			case cdproto.MethodType(target.CommandDetachFromTarget):
 				// Target.detachFromTarget is a browser-level command: the
@@ -152,20 +155,21 @@ func requireDetachedOnly(t *testing.T, received <-chan cdproto.Message, sid targ
 				var params target.DetachFromTargetParams
 				require.NoError(t, jsonv2.Unmarshal(msg.Params, &params, defaultJSONV2Options))
 				require.Equal(t, sid, params.SessionID)
-				require.False(t, sawResume, "expected no Runtime.runIfWaitingForDebugger for a rejected target")
+				require.True(t, sawResume, "expected Runtime.runIfWaitingForDebugger before the detach")
 				return
 			}
 		case <-timeout:
-			t.Fatal("timed out waiting for the rejected target to be detached from")
+			t.Fatal("timed out waiting for the rejected target to be released")
 		}
 	}
 }
 
 // TestConnectionRejectedTarget ensures a target rejected by the attach filter
-// is detached from, and only detached from. The browser keeps a new target
-// paused until every client attached with waitForDebuggerOnStart releases it,
-// and detaching drops this client's hold. Like Playwright, rejection sends no
-// separate resume: a client either adopts a target or detaches from it.
+// is resumed and then detached from. The browser keeps a new target paused
+// until every client attached with waitForDebuggerOnStart releases it.
+// Detaching should be enough to release the hold, but the browser has a bug
+// where a detached target can stay paused, so the resume must come first —
+// the same workaround Playwright uses (crConnection.ts, CRSession.detach).
 func TestConnectionRejectedTarget(t *testing.T) {
 	t.Parallel()
 
@@ -183,7 +187,7 @@ func TestConnectionRejectedTarget(t *testing.T) {
 	action := target.SetDiscoverTargets(true)
 	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
 
-	requireDetachedOnly(t, received, rejectedSessionID)
+	requireResumeThenDetach(t, received, rejectedSessionID)
 }
 
 func TestConnectionCreateSession(t *testing.T) {

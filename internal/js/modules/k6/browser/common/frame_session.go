@@ -1289,8 +1289,8 @@ func (fs *FrameSession) executionContextForID(
 	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
 }
 
-// detachSession detaches from a rejected target's session. Detaching also
-// releases this client's waitForDebuggerOnStart hold, letting the target
+// detachSession resumes a rejected target's session and detaches from it,
+// releasing this client's waitForDebuggerOnStart hold so the target can
 // run for its other clients.
 func detachSession(session *Session) {
 	session.conn.detachFromTarget(session.id)

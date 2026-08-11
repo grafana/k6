@@ -243,8 +243,8 @@ func TestConnectionOnAttachedToTarget(t *testing.T) {
 }
 
 // TestBrowserRejectedTarget ensures a target the connection accepts but the
-// browser rejects (isAttachedPageValid) is detached from, and only detached
-// from, like the connection-level rejection in TestConnectionRejectedTarget.
+// browser rejects (isAttachedPageValid) is resumed and then detached from,
+// like the connection-level rejection in TestConnectionRejectedTarget.
 func TestBrowserRejectedTarget(t *testing.T) {
 	t.Parallel()
 
@@ -282,7 +282,7 @@ func TestBrowserRejectedTarget(t *testing.T) {
 		t.Fatal("timed out waiting for the attached target event")
 	}
 
-	requireDetachedOnly(t, received, rejectedSessionID)
+	requireResumeThenDetach(t, received, rejectedSessionID)
 }
 
 type fakeConn struct {
