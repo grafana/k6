@@ -21,8 +21,7 @@ labels: ["release"]
       ```
       git remote add upstream https://github.com/DefinitelyTyped/DefinitelyTyped.git  # only once
       git fetch origin && git fetch upstream
-      git checkout -b release-v2.3.0 origin/master
-      git merge upstream/master
+      git checkout -b release-v2.3.0 upstream/master
       git push -u origin release-v2.3.0
       ```
     - [ ] Bump the version in [types/k6/package.json](https://github.com/grafana/k6-DefinitelyTyped/blob/master/types/k6/package.json#L4) to the next one.
@@ -65,7 +64,7 @@ labels: ["release"]
 - [ ] Merge the PR bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/internal/build/version.go#L6).
 - [ ] Merge the release notes PR.
 - [ ] Pull locally the previously merged changes.
-- [ ] Create a new long-lived `v{major}.{minor}.x` release branch from the `master` branch, and push it to `origin`.
+- [ ] Create a new long-lived `v{major}.{minor}.x` release branch from the `master` branch.
 - [ ] Create and push a new tag of the form `v{major}.{minor}.0`.
 
 !!! Update the below when making the issue
