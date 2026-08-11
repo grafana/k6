@@ -21,8 +21,7 @@ labels: ["release"]
       ```
       git remote add upstream https://github.com/DefinitelyTyped/DefinitelyTyped.git  # only once
       git fetch origin && git fetch upstream
-      git checkout -b release-v2.3.0 origin/master
-      git merge upstream/master
+      git checkout -b release-v2.3.0 upstream/master
       git push -u origin release-v2.3.0
       ```
     - [ ] Bump the version in [types/k6/package.json](https://github.com/grafana/k6-DefinitelyTyped/blob/master/types/k6/package.json#L4) to the next one.
