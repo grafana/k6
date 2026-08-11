@@ -283,7 +283,10 @@ func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget
 	isAllowedBrowserContext := func() bool {
 		b.contextMu.RLock()
 		defer b.contextMu.RUnlock()
-		return b.context == nil || b.context.id == eva.TargetInfo.BrowserContextID
+		if b.context != nil && b.context.id == eva.TargetInfo.BrowserContextID {
+			return true
+		}
+		return b.defaultContext.id == eva.TargetInfo.BrowserContextID
 	}
 
 	return isAllowedBrowserContext()
