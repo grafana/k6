@@ -16,11 +16,11 @@ labels: ["release"]
 - [ ] Create a new `release-v{major}.{minor}.0` branch.
     - [ ] Add a new release notes file using the available [template](https://github.com/grafana/k6/blob/master/release%20notes/template.md) to the [repository's `release notes` folder](https://github.com/grafana/k6/blob/master/release%20notes).
 - [ ] Create a new `release-v{major}.{minor}.0` branch on the [grafana/k6-DefinitelyTyped](https://github.com/grafana/k6-DefinitelyTyped) fork repository.
-    - Branch off the fork's `master` and merge `upstream/master` into it. Do **not** use GitHub's "Sync fork" button: repository rules on the fork block it and they cannot be amended.
+    - Branch directly off `upstream/master`, so the branch starts from the latest upstream state. Do **not** use GitHub's "Sync fork" button: repository rules on the fork block it and they cannot be amended.
 
       ```
       git remote add upstream https://github.com/DefinitelyTyped/DefinitelyTyped.git  # only once
-      git fetch origin && git fetch upstream
+      git fetch upstream
       git checkout -b release-v2.3.0 upstream/master
       git push -u origin release-v2.3.0
       ```
