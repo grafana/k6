@@ -62,10 +62,14 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 	rt := vu.Runtime()
 
 	obj := rt.NewObject()
+	arrayBufferIsView, err := getArrayBufferIsView(rt)
+	if err != nil {
+		common.Throw(rt, NewError(ImplementationError, err.Error()))
+	}
 
 	crypto := &Crypto{
 		vu:        vu,
-		Subtle:    &SubtleCrypto{vu: vu},
+		Subtle:    &SubtleCrypto{vu: vu, arrayBufferIsView: arrayBufferIsView},
 		CryptoKey: &CryptoKey{},
 	}
 
@@ -77,7 +81,11 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
 	}
 
-	if err := setReadOnlyPropertyOf(obj, "subtle", rt.ToValue(newSubtleCryptoObject(vu))); err != nil {
+	if err := setReadOnlyPropertyOf(
+		obj,
+		"subtle",
+		rt.ToValue(newSubtleCryptoObject(vu, arrayBufferIsView)),
+	); err != nil {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
 	}
 
@@ -88,12 +96,12 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 	return obj
 }
 
-func newSubtleCryptoObject(vu modules.VU) *sobek.Object {
+func newSubtleCryptoObject(vu modules.VU, arrayBufferIsView sobek.Callable) *sobek.Object {
 	rt := vu.Runtime()
 
 	obj := rt.NewObject()
 
-	subtleCrypto := &SubtleCrypto{vu: vu}
+	subtleCrypto := &SubtleCrypto{vu: vu, arrayBufferIsView: arrayBufferIsView}
 
 	if err := setReadOnlyPropertyOf(obj, "decrypt", rt.ToValue(subtleCrypto.Decrypt)); err != nil {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
