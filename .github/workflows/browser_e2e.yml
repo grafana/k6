@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - master
       - v1.x
   pull_request:
   schedule:
@@ -35,6 +35,8 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: 1.x
+          check-latest: true
+          cache: false # against cache-poisoning
       - name: Install Go tip
         if: matrix.go == 'tip'
         env:
