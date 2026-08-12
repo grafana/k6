@@ -5,6 +5,9 @@ on:
       - master
       - v1.x
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'release notes/**'
 
 defaults:
   run:
