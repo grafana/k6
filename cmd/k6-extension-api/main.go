@@ -13,6 +13,7 @@ import (
 	_ "github.com/grafana/xk6-sql-driver-postgres"
 	_ "github.com/grafana/xk6-sql-driver-sqlserver"
 	_ "github.com/grafana/xk6-ssh"
+	_ "github.com/grafana/xk6-tls"
 	_ "github.com/tango-tango/xk6-msgpack"
 	"go.k6.io/k6/v2/cmd"
 )

@@ -13,6 +13,7 @@ require (
 	github.com/grafana/xk6-sql-driver-postgres v0.0.0
 	github.com/grafana/xk6-sql-driver-sqlserver v0.0.0
 	github.com/grafana/xk6-ssh v0.0.0
+	github.com/grafana/xk6-tls v0.0.0
 	github.com/tango-tango/xk6-msgpack v0.0.0
 	go.k6.io/k6/v2 v2.1.0
 )
@@ -180,6 +181,8 @@ replace github.com/grafana/xk6-sql-driver-sqlserver => ../../extensions-corpus/g
 replace github.com/grafana/xk6-ssh => ../../extensions-corpus/grafana/xk6-ssh
 
 replace github.com/tango-tango/xk6-msgpack => ../../extensions-corpus/tango-tango/xk6-msgpack
+
+replace github.com/grafana/xk6-tls => ../../extensions-corpus/grafana/xk6-tls
 
 replace go.k6.io/k6/v2 => ../..
 

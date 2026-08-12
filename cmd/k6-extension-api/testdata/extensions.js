@@ -1,5 +1,6 @@
 import msgpack from "k6/x/msgpack";
 import ssh from "k6/x/ssh";
+import tls from "k6/x/tls";
 import { Faker } from "k6/x/faker";
 import "k6/x/kubernetes";
 import "k6/x/sql";
@@ -21,5 +22,8 @@ export default function () {
 	}
 	if (typeof Faker !== "function") {
 		throw new Error("Faker extension was not registered");
+	}
+	if (typeof tls.getCertificate !== "function") {
+		throw new Error("TLS extension was not registered");
 	}
 }

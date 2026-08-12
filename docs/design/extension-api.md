@@ -87,6 +87,15 @@ selection. The capability is unavailable in init context and returns
 `ErrNetworkUnavailable`; extensions must not fall back to Go's default dialer
 or resolver because that would bypass host policy.
 
+### Promise and scheduler capabilities
+
+`Scheduler` reserves one event-loop callback on the JavaScript runtime
+goroutine and returns a thread-safe function that queues exactly one `Task`.
+`Promises.NewPromise()` returns a Sobek promise with a resolver that safely
+settles it from asynchronous Go code. The k6 adapter performs all Sobek promise
+settlement on the owning event loop; extensions must never call Sobek from the
+background goroutine that performs I/O.
+
 ## Migrated
 
 | Extension | Shape | Result |
@@ -94,6 +103,7 @@ or resolver because that would bypass host policy.
 | `github.com/tango-tango/xk6-msgpack` | Per-VU module using Sobek `Runtime()` | Migrated. `pack()`/`unpack()` round-trip passes in the custom binary. |
 | `github.com/grafana/xk6-ssh` | Raw shared Go default export | Migrated. The custom binary imports it and exposes `connect()`. |
 | `github.com/grafana/xk6-faker` | Per-VU module using Sobek and `Environment` | Migrated. Its complete Go test suite passes. |
+| `github.com/grafana/xk6-tls` | Per-VU module using `Network` and `Promises` | Migrated. Its complete Go test suite passes. |
 | `github.com/grafana/xk6-disruptor` | Per-VU module using context and Sobek | Migrated. Its complete Go test suite passes. |
 | `github.com/grafana/xk6-kubernetes` | Per-VU module using context and Sobek | Migrated. Its complete Go test suite passes. |
 | `github.com/grafana/xk6-sql` | Per-VU module using context and Sobek | Migrated. Production packages build; its legacy test harness still imports the old k6 module test API. |
@@ -121,13 +131,13 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-sql` | Migrated | Its production code no longer needs k6; legacy tests need standalone test helpers. |
 | `xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | Migrated | Drivers are registration shims; MySQL uses `crypto/tls` constants. |
 | `xk6-faker` | Migrated | Uses the optional `Environment` capability for `XK6_FAKER_SEED`. |
-| `xk6-redis` | Deferred | Needs a promise/event-loop bridge, active-vs-init state, and TLS policy. |
-| `xk6-tls` | Deferred | Network capability is available; promise settlement on the JS event loop remains required. |
+| `xk6-redis` | Can migrate after TLS policy | Promise/event-loop and network capabilities are available; it still merges k6 TLS settings into Redis TLS options. |
+| `xk6-tls` | Migrated | Uses `Network` and `Promises`; no k6 dependency remains. |
 | `xk6-kafka` | Deferred | Needs metrics declaration/emission, current tags, built-in byte metrics, and active-vs-init state. |
-| `xk6-dns` | Deferred | Network capability is available; promises, event-loop scheduling, and custom metrics remain required. |
-| `xk6-icmp` | Deferred | Needs promises, callback scheduling, resolver, logger, environment lookup, and metrics. |
-| `xk6-mqtt` | Deferred | Needs promises/callback scheduling, resolver/TLS, logger, and metrics. |
-| `xk6-tcp` | Deferred | Network capability is available; promises/callback scheduling, TLS, logger, and metrics/tags remain required. |
+| `xk6-dns` | Deferred | Promise/event-loop is available; needs metrics/tags and a DNS-query policy/multi-record lookup capability. |
+| `xk6-icmp` | Deferred | Promise/event-loop and environment are available; needs ICMP packet sockets, logger, and metrics/tags. |
+| `xk6-mqtt` | Deferred | Promise/event-loop is available; needs TLS policy, logger, and metrics/tags. |
+| `xk6-tcp` | Deferred | Network and promise/event-loop are available; needs TLS policy, logger, and metrics/tags. |
 | `xk6-loki` | Deferred | Needs a k6-aware HTTP executor, current tags, VU ID, logger, and metrics. |
 | `xk6-client-prometheus-remote` | Deferred | Needs a k6-aware HTTP executor preserving transport, options, tags, and HTTP metrics. |
 | `xk6-sse` | Deferred | Needs HTTP transport/options/cookies plus HTTP/custom metrics and tags. |
@@ -137,20 +147,17 @@ validate the release tag registered for that k6 catalog version.
 
 The following capabilities are intentionally not in the base API:
 
-1. **JS scheduler and promises**: an API-owned, thread-safe way for a
-   goroutine to settle a Sobek promise or enqueue JavaScript work on the owning
-   event loop.
-2. **TLS configuration**: policy-managed TLS configuration supplied by the
+1. **TLS configuration**: policy-managed TLS configuration supplied by the
    host. Resolver and cancellation-aware dialer access are now provided by the
    optional `Network` capability.
-3. **Metrics and tags**: portable metric definitions, immutable current-tag
+2. **Metrics and tags**: portable metric definitions, immutable current-tag
    snapshots, and cancellation-aware sample emission. Concrete k6 metrics
    types must not cross the API boundary.
-4. **HTTP execution**: a host executor with portable request/response types,
+3. **HTTP execution**: a host executor with portable request/response types,
    preserving k6 transport settings and built-in HTTP metrics when k6 is the
    host.
-5. **Small metadata services**: environment lookup, structured logging, VU
-   identity, and active-vs-init execution state.
+4. **Small metadata services**: structured logging, VU identity, and
+   active-vs-init execution state.
 
 Each capability should be designed against at least one migrated extension and
 one test fixture before being released. This keeps extensions independent from

@@ -58,6 +58,36 @@ type Network interface {
 	LookupHost(ctx context.Context, host string) ([]string, error)
 }
 
+// Task is JavaScript-runtime work that a Scheduler executes on the owning
+// runtime goroutine. A Task must not be run directly by an extension.
+type Task func() error
+
+// Scheduler is an optional VU capability for safely resuming JavaScript work
+// after asynchronous Go work completes.
+//
+// RegisterCallback must be called on the JavaScript runtime goroutine. Its
+// returned callback is safe to call from another goroutine, but must be called
+// exactly once. This reservation keeps the host event loop alive until the
+// supplied Task runs.
+type Scheduler interface {
+	RegisterCallback() func(Task)
+}
+
+// PromiseResolver settles a JavaScript Promise. Resolve and Reject are safe to
+// call from another goroutine; the host schedules the settlement on the owning
+// JavaScript runtime. Only the first call has an effect.
+type PromiseResolver interface {
+	Resolve(value any)
+	Reject(reason any)
+}
+
+// Promises is an optional VU capability for creating Promises that are safe to
+// settle from asynchronous Go code. NewPromise must be called on the owning
+// JavaScript runtime goroutine.
+type Promises interface {
+	NewPromise() (*sobek.Promise, PromiseResolver)
+}
+
 // Exports represents the ESM exports of an Instance.
 type Exports struct {
 	Default any

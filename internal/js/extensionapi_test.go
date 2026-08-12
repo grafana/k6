@@ -36,12 +36,37 @@ func (mi extensionAPITestInstance) Exports() extensionapi.Exports {
 	if environmentAvailable {
 		environmentValue, _ = environment.LookupEnv("K6_EXTENSION_API_TEST_ENV")
 	}
+	promises, promisesAvailable := mi.vu.(extensionapi.Promises)
+	resolveAsync := func() any {
+		if !promisesAvailable {
+			return nil
+		}
+
+		promise, resolver := promises.NewPromise()
+		go resolver.Resolve("resolved asynchronously")
+		return promise
+	}
+	scheduler, schedulerAvailable := mi.vu.(extensionapi.Scheduler)
+	scheduleAsync := func() any {
+		if !schedulerAvailable {
+			return nil
+		}
+
+		promise, resolve, _ := mi.vu.Runtime().NewPromise()
+		callback := scheduler.RegisterCallback()
+		go callback(func() error { return resolve("scheduled asynchronously") })
+		return promise
+	}
 
 	return extensionapi.Exports{Default: map[string]any{
 		"runtimeAvailable":     func() bool { return mi.vu.Runtime() != nil },
 		"contextAvailable":     func() bool { return mi.vu.Context() != nil },
 		"environmentAvailable": func() bool { return environmentAvailable },
 		"environmentValue":     func() string { return environmentValue },
+		"promisesAvailable":    func() bool { return promisesAvailable },
+		"resolveAsync":         resolveAsync,
+		"schedulerAvailable":   func() bool { return schedulerAvailable },
+		"scheduleAsync":        scheduleAsync,
 	}}
 }
 
@@ -81,11 +106,19 @@ func TestNewJSRunnerWithExtensionAPI(t *testing.T) {
 					throw new Error("raw extension API export was not adapted");
 				}
 				export const options = { vus: 1, iterations: 1 };
-				export default function () {
+				export default async function () {
 					if (!extension.runtimeAvailable() || !extension.contextAvailable() ||
 						!extension.environmentAvailable() ||
 						extension.environmentValue() !== "extension-api-test-environment") {
 						throw new Error("extension API VU was not adapted");
+					}
+					if (!extension.promisesAvailable() ||
+						await extension.resolveAsync() !== "resolved asynchronously") {
+						throw new Error("extension API promise was not adapted");
+					}
+					if (!extension.schedulerAvailable() ||
+						await extension.scheduleAsync() !== "scheduled asynchronously") {
+						throw new Error("extension API scheduler was not adapted");
 					}
 				}
 			`, moduleName, rawModuleName),
