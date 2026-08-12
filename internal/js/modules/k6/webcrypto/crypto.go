@@ -61,6 +61,16 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 		common.Throw(c.vu.Runtime(), NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
 	}
 
+	if objLength < 0 {
+		// Real TypedArrays cannot have a negative length, but IsInstanceOf only
+		// checks constructor identity. A spoofed {constructor: Uint8Array, length: -1}
+		// would otherwise reach make([]byte, -1) and panic.
+		common.Throw(
+			c.vu.Runtime(),
+			NewError(TypeMismatchError, "typedArray parameter has an invalid length"),
+		)
+	}
+
 	if objLength > maxRandomValuesLength {
 		common.Throw(
 			c.vu.Runtime(),
