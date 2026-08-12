@@ -7,6 +7,9 @@ on:
       - master
       - v1.x
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'release notes/**'
   schedule:
     # At 06:00 AM UTC from Monday through Friday
     - cron:  '0 6 * * 1-5'
