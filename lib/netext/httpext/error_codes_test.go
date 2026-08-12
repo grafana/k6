@@ -338,6 +338,99 @@ func TestHTTP2GoAwayError(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity), msg)
 }
 
+// TestHTTP2MessageFallback covers message-based classification of HTTP/2 errors.
+// Both golang.org/x/net/http2 and Go's stdlib net/http/internal/http2 produce
+// identical Error() strings, so a single message-based path handles every Go
+// version uniformly. This feeds exact error strings directly, so it runs on
+// every Go version without a live server.
+func TestHTTP2MessageFallback(t *testing.T) {
+	t.Parallel()
+
+	streamErr := fmt.Errorf("stream error: stream ID 1; %v; EOF", http2.ErrCodeInternal)
+	streamErrNoCause := fmt.Errorf("stream error: stream ID 1; %v", http2.ErrCodeInternal)
+	connErr := errors.New("connection error: " + http2.ErrCodeProtocol.String())
+	goAwayErr := fmt.Errorf(
+		"http2: server sent GOAWAY and closed the connection; LastStreamID=4, ErrCode=%v, debug=%q",
+		http2.ErrCodeInadequateSecurity, "whatever")
+
+	testCases := []struct {
+		name     string
+		err      error
+		wantCode errCode
+		wantMsg  string
+	}{
+		{
+			name:     "stream error",
+			err:      streamErr,
+			wantCode: unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			wantMsg:  fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			name:     "stream error wrapped",
+			err:      fmt.Errorf("read: %w", streamErr),
+			wantCode: unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			wantMsg:  fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			name:     "stream error no cause",
+			err:      streamErrNoCause,
+			wantCode: unknownHTTP2StreamErrorCode + http2ErrCodeOffset(http2.ErrCodeInternal),
+			wantMsg:  fmt.Sprintf(http2StreamErrorCodeMsg, http2.ErrCodeInternal),
+		},
+		{
+			name:     "connection error",
+			err:      connErr,
+			wantCode: unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCodeProtocol),
+			wantMsg:  fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCodeProtocol),
+		},
+		{
+			name:     "connection error wrapped in url.Error",
+			err:      &url.Error{Op: "Get", URL: "https://example.com", Err: connErr},
+			wantCode: unknownHTTP2ConnectionErrorCode + http2ErrCodeOffset(http2.ErrCodeProtocol),
+			wantMsg:  fmt.Sprintf(http2ConnectionErrorCodeMsg, http2.ErrCodeProtocol),
+		},
+		{
+			name:     "goaway error",
+			err:      goAwayErr,
+			wantCode: unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(http2.ErrCodeInadequateSecurity),
+			wantMsg:  fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity),
+		},
+		{
+			name:     "goaway error wrapped",
+			err:      fmt.Errorf("read tcp: %w", goAwayErr),
+			wantCode: unknownHTTP2GoAwayErrorCode + http2ErrCodeOffset(http2.ErrCodeInadequateSecurity),
+			wantMsg:  fmt.Sprintf(http2GoAwayErrorCodeMsg, http2.ErrCodeInadequateSecurity),
+		},
+		{
+			name:     "unknown connection error",
+			err:      errors.New("connection error: unknown error code 0xe"),
+			wantCode: unknownHTTP2ConnectionErrorCode,
+			wantMsg:  "http2: connection error with http2 ErrCode unknown error code 0xe",
+		},
+		{
+			name:     "unknown stream error",
+			err:      errors.New("stream error: stream ID 1; unknown error code 0xe; received from peer"),
+			wantCode: unknownHTTP2StreamErrorCode,
+			wantMsg:  "http2: stream error with http2 ErrCode unknown error code 0xe",
+		},
+		{
+			name: "unknown goaway error",
+			err: errors.New(
+				"http2: server sent GOAWAY and closed the connection; LastStreamID=4, ErrCode=unknown error code 0xe, debug=\"whatever\""),
+			wantCode: unknownHTTP2GoAwayErrorCode,
+			wantMsg:  "http2: received GoAway with http2 ErrCode unknown error code 0xe",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			code, msg := errorCodeForError(tc.err)
+			assert.Equal(t, tc.wantCode, code)
+			assert.Equal(t, tc.wantMsg, msg)
+		})
+	}
+}
+
 type connKeyT int32
 
 const connKey connKeyT = 2
@@ -372,10 +465,10 @@ func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBi
 	require.NoError(t, err)
 
 	transport := &http.Transport{
-		DialContext:     dialer.DialContext,
-		TLSClientConfig: tlsConfig,
+		DialContext:       dialer.DialContext,
+		TLSClientConfig:   tlsConfig,
+		ForceAttemptHTTP2: true,
 	}
-	require.NoError(t, http2.ConfigureTransport(transport))
 	return &httpmultibin.HTTPMultiBin{
 		Mux:         mux,
 		ServerHTTP2: http2Srv,
