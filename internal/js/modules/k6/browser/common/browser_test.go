@@ -189,8 +189,9 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	})
 
 	// A non-matching page event (popup, or another concurrent newPage in the
-	// same context) must not consume the target ID. Previously the predicate
-	// did a one-shot receive, so the matching event then blocked until timeout.
+	// same context) must not finish the wait or consume the target ID.
+	// Regression for: (1) createWaitForEventHandler closing on a false
+	// predicate; (2) a one-shot receive of the created target ID.
 	t.Run("ignores_unrelated_page_event", func(t *testing.T) {
 		t.Parallel()
 
