@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - v1.x
   pull_request:
   schedule:
     # At 06:00 AM UTC from Monday through Friday
