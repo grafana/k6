@@ -58,20 +58,6 @@ func arraySpeciesCreate(obj *Object, size int64) *Object {
 	return obj.runtime.newArrayLength(size)
 }
 
-func max(a, b int64) int64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int64) int64 {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func relToIdx(rel, l int64) int64 {
 	if rel >= 0 {
 		return min(rel, l)
@@ -979,7 +965,7 @@ func arrayproto_reverse_generic_step(o *Object, lower, upper int64) {
 	} else if !lowerExists && upperExists {
 		o.self.setOwnIdx(lowerP, upperValue, true)
 		o.self.deleteIdx(upperP, true)
-	} else if lowerExists && !upperExists {
+	} else if lowerExists {
 		o.self.deleteIdx(lowerP, true)
 		o.self.setOwnIdx(upperP, lowerValue, true)
 	}
@@ -1276,7 +1262,7 @@ func (r *Runtime) arrayproto_with(call FunctionCall) Value {
 		actualIndex = length + relativeIndex
 	}
 	if actualIndex >= length || actualIndex < 0 {
-		panic(r.newError(r.getRangeError(), "Invalid index %s", call.Argument(0).String()))
+		panic(r.newErrorf(r.getRangeError(), "Invalid index %s", call.Argument(0).String()))
 	}
 
 	if src := r.checkStdArrayObj(o); src != nil {
