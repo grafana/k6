@@ -7,8 +7,10 @@ package extensionapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
+	"net"
 	"strings"
 	"sync"
 
@@ -42,6 +44,18 @@ type VU interface {
 // hosts can provide the base API without exposing an environment.
 type Environment interface {
 	LookupEnv(key string) (value string, ok bool)
+}
+
+// ErrNetworkUnavailable is returned when a host does not provide network
+// access in the current VU context, such as k6's init context.
+var ErrNetworkUnavailable = errors.New("extension API network capability is unavailable")
+
+// Network is an optional VU capability for host-policy-aware network access.
+// Hosts must apply their DNS, hostname, and address policies to both methods.
+// Extensions obtain it with a type assertion from VU.
+type Network interface {
+	DialContext(ctx context.Context, network, address string) (net.Conn, error)
+	LookupHost(ctx context.Context, host string) ([]string, error)
 }
 
 // Exports represents the ESM exports of an Instance.

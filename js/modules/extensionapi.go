@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"net"
 
 	"github.com/grafana/sobek"
 	extensionapi "go.k6.io/k6-extension-api"
@@ -37,6 +38,38 @@ func (v extensionAPIVU) LookupEnv(key string) (string, bool) {
 	}
 
 	return initEnv.LookupEnv(key)
+}
+
+func (v extensionAPIVU) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	state := v.vu.State()
+	if state == nil || state.Dialer == nil {
+		return nil, extensionapi.ErrNetworkUnavailable
+	}
+
+	return state.Dialer.DialContext(ctx, network, address)
+}
+
+func (v extensionAPIVU) LookupHost(ctx context.Context, host string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	state := v.vu.State()
+	if state == nil {
+		return nil, extensionapi.ErrNetworkUnavailable
+	}
+
+	resolver := state.GetAddrResolver()
+	if resolver == nil {
+		return nil, extensionapi.ErrNetworkUnavailable
+	}
+
+	ip, _, err := resolver.ResolveAddr(host)
+	if err != nil {
+		return nil, err
+	}
+
+	return []string{ip.String()}, nil
 }
 
 type extensionAPIInstanceAdapter struct {

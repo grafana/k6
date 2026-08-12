@@ -70,6 +70,23 @@ An extension obtains it with `vu.(extensionapi.Environment)`. k6 adapts its
 configured environment lookup into this capability without exposing `InitEnv`
 or any other k6 type.
 
+### Network capability
+
+`Network` is an optional capability for direct network extensions:
+
+```go
+type Network interface {
+    DialContext(context.Context, network, address string) (net.Conn, error)
+    LookupHost(context.Context, host string) ([]string, error)
+}
+```
+
+k6 delegates both methods to its configured VU dialer and resolver. This
+preserves k6 DNS behavior, hostname blocking, host overrides, and address
+selection. The capability is unavailable in init context and returns
+`ErrNetworkUnavailable`; extensions must not fall back to Go's default dialer
+or resolver because that would bypass host policy.
+
 ## Migrated
 
 | Extension | Shape | Result |
@@ -104,13 +121,13 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-sql` | Migrated | Its production code no longer needs k6; legacy tests need standalone test helpers. |
 | `xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | Migrated | Drivers are registration shims; MySQL uses `crypto/tls` constants. |
 | `xk6-faker` | Migrated | Uses the optional `Environment` capability for `XK6_FAKER_SEED`. |
-| `xk6-redis` | Deferred | Needs a promise/event-loop bridge, active-vs-init state, and host dialer/TLS policy. |
-| `xk6-tls` | Deferred | Needs promise settlement on the JS event loop and a host dialer. |
+| `xk6-redis` | Deferred | Needs a promise/event-loop bridge, active-vs-init state, and TLS policy. |
+| `xk6-tls` | Deferred | Network capability is available; promise settlement on the JS event loop remains required. |
 | `xk6-kafka` | Deferred | Needs metrics declaration/emission, current tags, built-in byte metrics, and active-vs-init state. |
-| `xk6-dns` | Deferred | Needs promises, event-loop scheduling, DNS/dial hostname policy, and custom metrics. |
+| `xk6-dns` | Deferred | Network capability is available; promises, event-loop scheduling, and custom metrics remain required. |
 | `xk6-icmp` | Deferred | Needs promises, callback scheduling, resolver, logger, environment lookup, and metrics. |
 | `xk6-mqtt` | Deferred | Needs promises/callback scheduling, resolver/TLS, logger, and metrics. |
-| `xk6-tcp` | Deferred | Needs promises/callback scheduling, resolver/dialer/TLS, logger, and metrics/tags. |
+| `xk6-tcp` | Deferred | Network capability is available; promises/callback scheduling, TLS, logger, and metrics/tags remain required. |
 | `xk6-loki` | Deferred | Needs a k6-aware HTTP executor, current tags, VU ID, logger, and metrics. |
 | `xk6-client-prometheus-remote` | Deferred | Needs a k6-aware HTTP executor preserving transport, options, tags, and HTTP metrics. |
 | `xk6-sse` | Deferred | Needs HTTP transport/options/cookies plus HTTP/custom metrics and tags. |
@@ -123,8 +140,9 @@ The following capabilities are intentionally not in the base API:
 1. **JS scheduler and promises**: an API-owned, thread-safe way for a
    goroutine to settle a Sobek promise or enqueue JavaScript work on the owning
    event loop.
-2. **Network policy**: resolver, cancellation-aware dialer, hostname policy,
-   and optional TLS configuration supplied by the host.
+2. **TLS configuration**: policy-managed TLS configuration supplied by the
+   host. Resolver and cancellation-aware dialer access are now provided by the
+   optional `Network` capability.
 3. **Metrics and tags**: portable metric definitions, immutable current-tag
    snapshots, and cancellation-aware sample emission. Concrete k6 metrics
    types must not cross the API boundary.
