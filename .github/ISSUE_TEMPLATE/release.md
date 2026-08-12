@@ -56,9 +56,9 @@ labels: ["release"]
 
 - [ ] Open and merge a PR from `main` in the `k6-docs` repository:
   - [ ] Creating a new `v{major}.{minor}.0` file in the [next release notes folder](https://github.com/grafana/k6-docs/tree/main/docs/sources/k6/next/release-notes) and copy/paste the main sections of the release notes (new features, deprecations and roadmap).
-    - Include the front matter (`title`, `menuTitle`, `description`, `weight`), otherwise the page does not appear in the release notes index.
+    - Include the front matter (`title`, `menuTitle`, `description`, `weight`), or the page won't appear in the release notes index.
   - [ ] Copying the current k6's `next` (including the newly created release note file) to a folder named with the k6 version (e.g., `v2.2.x`).
-  - [ ] Ensure the release notes file ends up in `next` and in the highest version folder, and not only in the folder matching its own version. Only the highest version tree is published as `latest`, so notes left behind in an older folder are never published. This is what happened to v1.8.x and v2.0.0, fixed in [k6-docs#2299](https://github.com/grafana/k6-docs/pull/2299), and it applies to patch releases cut from a maintenance branch too, since those skip the `next` copy above.
+  - [ ] Ensure the file is in `next` and the highest version folder, not only its own. Only the highest tree is published as `latest`, so notes left in an older folder are lost (see [k6-docs#2299](https://github.com/grafana/k6-docs/pull/2299)). Applies to patch releases from maintenance branches too.
 - [ ] Ensure the `k6` repository release notes PR contains the correct links to the docs.
 
 #### In k6 repository
