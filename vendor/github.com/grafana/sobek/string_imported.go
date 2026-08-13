@@ -188,7 +188,11 @@ func (i *importedString) Substring(start, end int) String {
 }
 
 func (i *importedString) CompareTo(v String) int {
-	return strings.Compare(i.s, v.String())
+	i.ensureScanned()
+	if i.u != nil {
+		return i.u.CompareTo(v)
+	}
+	return asciiString(i.s).CompareTo(v)
 }
 
 func (i *importedString) Reader() io.RuneReader {

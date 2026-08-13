@@ -4238,7 +4238,7 @@ func (n *newAsyncArrowFunc) exec(vm *vm) {
 }
 
 func (vm *vm) alreadyDeclared(name unistring.String) Value {
-	return vm.r.newError(vm.r.getSyntaxError(), "Identifier '%s' has already been declared", name)
+	return vm.r.newErrorf(vm.r.getSyntaxError(), "Identifier '%s' has already been declared", name)
 }
 
 func (vm *vm) checkBindVarsGlobal(names []unistring.String) {

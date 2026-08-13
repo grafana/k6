@@ -7,7 +7,7 @@ toolchain go1.25.12
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.11-20251118093737-4105057cc7d4.1
 	github.com/Azure/go-ntlmssp v0.1.1
-	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/PuerkitoBio/goquery v1.11.0
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.2.0
@@ -21,7 +21,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6provider v0.5.0
-	github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b
+	github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f
 	github.com/grafana/xk6-dashboard v0.8.1
 	github.com/grafana/xk6-redis v0.3.6
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -67,6 +67,7 @@ require (
 )
 
 require (
+	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/grafana/xk6-dashboard-assets v0.1.2 // indirect
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
@@ -83,7 +84,6 @@ require (
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect

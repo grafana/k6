@@ -3,6 +3,7 @@ package regexp2
 import (
 	"bytes"
 	"fmt"
+	"unicode/utf8"
 )
 
 // Match is a single regex result match that contains groups and repeated captures
@@ -20,7 +21,6 @@ type Match struct {
 	textstart int
 
 	capcount   int
-	caps       []int
 	sparseCaps map[int]int
 
 	// output from the match
@@ -43,25 +43,124 @@ type Group struct {
 // Capture is a single capture of text within the larger original string
 type Capture struct {
 	// the original string
-	text []rune
-	// Index is the position in the underlying rune slice where the first character of
+	text *matchText
+	// RuneIndex is the position in the underlying rune slice where the first character of
 	// captured substring was found. Even if you pass in a string this will be in Runes.
-	Index int
-	// Length is the number of runes in the captured substring.
-	Length int
+	RuneIndex int
+	// RuneLength is the number of runes in the captured substring.
+	RuneLength int
+}
+
+type matchText struct {
+	runes            []rune
+	input            string
+	hasStringInput   bool
+	byteOffsets      []int
+	byteOffsetsReady bool
 }
 
 // String returns the captured text as a String
 func (c *Capture) String() string {
-	return string(c.text[c.Index : c.Index+c.Length])
+	return string(c.text.runes[c.RuneIndex : c.RuneIndex+c.RuneLength])
 }
 
 // Runes returns the captured text as a rune slice
 func (c *Capture) Runes() []rune {
-	return c.text[c.Index : c.Index+c.Length]
+	return c.text.runes[c.RuneIndex : c.RuneIndex+c.RuneLength]
 }
 
-func newMatch(regex *Regexp, capcount int, text []rune, startpos int) *Match {
+// ByteRange returns the UTF-8 byte index and byte length of the captured
+// substring. The first call lazily caches byte offsets on shared match text,
+// so it is not safe to call concurrently with ByteRange on another capture
+// from the same match until the cache has been initialized.
+func (c *Capture) ByteRange() (index, length int) {
+	if c.text == nil {
+		return c.RuneIndex, c.RuneLength
+	}
+	return c.text.byteRange(c.RuneIndex, c.RuneLength)
+}
+
+func newMatchText(r []rune) *matchText {
+	return &matchText{runes: r}
+}
+
+func newStringMatchText(input string, r []rune) *matchText {
+	return &matchText{runes: r, input: input, hasStringInput: true}
+}
+
+func (t *matchText) byteRange(runeIndex, runeLength int) (int, int) {
+	if !t.byteOffsetsReady {
+		t.byteOffsets = t.buildByteOffsets()
+		t.byteOffsetsReady = true
+	}
+	if t.byteOffsets == nil {
+		return runeIndex, runeLength
+	}
+	byteIndex := t.byteOffsets[runeIndex]
+	return byteIndex, t.byteOffsets[runeIndex+runeLength] - byteIndex
+}
+
+func (t *matchText) buildByteOffsets() []int {
+	if t.hasStringInput {
+		return stringByteOffsets(t.input)
+	}
+	return runeByteOffsets(t.runes)
+}
+
+func stringByteOffsets(s string) []int {
+	var byteOffsets []int
+	runeIndex := 0
+	for strIdx, ch := range s {
+		if byteOffsets != nil {
+			byteOffsets[runeIndex] = strIdx
+		}
+		runeLen := utf8.RuneLen(ch)
+		if ch == utf8.RuneError {
+			_, runeLen = utf8.DecodeRuneInString(s[strIdx:])
+		}
+		if byteOffsets == nil && (strIdx != runeIndex || runeLen != 1) {
+			byteOffsets = make([]int, len(s)+1)
+			for i := 0; i < runeIndex; i++ {
+				byteOffsets[i] = i
+			}
+			byteOffsets[runeIndex] = strIdx
+		}
+		runeIndex++
+	}
+	if byteOffsets != nil {
+		byteOffsets[runeIndex] = len(s)
+		return byteOffsets[:runeIndex+1]
+	}
+	return nil
+}
+
+func runeByteOffsets(runes []rune) []int {
+	var byteOffsets []int
+	bytePos := 0
+	for i, ch := range runes {
+		if byteOffsets != nil {
+			byteOffsets[i] = bytePos
+		}
+		runeLen := utf8.RuneLen(ch)
+		if runeLen < 0 {
+			runeLen = utf8.RuneLen(utf8.RuneError)
+		}
+		if byteOffsets == nil && runeLen != 1 {
+			byteOffsets = make([]int, len(runes)+1)
+			for j := 0; j < i; j++ {
+				byteOffsets[j] = j
+			}
+			byteOffsets[i] = bytePos
+		}
+		bytePos += runeLen
+	}
+	if byteOffsets != nil {
+		byteOffsets[len(runes)] = bytePos
+	}
+	return byteOffsets
+}
+
+func newMatch(regex *Regexp, capcount int, text *matchText, startpos int) *Match {
 	m := Match{
 		regex:      regex,
 		matchcount: make([]int, capcount),
@@ -69,19 +168,21 @@ func newMatch(regex *Regexp, capcount int, text []rune, startpos int) *Match {
 		textstart:  startpos,
 		balancing:  false,
 	}
-	m.Name = "0"
+	if (regex.options & ECMAScript) == 0 {
+		m.Name = "0"
+	}
 	m.text = text
 	m.matches[0] = make([]int, 2)
 	return &m
 }
 
-func newMatchSparse(regex *Regexp, caps map[int]int, capcount int, text []rune, startpos int) *Match {
+func newMatchSparse(regex *Regexp, caps map[int]int, capcount int, text *matchText, startpos int) *Match {
 	m := newMatch(regex, capcount, text, startpos)
 	m.sparseCaps = caps
 	return m
 }
 
-func (m *Match) reset(text []rune, textstart int) {
+func (m *Match) reset(text *matchText, textstart int) {
 	m.text = text
 	m.textstart = textstart
 	for i := 0; i < len(m.matchcount); i++ {
@@ -93,12 +194,11 @@ func (m *Match) reset(text []rune, textstart int) {
 func (m *Match) tidy(textpos int) {
 
 	interval := m.matches[0]
-	m.Index = interval[0]
-	m.Length = interval[1]
+	setCaptureFields(&m.Capture, interval[0], interval[1])
 	m.textpos = textpos
 	m.capcount = m.matchcount[0]
 	//copy our root capture to the list
-	m.Group.Captures = []Capture{m.Group.Capture}
+	m.Captures = []Capture{m.Capture}
 
 	if m.balancing {
 		// The idea here is that we want to compact all of our unbalanced captures.  To do that we
@@ -288,29 +388,35 @@ func (m *Match) groupValueAppendToBuf(groupnum int, buf *bytes.Buffer) {
 	last := index + matches[(c*2)-1]
 
 	for ; index < last; index++ {
-		buf.WriteRune(m.text[index])
+		buf.WriteRune(m.text.runes[index])
 	}
 }
 
-func newGroup(name string, text []rune, caps []int, capcount int) Group {
+func newGroup(name string, text *matchText, caps []int, capcount int) Group {
 	g := Group{}
 	g.text = text
 	if capcount > 0 {
-		g.Index = caps[(capcount-1)*2]
-		g.Length = caps[(capcount*2)-1]
+		setCaptureFields(&g.Capture, caps[(capcount-1)*2], caps[(capcount*2)-1])
 	}
 	g.Name = name
 	g.Captures = make([]Capture, capcount)
 	for i := 0; i < capcount; i++ {
-		g.Captures[i] = Capture{
-			text:   text,
-			Index:  caps[i*2],
-			Length: caps[i*2+1],
-		}
+		g.Captures[i] = newCapture(text, caps[i*2], caps[i*2+1])
 	}
 	//log.Printf("newGroup! capcount %v, %+v", capcount, g)
 
 	return g
+}
+
+func newCapture(text *matchText, runeIndex, runeLength int) Capture {
+	c := Capture{text: text}
+	setCaptureFields(&c, runeIndex, runeLength)
+	return c
+}
+
+func setCaptureFields(c *Capture, runeIndex, runeLength int) {
+	c.RuneIndex = runeIndex
+	c.RuneLength = runeLength
 }
 
 func (m *Match) dump() string {
@@ -326,7 +432,7 @@ func (m *Match) dump() string {
 		fmt.Fprintf(buf, "Group %v (%v), %v caps:\n", i, g.Name, len(g.Captures))
 
 		for _, c := range g.Captures {
-			fmt.Fprintf(buf, "  (%v, %v) %v\n", c.Index, c.Length, c.String())
+			fmt.Fprintf(buf, "  (%v, %v) %v\n", c.RuneIndex, c.RuneLength, c.String())
 		}
 	}
 	/*
@@ -338,7 +444,7 @@ func (m *Match) dump() string {
 
 				if m.matches[i][j*2] >= 0 {
 					start := m.matches[i][j*2]
-					text = m.text[start : start+m.matches[i][j*2+1]]
+					text = m.text.runes[start : start+m.matches[i][j*2+1]]
 				}
 
 				fmt.Fprintf(buf, "  (%v, %v) %v\n", m.matches[i][j*2], m.matches[i][j*2+1], text)

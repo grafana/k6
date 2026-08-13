@@ -136,11 +136,11 @@ func (r *Runtime) string_fromcodepoint(call FunctionCall) Value {
 		var c rune
 		if numInt, ok := num.(valueInt); ok {
 			if numInt < 0 || numInt > utf8.MaxRune {
-				panic(r.newError(r.getRangeError(), "Invalid code point %d", numInt))
+				panic(r.newErrorf(r.getRangeError(), "Invalid code point %d", numInt))
 			}
 			c = rune(numInt)
 		} else {
-			panic(r.newError(r.getRangeError(), "Invalid code point %s", num))
+			panic(r.newErrorf(r.getRangeError(), "Invalid code point %s", num))
 		}
 		sb.WriteRune(c)
 	}
@@ -593,7 +593,7 @@ func getReplaceValue(replaceValue Value) (str String, rcall func(FunctionCall) V
 	return
 }
 
-func stringReplace(s String, found [][]int, newstring String, rcall func(FunctionCall) Value) Value {
+func (r *Runtime) stringReplace(s String, found []regexpResult, newstring String, rcall func(FunctionCall) Value) Value {
 	if len(found) == 0 {
 		return s
 	}
@@ -606,48 +606,69 @@ func stringReplace(s String, found [][]int, newstring String, rcall func(Functio
 	lengthS := s.Length()
 	if rcall != nil {
 		for _, item := range found {
-			if item[0] != lastIndex {
-				buf.WriteSubstring(s, lastIndex, item[0])
+			if item.indexes[0] != lastIndex {
+				buf.WriteSubstring(s, lastIndex, item.indexes[0])
 			}
-			matchCount := len(item) / 2
-			argumentList := make([]Value, matchCount+2)
+			matchCount := len(item.indexes) / 2
+			argumentList := make([]Value, matchCount+2, matchCount+3)
 			for index := 0; index < matchCount; index++ {
 				offset := 2 * index
-				if item[offset] != -1 {
+				if item.indexes[offset] != -1 {
 					if u == nil {
-						argumentList[index] = a[item[offset]:item[offset+1]]
+						argumentList[index] = a[item.indexes[offset]:item.indexes[offset+1]]
 					} else {
-						argumentList[index] = u.Substring(item[offset], item[offset+1])
+						argumentList[index] = u.Substring(item.indexes[offset], item.indexes[offset+1])
 					}
 				} else {
 					argumentList[index] = _undefined
 				}
 			}
-			argumentList[matchCount] = valueInt(item[0])
+			argumentList[matchCount] = intToValue(int64(item.indexes[0]))
 			argumentList[matchCount+1] = s
+			groups := r.createRegexpGroupsObj(argumentList[:matchCount], item.groups)
+			if groups != nil {
+				argumentList = append(argumentList, groups)
+			}
 			replacement := rcall(FunctionCall{
 				This:      _undefined,
 				Arguments: argumentList,
 			}).toString()
 			buf.WriteString(replacement)
-			lastIndex = item[1]
+			lastIndex = item.indexes[1]
 		}
 	} else {
 		for _, item := range found {
-			if item[0] != lastIndex {
-				buf.WriteString(s.Substring(lastIndex, item[0]))
+			if item.indexes[0] != lastIndex {
+				buf.WriteString(s.Substring(lastIndex, item.indexes[0]))
 			}
-			matchCount := len(item) / 2
-			writeSubstitution(s, item[0], matchCount, func(idx int) String {
-				if item[idx*2] != -1 {
+			matchCount := len(item.indexes) / 2
+			var namedGroups map[unistring.String]int
+			writeSubstitution(s, item.indexes[0], matchCount, func(idx int) String {
+				if item.indexes[idx*2] != -1 {
 					if u == nil {
-						return a[item[idx*2]:item[idx*2+1]]
+						return a[item.indexes[idx*2]:item.indexes[idx*2+1]]
 					}
-					return u.Substring(item[idx*2], item[idx*2+1])
+					return u.Substring(item.indexes[idx*2], item.indexes[idx*2+1])
+				}
+				return stringEmpty
+			}, func(ref String) String {
+				if namedGroups == nil {
+					namedGroups = createRegexpGroupsMap(item)
+				}
+				if len(namedGroups) == 0 {
+					return nil
+				}
+				if idx, exists := namedGroups[ref.string()]; exists {
+					if item.indexes[idx] != -1 {
+						if u == nil {
+							return a[item.indexes[idx]:item.indexes[idx+1]]
+						}
+						return u.Substring(item.indexes[idx], item.indexes[idx+1])
+					}
 				}
 				return stringEmpty
 			}, newstring, &buf)
-			lastIndex = item[1]
+			lastIndex = item.indexes[1]
 		}
 	}
 
@@ -672,15 +693,15 @@ func (r *Runtime) stringproto_replace(call FunctionCall) Value {
 	}
 
 	s := call.This.toString()
-	var found [][]int
+	var found []regexpResult
 	searchStr := searchValue.toString()
 	pos := s.index(searchStr, 0)
 	if pos != -1 {
-		found = append(found, []int{pos, pos + searchStr.Length()})
+		found = append(found, regexpResult{indexes: []int{pos, pos + searchStr.Length()}})
 	}
 
 	str, rcall := getReplaceValue(replaceValue)
-	return stringReplace(s, found, str, rcall)
+	return r.stringReplace(s, found, str, rcall)
 }
 
 func (r *Runtime) stringproto_replaceAll(call FunctionCall) Value {
@@ -704,19 +725,19 @@ func (r *Runtime) stringproto_replaceAll(call FunctionCall) Value {
 	}
 
 	s := call.This.toString()
-	var found [][]int
+	var found []regexpResult
 	searchStr := searchValue.toString()
 	searchLength := searchStr.Length()
 	advanceBy := toIntStrict(max(1, int64(searchLength)))
 
 	pos := s.index(searchStr, 0)
 	for pos != -1 {
-		found = append(found, []int{pos, pos + searchLength})
+		found = append(found, regexpResult{indexes: []int{pos, pos + searchLength}})
 		pos = s.index(searchStr, pos+advanceBy)
 	}
 
 	str, rcall := getReplaceValue(replaceValue)
-	return stringReplace(s, found, str, rcall)
+	return r.stringReplace(s, found, str, rcall)
 }
 
 func (r *Runtime) stringproto_search(call FunctionCall) Value {
@@ -820,24 +841,88 @@ func (r *Runtime) stringproto_split(call FunctionCall) Value {
 		return r.newArrayValues([]Value{s})
 	}
 
-	separator := separatorValue.String()
+	var valueArray []Value
+	sa, su := devirtualizeString(s)
+	sepa, sepu := devirtualizeString(separatorValue.toString())
+	if su == nil { // ASCII string
+		if sepu == nil {
+			// Both are ASCII
+			splitLimit := limit
+			if limit > 0 {
+				splitLimit = limit + 1
+			}
 
-	str := s.String()
-	splitLimit := limit
-	if limit > 0 {
-		splitLimit = limit + 1
-	}
+			split := strings.SplitN(string(sa), string(sepa), splitLimit)
 
-	// TODO handle invalid UTF-16
-	split := strings.SplitN(str, separator, splitLimit)
-
-	if limit > 0 && len(split) > limit {
-		split = split[:limit]
-	}
-
-	valueArray := make([]Value, len(split))
-	for index, value := range split {
-		valueArray[index] = newStringValue(value)
+			if limit > 0 && len(split) > limit {
+				split = split[:limit]
+			}
+			valueArray = make([]Value, len(split))
+			for index, value := range split {
+				valueArray[index] = asciiString(value)
+			}
+		} else {
+			// Unicode separator will never match an ASCII string
+			return r.newArrayValues([]Value{s})
+		}
+	} else {
+		var ss []uint16
+		if sepu != nil {
+			ss = sepu[1:]
+		} else {
+			ss = sepa.utf16()
+		}
+		su = su[1:]
+		if len(ss) > 0 {
+			idx := utf16Index(su, ss)
+			if idx == -1 {
+				// Shortcut to avoid creating a copy of s
+				return r.newArrayValues([]Value{s})
+			}
+			if limit < 0 {
+				limit = min(math.MaxInt, math.MaxUint32)
+			}
+			for ; limit > 0; limit-- {
+				var sb strings.Builder
+				for i := range idx {
+					if su[i] >= utf8.RuneSelf {
+						chunk := make(unicodeString, idx+1)
+						chunk[0] = unistring.BOM
+						copy(chunk[1:], su[:idx])
+						valueArray = append(valueArray, chunk)
+						goto next
+					}
+				}
+				sb.Grow(idx)
+				for i := range idx {
+					sb.WriteByte((byte)(su[i]))
+				}
+				valueArray = append(valueArray, asciiString(sb.String()))
+			next:
+				if idx == len(su) {
+					break
+				}
+				su = su[idx+len(ss):]
+				idx = utf16Index(su, ss)
+				if idx == -1 {
+					idx = len(su)
+				}
+			}
+		} else {
+			if limit > 0 && len(su) > limit {
+				su = su[:limit]
+			}
+			for len(su) > 0 {
+				c := su[0]
+				if c >= utf8.RuneSelf {
+					chunk := unicodeString{unistring.BOM, c}
+					valueArray = append(valueArray, chunk)
+				} else {
+					valueArray = append(valueArray, asciiString(rune(c)))
+				}
+				su = su[1:]
+			}
+		}
 	}
 
 	return r.newArrayValues(valueArray)
