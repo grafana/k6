@@ -9,10 +9,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/grafana/sobek"
 )
@@ -44,6 +46,139 @@ type VU interface {
 // hosts can provide the base API without exposing an environment.
 type Environment interface {
 	LookupEnv(key string) (value string, ok bool)
+}
+
+// Logger is an optional VU capability for structured extension logging. The
+// logger uses the Go standard library's log/slog API; extensions must not
+// depend on a host logging implementation.
+type Logger interface {
+	Logger() *slog.Logger
+}
+
+// ErrMetricsUnavailable is returned when a host cannot register or emit
+// metrics in the current context.
+var ErrMetricsUnavailable = errors.New("extension API metrics capability is unavailable")
+
+// MetricKind determines how a host aggregates metric samples.
+type MetricKind uint8
+
+const (
+	MetricCounter MetricKind = iota
+	MetricGauge
+	MetricTrend
+	MetricRate
+)
+
+// MetricUnit describes the values emitted for a metric.
+type MetricUnit uint8
+
+const (
+	MetricUnitDefault MetricUnit = iota
+	MetricUnitTime
+	MetricUnitData
+)
+
+// MetricSpec declares a custom metric. Registration is idempotent for an
+// identical specification and returns an error for incompatible redeclarations.
+type MetricSpec struct {
+	Name string
+	Kind MetricKind
+	Unit MetricUnit
+}
+
+// Metric is a name-based handle returned by Metrics. Hosts verify that its
+// name is registered before accepting an emitted Sample.
+type Metric struct{ name string }
+
+// Name returns the metric's stable host-visible name.
+func (m Metric) Name() string { return m.name }
+
+// MetricFromName creates a metric handle for host adapters and test doubles.
+// Extensions should obtain handles from Metrics.RegisterMetric or BuiltinMetric.
+func MetricFromName(name string) Metric { return Metric{name: name} }
+
+// BuiltinMetric identifies a host-provided metric that an extension may emit.
+type BuiltinMetric string
+
+const (
+	BuiltinDataSent     BuiltinMetric = "data_sent"
+	BuiltinDataReceived BuiltinMetric = "data_received"
+)
+
+// SystemTag identifies a host-controlled system tag. Hosts decide whether a
+// requested system tag is enabled and whether it is indexed or metadata.
+type SystemTag string
+
+const (
+	SystemTagIP       SystemTag = "ip"
+	SystemTagMethod   SystemTag = "method"
+	SystemTagProto    SystemTag = "proto"
+	SystemTagStatus   SystemTag = "status"
+	SystemTagSubproto SystemTag = "subproto"
+	SystemTagURL      SystemTag = "url"
+)
+
+// Tags is an immutable snapshot of indexed tags and unindexed metadata.
+// Its methods always copy supplied and returned maps.
+type Tags struct {
+	values   map[string]string
+	metadata map[string]string
+}
+
+// NewTags creates an immutable tag snapshot from values and metadata.
+func NewTags(values, metadata map[string]string) Tags {
+	return Tags{values: maps.Clone(values), metadata: maps.Clone(metadata)}
+}
+
+// Values returns a copy of the snapshot's indexed tags.
+func (t Tags) Values() map[string]string { return maps.Clone(t.values) }
+
+// Metadata returns a copy of the snapshot's unindexed metadata.
+func (t Tags) Metadata() map[string]string { return maps.Clone(t.metadata) }
+
+// With returns a snapshot with the supplied indexed tags merged into it.
+func (t Tags) With(values map[string]string) Tags {
+	merged := t.Values()
+	if merged == nil {
+		merged = make(map[string]string, len(values))
+	}
+	for key, value := range values {
+		merged[key] = value
+	}
+	return NewTags(merged, t.metadata)
+}
+
+// WithMetadata returns a snapshot with the supplied metadata merged into it.
+func (t Tags) WithMetadata(metadata map[string]string) Tags {
+	merged := t.Metadata()
+	if merged == nil {
+		merged = make(map[string]string, len(metadata))
+	}
+	for key, value := range metadata {
+		merged[key] = value
+	}
+	return NewTags(t.values, merged)
+}
+
+// Sample is one metric measurement. A zero Time asks the host to use its
+// current time. Tags should normally come from Metrics.CurrentTags().
+type Sample struct {
+	Metric Metric
+	Value  float64
+	Time   time.Time
+	Tags   Tags
+}
+
+// Metrics is an optional VU capability for custom metrics, built-in byte
+// metrics, immutable tag snapshots, and cancellation-aware sample emission.
+// Emit returns ctx.Err() if the context is cancelled before the host accepts
+// the samples.
+type Metrics interface {
+	RegisterMetric(MetricSpec) (Metric, error)
+	BuiltinMetric(BuiltinMetric) (Metric, bool)
+	CurrentTags() Tags
+	WithSystemTags(Tags, map[SystemTag]string) Tags
+	Emit(context.Context, []Sample) error
 }
 
 // ErrNetworkUnavailable is returned when a host does not provide network

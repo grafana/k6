@@ -2,11 +2,17 @@ package modules
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/grafana/sobek"
+
 	extensionapi "go.k6.io/k6-extension-api"
+
+	"go.k6.io/k6/v2/metrics"
 )
 
 // extensionAPIModuleAdapter is the k6-owned translation layer between the
@@ -39,6 +45,16 @@ func (v extensionAPIVU) LookupEnv(key string) (string, bool) {
 	}
 
 	return initEnv.LookupEnv(key)
+}
+
+func (v extensionAPIVU) Logger() *slog.Logger {
+	if initEnv := v.vu.InitEnv(); initEnv != nil && initEnv.Logger != nil {
+		return slog.New(newExtensionAPISlogHandler(initEnv.Logger))
+	}
+	if state := v.vu.State(); state != nil && state.Logger != nil {
+		return slog.New(newExtensionAPISlogHandler(state.Logger))
+	}
+	return extensionAPIDiscardLogger
 }
 
 func (v extensionAPIVU) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
@@ -86,6 +102,168 @@ func (v extensionAPIVU) NewPromise() (*sobek.Promise, extensionapi.PromiseResolv
 		enqueue: v.RegisterCallback(),
 		resolve: resolve,
 		reject:  reject,
+	}
+}
+
+func (v extensionAPIVU) RegisterMetric(spec extensionapi.MetricSpec) (extensionapi.Metric, error) {
+	initEnv := v.vu.InitEnv()
+	if initEnv == nil || initEnv.Registry == nil {
+		return extensionapi.Metric{}, extensionapi.ErrMetricsUnavailable
+	}
+
+	metricType, err := extensionAPIMetricType(spec.Kind)
+	if err != nil {
+		return extensionapi.Metric{}, err
+	}
+	valueType, err := extensionAPIMetricUnit(spec.Unit)
+	if err != nil {
+		return extensionapi.Metric{}, err
+	}
+	if _, err := initEnv.Registry.NewMetric(spec.Name, metricType, valueType); err != nil {
+		return extensionapi.Metric{}, err
+	}
+	return extensionAPIMetric(spec.Name), nil
+}
+
+func (v extensionAPIVU) BuiltinMetric(builtin extensionapi.BuiltinMetric) (extensionapi.Metric, bool) {
+	initEnv := v.vu.InitEnv()
+	if initEnv == nil || initEnv.BuiltinMetrics == nil {
+		return extensionapi.Metric{}, false
+	}
+
+	switch builtin {
+	case extensionapi.BuiltinDataSent:
+		return extensionAPIMetric(initEnv.BuiltinMetrics.DataSent.Name), true
+	case extensionapi.BuiltinDataReceived:
+		return extensionAPIMetric(initEnv.BuiltinMetrics.DataReceived.Name), true
+	default:
+		return extensionapi.Metric{}, false
+	}
+}
+
+func (v extensionAPIVU) CurrentTags() extensionapi.Tags {
+	state := v.vu.State()
+	if state == nil || state.Tags == nil {
+		return extensionapi.NewTags(nil, nil)
+	}
+	tagsAndMeta := state.Tags.GetCurrentValues()
+	return extensionapi.NewTags(tagsAndMeta.Tags.Map(), tagsAndMeta.Metadata)
+}
+
+func (v extensionAPIVU) WithSystemTags(
+	tags extensionapi.Tags, systemTags map[extensionapi.SystemTag]string,
+) extensionapi.Tags {
+	state := v.vu.State()
+	if state == nil || state.Options.SystemTags == nil || len(systemTags) == 0 {
+		return tags
+	}
+
+	initEnv := v.vu.InitEnv()
+	if initEnv == nil || initEnv.Registry == nil {
+		return tags
+	}
+	tagsAndMeta := metrics.TagsAndMeta{
+		Tags:     initEnv.Registry.RootTagSet().WithTagsFromMap(tags.Values()),
+		Metadata: tags.Metadata(),
+	}
+	for systemTag, value := range systemTags {
+		if k6SystemTag, ok := extensionAPIToK6SystemTag(systemTag); ok {
+			tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, k6SystemTag, value)
+		}
+	}
+	return extensionapi.NewTags(tagsAndMeta.Tags.Map(), tagsAndMeta.Metadata)
+}
+
+func (v extensionAPIVU) Emit(ctx context.Context, samples []extensionapi.Sample) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if len(samples) == 0 {
+		return nil
+	}
+	state := v.vu.State()
+	initEnv := v.vu.InitEnv()
+	if state == nil || state.Samples == nil || initEnv == nil || initEnv.Registry == nil {
+		return extensionapi.ErrMetricsUnavailable
+	}
+
+	k6Samples := make(metrics.Samples, 0, len(samples))
+	for _, sample := range samples {
+		metric := initEnv.Registry.Get(sample.Metric.Name())
+		if metric == nil {
+			return fmt.Errorf("extension API metric %q is not registered", sample.Metric.Name())
+		}
+		timestamp := sample.Time
+		if timestamp.IsZero() {
+			timestamp = time.Now()
+		}
+		k6Samples = append(k6Samples, metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: metric,
+				Tags:   initEnv.Registry.RootTagSet().WithTagsFromMap(sample.Tags.Values()),
+			},
+			Time:     timestamp,
+			Value:    sample.Value,
+			Metadata: sample.Tags.Metadata(),
+		})
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case state.Samples <- k6Samples:
+		return nil
+	}
+}
+
+func extensionAPIMetric(name string) extensionapi.Metric {
+	return extensionapi.MetricFromName(name)
+}
+
+func extensionAPIMetricType(kind extensionapi.MetricKind) (metrics.MetricType, error) {
+	switch kind {
+	case extensionapi.MetricCounter:
+		return metrics.Counter, nil
+	case extensionapi.MetricGauge:
+		return metrics.Gauge, nil
+	case extensionapi.MetricTrend:
+		return metrics.Trend, nil
+	case extensionapi.MetricRate:
+		return metrics.Rate, nil
+	default:
+		return 0, fmt.Errorf("unsupported extension API metric kind %d", kind)
+	}
+}
+
+func extensionAPIMetricUnit(unit extensionapi.MetricUnit) (metrics.ValueType, error) {
+	switch unit {
+	case extensionapi.MetricUnitDefault:
+		return metrics.Default, nil
+	case extensionapi.MetricUnitTime:
+		return metrics.Time, nil
+	case extensionapi.MetricUnitData:
+		return metrics.Data, nil
+	default:
+		return 0, fmt.Errorf("unsupported extension API metric unit %d", unit)
+	}
+}
+
+func extensionAPIToK6SystemTag(tag extensionapi.SystemTag) (metrics.SystemTag, bool) {
+	switch tag {
+	case extensionapi.SystemTagIP:
+		return metrics.TagIP, true
+	case extensionapi.SystemTagMethod:
+		return metrics.TagMethod, true
+	case extensionapi.SystemTagProto:
+		return metrics.TagProto, true
+	case extensionapi.SystemTagStatus:
+		return metrics.TagStatus, true
+	case extensionapi.SystemTagSubproto:
+		return metrics.TagSubproto, true
+	case extensionapi.SystemTagURL:
+		return metrics.TagURL, true
+	default:
+		return 0, false
 	}
 }
 

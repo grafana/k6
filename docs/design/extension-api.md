@@ -70,6 +70,21 @@ An extension obtains it with `vu.(extensionapi.Environment)`. k6 adapts its
 configured environment lookup into this capability without exposing `InitEnv`
 or any other k6 type.
 
+### Logger capability
+
+`Logger` exposes the standard-library structured logger:
+
+```go
+type Logger interface {
+    Logger() *slog.Logger
+}
+```
+
+k6 adapts its current Logrus logger with a `slog.Handler`. Slog levels map to
+the matching Logrus levels, and slog attributes and groups are flattened into
+dot-separated Logrus fields. Extension authors therefore depend only on
+`log/slog`, not Logrus.
+
 ### Network capability
 
 `Network` is an optional capability for direct network extensions:
@@ -95,6 +110,31 @@ goroutine and returns a thread-safe function that queues exactly one `Task`.
 settles it from asynchronous Go code. The k6 adapter performs all Sobek promise
 settlement on the owning event loop; extensions must never call Sobek from the
 background goroutine that performs I/O.
+
+### Metrics and tags capability
+
+`Metrics` is an optional VU capability. It lets an extension declare a metric
+with a portable kind and unit, obtain k6's `data_sent` and `data_received`
+metrics, snapshot the VU's tags, and emit samples without importing k6's
+metrics package:
+
+```go
+type Metrics interface {
+    RegisterMetric(MetricSpec) (Metric, error)
+    BuiltinMetric(BuiltinMetric) (Metric, bool)
+    CurrentTags() Tags
+    WithSystemTags(Tags, map[SystemTag]string) Tags
+    Emit(context.Context, []Sample) error
+}
+```
+
+`Tags` is immutable: the API copies both supplied and returned tag and metadata
+maps. `WithSystemTags()` applies only system tags enabled by the host and keeps
+non-indexable system tags as metadata. `Emit()` blocks only until the host
+accepts the batch and returns `ctx.Err()` if cancelled, so background I/O can
+stop without leaking a blocked goroutine. Metric handles are name-based but
+the host rejects emission of a metric that has not been registered or supplied
+as a supported built-in metric.
 
 ## Migrated
 
@@ -133,12 +173,12 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-faker` | Migrated | Uses the optional `Environment` capability for `XK6_FAKER_SEED`. |
 | `xk6-redis` | Can migrate after TLS policy | Promise/event-loop and network capabilities are available; it still merges k6 TLS settings into Redis TLS options. |
 | `xk6-tls` | Migrated | Uses `Network` and `Promises`; no k6 dependency remains. |
-| `xk6-kafka` | Deferred | Needs metrics declaration/emission, current tags, built-in byte metrics, and active-vs-init state. |
+| `xk6-kafka` | Can migrate after execution-state capability | Metrics/tags and built-in byte metrics are available; it still needs an active-vs-init state capability. |
 | `xk6-dns` | Deferred | Promise/event-loop is available; needs metrics/tags and a DNS-query policy/multi-record lookup capability. |
-| `xk6-icmp` | Deferred | Promise/event-loop and environment are available; needs ICMP packet sockets, logger, and metrics/tags. |
-| `xk6-mqtt` | Deferred | Promise/event-loop is available; needs TLS policy, logger, and metrics/tags. |
-| `xk6-tcp` | Deferred | Network and promise/event-loop are available; needs TLS policy, logger, and metrics/tags. |
-| `xk6-loki` | Deferred | Needs a k6-aware HTTP executor, current tags, VU ID, logger, and metrics. |
+| `xk6-icmp` | Deferred | Promise/event-loop, environment, and logger are available; needs ICMP packet sockets and metrics/tags. |
+| `xk6-mqtt` | Deferred | Promise/event-loop and logger are available; needs TLS policy and metrics/tags. |
+| `xk6-tcp` | Deferred | Network, promise/event-loop, and logger are available; needs TLS policy and metrics/tags. |
+| `xk6-loki` | Deferred | Logger is available; needs a k6-aware HTTP executor, current tags, VU ID, and metrics. |
 | `xk6-client-prometheus-remote` | Deferred | Needs a k6-aware HTTP executor preserving transport, options, tags, and HTTP metrics. |
 | `xk6-sse` | Deferred | Needs HTTP transport/options/cookies plus HTTP/custom metrics and tags. |
 | `xk6-client-tracing` | Not currently actionable | V1-only catalog entry; its registered GitHub repository was unavailable during the inventory. Restore or identify its authoritative source before migration. |
@@ -150,14 +190,11 @@ The following capabilities are intentionally not in the base API:
 1. **TLS configuration**: policy-managed TLS configuration supplied by the
    host. Resolver and cancellation-aware dialer access are now provided by the
    optional `Network` capability.
-2. **Metrics and tags**: portable metric definitions, immutable current-tag
-   snapshots, and cancellation-aware sample emission. Concrete k6 metrics
-   types must not cross the API boundary.
-3. **HTTP execution**: a host executor with portable request/response types,
+2. **HTTP execution**: a host executor with portable request/response types,
    preserving k6 transport settings and built-in HTTP metrics when k6 is the
    host.
-4. **Small metadata services**: structured logging, VU identity, and
-   active-vs-init execution state.
+3. **Small metadata services**: VU identity and active-vs-init execution
+   state. Environment lookup and structured logging are now available.
 
 Each capability should be designed against at least one migrated extension and
 one test fixture before being released. This keeps extensions independent from

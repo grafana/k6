@@ -2,25 +2,30 @@ package modules
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"testing"
 
 	"github.com/grafana/sobek"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 	extensionapi "go.k6.io/k6-extension-api"
+
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 type extensionAPITestVU struct {
-	state *lib.State
+	state   *lib.State
+	initEnv *common.InitEnvironment
 }
 
 func (vu extensionAPITestVU) Context() context.Context { return context.Background() }
 
 func (extensionAPITestVU) Events() common.Events { return common.Events{} }
 
-func (extensionAPITestVU) InitEnv() *common.InitEnvironment { return nil }
+func (vu extensionAPITestVU) InitEnv() *common.InitEnvironment { return vu.initEnv }
 
 func (vu extensionAPITestVU) State() *lib.State { return vu.state }
 
@@ -69,4 +74,99 @@ func TestExtensionAPIVUNetworkUnavailable(t *testing.T) {
 
 	_, err = network.DialContext(context.Background(), "tcp", "example.test:443")
 	require.ErrorIs(t, err, extensionapi.ErrNetworkUnavailable)
+}
+
+func TestExtensionAPISlogHandler(t *testing.T) {
+	t.Parallel()
+
+	logger, hook := logtest.NewNullLogger()
+	slog.New(newExtensionAPISlogHandler(logger)).With("extension", "test").WithGroup("request").Warn(
+		"request failed", "status", 503, slog.Group("response", "retryable", true),
+	)
+
+	require.Len(t, hook.Entries, 1)
+	entry := hook.LastEntry()
+	require.Equal(t, "request failed", entry.Message)
+	require.Equal(t, "warning", entry.Level.String())
+	require.Equal(t, "test", entry.Data["extension"])
+	require.EqualValues(t, 503, entry.Data["request.status"])
+	require.Equal(t, true, entry.Data["request.response.retryable"])
+}
+
+func TestExtensionAPIMetrics(t *testing.T) {
+	t.Parallel()
+	registry := metrics.NewRegistry()
+	builtins := metrics.RegisterBuiltinMetrics(registry)
+	systemTags := metrics.SystemTagSet(metrics.TagURL)
+	samples := make(chan metrics.SampleContainer, 1)
+	state := &lib.State{
+		BuiltinMetrics: builtins,
+		Options:        lib.Options{SystemTags: &systemTags},
+		Samples:        samples,
+		Tags:           lib.NewVUStateTags(registry.RootTagSet().With("scenario", "test")),
+	}
+	vu := extensionAPIVU{vu: extensionAPITestVU{
+		state: state,
+		initEnv: &common.InitEnvironment{TestPreInitState: &lib.TestPreInitState{
+			Registry:       registry,
+			BuiltinMetrics: builtins,
+		}},
+	}}
+	api, ok := any(vu).(extensionapi.Metrics)
+	require.True(t, ok)
+
+	metric, err := api.RegisterMetric(extensionapi.MetricSpec{
+		Name: "extension_api_metric", Kind: extensionapi.MetricCounter, Unit: extensionapi.MetricUnitData,
+	})
+	require.NoError(t, err)
+	duplicate, err := api.RegisterMetric(extensionapi.MetricSpec{
+		Name: "extension_api_metric", Kind: extensionapi.MetricCounter, Unit: extensionapi.MetricUnitData,
+	})
+	require.NoError(t, err)
+	require.Equal(t, metric.Name(), duplicate.Name())
+	_, err = api.RegisterMetric(extensionapi.MetricSpec{
+		Name: "extension_api_metric", Kind: extensionapi.MetricGauge, Unit: extensionapi.MetricUnitData,
+	})
+	require.Error(t, err)
+
+	tags := api.CurrentTags()
+	state.Tags.Modify(func(current *metrics.TagsAndMeta) { current.SetTag("scenario", "changed") })
+	require.Equal(t, "test", tags.Values()["scenario"])
+	tags = api.WithSystemTags(tags.With(map[string]string{"operation": "write"}), map[extensionapi.SystemTag]string{
+		extensionapi.SystemTagURL: "https://example.test",
+		extensionapi.SystemTagIP:  "192.0.2.1",
+	})
+	require.Equal(t, "https://example.test", tags.Values()["url"])
+	require.NotContains(t, tags.Values(), "ip")
+
+	require.NoError(t, api.Emit(context.Background(), []extensionapi.Sample{{
+		Metric: metric,
+		Value:  42,
+		Tags:   tags.WithMetadata(map[string]string{"request_id": "abc"}),
+	}}))
+	emitted := (<-samples).GetSamples()
+	require.Len(t, emitted, 1)
+	require.Equal(t, "extension_api_metric", emitted[0].Metric.Name)
+	require.Equal(t, float64(42), emitted[0].Value)
+	require.Equal(t, "https://example.test", emitted[0].Tags.Map()["url"])
+	require.Equal(t, "abc", emitted[0].Metadata["request_id"])
+
+	dataSent, ok := api.BuiltinMetric(extensionapi.BuiltinDataSent)
+	require.True(t, ok)
+	require.Equal(t, builtins.DataSent.Name, dataSent.Name())
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.ErrorIs(t, api.Emit(canceled, []extensionapi.Sample{{Metric: metric, Value: 1}}), context.Canceled)
+	require.Empty(t, metrics.GetBufferedSamples(samples))
+
+	blockedSamples := make(chan metrics.SampleContainer)
+	state.Samples = blockedSamples
+	blockingContext, cancelBlocking := context.WithCancel(context.Background())
+	blockedResult := make(chan error, 1)
+	go func() {
+		blockedResult <- api.Emit(blockingContext, []extensionapi.Sample{{Metric: metric, Value: 1}})
+	}()
+	cancelBlocking()
+	require.ErrorIs(t, <-blockedResult, context.Canceled)
 }
