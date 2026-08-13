@@ -3,7 +3,11 @@ on:
   push:
     branches:
       - master
+      - v1.x
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'release notes/**'
 
 defaults:
   run:
@@ -19,11 +23,11 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.25.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -46,12 +50,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Run common test steps
@@ -71,11 +75,11 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.26.x]
-        platform: [ubuntu-22.04, ubuntu-24.04-arm, windows-latest]
+        platform: [ubuntu-24.04, ubuntu-24.04-arm, windows-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Run common test steps
