@@ -12,7 +12,7 @@ import (
 
 var (
 	// ErrNotAuthenticated maps HTTP 401.
-	ErrNotAuthenticated = errors.New("failed to authenticate with k6 Cloud")
+	ErrNotAuthenticated = errors.New("failed to authenticate with k6 Cloud. Run `k6 cloud login` to refresh your token")
 	// ErrNotAuthorized maps HTTP 403.
 	ErrNotAuthorized = errors.New("not allowed to upload result to k6 Cloud")
 )

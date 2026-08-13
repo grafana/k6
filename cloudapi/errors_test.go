@@ -36,6 +36,12 @@ func TestErrorResponse_Error(t *testing.T) {
 
 	expected := "(E123) " + msg1 + "\n " + msg2 + "\n field1: error1, error2"
 	assert.Equal(t, expected, errResp.Error())
+
+	unauth := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusUnauthorized},
+		Message:  "Invalid token",
+	}
+	assert.Equal(t, "(401) Invalid token. Run `k6 cloud login` to refresh your token", unauth.Error())
 }
 
 func TestCheckResponse(t *testing.T) {

@@ -54,5 +54,9 @@ func (e ResponseError) Error() string {
 		msg = fmt.Sprintf("(%s) %s", code, msg)
 	}
 
+	if e.Response != nil && e.Response.StatusCode == http.StatusUnauthorized {
+		msg += ". Run `k6 cloud login` to refresh your token"
+	}
+
 	return msg
 }
