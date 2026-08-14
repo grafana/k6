@@ -126,7 +126,8 @@ func TestMappings(t *testing.T) {
 		"browser": {
 			apiInterface: (*browserAPI)(nil),
 			mapp: func() mapping {
-				return mapBrowser(moduleVU{VU: vu})
+				mvu := moduleVU{VU: vu}
+				return mapBrowser(mvu, mvu.browser)
 			},
 		},
 		"browserContext": {

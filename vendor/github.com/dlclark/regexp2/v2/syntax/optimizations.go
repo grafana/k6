@@ -11,20 +11,21 @@ type FindOptimizations struct {
 	rightToLeft  bool
 	asciiLookups [][]uint
 
-	FindMode             FindNextStartingPositionMode
-	LeadingAnchor        NodeType
-	TrailingAnchor       NodeType
-	MinRequiredLength    int
-	MaxPossibleLength    int
-	LeadingPrefix        string
-	LeadingPrefixes      []string
-	LeadingPrefixesRunes [][]rune
+	FindMode                FindNextStartingPositionMode
+	LeadingAnchor           NodeType
+	TrailingAnchor          NodeType
+	MinRequiredLength       int
+	MaxPossibleLength       int
+	LeadingPrefix           string
+	LeadingPrefixes         []string
+	LeadingPrefixesRunes    [][]rune
 	//LeadingStrings    *helpers.StringSearchValues
 
 	FixedDistanceLiteral FixedDistanceLiteral
 	FixedDistanceSets    []FixedDistanceSet
 	LiteralAfterLoop     *LiteralAfterLoop
 	LandmarkChain        *RequiredLandmarkChain
+	LeadingPrefixFirstRunes []rune
 }
 
 type LiteralAfterLoop struct {
@@ -468,6 +469,7 @@ func newFindOptimizationsForNode(root *RegexNode, opt ParseOptions, isLeadingPar
 		if len(ciPrefixes) > 1 {
 			f.LeadingPrefixes = ciPrefixes
 			f.LeadingPrefixesRunes = toRunePrefixes(ciPrefixes)
+			f.LeadingPrefixFirstRunes = leadingPrefixFirstRunes(f.LeadingPrefixesRunes)
 			f.FindMode = LeadingStrings_OrdinalIgnoreCase_LeftToRight
 			/*SYSTEM_TEXT_REGULAREXPRESSIONS
 			if usesRfoTryFind {
@@ -523,6 +525,7 @@ func newFindOptimizationsForNode(root *RegexNode, opt ParseOptions, isLeadingPar
 			if len(caseSensitivePrefixes) > 1 {
 				f.LeadingPrefixes = caseSensitivePrefixes
 				f.LeadingPrefixesRunes = toRunePrefixes(caseSensitivePrefixes)
+				f.LeadingPrefixFirstRunes = leadingPrefixFirstRunes(f.LeadingPrefixesRunes)
 				f.FindMode = LeadingStrings_LeftToRight
 				return f
 			}
@@ -585,6 +588,16 @@ func toRunePrefixes(prefixes []string) [][]rune {
 		runes[i] = []rune(prefix)
 	}
 	return runes
+}
+
+func leadingPrefixFirstRunes(prefixes [][]rune) []rune {
+	first := make([]rune, 0, len(prefixes))
+	for _, prefix := range prefixes {
+		if len(prefix) > 0 && !slices.Contains(first, prefix[0]) {
+			first = append(first, prefix[0])
+		}
+	}
+	return first
 }
 
 func getFindMode(rtl bool, t NodeType) FindNextStartingPositionMode {

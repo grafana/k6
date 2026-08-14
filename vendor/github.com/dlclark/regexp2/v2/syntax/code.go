@@ -113,6 +113,40 @@ type Code struct {
 	Anchors           AnchorLoc          // the set of zero-length start anchors (RegexFCD.Bol, etc)
 	RightToLeft       bool               // true if right to left
 	FindOptimizations *FindOptimizations // analyzed candidate search strategy
+	QuickCodes        []int              // bool-only code with unobservable captures removed
+	CaptureSlotInUse  []bool             // capture slots observable by the pattern itself during quick matches
+}
+
+// captureSlotsInUse returns the capture slots whose values can affect matching.
+// Group 0 is always retained as the success marker. Ordinary captures that are
+// never referenced by the pattern may be omitted by bool-only matching APIs.
+func captureSlotsInUse(codes []int, capsize int) []bool {
+	inUse := make([]bool, capsize)
+	if capsize > 0 {
+		inUse[0] = true
+	}
+	for pos := 0; pos < len(codes); {
+		op := InstOp(codes[pos]) & Mask
+		switch op {
+		case Ref, Testref:
+			capnum := codes[pos+1]
+			if capnum >= 0 && capnum < len(inUse) {
+				inUse[capnum] = true
+			}
+		case Capturemark:
+			// Balancing groups both observe and mutate capture state. Keep both
+			// sides live even if no later backreference refers to them.
+			if codes[pos+2] != -1 {
+				for _, capnum := range codes[pos+1 : pos+3] {
+					if capnum >= 0 && capnum < len(inUse) {
+						inUse[capnum] = true
+					}
+				}
+			}
+		}
+		pos += opcodeSize(op)
+	}
+	return inUse
 }
 
 // PrepareCharSetASCIIBitmaps builds bounded ASCII lookup tables for compiled

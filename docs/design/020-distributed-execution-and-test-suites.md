@@ -298,9 +298,9 @@ Let's get back to my actual proposal of a `execution.Controller` API + new `k6 c
 
 To show that the proposed solution is a viable one, I'll go through the 9 items from the list in the "Missing Parts in the Current State" section and show how the proposal can be used to easily implement them:
 1. `k6 coordinator` assembles the script and its dependencies into a [.tar archive bundle](https://k6.io/docs/misc/archive-command/) and distributes it to all `k6 agent` nodes automatically once they connect to it (either pull-based or push-based).
-2. I showed how `setup()` can be cooperatively execuded only on a single instance and how its result can be distributed to the rest of the instances with the `GetOrCreateData()` pseudo-API described in the "Instance Synchronization API" section.
+2. I showed how `setup()` can be cooperatively executed only on a single instance and how its result can be distributed to the rest of the instances with the `GetOrCreateData()` pseudo-API described in the "Instance Synchronization API" section.
 3. Similarly, in the "Instance Synchronization API" section I showed how the `SignalAndWait()` pseudo-API can be used to ensure that all instances have finished initializing their VUs and executed `setup()` before they start the actual test execution simultaneously
-4. Most failures will be handled by the coordinator and propaged to waiting instances. For the best UX, instances might subscribe to a special error channel so they can be interupted even during the test execution.
+4. Most failures will be handled by the coordinator and propagated to waiting instances. For the best UX, instances might subscribe to a special error channel so they can be interrupted even during the test execution.
 5. Metric collection was described in the "Metrics Handling" section, and the coordinator will be able to stop the test if a threshold is crossed.
 6. We can probably handle `test.abort()` calls from an instance with a `GetOrCreateData()` call that uses a special `dataID` watched by the coordinator, but it might be simpler to just add a custom API for that... :thinking:
 7. Detecting when the test has finished is trivial with `SignalAndWait()`.

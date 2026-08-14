@@ -26,6 +26,7 @@ func TestCloudNoArgsShowsHelp(t *testing.T) {
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, "Run and manage Grafana Cloud tests", "expected help text to be shown")
+	assert.NotContains(t, stdout, "--vus", "run flags belong to `k6 cloud run`, not to `k6 cloud`")
 }
 
 type setupCommandFunc func(cliFlags []string) []string

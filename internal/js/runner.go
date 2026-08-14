@@ -19,7 +19,6 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/v2/errext"
@@ -206,9 +205,11 @@ func (r *Runner) newVU(
 	}
 
 	if r.forceHTTP1() {
-		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
+		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 	} else {
-		_ = http2.ConfigureTransport(transport) // send over h2 protocol
+		// net/http negotiates HTTP/2 over a Transport with a custom DialContext or
+		// TLSClientConfig only when ForceAttemptHTTP2 is set (see Go issue #14275).
+		transport.ForceAttemptHTTP2 = true
 	}
 
 	cookieJar, err := cookiejar.New(nil)
@@ -394,6 +395,10 @@ func (r *Runner) HandleSummary(
 	callbackResult, err := runUserProvidedHandleSummaryCallback(summaryCtx, vu, handleSummaryData)
 	if err != nil {
 		return nil, err
+	}
+
+	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, nil, nil); deadlineError != nil {
+		return nil, deadlineError
 	}
 
 	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", summaryCode, 1)
@@ -692,7 +697,7 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 	case consts.TeardownFn:
 		return r.Bundle.Options.TeardownTimeout.TimeDuration()
 	case consts.HandleSummaryFn:
-		return 2 * time.Minute // TODO: make configurable
+		return r.Bundle.Options.HandleSummaryTimeout.TimeDuration()
 	}
 	return d
 }
@@ -752,12 +757,14 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		params.Exec = consts.DefaultFn
 	}
 
-	// Override the preset global env with any custom env vars
+	// Override the preset global env with any custom env vars.
+	// __ENV is frozen when the freeze-env feature flag is active.
 	env := make(map[string]string, len(u.env)+len(params.Env))
 	maps.Copy(env, u.env)
 	maps.Copy(env, params.Env)
-	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722#issuecomment-1761173634
-	u.Runtime.Set("__ENV", env)
+	if err := setupEnvObject(u.Runtime, env, u.Runner.preInitState.FeatureFlags); err != nil {
+		panic(err) // should not happen with string values
+	}
 
 	opts := u.Runner.Bundle.Options
 

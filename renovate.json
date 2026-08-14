@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>grafana/grafana-renovate-config//presets/k6/k6-engine-base.json",
-    "schedule:weekly"
+    "schedule:weekly",
+    "github>grafana/grafana-renovate-config//presets/k6/k6-engine-automerge.json"
   ],
   "ignorePaths": [
     "**/vendor/**",

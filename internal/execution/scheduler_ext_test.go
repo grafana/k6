@@ -579,8 +579,8 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 		checkVar('TESTVAR3', undefined);
 		checkVar('TESTGLOBALVAR', 'global');
 
-		// Intentionally try to pollute the env
-		__ENV.TESTVAR2 = 'overridden';
+		// Intentionally try to pollute the env (will be silently rejected since __ENV is frozen)
+		try { __ENV.TESTVAR2 = 'overridden'; } catch (e) { /* __ENV is frozen */ }
 
 		http.get('HTTPBIN_IP_URL/', { tags: { reqtag: 'scenario1' }});
 	}
