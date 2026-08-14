@@ -561,7 +561,7 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		handleNewMaxAllowedVUs,
 		handledGracefulSteps,
 	)
-	return nil
+	return runState.startErr
 }
 
 // rampingVUsRunState is created and initialized by the Run() method
@@ -577,6 +577,12 @@ type rampingVUsRunState struct {
 
 	runIteration func(context.Context, lib.ActiveVU) bool // a helper closure function that runs a single iteration
 	cancel       func()
+
+	// startErr holds a VU-start failure so Run() can return it to its caller.
+	// It's only written and read from the Run() goroutine: the
+	// scheduledVUsHandlerStrategy() closure that sets it is invoked exclusively
+	// from iterateSteps(), which Run() calls synchronously (not in a goroutine).
+	startErr error
 }
 
 func (rs *rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn func() (float64, []string)) {
@@ -644,6 +650,9 @@ func (rs *rampingVUsRunState) iterateSteps(
 				break
 			}
 			handleNewScheduledVUs(r)
+			if rs.startErr != nil {
+				break
+			}
 			i++
 		}
 	}
@@ -688,7 +697,9 @@ func (rs *rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionSt
 		pv := raw.PlannedVUs
 		for ; cur < pv; cur++ {
 			if err := rs.vuHandles[cur].start(); err != nil {
-				rs.executor.logger.WithError(err).Error("Cannot start a VU")
+				// getVU() (invoked by start()) has already logged this failure,
+				// so we only record it here for Run() to return.
+				rs.startErr = err
 				rs.cancel()
 				return
 			}

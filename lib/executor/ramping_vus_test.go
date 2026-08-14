@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -1215,6 +1214,8 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 	}
 }
 
+// TestRampingVUsVUStartError checks that a VU-start failure is returned by
+// Run() instead of being swallowed, and that it's logged exactly once.
 func TestRampingVUsVUStartError(t *testing.T) {
 	t.Parallel()
 
@@ -1232,8 +1233,9 @@ func TestRampingVUsVUStartError(t *testing.T) {
 	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
 	defer test.cancel()
 
-	// The fix emits the failure at error level, but setupExecutor's hook
-	// only captures warn-level entries, so attach a dedicated error hook.
+	// getVU() logs "Cannot get a VU from the buffer" at error level, but
+	// setupExecutor's hook only captures warn-level entries, so attach a
+	// dedicated error hook.
 	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
 	test.executor.GetLogger().Logger.AddHook(errorHook)
 
@@ -1249,18 +1251,22 @@ func TestRampingVUsVUStartError(t *testing.T) {
 	errCh := make(chan error, 1)
 	go func() { errCh <- test.executor.Run(test.ctx, engineOut) }()
 
-	// Run must finish; a hang here would mean the VU-start failure was swallowed.
+	// Run must surface the VU-start failure to its caller instead of
+	// swallowing it.
 	select {
 	case err := <-errCh:
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get a VU from the buffer in")
+	case <-time.After(2 * lib.MaxRetriesGetPlannedVU * lib.MaxTimeToWaitForPlannedVU):
 		t.Fatal("executor did not stop after a VU-start failure")
 	}
 
-	require.True(t,
-		testutils.LogContains(errorHook.Drain(), logrus.ErrorLevel, "Cannot start a VU"),
-		"expected a 'Cannot start a VU' error to be logged",
-	)
+	// Exactly one error-level entry is expected: getVU() logs the failure
+	// once. A second entry would mean the caller is still logging its own
+	// (now removed) duplicate "Cannot start a VU" line.
+	entries := errorHook.Drain()
+	require.Len(t, entries, 1)
+	assert.Contains(t, entries[0].Message, "Cannot get a VU from the buffer")
 }
 
 // TestRampingVUsVUStartErrorMultiStage checks that, with a multi-stage ramp,
@@ -1275,8 +1281,8 @@ func TestRampingVUsVUStartErrorMultiStage(t *testing.T) {
 		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
 		StartVUs:   null.IntFrom(1),
 		Stages: []Stage{
-			{Duration: types.NullDurationFrom(500 * time.Millisecond), Target: null.IntFrom(2)},
-			{Duration: types.NullDurationFrom(500 * time.Millisecond), Target: null.IntFrom(3)},
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(2)},
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(3)},
 		},
 	}
 
@@ -1300,17 +1306,16 @@ func TestRampingVUsVUStartErrorMultiStage(t *testing.T) {
 
 	select {
 	case err := <-errCh:
-		require.NoError(t, err)
-	case <-time.After(5 * time.Second):
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get a VU from the buffer in")
+	case <-time.After(2 * lib.MaxRetriesGetPlannedVU * lib.MaxTimeToWaitForPlannedVU):
 		t.Fatal("executor did not stop after a VU-start failure")
 	}
 
-	var startErrors int
-	for _, entry := range errorHook.Drain() {
-		if entry.Level == logrus.ErrorLevel && strings.Contains(entry.Message, "Cannot start a VU") {
-			startErrors++
-		}
-	}
-	require.Equal(t, 1, startErrors,
-		"the VU-start failure should be reported once; a repeated report means the executor kept going into later stages instead of stopping")
+	// The failure must be logged exactly once; a second entry means the
+	// executor kept going into later stages instead of stopping at the
+	// first failure.
+	entries := errorHook.Drain()
+	require.Len(t, entries, 1,
+		"the VU-start failure should be logged once; a repeat means later stages kept running")
 }
