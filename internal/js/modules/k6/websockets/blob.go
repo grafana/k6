@@ -90,7 +90,10 @@ func (r *WebSocketsAPI) blob(call sobek.ConstructorCall) *sobek.Object {
 		return rt.ToValue(promise)
 	}))
 	must(rt, obj.Set("stream", func(_ sobek.FunctionCall) sobek.Value {
-		return rt.ToValue(streams.NewReadableStreamFromReader(r.vu, b.data))
+		// Copy via NewReader so pulling the stream does not consume the Blob's
+		// backing buffer. Blob contents are immutable and must remain readable
+		// after stream(), text(), or arrayBuffer() are used independently.
+		return rt.ToValue(streams.NewReadableStreamFromReader(r.vu, bytes.NewReader(b.data.Bytes())))
 	}))
 
 	proto := call.This.Prototype()
@@ -123,7 +126,11 @@ func (r *WebSocketsAPI) fillData(b *blob, blobParts []any, call sobek.Constructo
 				obj := call.Arguments[0].ToObject(rt).Get(strconv.FormatInt(int64(n), 10)).ToObject(rt)
 				switch {
 				case isDataView(obj, rt):
-					_, err = b.data.Write(obj.Get("buffer").Export().(sobek.ArrayBuffer).Bytes()) //nolint:forcetypeassert
+					var view []byte
+					view, err = dataViewBytes(obj)
+					if err == nil {
+						_, err = b.data.Write(view)
+					}
 				case isBlob(obj, r.blobConstructor):
 					_, err = b.data.Write(extractBytes(obj, rt))
 				default:
@@ -140,11 +147,10 @@ func (r *WebSocketsAPI) fillData(b *blob, blobParts []any, call sobek.Constructo
 }
 
 func (r *WebSocketsAPI) slice(call sobek.FunctionCall, b *blob, rt *sobek.Runtime) sobek.Value {
-	var (
-		from int
-		to   = b.data.Len()
-		ct   = ""
-	)
+	size := b.data.Len()
+	from := 0
+	to := size
+	ct := ""
 
 	if len(call.Arguments) > 0 {
 		from = int(call.Arguments[0].ToInteger())
@@ -152,13 +158,16 @@ func (r *WebSocketsAPI) slice(call sobek.FunctionCall, b *blob, rt *sobek.Runtim
 
 	if len(call.Arguments) > 1 {
 		to = int(call.Arguments[1].ToInteger())
-		if to < 0 {
-			to = b.data.Len() + to
-		}
 	}
 
 	if len(call.Arguments) > 2 {
 		ct = call.Arguments[2].String()
+	}
+
+	from = normalizeBlobIndex(from, size)
+	to = normalizeBlobIndex(to, size)
+	if from > to {
+		from = to
 	}
 
 	opts := rt.NewObject()
@@ -168,4 +177,42 @@ func (r *WebSocketsAPI) slice(call sobek.FunctionCall, b *blob, rt *sobek.Runtim
 	must(rt, err)
 
 	return sliced
+}
+
+// normalizeBlobIndex implements the File API slice() start/end conversion:
+// negative indexes are treated as size+index, then clamped to [0, size].
+func normalizeBlobIndex(idx, size int) int {
+	if idx < 0 {
+		idx += size
+		if idx < 0 {
+			return 0
+		}
+		return idx
+	}
+	if idx > size {
+		return size
+	}
+	return idx
+}
+
+// dataViewBytes returns the bytes visible through a DataView, not the entire
+// backing ArrayBuffer. Using buffer.Bytes() alone would include adjacent
+// memory outside the view's byteOffset/byteLength.
+func dataViewBytes(obj *sobek.Object) ([]byte, error) {
+	ab, ok := obj.Get("buffer").Export().(sobek.ArrayBuffer)
+	if !ok {
+		return nil, errors.New("DataView.buffer is not an ArrayBuffer")
+	}
+
+	offset := int(obj.Get("byteOffset").ToInteger())
+	length := int(obj.Get("byteLength").ToInteger())
+	buf := ab.Bytes()
+	if offset < 0 || length < 0 || offset+length > len(buf) {
+		return nil, fmt.Errorf(
+			"DataView bounds [%d, %d) are outside the ArrayBuffer of length %d",
+			offset, offset+length, len(buf),
+		)
+	}
+
+	return buf[offset : offset+length], nil
 }

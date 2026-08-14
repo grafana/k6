@@ -68,6 +68,10 @@ func TestBlob(t *testing.T) {
 			blobPartsDef:  `[new DataView(new Int8Array([0x50, 0x41, 0x53, 0x53]).buffer)]`,
 			bytesExpected: []byte("PASS"),
 		},
+		"DataViewOffset": {
+			blobPartsDef:  `[new DataView(new Uint8Array([0x00, 0x50, 0x41, 0x53, 0x53, 0xFF]).buffer, 1, 4)]`,
+			bytesExpected: []byte("PASS"),
+		},
 		"Blob": {
 			blobPartsDef:  `[new Blob(["PASS"])]`,
 			bytesExpected: []byte("PASS"),
@@ -189,6 +193,30 @@ func TestBlob_slice(t *testing.T) {
 			bytesExpected: []byte("P"),
 			ctExpected:    "text/example",
 		},
+		"slice(negative start)": {
+			call:          `slice(-1)`,
+			bytesExpected: []byte("S"),
+		},
+		"slice(negative start, negative end)": {
+			call:          `slice(-3,-1)`,
+			bytesExpected: []byte("AS"),
+		},
+		"slice(start past end)": {
+			call:          `slice(3,1)`,
+			bytesExpected: []byte{},
+		},
+		"slice(start past size)": {
+			call:          `slice(10)`,
+			bytesExpected: []byte{},
+		},
+		"slice(end past size)": {
+			call:          `slice(0,100)`,
+			bytesExpected: []byte("PASS"),
+		},
+		"slice(start far negative)": {
+			call:          `slice(-100)`,
+			bytesExpected: []byte("PASS"),
+		},
 	}
 
 	for name, tc := range tcs {
@@ -263,6 +291,24 @@ func TestBlob_stream(t *testing.T) {
 		  const reader = blob.stream().getReader();
 		  const {value} = await reader.read();
 		  return value;
+		})()
+	`)
+	require.NoError(t, err)
+
+	p, ok := val.Export().(*sobek.Promise)
+	require.True(t, ok)
+	require.Equal(t, "PASS", p.Result().String())
+}
+
+func TestBlob_streamDoesNotConsume(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	val, err := ts.runtime.RunOnEventLoop(`
+		(async () => {
+		  const blob = new Blob(["P", "A", "SS"]);
+		  const reader = blob.stream().getReader();
+		  await reader.read();
+		  return blob.text();
 		})()
 	`)
 	require.NoError(t, err)
