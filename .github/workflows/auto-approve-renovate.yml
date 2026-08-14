@@ -1,0 +1,14 @@
+name: Auto-approve Renovate
+on:
+  schedule:
+    - cron: '1 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+  id-token: write
+jobs:
+  approve:
+    uses: grafana/k6-ci/.github/workflows/auto-approve-renovate.yml@9477260e6838640d56c28aa95bcbf9a884ab21f3 # k6-ci#44 merge commit

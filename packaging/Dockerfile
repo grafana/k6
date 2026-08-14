@@ -5,7 +5,7 @@ LABEL maintainer="k6 Developers <developers@k6.io>"
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
-    apt-get install -y apt-utils createrepo-c curl git gnupg2 s3cmd unzip rpm
+    apt-get install -y apt-utils bzip2 createrepo-c curl git gnupg2 s3cmd unzip rpm
 
 # Download awscli, check GPG signature and install.
 COPY ./awscli-key.gpg .

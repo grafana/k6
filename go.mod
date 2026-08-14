@@ -31,7 +31,7 @@ require (
 	github.com/klauspost/compress v1.19.1
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mattn/go-isatty v0.0.24
-	github.com/mccutchen/go-httpbin/v2 v2.24.0
+	github.com/mccutchen/go-httpbin/v2 v2.25.0
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
@@ -64,7 +64,7 @@ require (
 	golang.org/x/term v0.45.0
 	golang.org/x/time v0.15.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720211330-0afa2a65878a
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1

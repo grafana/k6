@@ -19,7 +19,6 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/v2/errext"
@@ -206,9 +205,11 @@ func (r *Runner) newVU(
 	}
 
 	if r.forceHTTP1() {
-		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
+		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 	} else {
-		_ = http2.ConfigureTransport(transport) // send over h2 protocol
+		// net/http negotiates HTTP/2 over a Transport with a custom DialContext or
+		// TLSClientConfig only when ForceAttemptHTTP2 is set (see Go issue #14275).
+		transport.ForceAttemptHTTP2 = true
 	}
 
 	cookieJar, err := cookiejar.New(nil)

@@ -47,24 +47,66 @@ func getDefaultLoki() *lokiHook {
 	}
 }
 
-// LokiFromConfigLine returns a new logrus.Hook
-// that pushes logrus.Entrys to loki and is configured
-// through the provided line.
-func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHook, error) {
+// LokiHookOptions configures a loki push hook built by NewLokiHook.
+// Zero-valued fields take the built-in defaults.
+type LokiHookOptions struct {
+	Addr          string        // default http://127.0.0.1:3100/loki/api/v1/push
+	PushPeriod    time.Duration // default 1s
+	Limit         int           // default 100
+	MsgMaxSize    int           // default 1MB
+	Level         string        // "" => all levels; else parseLevels
+	AllowedLabels []string
+	Labels        [][2]string // static labels (e.g. test_run_id)
+	Headers       [][2]string // e.g. Authorization: Bearer <token>
+	Profile       bool
+}
+
+// NewLokiHook returns a new AsyncHook that pushes logrus.Entrys to loki,
+// configured from opts. Zero-valued opts fields take the built-in defaults.
+func NewLokiHook(fallbackLogger logrus.FieldLogger, opts LokiHookOptions) (AsyncHook, error) {
 	h := getDefaultLoki()
 	h.fallbackLogger = fallbackLogger
 
-	if line != "loki" {
-		logOutput, _, _ := strings.Cut(line, "=")
-		if logOutput != "loki" {
-			return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
-		}
-
-		err := h.parseArgs(line)
+	if opts.Addr != "" {
+		h.addr = opts.Addr
+	}
+	// Limit, PushPeriod and MsgMaxSize fall back to their defaults on a
+	// non-positive value. Negatives can only arrive programmatically
+	// (K6_CLOUD_LOGS_* / a backend logs config bypass the config-line
+	// validation) and would otherwise panic in Listen — make([]tmpMsg, limit)
+	// and time.NewTicker(pushPeriod) — or on push (msgMaxSize slicing); warn so
+	// a bad value is visible.
+	if opts.PushPeriod > 0 {
+		h.pushPeriod = opts.PushPeriod
+	} else if opts.PushPeriod < 0 && fallbackLogger != nil {
+		fallbackLogger.WithField("pushPeriod", opts.PushPeriod).
+			Warn("negative loki push period; using default")
+	}
+	if opts.Limit > 0 {
+		h.limit = opts.Limit
+	} else if opts.Limit < 0 && fallbackLogger != nil {
+		fallbackLogger.WithField("limit", opts.Limit).
+			Warn("negative loki limit; using default")
+	}
+	if opts.MsgMaxSize > 0 {
+		h.msgMaxSize = opts.MsgMaxSize
+	} else if opts.MsgMaxSize < 0 && fallbackLogger != nil {
+		fallbackLogger.WithField("msgMaxSize", opts.MsgMaxSize).
+			Warn("negative loki message size; using default")
+	}
+	if opts.Level != "" {
+		levels, err := parseLevels(opts.Level)
 		if err != nil {
 			return nil, err
 		}
+		h.levels = levels
 	}
+	if opts.AllowedLabels != nil {
+		h.allowedLabels = opts.AllowedLabels
+	}
+	h.labels = append(h.labels, opts.Labels...)
+	h.headers = append(h.headers, opts.Headers...)
+	h.profile = opts.Profile
 
 	h.droppedLabels = make(map[string]string, 2+len(h.labels))
 	h.droppedLabels["level"] = logrus.WarnLevel.String()
@@ -74,10 +116,31 @@ func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHo
 
 	h.droppedMsg = h.filterLabels(h.droppedLabels, h.droppedMsg)
 	h.client = &http.Client{Timeout: h.pushPeriod}
+
 	return h, nil
 }
 
-func (h *lokiHook) parseArgs(line string) error {
+// LokiFromConfigLine returns a new logrus.Hook
+// that pushes logrus.Entrys to loki and is configured
+// through the provided line.
+func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHook, error) {
+	var opts LokiHookOptions
+
+	if line != "loki" {
+		logOutput, _, _ := strings.Cut(line, "=")
+		if logOutput != "loki" {
+			return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
+		}
+
+		if err := opts.parseArgs(line); err != nil {
+			return nil, err
+		}
+	}
+
+	return NewLokiHook(fallbackLogger, opts)
+}
+
+func (opts *LokiHookOptions) parseArgs(line string) error {
 	tokens, err := strvals.Parse(line)
 	if err != nil {
 		return fmt.Errorf("error while parsing loki configuration %w", err)
@@ -90,46 +153,41 @@ func (h *lokiHook) parseArgs(line string) error {
 		var err error
 		switch key {
 		case "loki":
-			h.addr = value
+			opts.Addr = value
 		case "pushPeriod":
-			h.pushPeriod, err = time.ParseDuration(value)
+			opts.PushPeriod, err = time.ParseDuration(value)
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki pushPeriod %w", err)
 			}
 		case "profile":
-			h.profile = true
+			opts.Profile = true
 		case "limit":
-			h.limit, err = strconv.Atoi(value)
+			opts.Limit, err = strconv.Atoi(value)
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki limit as a number %w", err)
 			}
-			if h.limit < 1 {
-				return fmt.Errorf("loki limit needs to be a positive number, is %d", h.limit)
+			if opts.Limit < 1 {
+				return fmt.Errorf("loki limit needs to be a positive number, is %d", opts.Limit)
 			}
 		case "msgMaxSize":
-			h.msgMaxSize, err = strconv.Atoi(value)
+			opts.MsgMaxSize, err = strconv.Atoi(value)
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
 			}
-			if h.msgMaxSize < 1 {
-				return fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", h.msgMaxSize)
+			if opts.MsgMaxSize < 1 {
+				return fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", opts.MsgMaxSize)
 			}
 		case "level":
-			h.levels, err = parseLevels(value)
-			if err != nil {
-				return err
-			}
+			opts.Level = value
 		case "allowedLabels":
-			h.allowedLabels = strings.Split(value, ",")
+			opts.AllowedLabels = strings.Split(value, ",")
 		default:
 			if after, ok := strings.CutPrefix(key, "label."); ok {
-				labelKey := after
-				h.labels = append(h.labels, [2]string{labelKey, value})
+				opts.Labels = append(opts.Labels, [2]string{after, value})
 
 				continue
 			} else if after, ok := strings.CutPrefix(key, "header."); ok {
-				headerKey := after
-				h.headers = append(h.headers, [2]string{headerKey, value})
+				opts.Headers = append(opts.Headers, [2]string{after, value})
 
 				continue
 			}
@@ -146,7 +204,7 @@ func (h *lokiHook) parseArgs(line string) error {
 //
 // TODO benchmark this
 //
-//nolint:funlen
+//nolint:funlen,gocognit
 func (h *lokiHook) Listen(ctx context.Context) {
 	var (
 		msgs       = make([]tmpMsg, h.limit)
@@ -216,45 +274,75 @@ func (h *lokiHook) Listen(ctx context.Context) {
 		}
 	}()
 
+	// appendEntry buffers one entry into msgs, or counts it as dropped once the
+	// per-push-period limit is reached. It mutates the count, dropped and msgs
+	// loop state, so it must run only on the main goroutine — never while the
+	// push goroutine is swapping msgs and resetting the counters.
+	appendEntry := func(entry *logrus.Entry) {
+		if count == h.limit {
+			dropped++
+
+			return
+		}
+
+		// Arguably we can directly generate the final marshalled version of the labels right here
+		// through sorting the entry.Data, removing additionalparams from it and then dumping it
+		// as the final marshal and appending level and h.labels after it.
+		// If we reuse some kind of big enough `[]byte` buffer we can also possibly skip on some
+		// of allocation. Combined with the cutoff part and directly pushing in the final data
+		// type this can be really a lot faster and to use a lot less memory
+		labels := make(map[string]string, len(entry.Data)+1)
+		for k, v := range entry.Data {
+			labels[k] = fmt.Sprint(v) // TODO optimize ?
+		}
+		for _, params := range h.labels {
+			labels[params[0]] = params[1]
+		}
+		labels["level"] = entry.Level.String()
+		msg := h.filterLabels(labels, entry.Message) // TODO we can do this while constructing
+		// have the cutoff here ?
+		// if we cutoff here we can cut somewhat on the backbuffers and optimize the inserting
+		// in/creating of the final Streams that we push
+		msgs[count] = tmpMsg{
+			labels: labels,
+			msg:    msg,
+			t:      entry.Time.UnixNano(),
+		}
+		count++
+	}
+
+	// drainQueued flushes entries still buffered in h.ch into msgs without
+	// blocking. Called on shutdown so the final push includes everything Fire
+	// already accepted; best-effort, it does not wait for entries still being
+	// Fired concurrently with the shutdown.
+	drainQueued := func() {
+		for {
+			select {
+			case entry, ok := <-h.ch:
+				if !ok {
+					// h.ch is never closed today; this guards a future close
+					// from spinning on nil receives.
+					return
+				}
+				appendEntry(entry)
+			default:
+				return
+			}
+		}
+	}
+
 	for {
 		select {
 		case entry := <-h.ch:
-			if count == h.limit {
-				dropped++
-
-				continue
-			}
-
-			// Arguably we can directly generate the final marshalled version of the labels right here
-			// through sorting the entry.Data, removing additionalparams from it and then dumping it
-			// as the final marshal and appending level and h.labels after it.
-			// If we reuse some kind of big enough `[]byte` buffer we can also possibly skip on some
-			// of allocation. Combined with the cutoff part and directly pushing in the final data
-			// type this can be really a lot faster and to use a lot less memory
-			labels := make(map[string]string, len(entry.Data)+1)
-			for k, v := range entry.Data {
-				labels[k] = fmt.Sprint(v) // TODO optimize ?
-			}
-			for _, params := range h.labels {
-				labels[params[0]] = params[1]
-			}
-			labels["level"] = entry.Level.String()
-			msg := h.filterLabels(labels, entry.Message) // TODO we can do this while constructing
-			// have the cutoff here ?
-			// if we cutoff here we can cut somewhat on the backbuffers and optimize the inserting
-			// in/creating of the final Streams that we push
-			msgs[count] = tmpMsg{
-				labels: labels,
-				msg:    msg,
-				t:      entry.Time.UnixNano(),
-			}
-			count++
+			appendEntry(entry)
 		case t := <-ticker.C:
 			ch := make(chan int64)
 			pushCh <- ch
 			ch <- t.Add(-(h.pushPeriod / 2)).UnixNano()
 			<-ch
 		case <-ctx.Done():
+			drainQueued()
+
 			ch := make(chan int64)
 			pushCh <- ch
 			ch <- time.Now().Add(time.Second).UnixNano()
@@ -328,6 +416,28 @@ func (h *lokiHook) createPushMessage(msgs []tmpMsg, cutOffIndex, dropped int) *l
 	}
 
 	return pushMsg
+}
+
+// PushNotice synchronously pushes a single warning line to loki, exempt from
+// the per-batch limit the main push loop enforces. It surfaces out-of-band
+// drops (for example an upstream buffer overflow) that must not be lost to that
+// limit. The line carries the hook's configured labels, so it is not rejected
+// for a missing test_run_id.
+func (h *lokiHook) PushNotice(message string) error {
+	pushMsg := new(lokiPushMessage)
+	pushMsg.maxSize = h.msgMaxSize
+	pushMsg.add(tmpMsg{
+		labels: h.droppedLabels,
+		msg:    message,
+		t:      time.Now().UnixNano(),
+	})
+
+	var b bytes.Buffer
+	if _, err := pushMsg.WriteTo(&b); err != nil {
+		return err
+	}
+
+	return h.push(b)
 }
 
 func (h *lokiHook) push(b bytes.Buffer) error {
