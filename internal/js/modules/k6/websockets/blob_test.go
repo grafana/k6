@@ -262,6 +262,10 @@ func assertBlobTypeAndContents(t *testing.T, ts testState, blob *sobek.Object, e
 
 	ab, ok := p.Result().Export().(sobek.ArrayBuffer)
 	require.True(t, ok)
+	if len(expContents) == 0 {
+		require.Empty(t, ab.Bytes())
+		return
+	}
 	require.Equal(t, expContents, ab.Bytes())
 }
 
