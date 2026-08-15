@@ -1,4 +1,4 @@
-package event
+package eventdispatcher
 
 import (
 	"context"
@@ -6,21 +6,23 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/v2/event"
 )
 
-// Subscriber is a limited interface of System that only allows subscribing and
-// unsubscribing.
-type Subscriber interface {
-	Subscribe(events ...Type) (subID uint64, eventsCh <-chan *Event)
-	Unsubscribe(subID uint64)
-}
+//nolint:gochecknoglobals
+var (
+	// GlobalEvents are emitted once per test run.
+	GlobalEvents = []event.Type{event.Init, event.TestStart, event.TestEnd, event.Exit}
+	// VUEvents are emitted multiple times per each VU.
+	VUEvents = []event.Type{event.IterStart, event.IterEnd}
+)
 
 // System keeps track of subscribers, and allows subscribing to and emitting
 // events.
 type System struct {
 	subMx       sync.RWMutex
 	subIDCount  uint64
-	subscribers map[Type]map[uint64]chan *Event
+	subscribers map[event.Type]map[uint64]chan *event.Event
 	eventBuffer int
 	logger      logrus.FieldLogger
 }
@@ -33,7 +35,7 @@ type System struct {
 // listener goroutine.
 func NewEventSystem(eventBuffer int, logger logrus.FieldLogger) *System {
 	return &System{
-		subscribers: make(map[Type]map[uint64]chan *Event),
+		subscribers: make(map[event.Type]map[uint64]chan *event.Event),
 		eventBuffer: eventBuffer,
 		logger:      logger,
 	}
@@ -42,7 +44,7 @@ func NewEventSystem(eventBuffer int, logger logrus.FieldLogger) *System {
 // Subscribe to one or more events. It returns a subscriber ID that can be
 // used to unsubscribe, and an Event channel to receive events.
 // It panics if events is empty.
-func (s *System) Subscribe(events ...Type) (subID uint64, eventsCh <-chan *Event) {
+func (s *System) Subscribe(events ...event.Type) (subID uint64, eventsCh <-chan *event.Event) {
 	if len(events) == 0 {
 		panic("must subscribe to at least 1 event type")
 	}
@@ -52,10 +54,10 @@ func (s *System) Subscribe(events ...Type) (subID uint64, eventsCh <-chan *Event
 	s.subIDCount++
 	subID = s.subIDCount
 
-	evtCh := make(chan *Event, s.eventBuffer)
+	evtCh := make(chan *event.Event, s.eventBuffer)
 	for _, evt := range events {
 		if s.subscribers[evt] == nil {
-			s.subscribers[evt] = make(map[uint64]chan *Event)
+			s.subscribers[evt] = make(map[uint64]chan *event.Event)
 		}
 		s.subscribers[evt][subID] = evtCh
 	}
@@ -71,18 +73,18 @@ func (s *System) Subscribe(events ...Type) (subID uint64, eventsCh <-chan *Event
 // Emit the event to all subscribers of its type.
 // It returns a function that can be optionally used to wait for all subscribers
 // to process the event (by signalling via the Done method).
-func (s *System) Emit(event *Event) (wait func(context.Context) error) {
+func (s *System) Emit(evt *event.Event) (wait func(context.Context) error) {
 	s.subMx.RLock()
 	defer s.subMx.RUnlock()
-	totalSubs := len(s.subscribers[event.Type])
+	totalSubs := len(s.subscribers[evt.Type])
 	if totalSubs == 0 {
 		return func(context.Context) error { return nil }
 	}
 
-	if event.Done == nil {
-		event.Done = func() {}
+	if evt.Done == nil {
+		evt.Done = func() {}
 	}
-	origDoneFn := event.Done
+	origDoneFn := evt.Done
 	doneCh := make(chan struct{}, s.eventBuffer)
 	doneFn := func() {
 		origDoneFn()
@@ -90,17 +92,17 @@ func (s *System) Emit(event *Event) (wait func(context.Context) error) {
 		// a goroutine that waits indefinitely.
 		doneCh <- struct{}{}
 	}
-	event.Done = doneFn
+	evt.Done = doneFn
 
-	for _, evtCh := range s.subscribers[event.Type] {
+	for _, evtCh := range s.subscribers[evt.Type] {
 		// The event channel must read off the channel otherwise we would
 		// be dropping events.
-		evtCh <- event
+		evtCh <- evt
 	}
 
 	s.logger.WithFields(logrus.Fields{
 		"subscribers": totalSubs,
-		"event":       event.Type,
+		"event":       evt.Type,
 	}).Trace("Emitted event")
 
 	return func(ctx context.Context) error {
@@ -114,7 +116,7 @@ func (s *System) Emit(event *Event) (wait func(context.Context) error) {
 			case <-doneCh:
 				doneCount++
 			case <-ctx.Done():
-				return fmt.Errorf("context is done before all '%s' events were processed", event.Type)
+				return fmt.Errorf("context is done before all '%s' events were processed", evt.Type)
 			}
 		}
 	}
@@ -164,5 +166,5 @@ func (s *System) UnsubscribeAll() {
 		}).Debug("Removed all event subscriptions")
 	}
 
-	s.subscribers = make(map[Type]map[uint64]chan *Event)
+	s.subscribers = make(map[event.Type]map[uint64]chan *event.Event)
 }

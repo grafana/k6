@@ -16,7 +16,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/internal/ui/console"
@@ -79,7 +79,7 @@ type GlobalState struct {
 	BinaryName      string
 	CmdArgs         []string
 	Env             map[string]string
-	Events          *event.System
+	Events          *eventdispatcher.System
 
 	DefaultFlags, Flags GlobalFlags
 
@@ -168,7 +168,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		BinaryName:      filepath.Base(binary),
 		CmdArgs:         os.Args,
 		Env:             env,
-		Events:          event.NewEventSystem(100, logger),
+		Events:          eventdispatcher.NewEventSystem(100, logger),
 		DefaultFlags:    defaultFlags,
 		Flags:           globalFlags,
 		OutMutex:        outMutex,

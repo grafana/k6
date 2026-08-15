@@ -9,10 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/event"
 	"go.k6.io/k6/v2/internal/js/eventloop"
 	k6testutils "go.k6.io/k6/v2/internal/lib/testutils"
 	k6trace "go.k6.io/k6/v2/internal/lib/trace"
@@ -116,8 +117,8 @@ func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, op
 		}
 	}
 
-	events, ok := v.EventsField.Local.(*event.System)
-	require.True(tb, ok, "want *event.System; got %T", events)
+	events, ok := v.EventsField.Local.(*eventdispatcher.System)
+	require.True(tb, ok, "want *eventdispatcher.System; got %T", events)
 	waitDone := events.Emit(&event.Event{
 		Type: eventType,
 		Data: data,
@@ -206,10 +207,10 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 
 	testRT := k6modulestest.NewRuntime(tb)
 	testRT.VU.InitEnvField.LookupEnv = lookupFunc
-	globalEvents := event.NewEventSystem(100, logger)
+	globalEvents := eventdispatcher.NewEventSystem(100, logger)
 	testRT.VU.EventsField = k6common.Events{
 		Global: globalEvents,
-		Local:  event.NewEventSystem(100, logger),
+		Local:  eventdispatcher.NewEventSystem(100, logger),
 	}
 	// Emit an Exit event on cleanup to ensure browser registry goroutines
 	// (handleIterEvents and handleExitEvent) are properly terminated.
