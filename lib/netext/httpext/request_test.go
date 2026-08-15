@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
 	"runtime"
@@ -590,4 +591,64 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 			require.NoError(t, err)
 		}
 	}
+}
+
+func TestSetRequestCookies(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		value  string
+		expect string
+	}{
+		"plain":              {`value`, `k=value`},
+		"double quote":       {`"`, `k="`},
+		"inner double quote": {`a"b`, `k=a"b`},
+		"quoted value":       {`"quoted"`, `k="quoted"`},
+		"json":               {`{"a":1}`, `k={"a":1}`},
+		"escaped json":       {`{"a":"sa\"y"}`, `k={"a":"sa\"y"}`},
+		"space":              {`a b`, `k="a b"`},
+		"comma":              {`a,b`, `k="a,b"`},
+		"quotes and space":   {`{"a": 1}`, `k="{"a": 1}"`},
+		"already quoted":     {`"a b"`, `k="a b"`},
+		"non-ascii":          {"héllo", "k=héllo"},
+		"semicolon dropped":  {`a;b=c`, `k=ab=c`},
+		"newline dropped":    {"a\r\nb", `k=ab`},
+		"empty":              {``, `k=`},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			jar, err := cookiejar.New(nil)
+			require.NoError(t, err)
+			req, err := http.NewRequestWithContext(
+				context.Background(), http.MethodGet, "https://example.com/", nil)
+			require.NoError(t, err)
+
+			SetRequestCookies(req, jar, map[string]*HTTPRequestCookie{
+				"k": {Name: "k", Value: tc.value},
+			})
+			assert.Equal(t, tc.expect, req.Header.Get("Cookie"))
+		})
+	}
+}
+
+func TestSetRequestCookiesFromJar(t *testing.T) {
+	t.Parallel()
+
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	u, err := url.Parse("https://example.com/")
+	require.NoError(t, err)
+	jar.SetCookies(u, []*http.Cookie{{Name: "k", Value: `a"b`}})
+
+	// The jar itself must round-trip the value unchanged.
+	require.Len(t, jar.Cookies(u), 1)
+	assert.Equal(t, `a"b`, jar.Cookies(u)[0].Value)
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, u.String(), nil)
+	require.NoError(t, err)
+	SetRequestCookies(req, jar, nil)
+	assert.Equal(t, `k=a"b`, req.Header.Get("Cookie"))
 }
