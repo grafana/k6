@@ -23,7 +23,7 @@ import (
 
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/event"
 	"go.k6.io/k6/v2/internal/js/eventloop"
 	"go.k6.io/k6/v2/internal/lib/consts"
 	"go.k6.io/k6/v2/internal/lib/summary"
