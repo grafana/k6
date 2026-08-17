@@ -19,9 +19,11 @@ export const options = {
 }
 
 export default async function () {
-  const page = await browser.newPage();
+  let page;
 
   try {
+    page = await browser.newPage();
+
     // create a page with an iframe
     await page.setContent(`
       <html>
@@ -74,6 +76,8 @@ export default async function () {
     const message = error.message || error.toString();
     exec.test.fail(`Browser iteration failed: ${message}`);
   } finally {
-    await page.close();
+    if (page) {
+      await page.close();
+    }
   }
 }
