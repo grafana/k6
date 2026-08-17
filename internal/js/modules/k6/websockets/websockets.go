@@ -29,8 +29,9 @@ type RootModule struct{}
 
 // WebSocketsAPI is the k6 extension implementing the websocket API as defined in https://websockets.spec.whatwg.org
 type WebSocketsAPI struct { //nolint:revive
-	vu              modules.VU
-	blobConstructor sobek.Value
+	vu                   modules.VU
+	blobConstructor      sobek.Value
+	webSocketConstructor sobek.Value
 }
 
 var _ modules.Module = &RootModule{}
@@ -42,17 +43,23 @@ func New() *RootModule {
 
 // NewModuleInstance returns a new instance of the module
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &WebSocketsAPI{
-		vu: vu,
-	}
+	api := &WebSocketsAPI{vu: vu}
+
+	rt := vu.Runtime()
+	api.blobConstructor = rt.ToValue(api.blob)
+
+	wsConstructor := rt.ToValue(api.websocket).(*sobek.Object)
+	defineReadyStateProperties(rt, wsConstructor)
+	api.webSocketConstructor = wsConstructor
+
+	return api
 }
 
 // Exports implements the modules.Instance interface's Exports
 func (r *WebSocketsAPI) Exports() modules.Exports {
-	r.blobConstructor = r.vu.Runtime().ToValue(r.blob)
 	return modules.Exports{
 		Named: map[string]any{
-			"WebSocket": r.websocket,
+			"WebSocket": r.webSocketConstructor,
 			"Blob":      r.blobConstructor,
 		},
 	}
@@ -256,6 +263,16 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 	setOn("onclose", w.eventListeners.getType(events.CLOSE))
 	setOn("onping", w.eventListeners.getType(events.PING))
 	setOn("onpong", w.eventListeners.getType(events.PONG))
+
+	defineReadyStateProperties(rt, w.obj)
+}
+
+// the spec defines constants for the ready state on both the constructor and actual instances
+func defineReadyStateProperties(rt *sobek.Runtime, target *sobek.Object) {
+	must(rt, target.DefineDataProperty("OPEN", rt.ToValue(uint(OPEN)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty("CLOSED", rt.ToValue(uint(CLOSED)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty("CLOSING", rt.ToValue(uint(CLOSING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty("CONNECTING", rt.ToValue(uint(CONNECTING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 }
 
 type message struct {
@@ -834,7 +851,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 	return w.callEventListeners(events.CLOSE)
 }
 
-// newEvent return an event implementing "implements" https://dom.spec.whatwg.org/#event
+// newEvent returns an event implementing "implements" https://dom.spec.whatwg.org/#event
 // needs to be called on the event loop
 // TODO: move to events
 func (w *webSocket) newEvent(eventType string, t time.Time, funcOptions ...func(*sobek.Object)) *sobek.Object {
