@@ -8,6 +8,7 @@ package tracing
 
 import (
 	"context"
+	"encoding/base64"
 
 	"github.com/chromedp/cdproto/cdp"
 )
@@ -56,6 +57,45 @@ func (p *GetCategoriesParams) Do(ctx context.Context) (categories []string, err 
 	}
 
 	return res.Categories, nil
+}
+
+// GetTrackEventDescriptorParams return a descriptor for all available
+// tracing categories.
+type GetTrackEventDescriptorParams struct{}
+
+// GetTrackEventDescriptor return a descriptor for all available tracing
+// categories.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Tracing#method-getTrackEventDescriptor
+func GetTrackEventDescriptor() *GetTrackEventDescriptorParams {
+	return &GetTrackEventDescriptorParams{}
+}
+
+// GetTrackEventDescriptorReturns return values.
+type GetTrackEventDescriptorReturns struct {
+	Descriptor string `json:"descriptor,omitempty,omitzero"` // Base64-encoded serialized perfetto.protos.TrackEventDescriptor protobuf message.
+}
+
+// Do executes Tracing.getTrackEventDescriptor against the provided context.
+//
+// returns:
+//
+//	descriptor - Base64-encoded serialized perfetto.protos.TrackEventDescriptor protobuf message.
+func (p *GetTrackEventDescriptorParams) Do(ctx context.Context) (descriptor []byte, err error) {
+	// execute
+	var res GetTrackEventDescriptorReturns
+	err = cdp.Execute(ctx, CommandGetTrackEventDescriptor, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	// decode
+	var dec []byte
+	dec, err = base64.StdEncoding.DecodeString(res.Descriptor)
+	if err != nil {
+		return nil, err
+	}
+	return dec, nil
 }
 
 // RecordClockSyncMarkerParams record a clock sync marker in the trace.
@@ -142,8 +182,10 @@ type StartParams struct {
 	StreamFormat                 StreamFormat      `json:"streamFormat,omitempty,omitzero"`                 // Trace data format to use. This only applies when using ReturnAsStream transfer mode (defaults to json).
 	StreamCompression            StreamCompression `json:"streamCompression,omitempty,omitzero"`            // Compression format to use. This only applies when using ReturnAsStream transfer mode (defaults to none)
 	TraceConfig                  *TraceConfig      `json:"traceConfig,omitempty,omitzero"`
-	PerfettoConfig               string            `json:"perfettoConfig,omitempty,omitzero"` // Base64-encoded serialized perfetto.protos.TraceConfig protobuf message When specified, the parameters categories, options, traceConfig are ignored.
-	TracingBackend               Backend           `json:"tracingBackend,omitempty,omitzero"` // Backend type (defaults to auto)
+	PerfettoConfig               string            `json:"perfettoConfig,omitempty,omitzero"`     // Base64-encoded serialized perfetto.protos.TraceConfig protobuf message When specified, the parameters categories, options, traceConfig are ignored.
+	TracingBackend               Backend           `json:"tracingBackend,omitempty,omitzero"`     // Backend type (defaults to auto)
+	ScreenshotMaxSize            int64             `json:"screenshotMaxSize,omitempty,omitzero"`  // Maximum width and height (in pixels) of each captured screenshot. Only used when the disabled-by-default-devtools.screenshot category is enabled. Defaults to 500. The combined memory footprint of screenshots (screenshotMaxSize * screenshotMaxSize * 4 * screenshotMaxCount) is clamped to the existing per-session budget.
+	ScreenshotMaxCount           int64             `json:"screenshotMaxCount,omitempty,omitzero"` // Maximum number of screenshots captured during a single tracing session. Only used when the disabled-by-default-devtools.screenshot category is enabled. Defaults to 450. Clamped together with screenshotMaxSize to stay within the per-session screenshot memory budget.
 }
 
 // Start start trace events collection.
@@ -203,6 +245,27 @@ func (p StartParams) WithTracingBackend(tracingBackend Backend) *StartParams {
 	return &p
 }
 
+// WithScreenshotMaxSize maximum width and height (in pixels) of each
+// captured screenshot. Only used when the
+// disabled-by-default-devtools.screenshot category is enabled. Defaults to 500.
+// The combined memory footprint of screenshots (screenshotMaxSize *
+// screenshotMaxSize * 4 * screenshotMaxCount) is clamped to the existing
+// per-session budget.
+func (p StartParams) WithScreenshotMaxSize(screenshotMaxSize int64) *StartParams {
+	p.ScreenshotMaxSize = screenshotMaxSize
+	return &p
+}
+
+// WithScreenshotMaxCount maximum number of screenshots captured during a
+// single tracing session. Only used when the
+// disabled-by-default-devtools.screenshot category is enabled. Defaults to 450.
+// Clamped together with screenshotMaxSize to stay within the per-session
+// screenshot memory budget.
+func (p StartParams) WithScreenshotMaxCount(screenshotMaxCount int64) *StartParams {
+	p.ScreenshotMaxCount = screenshotMaxCount
+	return &p
+}
+
 // Do executes Tracing.start against the provided context.
 func (p *StartParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandStart, p, nil)
@@ -210,9 +273,10 @@ func (p *StartParams) Do(ctx context.Context) (err error) {
 
 // Command names.
 const (
-	CommandEnd                   = "Tracing.end"
-	CommandGetCategories         = "Tracing.getCategories"
-	CommandRecordClockSyncMarker = "Tracing.recordClockSyncMarker"
-	CommandRequestMemoryDump     = "Tracing.requestMemoryDump"
-	CommandStart                 = "Tracing.start"
+	CommandEnd                     = "Tracing.end"
+	CommandGetCategories           = "Tracing.getCategories"
+	CommandGetTrackEventDescriptor = "Tracing.getTrackEventDescriptor"
+	CommandRecordClockSyncMarker   = "Tracing.recordClockSyncMarker"
+	CommandRequestMemoryDump       = "Tracing.requestMemoryDump"
+	CommandStart                   = "Tracing.start"
 )

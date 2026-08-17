@@ -398,10 +398,13 @@ func (p *SetAutomaticPresenceSimulationParams) Do(ctx context.Context) (err erro
 // SetCredentialPropertiesParams allows setting credential properties.
 // https://w3c.github.io/webauthn/#sctn-automation-set-credential-properties.
 type SetCredentialPropertiesParams struct {
-	AuthenticatorID   AuthenticatorID `json:"authenticatorId"`
-	CredentialID      string          `json:"credentialId"`
-	BackupEligibility bool            `json:"backupEligibility"`
-	BackupState       bool            `json:"backupState"`
+	AuthenticatorID                AuthenticatorID `json:"authenticatorId"`
+	CredentialID                   string          `json:"credentialId"`
+	BackupEligibility              bool            `json:"backupEligibility"`
+	BackupState                    bool            `json:"backupState"`
+	ActiveCmtgKeyIndex             int64           `json:"activeCmtgKeyIndex,omitempty,omitzero"`
+	GenerateCmtgKeyOnNextOperation bool            `json:"generateCmtgKeyOnNextOperation"`
+	SignCount                      int64           `json:"signCount,omitempty,omitzero"` // Must be equal to or greater than -1. If -1, the signature counter is removed from the credential, and every assertion operation will report a value of 0. See https://w3c.github.io/webauthn/#signature-counter
 }
 
 // SetCredentialProperties allows setting credential properties.
@@ -415,10 +418,11 @@ type SetCredentialPropertiesParams struct {
 //	credentialID
 func SetCredentialProperties(authenticatorID AuthenticatorID, credentialID string) *SetCredentialPropertiesParams {
 	return &SetCredentialPropertiesParams{
-		AuthenticatorID:   authenticatorID,
-		CredentialID:      credentialID,
-		BackupEligibility: false,
-		BackupState:       false,
+		AuthenticatorID:                authenticatorID,
+		CredentialID:                   credentialID,
+		BackupEligibility:              false,
+		BackupState:                    false,
+		GenerateCmtgKeyOnNextOperation: false,
 	}
 }
 
@@ -431,6 +435,26 @@ func (p SetCredentialPropertiesParams) WithBackupEligibility(backupEligibility b
 // WithBackupState [no description].
 func (p SetCredentialPropertiesParams) WithBackupState(backupState bool) *SetCredentialPropertiesParams {
 	p.BackupState = backupState
+	return &p
+}
+
+// WithActiveCmtgKeyIndex [no description].
+func (p SetCredentialPropertiesParams) WithActiveCmtgKeyIndex(activeCmtgKeyIndex int64) *SetCredentialPropertiesParams {
+	p.ActiveCmtgKeyIndex = activeCmtgKeyIndex
+	return &p
+}
+
+// WithGenerateCmtgKeyOnNextOperation [no description].
+func (p SetCredentialPropertiesParams) WithGenerateCmtgKeyOnNextOperation(generateCmtgKeyOnNextOperation bool) *SetCredentialPropertiesParams {
+	p.GenerateCmtgKeyOnNextOperation = generateCmtgKeyOnNextOperation
+	return &p
+}
+
+// WithSignCount must be equal to or greater than -1. If -1, the signature
+// counter is removed from the credential, and every assertion operation will
+// report a value of 0. See https://w3c.github.io/webauthn/#signature-counter.
+func (p SetCredentialPropertiesParams) WithSignCount(signCount int64) *SetCredentialPropertiesParams {
+	p.SignCount = signCount
 	return &p
 }
 

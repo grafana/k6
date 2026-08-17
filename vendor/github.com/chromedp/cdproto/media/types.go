@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/go-json-experiment/json/jsontext"
 )
 
@@ -73,6 +74,14 @@ type PlayerError struct {
 	Stack     []*PlayerErrorSourceLocation `json:"stack"` // A trace of where this error was caused / where it passed through.
 	Cause     []*PlayerError               `json:"cause"` // Errors potentially have a root cause error, ie, a DecoderError might be caused by an WindowsError
 	Data      jsontext.Value               `json:"data"`
+}
+
+// Player [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Media#type-Player
+type Player struct {
+	PlayerID  PlayerID          `json:"playerId"`
+	DomNodeID cdp.BackendNodeID `json:"domNodeId,omitempty,omitzero"`
 }
 
 // PlayerMessageLevel keep in sync with MediaLogMessageLevel We are currently

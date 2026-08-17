@@ -91,7 +91,7 @@ func (p EnableParams) WithMaxScriptsCacheSize(maxScriptsCacheSize float64) *Enab
 
 // EnableReturns return values.
 type EnableReturns struct {
-	DebuggerID runtime.UniqueDebuggerID `json:"debuggerId,omitempty,omitzero"` // Unique identifier of the debugger.
+	DebuggerID cdp.UniqueDebuggerID `json:"debuggerId,omitempty,omitzero"` // Unique identifier of the debugger.
 }
 
 // Do executes Debugger.enable against the provided context.
@@ -99,7 +99,7 @@ type EnableReturns struct {
 // returns:
 //
 //	debuggerID - Unique identifier of the debugger.
-func (p *EnableParams) Do(ctx context.Context) (debuggerID runtime.UniqueDebuggerID, err error) {
+func (p *EnableParams) Do(ctx context.Context) (debuggerID cdp.UniqueDebuggerID, err error) {
 	// execute
 	var res EnableReturns
 	err = cdp.Execute(ctx, CommandEnable, p, &res)
@@ -273,7 +273,7 @@ func (p *GetPossibleBreakpointsParams) Do(ctx context.Context) (locations []*Bre
 
 // GetScriptSourceParams returns source for the script with given id.
 type GetScriptSourceParams struct {
-	ScriptID runtime.ScriptID `json:"scriptId"` // Id of the script to get source for.
+	ScriptID cdp.ScriptID `json:"scriptId"` // Id of the script to get source for.
 }
 
 // GetScriptSource returns source for the script with given id.
@@ -283,7 +283,7 @@ type GetScriptSourceParams struct {
 // parameters:
 //
 //	scriptID - Id of the script to get source for.
-func GetScriptSource(scriptID runtime.ScriptID) *GetScriptSourceParams {
+func GetScriptSource(scriptID cdp.ScriptID) *GetScriptSourceParams {
 	return &GetScriptSourceParams{
 		ScriptID: scriptID,
 	}
@@ -320,7 +320,7 @@ func (p *GetScriptSourceParams) Do(ctx context.Context) (scriptSource string, by
 
 // DisassembleWasmModuleParams [no description].
 type DisassembleWasmModuleParams struct {
-	ScriptID runtime.ScriptID `json:"scriptId"` // Id of the script to disassemble
+	ScriptID cdp.ScriptID `json:"scriptId"` // Id of the script to disassemble
 }
 
 // DisassembleWasmModule [no description].
@@ -330,7 +330,7 @@ type DisassembleWasmModuleParams struct {
 // parameters:
 //
 //	scriptID - Id of the script to disassemble
-func DisassembleWasmModule(scriptID runtime.ScriptID) *DisassembleWasmModuleParams {
+func DisassembleWasmModule(scriptID cdp.ScriptID) *DisassembleWasmModuleParams {
 	return &DisassembleWasmModuleParams{
 		ScriptID: scriptID,
 	}
@@ -567,10 +567,10 @@ func (p *ResumeParams) Do(ctx context.Context) (err error) {
 
 // SearchInContentParams searches for given string in script content.
 type SearchInContentParams struct {
-	ScriptID      runtime.ScriptID `json:"scriptId"`      // Id of the script to search in.
-	Query         string           `json:"query"`         // String to search for.
-	CaseSensitive bool             `json:"caseSensitive"` // If true, search is case sensitive.
-	IsRegex       bool             `json:"isRegex"`       // If true, treats string parameter as regex.
+	ScriptID      cdp.ScriptID `json:"scriptId"`      // Id of the script to search in.
+	Query         string       `json:"query"`         // String to search for.
+	CaseSensitive bool         `json:"caseSensitive"` // If true, search is case sensitive.
+	IsRegex       bool         `json:"isRegex"`       // If true, treats string parameter as regex.
 }
 
 // SearchInContent searches for given string in script content.
@@ -581,7 +581,7 @@ type SearchInContentParams struct {
 //
 //	scriptID - Id of the script to search in.
 //	query - String to search for.
-func SearchInContent(scriptID runtime.ScriptID, query string) *SearchInContentParams {
+func SearchInContent(scriptID cdp.ScriptID, query string) *SearchInContentParams {
 	return &SearchInContentParams{
 		ScriptID:      scriptID,
 		Query:         query,
@@ -720,7 +720,7 @@ func (p *SetBlackboxPatternsParams) Do(ctx context.Context) (err error) {
 // array contains positions where blackbox state is changed. First interval
 // isn't blackboxed. Array should be sorted.
 type SetBlackboxedRangesParams struct {
-	ScriptID  runtime.ScriptID  `json:"scriptId"` // Id of the script.
+	ScriptID  cdp.ScriptID      `json:"scriptId"` // Id of the script.
 	Positions []*ScriptPosition `json:"positions"`
 }
 
@@ -736,7 +736,7 @@ type SetBlackboxedRangesParams struct {
 //
 //	scriptID - Id of the script.
 //	positions
-func SetBlackboxedRanges(scriptID runtime.ScriptID, positions []*ScriptPosition) *SetBlackboxedRangesParams {
+func SetBlackboxedRanges(scriptID cdp.ScriptID, positions []*ScriptPosition) *SetBlackboxedRangesParams {
 	return &SetBlackboxedRangesParams{
 		ScriptID:  scriptID,
 		Positions: positions,
@@ -1059,10 +1059,10 @@ func (p *SetReturnValueParams) Do(ctx context.Context) (err error) {
 // successful and a Debugger.restartFrame for the top-most function is
 // automatically triggered.
 type SetScriptSourceParams struct {
-	ScriptID             runtime.ScriptID `json:"scriptId"`             // Id of the script to edit.
-	ScriptSource         string           `json:"scriptSource"`         // New content of the script.
-	DryRun               bool             `json:"dryRun"`               // If true the change will not actually be applied. Dry run may be used to get result description without actually modifying the code.
-	AllowTopFrameEditing bool             `json:"allowTopFrameEditing"` // If true, then scriptSource is allowed to change the function on top of the stack as long as the top-most stack frame is the only activation of that function.
+	ScriptID             cdp.ScriptID `json:"scriptId"`             // Id of the script to edit.
+	ScriptSource         string       `json:"scriptSource"`         // New content of the script.
+	DryRun               bool         `json:"dryRun"`               // If true the change will not actually be applied. Dry run may be used to get result description without actually modifying the code.
+	AllowTopFrameEditing bool         `json:"allowTopFrameEditing"` // If true, then scriptSource is allowed to change the function on top of the stack as long as the top-most stack frame is the only activation of that function.
 }
 
 // SetScriptSource edits JavaScript source live. In general, functions that
@@ -1078,7 +1078,7 @@ type SetScriptSourceParams struct {
 //
 //	scriptID - Id of the script to edit.
 //	scriptSource - New content of the script.
-func SetScriptSource(scriptID runtime.ScriptID, scriptSource string) *SetScriptSourceParams {
+func SetScriptSource(scriptID cdp.ScriptID, scriptSource string) *SetScriptSourceParams {
 	return &SetScriptSourceParams{
 		ScriptID:             scriptID,
 		ScriptSource:         scriptSource,
