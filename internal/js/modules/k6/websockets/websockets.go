@@ -48,7 +48,11 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	rt := vu.Runtime()
 	api.blobConstructor = rt.ToValue(api.blob)
 
-	wsConstructor := rt.ToValue(api.websocket).(*sobek.Object)
+	wsConstructor, ok := rt.ToValue(api.websocket).(*sobek.Object)
+	if !ok {
+		common.Throw(rt, errors.New("websocket constructor is not a sobek.Object"))
+	}
+
 	defineReadyStateProperties(rt, wsConstructor)
 	api.webSocketConstructor = wsConstructor
 
@@ -269,10 +273,14 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 
 // the spec defines constants for the ready state on both the constructor and actual instances
 func defineReadyStateProperties(rt *sobek.Runtime, target *sobek.Object) {
-	must(rt, target.DefineDataProperty("OPEN", rt.ToValue(uint(OPEN)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
-	must(rt, target.DefineDataProperty("CLOSED", rt.ToValue(uint(CLOSED)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
-	must(rt, target.DefineDataProperty("CLOSING", rt.ToValue(uint(CLOSING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
-	must(rt, target.DefineDataProperty("CONNECTING", rt.ToValue(uint(CONNECTING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty(
+		"OPEN", rt.ToValue(uint(OPEN)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty(
+		"CLOSED", rt.ToValue(uint(CLOSED)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty(
+		"CLOSING", rt.ToValue(uint(CLOSING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty(
+		"CONNECTING", rt.ToValue(uint(CONNECTING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 }
 
 type message struct {
