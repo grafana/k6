@@ -15,12 +15,13 @@ func TestCookieJarCookiesForURLInvalidURL(t *testing.T) {
 	require.NoError(t, err)
 	cj := CookieJar{Jar: jar}
 
-	// Unencoded '%' in a query string is a common real-world trigger
-	// (e.g. "50% off" interpolated into a URL without encodeURIComponent).
+	// url.Parse rejects invalid percent-encoding in the path (not the query)
+	// and malformed hosts. A typical trigger is interpolating a slug such as
+	// "save-50%" into the path without encodeURIComponent.
 	invalidURLs := []string{
 		"%",
 		"%zz",
-		"https://example.com/search?q=50%",
+		"https://example.com/products/save-50%",
 		"https://example.com/%zz",
 		"http://[::1",
 	}
@@ -58,7 +59,7 @@ func TestCookieJarCookiesForURLJSThrowsInsteadOfPanicking(t *testing.T) {
 		const jar = new http.CookieJar();
 		let threw = false;
 		try {
-			jar.cookiesForURL("https://shop.example.com/search?q=50%");
+			jar.cookiesForURL("https://shop.example.com/products/save-50%");
 		} catch (e) {
 			threw = true;
 			if (!String(e).includes("invalid URL escape")) {
@@ -70,7 +71,7 @@ func TestCookieJarCookiesForURLJSThrowsInsteadOfPanicking(t *testing.T) {
 		}
 
 		// Valid URLs, including correctly encoded percent signs, still work.
-		const ok = jar.cookiesForURL("https://shop.example.com/search?q=50%25");
+		const ok = jar.cookiesForURL("https://shop.example.com/products/save-50%25");
 		if (ok === undefined || ok === null) {
 			throw new Error("cookiesForURL should return a cookie map for a valid URL");
 		}
