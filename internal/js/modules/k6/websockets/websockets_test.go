@@ -1794,3 +1794,71 @@ func TestRemoveEventListener(t *testing.T) {
 	assert.Contains(t, recorded, "kept-handler-count:1")
 	assert.NotContains(t, recorded, "kept-handler-count:2")
 }
+
+func TestRemoveEventListenerWithNullHandler(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		var handlerToKeepCount = 0
+
+		function handlerToKeep() {
+			handlerToKeepCount++
+			call("kept-handler-count:" + handlerToKeepCount)
+			ws.close()
+		}
+
+		ws.addEventListener("open", () => {
+			ws.addEventListener("pong", handlerToKeep)
+
+		 	ws.removeEventListener("pong", null)
+			ws.removeEventListener("pong", "Not a function")
+			ws.removeEventListener("pong", 42)
+			ws.removeEventListener("pong", undefined)
+
+			ws.ping()
+		})
+	`))
+	require.NoError(t, err)
+
+	recorded := ts.callRecorder.Recorded()
+	assert.Contains(t, recorded, "kept-handler-count:1")
+}
+
+func TestRemoveEventListenerRegisteredTwice(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		var handlerToKeepCount = 0
+		
+		function handlerToRemove() {
+			call("removed-handler-called")
+		}
+		function handlerToKeep() {
+			handlerToKeepCount++
+			call("kept-handler-count:" + handlerToKeepCount)
+			ws.close()
+		}
+
+		ws.addEventListener("open", () => {
+			ws.addEventListener("pong", handlerToKeep)
+			ws.addEventListener("pong", handlerToRemove)
+			ws.addEventListener("pong", handlerToRemove)
+
+			ws.removeEventListener("pong", handlerToRemove)
+
+			ws.ping()
+		})
+	`))
+	require.NoError(t, err)
+
+	recorded := ts.callRecorder.Recorded()
+	// This documents current behaviour without dedup.
+	// A single removeEventListener call removes all matching entries, regardless
+	// of how many times the same handler was registered using addEventListener
+	assert.NotContains(t, recorded, "removed-handler-called")
+	assert.Contains(t, recorded, "kept-handler-count:1")
+}
