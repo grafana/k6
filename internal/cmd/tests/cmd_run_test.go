@@ -3202,6 +3202,38 @@ func TestGroupsOrderInFullSummaryWithScenario(t *testing.T) {
 	assert.Regexp(t, regexp.MustCompile(expectedGroupsRegex), stdout)
 }
 
+func TestJsonLogFormat(t *testing.T) {
+	t.Parallel()
+
+	mainScript := `
+		export default function () {
+			console.log("test 1");
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+	ts.CmdArgs = []string{
+		"k6", "--quiet", "run", "--log-format=json", "script.js",
+	}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	logs := strings.Trim(ts.Stderr.String(), "\n")
+	lines := strings.Split(logs, "\n")
+	require.Len(t, lines, 1)
+
+	parsed := &struct {
+		Msg  string
+		Time time.Time
+	}{}
+
+	require.NoError(t, json.Unmarshal([]byte(lines[0]), parsed))
+	require.NotZero(t, parsed.Time.Nanosecond(), "Logged timestamp should have nanoseconds")
+	require.Equal(t, "test 1", parsed.Msg)
+}
+
 func TestInvalidSummaryModeAbortsTheExecution(t *testing.T) {
 	t.Parallel()
 
