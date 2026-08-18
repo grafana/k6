@@ -770,8 +770,12 @@ func (sc *SubtleCrypto) DeriveBits(
 	callback := sc.vu.RegisterCallback()
 	go func() {
 		result, err := func() ([]byte, error) {
-			if length == 0 {
-				return nil, NewError(OperationError, "length can not be 0")
+			// Reject non-positive lengths before derivers slice/allocate. ECDH
+			// DeriveBits previously panicked on e.g. length:-8 with
+			// "slice bounds out of range [:-1]" because length/8 is negative
+			// and still a multiple of 8 (so the %8 check below would pass).
+			if length <= 0 {
+				return nil, NewError(OperationError, "length must be a positive number")
 			}
 
 			// currently we don't support lengths that are not multiples of 8
