@@ -349,14 +349,64 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
 	replacedCookies := make(map[string]struct{})
 	for key, reqCookie := range reqCookies {
-		req.AddCookie(&http.Cookie{Name: key, Value: reqCookie.Value})
+		addRequestCookie(req, key, reqCookie.Value)
 		if reqCookie.Replace {
 			replacedCookies[key] = struct{}{}
 		}
 	}
 	for _, c := range jar.Cookies(req.URL) {
 		if _, ok := replacedCookies[c.Name]; !ok {
-			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
+			addRequestCookie(req, c.Name, c.Value)
 		}
 	}
+}
+
+// cookieNameSanitizer mirrors what net/http does with cookie names: CR and LF
+// would end the header, so they are replaced instead of being sent.
+var cookieNameSanitizer = strings.NewReplacer("\n", "-", "\r", "-") //nolint:gochecknoglobals
+
+// addRequestCookie appends a name/value pair to the Cookie header of req, the
+// way (*http.Request).AddCookie() does, but with k6's own value sanitization.
+func addRequestCookie(req *http.Request, name, value string) {
+	cookie := cookieNameSanitizer.Replace(name) + "=" + sanitizeCookieValue(value)
+	if current := req.Header.Get("Cookie"); current != "" {
+		req.Header.Set("Cookie", current+"; "+cookie)
+	} else {
+		req.Header.Set("Cookie", cookie)
+	}
+}
+
+// sanitizeCookieValue prepares a cookie value to be sent in a Cookie header.
+//
+// Unlike net/http, k6 keeps double quotes and backslashes in the value, as
+// browsers do. RFC 6265 leaves them out of cookie-octet, but servers read a
+// cookie value as everything up to the next ";" (RFC 6265 section 5.2), so
+// sending them is unambiguous, while dropping them silently corrupts values
+// like a JSON document. Non-ASCII bytes are passed through as well. Only bytes
+// that would change the meaning of the header are removed: control characters,
+// which include the CR and LF that would allow header injection, and ";",
+// which would let a value forge extra cookies.
+//
+// A value containing a space or a comma is wrapped in the double-quoted form
+// allowed by RFC 6265 section 4.1.1, unless it is already wrapped, because
+// those bytes are otherwise rejected by strict servers.
+func sanitizeCookieValue(value string) string {
+	var sanitized strings.Builder
+	sanitized.Grow(len(value))
+	for i := range len(value) {
+		if b := value[i]; b >= 0x20 && b != 0x7f && b != ';' {
+			sanitized.WriteByte(b)
+		}
+	}
+	value = sanitized.String()
+
+	if strings.ContainsAny(value, " ,") && !isQuoted(value) {
+		return `"` + value + `"`
+	}
+	return value
+}
+
+// isQuoted reports whether the value is already wrapped in double quotes.
+func isQuoted(value string) bool {
+	return len(value) > 1 && strings.HasPrefix(value, `"`) && strings.HasSuffix(value, `"`)
 }
