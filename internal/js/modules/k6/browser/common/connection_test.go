@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -225,6 +226,117 @@ func TestConnectionRejectedTarget(t *testing.T) {
 	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
 
 	requireResumeThenDetach(t, received, rejectedSessionID)
+}
+
+// newTestConnection dials a minimal fake CDP server that acknowledges
+// every command with an empty success reply.
+func newTestConnection(t *testing.T) *Connection {
+	t.Helper()
+
+	handler := func(_ *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, _ chan struct{}) {
+		writeCh <- cdproto.Message{ID: msg.ID, SessionID: msg.SessionID, Result: jsontext.Value([]byte("{}"))}
+	}
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, nil))
+	u, err := url.Parse(server.ServerHTTP.URL)
+	require.NoError(t, err)
+
+	conn, err := NewConnection(context.Background(), fmt.Sprintf("ws://%s/cdp", u.Host), log.NewNullLogger(), nil)
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+
+	return conn
+}
+
+// TestConnectionDeliverToSessionAfterClose is a deterministic regression
+// test for a race in recvLoop's dispatch to a session's readCh: getSession
+// only holds the sessions lock for the map lookup, so a session obtained
+// this way can already be closed - by closeSession, callable from any
+// goroutine, not just recvLoop - by the time the dispatch actually runs.
+// Without the <-session.done case, delivering to an already-closed
+// session's readCh blocks forever: its readLoop has already exited, so
+// there is no reader left, and neither c.closeCh nor c.done fire just
+// because one session closed. That would stall recvLoop - the single
+// goroutine reading every message for the whole connection - along with
+// every other session sharing it.
+//
+// The session's readLoop is deliberately never started (done is closed by
+// hand instead of via NewSession + closeSession), so there is provably no
+// reader on readCh, ever - this removes any dependency on readLoop's own
+// exit timing and drives the exact interleaving deterministically, rather
+// than hoping to catch it.
+func TestConnectionDeliverToSessionAfterClose(t *testing.T) {
+	t.Parallel()
+
+	const sid = target.SessionID("session_id_0123456789")
+	const tid = target.ID("target_id_0123456789")
+
+	conn := newTestConnection(t)
+
+	session := &Session{
+		BaseEventEmitter: NewBaseEventEmitter(context.Background()),
+		conn:             conn,
+		id:               sid,
+		targetID:         tid,
+		readCh:           make(chan *cdproto.Message),
+		done:             make(chan struct{}),
+		msgIDGen:         conn.msgIDGen,
+		logger:           log.NewNullLogger(),
+	}
+	close(session.done) // no readLoop was ever started to close it itself
+
+	done := make(chan bool, 1)
+	go func() {
+		done <- conn.deliverToSession(session, &cdproto.Message{Method: "Test.event", SessionID: sid})
+	}()
+
+	select {
+	case stop := <-done:
+		require.False(t, stop, "delivering to a closed session must not signal a connection-level stop")
+	case <-time.After(2 * time.Second):
+		t.Fatal("deliverToSession blocked forever delivering to an already-closed session")
+	}
+}
+
+// TestConnectionCloseSessionConcurrent proves closeSession is safe to call
+// concurrently, and repeatedly, for the same session - the exact shape of
+// detachSession's own closeSession call racing the browser's genuine
+// Target.detachedFromTarget event arriving and being handled by recvLoop's
+// own closeSession call, or any other pair of callers. Under -race, a
+// data race here would fail the test; closeSession's own locking must
+// also make it safe to call twice - only the first caller may release the
+// session, every other caller must see it already gone.
+func TestConnectionCloseSessionConcurrent(t *testing.T) {
+	t.Parallel()
+
+	const sid = target.SessionID("session_id_0123456789")
+	const tid = target.ID("target_id_0123456789")
+	const callers = 50
+
+	conn := newTestConnection(t)
+
+	conn.sessionsMu.Lock()
+	conn.sessions[sid] = NewSession(context.Background(), conn, sid, tid, log.NewNullLogger(), conn.msgIDGen)
+	conn.sessionsMu.Unlock()
+
+	var wg sync.WaitGroup
+	results := make([]bool, callers)
+	for i := range callers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			results[i] = conn.closeSession(sid, tid)
+		}(i)
+	}
+	wg.Wait()
+
+	var released int
+	for _, ok := range results {
+		if ok {
+			released++
+		}
+	}
+	require.Equal(t, 1, released, "exactly one concurrent closeSession call should release the session")
+	require.Nil(t, conn.getSession(sid), "the session must be gone from the connection after closing")
 }
 
 func TestConnectionCreateSession(t *testing.T) {

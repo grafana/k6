@@ -332,7 +332,36 @@ func (c *Connection) findTargetIDForLog(id target.SessionID) target.ID {
 	return s.targetID
 }
 
-//nolint:funlen,gocognit,cyclop
+// deliverToSession routes msg to session's readCh. It reports whether
+// recvLoop should stop reading from the connection entirely.
+//
+// getSession only holds the sessions lock for the lookup, so by the time
+// this runs, session may already be closed (e.g. by closeSession, which
+// can be called concurrently from any goroutine, not just recvLoop): its
+// readLoop may have already exited on its own done channel, leaving no
+// receiver on readCh. Without the <-session.done case, an unbuffered send
+// there would then block forever, since neither c.closeCh nor c.done fire
+// just because one session closed - stalling recvLoop, and with it every
+// other session on the connection.
+func (c *Connection) deliverToSession(session *Session, msg *cdproto.Message) (stop bool) {
+	select {
+	case session.readCh <- msg:
+	case <-session.done:
+		c.logger.Debugf("Connection:deliverToSession:<-session.done", "sid:%v tid:%v wsURL:%q",
+			session.id, session.targetID, c.wsURL)
+	case code := <-c.closeCh:
+		c.logger.Debugf("Connection:deliverToSession:<-c.closeCh", "sid:%v tid:%v wsURL:%v crashed:%t",
+			session.id, session.targetID, c.wsURL, session.crashed)
+		_ = c.close(code)
+	case <-c.done:
+		c.logger.Debugf("Connection:deliverToSession:<-c.done", "sid:%v tid:%v wsURL:%v crashed:%t",
+			session.id, session.targetID, c.wsURL, session.crashed)
+		return true
+	}
+	return false
+}
+
+//nolint:funlen,gocognit
 func (c *Connection) recvLoop() {
 	c.logger.Debugf("Connection:recvLoop", "wsURL:%q", c.wsURL)
 	for {
@@ -404,7 +433,6 @@ func (c *Connection) recvLoop() {
 
 		switch {
 		case msg.SessionID != "" && (msg.Method != "" || msg.ID != 0):
-			// TODO: possible data race - session can get removed after getting it here
 			session := c.getSession(msg.SessionID)
 			if session == nil {
 				continue
@@ -416,15 +444,7 @@ func (c *Connection) recvLoop() {
 				continue
 			}
 
-			select {
-			case session.readCh <- &msg:
-			case code := <-c.closeCh:
-				c.logger.Debugf("Connection:recvLoop:<-c.closeCh", "sid:%v tid:%v wsURL:%v crashed:%t",
-					session.id, session.targetID, c.wsURL, session.crashed)
-				_ = c.close(code)
-			case <-c.done:
-				c.logger.Debugf("Connection:recvLoop:<-c.done", "sid:%v tid:%v wsURL:%v crashed:%t",
-					session.id, session.targetID, c.wsURL, session.crashed)
+			if c.deliverToSession(session, &msg) {
 				return
 			}
 
