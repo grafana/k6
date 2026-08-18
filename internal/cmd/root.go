@@ -393,7 +393,7 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		c.globalState.Logger.SetFormatter(&RawFormatter{})
 		c.globalState.Logger.Debug("Logger format: RAW")
 	case "json":
-		c.globalState.Logger.SetFormatter(&logrus.JSONFormatter{})
+		c.globalState.Logger.SetFormatter(&logrus.JSONFormatter{TimestampFormat: time.RFC3339Nano})
 		c.globalState.Logger.Debug("Logger format: JSON")
 	default:
 		c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
