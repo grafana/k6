@@ -321,10 +321,10 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	}
 	p, err := NewPage(b.vuCtx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
-		if b.closing.Load() {
-			b.logger.Debugf("Browser:onAttachedToTarget", "new page failed; browser is closing: sid:%v", ev.SessionID)
-			detachSession(session)
-		}
+		// Always release: isPageAttachmentErrorIgnorable can also return
+		// true when only this VU's context ended, while the browser
+		// instance stays alive and shared with other VUs.
+		detachSession(session)
 		return nil // Ignore this page.
 	}
 	if err != nil {
