@@ -325,9 +325,19 @@ func (c *Client) AsyncInvoke(
 		return promise, err
 	}
 
+	// Capture the connection before spawning the goroutine. client.close() can
+	// run on the VU event loop as soon as this method returns and will set
+	// c.conn to nil; invoking a method on that nil pointer panics. Using a
+	// closed (but non-nil) connection returns an error from gRPC instead.
+	conn := c.conn
+	if conn == nil {
+		err = reject(errors.New("no gRPC connection, you must call connect first"))
+		return promise, err
+	}
+
 	callback := c.vu.RegisterCallback()
 	go func() {
-		res, err := c.conn.Invoke(c.vu.Context(), grpcReq)
+		res, err := conn.Invoke(c.vu.Context(), grpcReq)
 
 		callback(func() error {
 			if err != nil {
