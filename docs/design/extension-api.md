@@ -190,7 +190,7 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-sql` | Migrated | Its production code no longer needs k6; legacy tests need standalone test helpers. |
 | `xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | Migrated | Drivers are registration shims; MySQL uses `crypto/tls` constants. |
 | `xk6-faker` | Migrated | Uses the optional `Environment` capability for `XK6_FAKER_SEED`. |
-| `xk6-redis` | Migration in progress | Production code uses `Network`, `TLS`, and `Promises`; its test harness still keeps k6 in the module graph. |
+| `xk6-redis` | Migrated | Uses `Network`, `TLS`, and `Promises`; its tests use the standalone API test host. |
 | `xk6-tls` | Migrated | Uses `Network` and `Promises`; no k6 dependency remains. |
 | `xk6-kafka` | Can migrate after execution-state capability | Metrics/tags and built-in byte metrics are available; it still needs an active-vs-init state capability. |
 | `xk6-dns` | Deferred | Promise/event-loop is available; needs metrics/tags and a DNS-query policy/multi-record lookup capability. |
