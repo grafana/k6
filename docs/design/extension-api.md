@@ -220,6 +220,107 @@ one test fixture before being released. This keeps extensions independent from
 k6's broad dependency graph while allowing later API versions to add
 capabilities without breaking the small base contract.
 
+## Proposed next capabilities
+
+These are proposals only. They should be added in a later API version after a
+host adapter and standalone test-host implementation have been reviewed.
+
+### Execution context (Kafka)
+
+Kafka only needs to distinguish an executable VU context from module
+initialization. It must not receive the host's scenario, VU, or executor
+objects. The proposed optional capability is:
+
+```go
+type ExecutionContext uint8
+
+const (
+    ExecutionContextInit ExecutionContext = iota
+    ExecutionContextVU
+)
+
+type Execution interface {
+    ExecutionContext() ExecutionContext
+}
+```
+
+Kafka uses this before its synchronous compatibility `produce()` and
+`consume()` calls, replacing its `vu.State() == nil` check. Its existing
+network, TLS, promise, logger, and metrics requirements are already covered.
+
+### DNS queries (xk6-dns)
+
+`Network.LookupHost()` is intentionally a simple address lookup and may return
+the host-selected address. `xk6-dns` additionally needs all answers for a
+requested record type and an explicit nameserver while the host enforces its
+DNS and hostname-blocking policy on the *queried name*. The proposed optional
+capability is:
+
+```go
+type DNSRecordType string
+
+const (
+    DNSRecordA    DNSRecordType = "A"
+    DNSRecordAAAA DNSRecordType = "AAAA"
+    DNSRecordTXT  DNSRecordType = "TXT"
+)
+
+type DNSQuery struct {
+    Name       string
+    Type       DNSRecordType
+    NameServer string // host:port
+}
+
+type DNS interface {
+    Query(context.Context, DNSQuery) ([]string, error)
+    LookupHost(context.Context, string) ([]string, error)
+}
+```
+
+The host owns transport choice, retries, response validation, and policy
+enforcement. The extension receives only the normalized values it exposes to
+JavaScript. This avoids exposing k6's resolver and dialer types or making the
+extension reimplement hostname blocking around a raw UDP connection.
+
+### ICMP echo (xk6-icmp)
+
+Raw ICMP sockets have platform-specific privilege and sandbox requirements, so
+they should not be modelled as a general `net.PacketConn`. The host should own
+socket creation, address-policy enforcement, and the privileged/unprivileged
+fallback. The proposed optional capability is a bounded echo operation:
+
+```go
+type ICMPEchoRequest struct {
+    Target      string
+    Source      string
+    Count       int
+    Interval    time.Duration
+    Timeout     time.Duration
+    PayloadSize int
+}
+
+type ICMPEchoReply struct {
+    Sequence int
+    RTT      time.Duration
+    TTL      int
+}
+
+type ICMPEchoResult struct {
+    TargetIP string
+    Sent     int
+    Replies  []ICMPEchoReply
+}
+
+type ICMP interface {
+    Echo(context.Context, ICMPEchoRequest) (ICMPEchoResult, error)
+}
+```
+
+`xk6-icmp` retains its JavaScript API, logging, promises, tags, and metrics;
+it translates the result into its current per-packet metrics. A host that does
+not permit ICMP returns a dedicated capability-unavailable error rather than
+letting an extension bypass host policy with `icmp.ListenPacket()`.
+
 ## Temporary compatibility helper
 
 `go.k6.io/k6-extension-api/common.Throw(runtime, err)` is available for the
