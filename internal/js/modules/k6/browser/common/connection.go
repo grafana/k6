@@ -476,9 +476,17 @@ func (c *Connection) recvLoop() {
 // detached from. Best-effort: errors are not returned. Target.detachFromTarget
 // is browser-level: the session goes in the params, not the message's
 // session ID.
+//
+// The session is also closed locally here, rather than left for the
+// browser's own Target.detachedFromTarget event to reap: that event isn't
+// guaranteed to arrive (e.g. if the detach command itself errors), and
+// waiting for it would leak the session's goroutine and its entry in the
+// connection's sessions map until the whole connection closes.
 func detachSession(session *Session) {
 	go func() {
 		c := session.conn
+		defer c.closeSession(session.id, session.targetID)
+
 		ctx, cancel := context.WithTimeout(c.ctx, DefaultTimeout)
 		defer cancel()
 		_ = session.Execute(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)

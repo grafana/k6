@@ -228,6 +228,57 @@ func TestConnectionRejectedTarget(t *testing.T) {
 	requireResumeThenDetach(t, received, rejectedSessionID)
 }
 
+// TestConnectionRejectedTargetClosedLocallyOnDetachError ensures a rejected
+// target's session is closed locally even when the outgoing detach command
+// itself errors (as it can against a real browser). Waiting for the
+// browser's own Target.detachedFromTarget event to reap the session would
+// leak it whenever that event never arrives.
+func TestConnectionRejectedTargetClosedLocallyOnDetachError(t *testing.T) {
+	t.Parallel()
+
+	const rejectedSessionID = target.SessionID("session_id_0123456789")
+
+	received := make(chan cdproto.Message, 16)
+	handler := func(_ *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, _ chan struct{}) {
+		if msg.Method == "" {
+			return
+		}
+		received <- *msg
+		switch msg.Method {
+		case cdproto.MethodType(cdproto.CommandTargetSetDiscoverTargets):
+			writeCh <- cdproto.Message{
+				Method: cdproto.EventTargetAttachedToTarget,
+				Params: jsontext.Value(attachedToTargetEvent(rejectedSessionID, "page", "browser_context_id_0123456789")),
+			}
+			writeCh <- cdproto.Message{ID: msg.ID, Result: jsontext.Value([]byte("{}"))}
+		case cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger):
+			writeCh <- cdproto.Message{ID: msg.ID, SessionID: msg.SessionID, Result: jsontext.Value([]byte("{}"))}
+		case cdproto.MethodType(target.CommandDetachFromTarget):
+			// Simulate the browser rejecting the detach itself.
+			writeCh <- cdproto.Message{ID: msg.ID, Error: &cdproto.Error{Message: "No session with given id"}}
+		}
+	}
+
+	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, nil))
+	u, err := url.Parse(server.ServerHTTP.URL)
+	require.NoError(t, err)
+	wsURL := fmt.Sprintf("ws://%s/cdp", u.Host)
+
+	ctx := context.Background()
+	rejectAll := func(*target.EventAttachedToTarget) bool { return false }
+	conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), rejectAll)
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+
+	action := target.SetDiscoverTargets(true)
+	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
+
+	require.Eventually(t, func() bool {
+		return conn.getSession(rejectedSessionID) == nil
+	}, 5*time.Second, 10*time.Millisecond,
+		"session should be closed locally even though the detach command errored")
+}
+
 // newTestConnection dials a minimal fake CDP server that acknowledges
 // every command with an empty success reply.
 func newTestConnection(t *testing.T) *Connection {
