@@ -21,7 +21,7 @@ func (s *socket) setTimeout(timeoutMs int64) (*sobek.Object, error) {
 		s.log.Debug("Timeout disabled")
 	} else {
 		s.timeout = time.Duration(timeoutMs) * time.Millisecond
-		s.log.WithField("timeout", s.timeout).Debug("Timeout set")
+		s.log.Debug("Timeout set", "timeout", s.timeout)
 	}
 
 	// If we have an active connection, update its deadline.

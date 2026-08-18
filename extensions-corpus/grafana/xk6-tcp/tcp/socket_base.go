@@ -3,16 +3,15 @@ package tcp
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/grafana/sobek"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/lib"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 var errInvalidType = errors.New("invalid type")
@@ -34,14 +33,14 @@ type socket struct {
 
 	conn net.Conn
 
-	log logrus.FieldLogger
+	log *slog.Logger
 
 	socketOpts  *socketOptions
 	connectOpts *connectOptions
 
 	handlers sync.Map
 
-	vu       modules.VU
+	vu       extensionapi.VU
 	callChan chan func() error
 	cancel   context.CancelFunc
 
@@ -63,14 +62,11 @@ type socket struct {
 	// readBuf is reused for each read operation to avoid allocations
 	readBuf [4096]byte
 
-	// bufferPool provides pooled buffers for event data to reduce GC pressure
-	bufferPool *lib.BufferPool
-
 	// destroyOnce ensures cleanup happens exactly once
 	destroyOnce sync.Once
 }
 
-func newSocket(log logrus.FieldLogger, vu modules.VU, metrics *tcpMetrics) *socket {
+func newSocket(log *slog.Logger, vu extensionapi.VU, metrics *tcpMetrics) *socket {
 	s := new(socket)
 	s.log = log
 	s.vu = vu
@@ -78,8 +74,6 @@ func newSocket(log logrus.FieldLogger, vu modules.VU, metrics *tcpMetrics) *sock
 
 	s.metrics = metrics
 	s.state = socketStateDisconnected
-	s.bufferPool = lib.NewBufferPool()
-
 	return s
 }
 

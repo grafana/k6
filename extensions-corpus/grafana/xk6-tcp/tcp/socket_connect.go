@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/promises"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 const defaultHost = "localhost"
@@ -22,29 +22,27 @@ type connectOptions struct {
 	Tags map[string]string `js:"tags"`
 }
 
-var errNoTLSConfig = errors.New("TLS requested but no TLS config available")
-
 func (co *connectOptions) address() string {
 	return net.JoinHostPort(co.Host, strconv.Itoa(co.Port))
 }
 
 func (s *socket) connect(portOrOptions sobek.Value, hostOrEmpty sobek.Value) (*sobek.Promise, error) {
-	promise, resolve, reject := promises.New(s.vu)
+	promise, resolver := newPromise(s.vu)
 
 	if err := s.connectPrepare(portOrOptions, hostOrEmpty); err != nil {
-		s.rejectWithTCPError(reject, err, "connect", s.tags())
+		s.rejectWithTCPError(resolver, err, "connect", s.tags())
 
 		return promise, nil
 	}
 
 	go func() {
 		if err := s.connectExecute(); err != nil {
-			s.rejectWithTCPError(reject, err, "connect", s.tags())
+			s.rejectWithTCPError(resolver, err, "connect", s.tags())
 
 			return
 		}
 
-		resolve(nil)
+		resolver.Resolve(nil)
 	}()
 
 	return promise, nil
@@ -87,7 +85,7 @@ func (s *socket) connectPrepare(portOrOptions sobek.Value, hostOrEmpty sobek.Val
 func (s *socket) connectExecute() error {
 	s.mu.Lock()
 
-	s.log.WithField("address", s.connectOpts.address()).Debug("Connecting to TCP server")
+	s.log.Debug("Connecting to TCP server", "address", s.connectOpts.address())
 
 	tags := s.tags()
 
@@ -124,20 +122,35 @@ func (s *socket) connectExecute() error {
 }
 
 func (s *socket) resolve() error {
-	ip, port, err := s.vu.State().GetAddrResolver().ResolveAddr(s.connectOpts.address())
+	network, err := networkFor(s.vu)
 	if err != nil {
 		return err
 	}
+	ips, err := network.LookupHost(s.vu.Context(), s.connectOpts.Host)
+	if err != nil {
+		return err
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("TCP resolver returned no addresses for %q", s.connectOpts.Host)
+	}
+	ip := net.ParseIP(ips[0])
+	if ip == nil {
+		return fmt.Errorf("TCP resolver returned an invalid address %q", ips[0])
+	}
 
 	s.endpoints.remoteIP = ip.String()
-	s.endpoints.remotePort = port
+	s.endpoints.remotePort = s.connectOpts.Port
 	s.endpoints.remoteAddr = net.JoinHostPort(s.endpoints.remoteIP, strconv.Itoa(s.connectOpts.Port))
 
 	return nil
 }
 
 func (s *socket) dial() error {
-	conn, err := s.vu.State().Dialer.DialContext(s.vu.Context(), "tcp", s.endpoints.remoteAddr)
+	network, err := networkFor(s.vu)
+	if err != nil {
+		return err
+	}
+	conn, err := network.DialContext(s.vu.Context(), "tcp", s.endpoints.remoteAddr)
 	if err != nil {
 		return err
 	}
@@ -172,37 +185,21 @@ func (s *socket) dial() error {
 	return nil
 }
 
-func (s *socket) wrapTLS(conn net.Conn) (*tls.Conn, error) {
-	if tlsConfig := s.vu.State().TLSConfig; tlsConfig != nil {
-		// Clone the TLS config to avoid modifying the shared config
-		tlsConfigCopy := tlsConfig.Clone()
-
-		// Set ServerName for SNI if not already set
-		if tlsConfigCopy.ServerName == "" {
-			tlsConfigCopy.ServerName = s.connectOpts.Host
-		}
-
-		// Force HTTP/1.1 to avoid HTTP/2 binary frames
-		// This makes raw TCP responses more readable for testing
-		tlsConfigCopy.NextProtos = []string{"http/1.1"}
-
-		tlsConn := tls.Client(conn, tlsConfigCopy)
-
-		// Perform TLS handshake
-		if err := tlsConn.HandshakeContext(s.vu.Context()); err != nil {
-			_ = conn.Close()
-
-			return nil, fmt.Errorf("TLS handshake failed: %w", err)
-		}
-
-		s.log.WithField("address", s.endpoints.remoteAddr).Debug("TLS handshake completed")
-
-		return tlsConn, nil
+func (s *socket) wrapTLS(conn net.Conn) (net.Conn, error) {
+	tlsCapability, ok := s.vu.(extensionapi.TLS)
+	if !ok {
+		_ = conn.Close()
+		return nil, errors.New("TCP TLS connections are not allowed in the init context")
 	}
-
-	_ = conn.Close()
-
-	return nil, errNoTLSConfig
+	tlsConn, err := tlsCapability.TLSClient(s.vu.Context(), conn, &tls.Config{
+		ServerName: s.connectOpts.Host,
+		NextProtos: []string{"http/1.1"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("TLS handshake failed: %w", err)
+	}
+	s.log.Debug("TLS handshake completed", "address", s.endpoints.remoteAddr)
+	return tlsConn, nil
 }
 
 // destroy closes the connection and cleans up resources.

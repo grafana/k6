@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/promises"
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 var errInvalidType = errors.New("invalid type")
@@ -38,17 +37,17 @@ func (c *client) publishAsync(topic string, message sobek.Value, opts *publishOp
 		return nil, err
 	}
 
-	promise, resolve, reject := promises.New(c.vu)
+	promise, resolver := newPromise(c.vu)
 
 	go func() {
 		err := c.publishExecute(topic, data, opts)
 		if err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(sobek.Undefined())
+		resolver.Resolve(sobek.Undefined())
 	}()
 
 	return promise, nil
@@ -90,36 +89,13 @@ func (c *client) publishExecute(topic string, message []byte, opts *publishOptio
 
 	now := time.Now()
 	bytes := float64(len(message))
-	tags := c.tags().With("topic", topic)
-
-	samples := metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: c.metrics.mqttCalls,
-				Tags:   c.tagsForMethod("publish", opts.Tags, "topic", topic),
-			},
-			Time:  now,
-			Value: float64(1),
-		},
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: c.metrics.mqttMessagesSent,
-				Tags:   tags,
-			},
-			Time:  now,
-			Value: float64(1),
-		},
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: c.metrics.dataSent,
-				Tags:   c.currentTags(),
-			},
-			Time:  now,
-			Value: bytes,
-		},
-	}
-
-	metrics.PushIfNotDone(c.vu.Context(), c.vu.State().Samples, samples)
+	tags := c.tags().With(map[string]string{"topic": topic})
+	c.emit(
+		extensionapi.Sample{Metric: c.metrics.mqttCalls, Time: now, Value: 1,
+			Tags: c.tagsForMethod("publish", opts.Tags, "topic", topic)},
+		extensionapi.Sample{Metric: c.metrics.mqttMessagesSent, Time: now, Value: 1, Tags: tags},
+		extensionapi.Sample{Metric: c.metrics.dataSent, Time: now, Value: bytes, Tags: c.currentTags()},
+	)
 
 	return nil
 }

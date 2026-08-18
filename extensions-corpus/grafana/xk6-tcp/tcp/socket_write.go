@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/promises"
 )
 
 var (
@@ -25,11 +24,11 @@ type writeOptions struct {
 }
 
 func (s *socket) write(data sobek.Value, opts *writeOptions) (*sobek.Promise, error) {
-	promise, resolve, reject := promises.New(s.vu)
+	promise, resolver := newPromise(s.vu)
 
 	dataBytes, opts, err := s.writePrepare(data, opts)
 	if err != nil {
-		s.rejectWithTCPError(reject, err, "write", addToTagSet(s.currentTags(), opts.Tags))
+		s.rejectWithTCPError(resolver, err, "write", s.currentTags().With(opts.Tags))
 
 		return promise, nil
 	}
@@ -37,12 +36,12 @@ func (s *socket) write(data sobek.Value, opts *writeOptions) (*sobek.Promise, er
 	go func() {
 		err := s.writeExecute(dataBytes, opts)
 		if err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(sobek.Undefined())
+		resolver.Resolve(sobek.Undefined())
 	}()
 
 	return promise, nil
@@ -95,19 +94,19 @@ func (s *socket) writeExecute(data []byte, opts *writeOptions) error {
 
 		atomic.AddInt64(&s.totalWritten, int64(n))
 
-		s.log.WithField("bytes_written", n).WithField("total_written", totalWritten).Debug("TCP write fragment completed")
+		s.log.Debug("TCP write fragment completed", "bytes_written", n, "total_written", totalWritten)
 	}
 
 	if result != nil {
-		s.log.WithError(result).Error("TCP write failed")
+		s.log.Error("TCP write failed", "error", result)
 
 		// Track partial write failures separately
 		if totalWritten > 0 && totalWritten < len(data) {
-			s.addCounterMetrics(s.metrics.tcpPartialWrites, addToTagSet(s.currentTags(), opts.Tags))
+			s.addCounterMetrics(s.metrics.tcpPartialWrites, s.currentTags().With(opts.Tags))
 		}
 	}
 
-	s.addCounterMetrics(s.metrics.tcpWrites, addToTagSet(s.currentTags(), opts.Tags))
+	s.addCounterMetrics(s.metrics.tcpWrites, s.currentTags().With(opts.Tags))
 
 	return result
 }

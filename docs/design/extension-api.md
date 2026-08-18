@@ -13,9 +13,9 @@ automatic extension provisioning.
 
 The current custom binary composition is in `cmd/k6-extension-api`. It declares
 all migrated clones and is intentionally a nested module, so it does not alter
-the root k6 module's vendored dependency set. The initial binary was built and
-run with msgpack and SSH; rebuilding the expanded composition requires the Go
-checksum database entry for Kubernetes dependencies.
+the root k6 module's vendored dependency set. It is built and run with an
+isolated empty configuration. Its smoke test links every migrated extension and
+directly exercises msgpack, SSH, Faker, TLS, Redis, and MQTT/TCP construction.
 
 ## Implemented v1 surface
 
@@ -167,9 +167,12 @@ as a supported built-in metric.
 | `github.com/grafana/xk6-kubernetes` | Per-VU module using context and Sobek | Migrated. Its complete Go test suite passes. |
 | `github.com/grafana/xk6-sql` | Per-VU module using context and Sobek | Migrated. Production packages build; its legacy test harness still imports the old k6 module test API. |
 | `github.com/grafana/xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | SQL driver registration modules | Migrated. Each repository builds. MySQL now uses `crypto/tls` version constants. |
+| `github.com/grafana/xk6-mqtt` | Per-VU MQTT client using network, TLS, promises, logging, and metrics | Migrated for native MQTT/TLS brokers. Its complete Go test suite passes. MQTT over WebSocket remains deferred pending a host-aware WebSocket capability. |
+| `github.com/grafana/xk6-tcp` | Per-VU TCP socket using network, TLS, promises, logging, and metrics | Migrated. Its complete Go test suite, including local integration tests, passes. |
 
 The custom binary test script imports every migrated module except disruptor
-and directly exercises msgpack and SSH. Disruptor initializes its Kubernetes
+and directly exercises msgpack, SSH, Faker, TLS, Redis, and MQTT/TCP module
+construction. Disruptor initializes its Kubernetes
 client at module-instantiation time and therefore requires a reachable cluster;
 the binary links it but the no-external-service smoke test deliberately avoids
 instantiating it. The script uses an isolated empty config file so it does not
@@ -195,8 +198,8 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-kafka` | Can migrate after execution-state capability | Metrics/tags and built-in byte metrics are available; it still needs an active-vs-init state capability. |
 | `xk6-dns` | Deferred | Promise/event-loop is available; needs metrics/tags and a DNS-query policy/multi-record lookup capability. |
 | `xk6-icmp` | Deferred | Promise/event-loop, environment, and logger are available; needs ICMP packet sockets and metrics/tags. |
-| `xk6-mqtt` | Can migrate | Network, TLS, promises, logger, and metrics/tags are available; it needs routine rewiring to the standalone interfaces. |
-| `xk6-tcp` | Can migrate | Network, TLS, promises, logger, and metrics/tags are available; it needs routine rewiring to the standalone interfaces. |
+| `xk6-mqtt` | Migrated for native MQTT/TLS | Uses network, TLS, promises, logger, and metrics/tags. MQTT-over-WebSocket awaits a host-aware WebSocket capability. |
+| `xk6-tcp` | Migrated | Uses network, TLS, promises, logger, and metrics/tags. |
 | `xk6-loki` | Deferred | Logger is available; needs a k6-aware HTTP executor, current tags, VU ID, and metrics. |
 | `xk6-client-prometheus-remote` | Deferred | Needs a k6-aware HTTP executor preserving transport, options, tags, and HTTP metrics. |
 | `xk6-sse` | Deferred | Needs HTTP transport/options/cookies plus HTTP/custom metrics and tags. |

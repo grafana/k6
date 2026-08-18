@@ -1,16 +1,17 @@
 package mqtt
 
 import (
+	"io"
+	"log/slog"
 	"testing"
 
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
-func newTestClient(t *testing.T, logger logrus.FieldLogger, vu modules.VU, mm *mqttMetrics) *client {
+func newTestClient(t *testing.T, _ any, vu extensionapi.VU, mm *mqttMetrics) *client {
 	t.Helper()
 
-	client := newClient(logger, vu, mm)
+	client := newClient(slog.New(slog.NewTextHandler(io.Discard, nil)), vu, mm)
 
 	client.clientOpts = new(clientOptions)
 

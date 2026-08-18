@@ -2,7 +2,6 @@ package mqtt
 
 import (
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/promises"
 )
 
 type endOptions struct {
@@ -27,16 +26,16 @@ func (c *client) end(opts *endOptions) error {
 }
 
 func (c *client) endAsync(opts *endOptions) (*sobek.Promise, error) {
-	promise, resolve, reject := promises.New(c.vu)
+	promise, resolver := newPromise(c.vu)
 
 	go func() {
 		if err := c.end(opts); err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(nil)
+		resolver.Resolve(nil)
 	}()
 
 	return promise, nil

@@ -6,8 +6,6 @@ import (
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 	"github.com/grafana/sobek"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/js/promises"
 )
 
 type subscribeOptions struct {
@@ -34,17 +32,17 @@ func (c *client) subscribeAsync(topic sobek.Value, opts *subscribeOptions) (*sob
 		return nil, err
 	}
 
-	promise, resolve, reject := promises.New(c.vu)
+	promise, resolver := newPromise(c.vu)
 
 	go func() {
 		err := c.subscribeExecute(topics, o)
 		if err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(sobek.Undefined())
+		resolver.Resolve(sobek.Undefined())
 	}()
 
 	return promise, nil
@@ -82,7 +80,7 @@ func (c *client) subscribeExecute(topics map[string]byte, opts *subscribeOptions
 	tokens := make(map[string]paho.Token)
 
 	for t, qos := range topics {
-		c.log.WithFields(logrus.Fields{"topic": t, "qos": qos}).Debug("Subscribing to topic")
+		c.log.Debug("Subscribing to topic", "topic", t, "qos", qos)
 
 		token := c.pahoClient.Subscribe(t, qos, nil)
 

@@ -35,7 +35,7 @@ func (s *socket) readLoopStep(conn net.Conn, timeout time.Duration) bool {
 	if timeout > 0 {
 		deadline := time.Now().Add(timeout)
 		if err := conn.SetReadDeadline(deadline); err != nil {
-			s.log.WithError(err).Error("Failed to set read deadline")
+			s.log.Error("Failed to set read deadline", "error", err)
 		}
 	}
 
@@ -46,18 +46,9 @@ func (s *socket) readLoopStep(conn net.Conn, timeout time.Duration) bool {
 
 		atomic.AddInt64(&s.totalRead, int64(n))
 
-		// Get a buffer from pool and copy data for JavaScript
-		buf := s.bufferPool.Get()
-		buf.Reset()
-		buf.Write(s.readBuf[:n])
-
-		// Fire event with cleanup callback to return buffer to pool
-		// Args are converted to sobek.Value in event loop (avoids race)
-		s.fireAndCleanup(func() {
-			s.bufferPool.Put(buf)
-		}, "data", buf.Bytes())
-
-		s.log.WithField("bytes", n).Debug("Read from TCP connection")
+		// Copy the buffer because the read buffer is reused by the next read.
+		s.fire("data", append([]byte(nil), s.readBuf[:n]...))
+		s.log.Debug("Read from TCP connection", "bytes", n)
 	}
 
 	// is closed by other goroutine
@@ -86,7 +77,7 @@ func (s *socket) readLoopStep(conn net.Conn, timeout time.Duration) bool {
 
 	e := s.handleError(err, "read", s.currentTags())
 	if e != nil {
-		s.log.WithError(e).Error("error in error handler")
+		s.log.Error("error in error handler", "error", e)
 	}
 
 	return false

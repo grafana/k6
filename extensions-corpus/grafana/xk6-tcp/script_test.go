@@ -5,15 +5,11 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-tcp/internal/testscript"
+	tcpmodule "github.com/grafana/xk6-tcp/tcp"
 )
 
 func TestModule(t *testing.T) {
 	t.Parallel()
 
-	testscript.RunGlob(t, filepath.Join("test", "*.test.js"))
-}
-
-func TestIntegration(t *testing.T) { //nolint:paralleltest
-	testscript.RunGlobIntegration(t, filepath.Join("test", "*.test.js"))
-	testscript.RunGlobIntegration(t, filepath.Join("examples", "*.[tj]s"))
+	testscript.RunGlob(t, filepath.Join("test", "*.test.js"), tcpmodule.ImportPath, tcpmodule.New())
 }

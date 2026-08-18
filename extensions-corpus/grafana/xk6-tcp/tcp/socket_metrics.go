@@ -4,78 +4,58 @@ import (
 	"strconv"
 	"time"
 
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
-func (s *socket) currentTags() *metrics.TagSet {
-	return s.vu.State().Tags.GetCurrentValues().Tags
+func (s *socket) currentTags() extensionapi.Tags {
+	return s.metrics.host.CurrentTags()
 }
 
-func (s *socket) tags() *metrics.TagSet {
-	tags := s.currentTags()
-
-	tags = tags.With("proto", "TCP")
-	tags = addToTagSet(tags, s.socketOpts.Tags)
-
+func (s *socket) tags() extensionapi.Tags {
+	tags := s.metrics.host.WithSystemTags(s.currentTags(), map[extensionapi.SystemTag]string{
+		extensionapi.SystemTagProto: "TCP",
+	})
+	tags = tags.With(s.socketOpts.Tags)
 	if s.connectOpts != nil {
-		tags = tags.WithTagsFromMap(s.connectOpts.Tags).
-			With("host", s.connectOpts.Host).
-			With("port", strconv.Itoa(s.connectOpts.Port))
+		tags = tags.With(s.connectOpts.Tags).With(map[string]string{
+			"host": s.connectOpts.Host,
+			"port": strconv.Itoa(s.connectOpts.Port),
+		})
 	}
-
-	if len(s.endpoints.remoteIP) > 0 {
-		tags = tags.With("ip", s.endpoints.remoteIP)
+	if s.endpoints.remoteIP != "" {
+		tags = s.metrics.host.WithSystemTags(tags, map[extensionapi.SystemTag]string{
+			extensionapi.SystemTagIP: s.endpoints.remoteIP,
+		})
 	}
-
 	return tags
 }
 
-func (s *socket) addErrorMetrics(ts *metrics.TagSet) {
-	metrics.PushIfNotDone(s.vu.Context(), s.vu.State().Samples, metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: s.metrics.tcpErrors,
-				Tags:   ts,
-			},
-			Time:  time.Now(),
-			Value: float64(1),
-		},
+func (s *socket) emit(samples ...extensionapi.Sample) {
+	if err := s.metrics.host.Emit(s.vu.Context(), samples); err != nil && s.vu.Context().Err() == nil {
+		s.log.Debug("TCP metric emission failed", "error", err)
+	}
+}
+
+func (s *socket) addErrorMetrics(tags extensionapi.Tags) {
+	s.emit(extensionapi.Sample{Metric: s.metrics.tcpErrors, Time: time.Now(), Value: 1, Tags: tags})
+}
+
+func (s *socket) addCounterMetrics(metric extensionapi.Metric, tags extensionapi.Tags) {
+	s.emit(extensionapi.Sample{Metric: metric, Time: time.Now(), Value: 1, Tags: tags})
+}
+
+func (s *socket) addDurationMetrics(duration time.Duration, metric extensionapi.Metric, tags extensionapi.Tags) {
+	s.emit(extensionapi.Sample{
+		Metric: metric,
+		Time:   time.Now(),
+		Value:  float64(duration) / float64(time.Millisecond),
+		Tags:   tags,
 	})
 }
 
-func (s *socket) addCounterMetrics(metric *metrics.Metric, ts *metrics.TagSet) {
-	metrics.PushIfNotDone(s.vu.Context(), s.vu.State().Samples, metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: metric,
-				Tags:   ts,
-			},
-			Time:  time.Now(),
-			Value: float64(1),
-		},
-	})
-}
-
-func (s *socket) addDurationMetrics(duration time.Duration, metric *metrics.Metric, ts *metrics.TagSet) {
-	metrics.PushIfNotDone(s.vu.Context(), s.vu.State().Samples, metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: metric,
-				Tags:   ts,
-			},
-			Time:  time.Now(),
-			Value: float64(duration.Milliseconds()),
-		},
-	})
-}
-
-func (s *socket) addDurationMetricsFor(metric *metrics.Metric, ts *metrics.TagSet, fn func() error) error {
+func (s *socket) addDurationMetricsFor(metric extensionapi.Metric, tags extensionapi.Tags, fn func() error) error {
 	start := time.Now()
-
 	err := fn()
-	duration := time.Since(start)
-
-	s.addDurationMetrics(duration, metric, ts)
-
+	s.addDurationMetrics(time.Since(start), metric, tags)
 	return err
 }

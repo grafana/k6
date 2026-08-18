@@ -13,10 +13,8 @@ func TestClientPublish(t *testing.T) {
 	t.Parallel()
 
 	runtime := newTestRuntime(t)
-	mm := newMqttMetrics(runtime.VU)
-	logger := runtime.VU.InitEnv().Logger
-
-	runtime.MoveToVUContext(newTestVUState(t))
+	mm := newTestMetrics(runtime.VU)
+	logger := runtime.VU.Logger()
 
 	client := newTestClient(t, logger, runtime.VU, mm)
 
@@ -36,5 +34,4 @@ func TestClientPublish(t *testing.T) {
 
 	require.NoError(t, err)
 
-	runtime.EventLoop.WaitOnRegistered()
 }

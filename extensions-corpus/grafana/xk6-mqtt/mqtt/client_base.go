@@ -2,13 +2,13 @@ package mqtt
 
 import (
 	"fmt"
+	"log/slog"
 	"sync"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 	"github.com/grafana/sobek"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 type will struct {
@@ -81,14 +81,14 @@ type client struct {
 	pahoClient paho.Client
 
 	url string
-	log logrus.FieldLogger
+	log *slog.Logger
 
 	clientOpts *clientOptions
 	connOpts   *connectOptions
 
 	handlers sync.Map
 
-	vu       modules.VU
+	vu       extensionapi.VU
 	callChan chan func() error
 	stop     chan struct{}
 	stopOnce sync.Once
@@ -98,7 +98,7 @@ type client struct {
 	mu sync.RWMutex
 }
 
-func newClient(log logrus.FieldLogger, vu modules.VU, metrics *mqttMetrics) *client {
+func newClient(log *slog.Logger, vu extensionapi.VU, metrics *mqttMetrics) *client {
 	c := new(client)
 	c.log = log
 	c.vu = vu

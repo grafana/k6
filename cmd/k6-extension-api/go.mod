@@ -6,6 +6,7 @@ require (
 	github.com/grafana/xk6-disruptor v0.0.0
 	github.com/grafana/xk6-faker v0.0.0
 	github.com/grafana/xk6-kubernetes v0.0.0
+	github.com/grafana/xk6-mqtt v0.0.0
 	github.com/grafana/xk6-redis v0.0.0
 	github.com/grafana/xk6-sql v1.2.1
 	github.com/grafana/xk6-sql-driver-azuresql v0.0.0
@@ -14,6 +15,7 @@ require (
 	github.com/grafana/xk6-sql-driver-postgres v0.0.0
 	github.com/grafana/xk6-sql-driver-sqlserver v0.0.0
 	github.com/grafana/xk6-ssh v0.0.0
+	github.com/grafana/xk6-tcp v0.0.0
 	github.com/grafana/xk6-tls v0.0.0
 	github.com/tango-tango/xk6-msgpack v0.0.0
 	go.k6.io/k6/v2 v2.1.0
@@ -45,6 +47,7 @@ require (
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
+	github.com/eclipse/paho.mqtt.golang v1.5.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanw/esbuild v0.28.2 // indirect
 	github.com/fatih/color v1.19.0 // indirect
@@ -85,7 +88,7 @@ require (
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lib/pq v1.12.3 // indirect
-	github.com/mailru/easyjson v0.9.0 // indirect
+	github.com/mailru/easyjson v0.9.2 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/microsoft/go-mssqldb v1.10.0 // indirect
@@ -94,6 +97,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd // indirect
 	github.com/mstoykov/envconfig v1.5.0 // indirect
+	github.com/mstoykov/k6-taskqueue-lib v0.1.3 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/paulmach/orb v0.13.0 // indirect
@@ -176,6 +180,8 @@ replace github.com/grafana/xk6-kubernetes => ../../extensions-corpus/grafana/xk6
 
 replace github.com/grafana/xk6-sql => ../../extensions-corpus/grafana/xk6-sql
 
+replace github.com/grafana/xk6-mqtt => ../../extensions-corpus/grafana/xk6-mqtt
+
 replace github.com/grafana/xk6-redis => ../../extensions-corpus/grafana/xk6-redis
 
 replace github.com/grafana/xk6-sql-driver-azuresql => ../../extensions-corpus/grafana/xk6-sql-driver-azuresql
@@ -193,6 +199,8 @@ replace github.com/grafana/xk6-ssh => ../../extensions-corpus/grafana/xk6-ssh
 replace github.com/tango-tango/xk6-msgpack => ../../extensions-corpus/tango-tango/xk6-msgpack
 
 replace github.com/grafana/xk6-tls => ../../extensions-corpus/grafana/xk6-tls
+
+replace github.com/grafana/xk6-tcp => ../../extensions-corpus/grafana/xk6-tcp
 
 replace go.k6.io/k6/v2 => ../..
 

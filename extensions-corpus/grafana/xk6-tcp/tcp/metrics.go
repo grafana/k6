@@ -1,10 +1,9 @@
 package tcp
 
 import (
-	"sort"
+	"fmt"
 
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 const (
@@ -21,44 +20,39 @@ const (
 )
 
 type tcpMetrics struct {
-	tcpConnecting *metrics.Metric
-	tcpResolving  *metrics.Metric
-	tcpDuration   *metrics.Metric
+	host          extensionapi.Metrics
+	tcpConnecting extensionapi.Metric
+	tcpResolving  extensionapi.Metric
+	tcpDuration   extensionapi.Metric
 
-	tcpSockets       *metrics.Metric
-	tcpReads         *metrics.Metric
-	tcpWrites        *metrics.Metric
-	tcpErrors        *metrics.Metric
-	tcpTimeouts      *metrics.Metric
-	tcpPartialWrites *metrics.Metric
+	tcpSockets       extensionapi.Metric
+	tcpReads         extensionapi.Metric
+	tcpWrites        extensionapi.Metric
+	tcpErrors        extensionapi.Metric
+	tcpTimeouts      extensionapi.Metric
+	tcpPartialWrites extensionapi.Metric
 }
 
-func newTCPMetrics(vu modules.VU) *tcpMetrics {
-	return &tcpMetrics{
-		tcpConnecting:    vu.InitEnv().Registry.MustNewMetric(tcpConnecting, metrics.Trend, metrics.Time),
-		tcpResolving:     vu.InitEnv().Registry.MustNewMetric(tcpResolving, metrics.Trend, metrics.Time),
-		tcpDuration:      vu.InitEnv().Registry.MustNewMetric(tcpDuration, metrics.Trend, metrics.Time),
-		tcpSockets:       vu.InitEnv().Registry.MustNewMetric(tcpSockets, metrics.Counter),
-		tcpReads:         vu.InitEnv().Registry.MustNewMetric(tcpReads, metrics.Counter),
-		tcpWrites:        vu.InitEnv().Registry.MustNewMetric(tcpWrites, metrics.Counter),
-		tcpErrors:        vu.InitEnv().Registry.MustNewMetric(tcpErrors, metrics.Counter),
-		tcpTimeouts:      vu.InitEnv().Registry.MustNewMetric(tcpTimeouts, metrics.Counter),
-		tcpPartialWrites: vu.InitEnv().Registry.MustNewMetric(tcpPartialWrites, metrics.Counter),
+func newTCPMetrics(vu extensionapi.VU) *tcpMetrics {
+	host, ok := vu.(extensionapi.Metrics)
+	if !ok {
+		panic("extension API metrics capability is unavailable")
 	}
-}
-
-func addToTagSet(ts *metrics.TagSet, tags map[string]string) *metrics.TagSet {
-	keys := make([]string, 0, len(tags))
-
-	for k := range tags {
-		keys = append(keys, k)
+	register := func(name string, kind extensionapi.MetricKind, unit extensionapi.MetricUnit) extensionapi.Metric {
+		metric, err := host.RegisterMetric(extensionapi.MetricSpec{Name: name, Kind: kind, Unit: unit})
+		if err != nil {
+			panic(fmt.Errorf("register TCP metric %q: %w", name, err))
+		}
+		return metric
 	}
-
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		ts = ts.With(k, tags[k])
-	}
-
-	return ts
+	return &tcpMetrics{host: host,
+		tcpConnecting:    register(tcpConnecting, extensionapi.MetricTrend, extensionapi.MetricUnitTime),
+		tcpResolving:     register(tcpResolving, extensionapi.MetricTrend, extensionapi.MetricUnitTime),
+		tcpDuration:      register(tcpDuration, extensionapi.MetricTrend, extensionapi.MetricUnitTime),
+		tcpSockets:       register(tcpSockets, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
+		tcpReads:         register(tcpReads, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
+		tcpWrites:        register(tcpWrites, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
+		tcpErrors:        register(tcpErrors, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
+		tcpTimeouts:      register(tcpTimeouts, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
+		tcpPartialWrites: register(tcpPartialWrites, extensionapi.MetricCounter, extensionapi.MetricUnitDefault)}
 }

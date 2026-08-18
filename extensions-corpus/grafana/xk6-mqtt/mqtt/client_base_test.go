@@ -42,7 +42,7 @@ func Test_clientOptions_toPaho_credentialsProvider(t *testing.T) {
 	t.Parallel()
 
 	pahoOpts := paho.NewClientOptions()
-	runtime := newTestRuntime(t).VU.RuntimeField
+	runtime := newTestRuntime(t).VU.Runtime()
 
 	_, err := runtime.RunString(`
     function provider() {

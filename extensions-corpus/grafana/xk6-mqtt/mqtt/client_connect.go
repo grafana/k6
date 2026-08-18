@@ -1,16 +1,17 @@
 package mqtt
 
 import (
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"reflect"
-	"strings"
 	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/promises"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 var (
@@ -59,16 +60,16 @@ func (c *client) connectAsync(urlOrOpts sobek.Value, optsOrEmpty sobek.Value) (*
 		return nil, err
 	}
 
-	promise, resolve, reject := promises.New(c.vu)
+	promise, resolver := newPromise(c.vu)
 
 	go func() {
 		if err := c.connectExecute(); err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(nil)
+		resolver.Resolve(nil)
 	}()
 
 	return promise, nil
@@ -83,16 +84,16 @@ func (c *client) reconnect() error {
 }
 
 func (c *client) reconnectAsync() (*sobek.Promise, error) {
-	promise, resolve, reject := promises.New(c.vu)
+	promise, resolver := newPromise(c.vu)
 
 	go func() {
 		if err := c.reconnect(); err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(nil)
+		resolver.Resolve(nil)
 	}()
 
 	return promise, nil
@@ -158,8 +159,11 @@ func (c *client) validateAddress(urlStr string) error {
 		return err
 	}
 
-	_, _, err = c.vu.State().GetAddrResolver().ResolveAddr(u.Host)
-
+	network, err := networkFor(c.vu)
+	if err != nil {
+		return err
+	}
+	_, err = network.LookupHost(c.vu.Context(), u.Hostname())
 	return err
 }
 
@@ -216,17 +220,40 @@ func (c *client) newPahoClient() paho.Client {
 	opts.SetOnConnectHandler(c.connectHandler)
 	opts.SetReconnectingHandler(c.reconnectHandler)
 
-	if conf := c.vu.State().TLSConfig; conf != nil {
-		// Overriding the NextProtos to avoid talking http2
-		// @see https://github.com/grafana/xk6-mqtt/issues/20
-		tlsConfig := conf.Clone()
-
-		if strings.HasPrefix(c.url, "wss://") {
-			tlsConfig.NextProtos = []string{"http/1.1"}
-		}
-
-		opts.SetTLSConfig(tlsConfig)
-	}
+	opts.SetCustomOpenConnectionFn(c.openConnection)
 
 	return paho.NewClient(opts)
+}
+
+func (c *client) openConnection(uri *url.URL, opts paho.ClientOptions) (net.Conn, error) {
+	network, err := networkFor(c.vu)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := network.DialContext(c.vu.Context(), "tcp", uri.Host)
+	if err != nil {
+		return nil, err
+	}
+	switch uri.Scheme {
+	case "mqtt", "tcp":
+		return conn, nil
+	case "ssl", "tls", "mqtts", "mqtt+ssl", "tcps":
+		tlsCapability, ok := c.vu.(extensionapi.TLS)
+		if !ok {
+			_ = conn.Close()
+			return nil, fmt.Errorf("MQTT TLS connections are not allowed in the init context")
+		}
+		config := opts.TLSConfig
+		if config == nil {
+			config = &tls.Config{}
+		}
+		if config.ServerName == "" {
+			config = config.Clone()
+			config.ServerName = uri.Hostname()
+		}
+		return tlsCapability.TLSClient(c.vu.Context(), conn, config)
+	default:
+		_ = conn.Close()
+		return nil, fmt.Errorf("MQTT protocol %q is not supported by the extension API network capability", uri.Scheme)
+	}
 }

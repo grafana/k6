@@ -6,8 +6,7 @@ import (
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 	"github.com/grafana/sobek"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 var events = map[string]struct{}{ //nolint:gochecknoglobals
@@ -20,21 +19,21 @@ var events = map[string]struct{}{ //nolint:gochecknoglobals
 
 func (c *client) on(event string, handler sobek.Callable) {
 	if _, ok := events[event]; !ok {
-		c.log.WithField("event", event).Warn("Unknown event type")
+		c.log.Warn("Unknown event type", "event", event)
 
 		return
 	}
 
 	if _, ok := c.handlers.Load(event); ok {
-		c.log.WithField("event", event).Warn("Event handler already registered, overriding")
+		c.log.Warn("Event handler already registered, overriding", "event", event)
 	}
 
-	c.log.WithField("event", event).Debug("Event handler registered")
+	c.log.Debug("Event handler registered", "event", event)
 
 	c.handlers.Store(event, handler)
 }
 
-func (c *client) fire(event string, args ...sobek.Value) bool {
+func (c *client) fire(event string, args ...any) bool {
 	f, ok := c.handlers.Load(event)
 	if !ok {
 		return false
@@ -45,12 +44,15 @@ func (c *client) fire(event string, args ...sobek.Value) bool {
 		return false
 	}
 
-	c.log.WithField("event", event).Debug("Queuing event handler")
+	c.log.Debug("Queuing event handler", "event", event)
 
 	call := func() error {
-		c.log.WithField("event", event).Debug("Firing event handler")
-
-		_, err := fn(sobek.Undefined(), args...)
+		c.log.Debug("Firing event handler", "event", event)
+		values := make([]sobek.Value, len(args))
+		for index, arg := range args {
+			values[index] = c.vu.Runtime().ToValue(arg)
+		}
+		_, err := fn(sobek.Undefined(), values...)
 
 		return err
 	}
@@ -64,49 +66,18 @@ func (c *client) fire(event string, args ...sobek.Value) bool {
 }
 
 func (c *client) messageHandler(_ paho.Client, msg paho.Message) {
-	c.log.WithFields(logrus.Fields{
-		"topic":     msg.Topic(),
-		"messageID": msg.MessageID(),
-	}).Debug("Received MQTT message")
-
-	rt := c.vu.Runtime()
-
-	payload := rt.NewArrayBuffer(msg.Payload())
+	c.log.Debug("Received MQTT message", "topic", msg.Topic(), "message_id", msg.MessageID())
 
 	now := time.Now()
 	bytes := float64(len(msg.Payload()))
-	tags := c.tags().With("topic", msg.Topic())
-
-	samples := metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: c.metrics.mqttCalls,
-				Tags:   c.tagsForMethod("message", nil, "topic", msg.Topic()),
-			},
-			Time:  now,
-			Value: float64(1),
-		},
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: c.metrics.mqttMessagesReceived,
-				Tags:   tags,
-			},
-			Time:  now,
-			Value: float64(1),
-		},
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: c.metrics.dataReceived,
-				Tags:   c.currentTags(),
-			},
-			Time:  now,
-			Value: bytes,
-		},
-	}
-
-	metrics.PushIfNotDone(c.vu.Context(), c.vu.State().Samples, samples)
-
-	c.fire("message", rt.ToValue(msg.Topic()), rt.ToValue(payload))
+	tags := c.tags().With(map[string]string{"topic": msg.Topic()})
+	c.emit(
+		extensionapi.Sample{Metric: c.metrics.mqttCalls, Time: now, Value: 1,
+			Tags: c.tagsForMethod("message", nil, "topic", msg.Topic())},
+		extensionapi.Sample{Metric: c.metrics.mqttMessagesReceived, Time: now, Value: 1, Tags: tags},
+		extensionapi.Sample{Metric: c.metrics.dataReceived, Time: now, Value: bytes, Tags: c.currentTags()},
+	)
+	c.fire("message", msg.Topic(), append([]byte(nil), msg.Payload()...))
 }
 
 func (c *client) connectHandler(_ paho.Client) {
@@ -122,13 +93,13 @@ func (c *client) reconnectHandler(_ paho.Client, _ *paho.ClientOptions) {
 }
 
 func (c *client) handleError(err error, method string, tags map[string]string, nv ...string) error {
-	c.log.WithField("error", err).WithField("method", method).Error("MQTT error occurred")
+	c.log.Error("MQTT error occurred", "error", err, "method", method)
 
 	c.addErrorMetrics(method, tags, nv...)
 
 	wrapped := newMQTTError(err, method)
 
-	if c.fire("error", c.vu.Runtime().ToValue(wrapped)) {
+	if c.fire("error", wrapped) {
 		return nil
 	}
 

@@ -6,7 +6,6 @@ import (
 
 	paho "github.com/eclipse/paho.mqtt.golang"
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/promises"
 )
 
 type unsubscribeOptions struct {
@@ -32,16 +31,16 @@ func (c *client) unsubscribeAsync(topic sobek.Value, opts *unsubscribeOptions) (
 		return nil, err
 	}
 
-	promise, resolve, reject := promises.New(c.vu)
+	promise, resolver := newPromise(c.vu)
 
 	go func() {
 		if err := c.unsubscribeExecute(topics, opts); err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(nil)
+		resolver.Resolve(nil)
 	}()
 
 	return promise, nil
@@ -72,7 +71,7 @@ func (c *client) unsubscribeExecute(topics []string, opts *unsubscribeOptions) e
 	tokens := make(map[string]paho.Token)
 
 	for _, topic := range topics {
-		c.log.WithField("topic", topic).Debug("Unsubscribing from topic")
+		c.log.Debug("Unsubscribing from topic", "topic", topic)
 
 		token := c.pahoClient.Unsubscribe(topic)
 

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 var events = map[string]struct{}{ //nolint:gochecknoglobals
@@ -17,16 +17,16 @@ var events = map[string]struct{}{ //nolint:gochecknoglobals
 
 func (s *socket) on(event string, handler sobek.Callable) {
 	if _, ok := events[event]; !ok {
-		s.log.WithField("event", event).Warn("Unknown event type")
+		s.log.Warn("Unknown event type", "event", event)
 
 		return
 	}
 
 	if _, ok := s.handlers.Load(event); ok {
-		s.log.WithField("event", event).Warn("Event handler already registered, overriding")
+		s.log.Warn("Event handler already registered, overriding", "event", event)
 	}
 
-	s.log.WithField("event", event).Debug("Event handler registered")
+	s.log.Debug("Event handler registered", "event", event)
 
 	s.handlers.Store(event, handler)
 }
@@ -58,7 +58,7 @@ func (s *socket) fireAndCleanup(cleanup func(), event string, args ...any) bool 
 		return false
 	}
 
-	s.log.WithField("event", event).Debug("Queuing event handler")
+	s.log.Debug("Queuing event handler", "event", event)
 
 	// Queue synchronously so the caller's event order is preserved across goroutines.
 	select {
@@ -67,7 +67,7 @@ func (s *socket) fireAndCleanup(cleanup func(), event string, args ...any) bool 
 			defer cleanup()
 		}
 
-		s.log.WithField("event", event).Debug("Firing event handler")
+		s.log.Debug("Firing event handler", "event", event)
 
 		// Convert raw Go values to sobek.Value in the event loop
 		sobekArgs := make([]sobek.Value, len(args))
@@ -82,7 +82,7 @@ func (s *socket) fireAndCleanup(cleanup func(), event string, args ...any) bool 
 		return true
 
 	case <-s.vu.Context().Done():
-		s.log.WithField("event", event).Debug("Context cancelled, skipping event")
+		s.log.Debug("Context cancelled, skipping event", "event", event)
 
 		if cleanup != nil {
 			cleanup()
@@ -92,10 +92,10 @@ func (s *socket) fireAndCleanup(cleanup func(), event string, args ...any) bool 
 	}
 }
 
-func (s *socket) handleError(err error, method string, ts *metrics.TagSet) error {
-	s.log.WithField("error", err).WithField("method", method).Error("Handling TCP error")
+func (s *socket) handleError(err error, method string, tags extensionapi.Tags) error {
+	s.log.Error("Handling TCP error", "error", err, "method", method)
 
-	s.addErrorMetrics(ts)
+	s.addErrorMetrics(tags)
 
 	wrapped := newTCPError(err, method)
 
@@ -106,13 +106,15 @@ func (s *socket) handleError(err error, method string, ts *metrics.TagSet) error
 	return wrapped
 }
 
-func (s *socket) rejectWithTCPError(reject func(any), err error, method string, ts *metrics.TagSet) {
-	tcpErr := s.handleError(err, method, ts)
+func (s *socket) rejectWithTCPError(
+	reject extensionapi.PromiseResolver, err error, method string, tags extensionapi.Tags,
+) {
+	tcpErr := s.handleError(err, method, tags)
 	if tcpErr == nil {
 		tcpErr = newTCPError(err, method)
 	}
 
-	reject(tcpErr)
+	reject.Reject(tcpErr)
 }
 
 // TCPError represents an error that occurred during a TCP operation.

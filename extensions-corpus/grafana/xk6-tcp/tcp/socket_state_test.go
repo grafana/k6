@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/metrics"
 )
 
 func TestSocketStateTransitions(t *testing.T) {
@@ -171,13 +170,12 @@ func TestMetricsCreation(t *testing.T) {
 	require.NotNil(t, m.tcpErrors)
 	require.NotNil(t, m.tcpTimeouts)
 
-	// Verify metric types
-	require.Equal(t, metrics.Trend, m.tcpConnecting.Type)
-	require.Equal(t, metrics.Trend, m.tcpResolving.Type)
-	require.Equal(t, metrics.Trend, m.tcpDuration.Type)
-	require.Equal(t, metrics.Counter, m.tcpSockets.Type)
-	require.Equal(t, metrics.Counter, m.tcpReads.Type)
-	require.Equal(t, metrics.Counter, m.tcpWrites.Type)
-	require.Equal(t, metrics.Counter, m.tcpErrors.Type)
-	require.Equal(t, metrics.Counter, m.tcpTimeouts.Type)
+	require.Equal(t, tcpConnecting, m.tcpConnecting.Name())
+	require.Equal(t, tcpResolving, m.tcpResolving.Name())
+	require.Equal(t, tcpDuration, m.tcpDuration.Name())
+	require.Equal(t, tcpSockets, m.tcpSockets.Name())
+	require.Equal(t, tcpReads, m.tcpReads.Name())
+	require.Equal(t, tcpWrites, m.tcpWrites.Name())
+	require.Equal(t, tcpErrors, m.tcpErrors.Name())
+	require.Equal(t, tcpTimeouts, m.tcpTimeouts.Name())
 }

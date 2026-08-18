@@ -1,131 +1,93 @@
 package testscript
 
 import (
+	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/ext"
-	"go.k6.io/k6/v2/js/modulestest"
+	extensionapi "go.k6.io/k6-extension-api"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
-// RunFile runs a single testscript file using a minimal test runtime.
-// It uses registered extensions if no module pairs are provided.
+// RunFile runs a CommonJS test script using the standalone extension API host.
 func RunFile(t *testing.T, filename string, modulePairs ...any) {
 	t.Helper()
-
 	t.Attr("script", filename)
 
-	testRuntime := newTestRuntime(t, modulePairs...)
-	state := newTestVUState(t)
-	runtime := testRuntime.VU.Runtime()
+	runtime := extensionapitest.NewScriptRuntime(nil)
+	runtime.SetModule("k6/execution", map[string]any{"test": map[string]any{
+		"fail":  func(message string) { t.Error(message) },
+		"abort": func(message string) { t.Fatal(message) },
+	}})
 
-	module := runtime.NewObject()
-	exports := runtime.NewObject()
+	for i := 0; i+1 < len(modulePairs); i += 2 {
+		path, ok := modulePairs[i].(string)
+		if !ok {
+			t.Fatalf("module pair at index %d: expected string, got %T", i, modulePairs[i])
+		}
+		module, ok := modulePairs[i+1].(extensionapi.Module)
+		if !ok {
+			t.Fatalf("module pair %q: expected extension API module, got %T", path, modulePairs[i+1])
+		}
+		runtime.SetExtension(path, module)
+	}
 
-	set := func(obj *sobek.Object, key string, val any) {
-		t.Helper()
-
-		if err := obj.Set(key, val); err != nil {
-			t.Fatalf("%s: Set property %q failed: %v", filename, key, err)
+	env := make(map[string]string)
+	for _, value := range os.Environ() {
+		if key, value, ok := splitEnv(value); ok {
+			env[key] = value
 		}
 	}
-
-	set(module, "exports", exports)
-	set(runtime.GlobalObject(), "module", module)
-	set(runtime.GlobalObject(), "exports", exports)
-
-	prog, err := modulestest.CompileFile(filepath.Dir(filename), filepath.Base(filename))
-	if err != nil {
-		t.Fatalf("%s: compile failed: %v", filename, err)
+	runtime.VU.LookupEnvFunc = func(key string) (string, bool) { value, ok := env[key]; return value, ok }
+	if err := runtime.VU.Runtime().Set("__ENV", env); err != nil {
+		t.Fatalf("%s: set __ENV failed: %v", filename, err)
 	}
+	runtime.VU.DialContextFunc = dialContext
+	runtime.VU.LookupHostFunc = lookupHost
+	runtime.VU.TLSClientFunc = tlsClient
+	runtime.VU.CheckHostFunc = func(_ context.Context, _ string) error { return nil }
 
-	_, err = runtime.RunProgram(prog)
+	exports, err := runtime.RunFile(filename)
 	if err != nil {
 		t.Fatalf("%s: run failed: %v", filename, err)
 	}
-
-	testRuntime.MoveToVUContext(state)
-
-	result, err := runtime.RunString("module.exports")
-	if err != nil {
-		t.Fatalf("%s: failed to get module.exports: %v", filename, err)
-	}
-
-	exports = result.ToObject(runtime)
-
-	fn, ok := sobek.AssertFunction(exports.Get("default"))
+	fn, ok := sobek.AssertFunction(exports.ToObject(runtime.VU.Runtime()).Get("default"))
 	if !ok {
 		t.Fatalf("%s: exports.default should be a function", filename)
 	}
-
-	_, err = fn(sobek.Undefined())
-	if err != nil {
+	if _, err = runtime.Call(fn); err != nil {
 		t.Fatalf("%s: default() failed: %v", filename, err)
 	}
-
-	testRuntime.EventLoop.WaitOnRegistered()
 }
 
-// RunFiles runs all provided testscript files using a minimal test runtime.
-// It uses registered extensions if no module pairs are provided.
 func RunFiles(t *testing.T, files []string, modulePairs ...any) {
 	t.Helper()
-
 	if len(files) == 0 {
 		t.Fatal("no test files provided")
-
 		return
 	}
-
-	modulePairs = modulePairsOrRegistered(t, modulePairs)
-
 	for _, file := range files {
-		t.Run(filepath.ToSlash(file), func(t *testing.T) {
-			RunFile(t, file, modulePairs...)
-		})
+		t.Run(filepath.ToSlash(file), func(t *testing.T) { RunFile(t, file, modulePairs...) })
 	}
 }
 
-// RunGlob runs all testscript files matching the provided glob pattern
-// using a minimal test runtime.
-// It uses registered extensions if no module pairs are provided.
 func RunGlob(t *testing.T, glob string, modulePairs ...any) {
 	t.Helper()
-
 	files, err := filepath.Glob(glob)
 	if err != nil {
 		t.Fatalf("glob %q failed: %v", glob, err)
-
 		return
 	}
-
 	RunFiles(t, files, modulePairs...)
 }
 
-func registeredExtensions(t *testing.T) []any {
-	t.Helper()
-
-	extensions := ext.Get(ext.JSExtension)
-	pairs := make([]any, 0, len(extensions)<<1)
-
-	for path, e := range extensions {
-		pairs = append(pairs, path, e.Module)
+func splitEnv(value string) (string, string, bool) {
+	for i := 0; i < len(value); i++ {
+		if value[i] == '=' {
+			return value[:i], value[i+1:], true
+		}
 	}
-
-	return pairs
-}
-
-func modulePairsOrRegistered(t *testing.T, modulePairs []any) []any {
-	t.Helper()
-
-	if len(modulePairs)%2 != 0 {
-		t.Fatalf("modulePairs length must be even, got %d", len(modulePairs))
-	}
-
-	if len(modulePairs) == 0 {
-		modulePairs = registeredExtensions(t)
-	}
-
-	return modulePairs
+	return "", "", false
 }

@@ -3,6 +3,8 @@ import ssh from "k6/x/ssh";
 import tls from "k6/x/tls";
 import { Faker } from "k6/x/faker";
 import { Client as RedisClient } from "k6/x/redis";
+import { Client as MQTTClient } from "k6/x/mqtt";
+import { Socket as TCPSocket } from "k6/x/tcp";
 import "k6/x/kubernetes";
 import "k6/x/sql";
 import "k6/x/sql/driver/azuresql";
@@ -31,4 +33,9 @@ export default function () {
 		throw new Error("Redis extension was not registered");
 	}
 	new RedisClient("redis://127.0.0.1:6379");
+	if (typeof MQTTClient !== "function" || typeof TCPSocket !== "function") {
+		throw new Error("MQTT or TCP extension was not registered");
+	}
+	new MQTTClient();
+	new TCPSocket();
 }

@@ -1,8 +1,9 @@
 package mqtt
 
 import (
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/metrics"
+	"fmt"
+
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 const (
@@ -13,21 +14,30 @@ const (
 )
 
 type mqttMetrics struct {
-	dataSent             *metrics.Metric
-	dataReceived         *metrics.Metric
-	mqttMessagesSent     *metrics.Metric
-	mqttMessagesReceived *metrics.Metric
-	mqttErrors           *metrics.Metric
-	mqttCalls            *metrics.Metric
+	host                 extensionapi.Metrics
+	dataSent             extensionapi.Metric
+	dataReceived         extensionapi.Metric
+	mqttMessagesSent     extensionapi.Metric
+	mqttMessagesReceived extensionapi.Metric
+	mqttErrors           extensionapi.Metric
+	mqttCalls            extensionapi.Metric
 }
 
-func newMqttMetrics(vu modules.VU) *mqttMetrics {
-	return &mqttMetrics{
-		dataSent:             vu.InitEnv().BuiltinMetrics.DataSent,
-		dataReceived:         vu.InitEnv().BuiltinMetrics.DataReceived,
-		mqttMessagesSent:     vu.InitEnv().Registry.MustNewMetric(mqttMessagesSent, metrics.Counter),
-		mqttMessagesReceived: vu.InitEnv().Registry.MustNewMetric(mqttMessagesReceived, metrics.Counter),
-		mqttErrors:           vu.InitEnv().Registry.MustNewMetric(mqttErrors, metrics.Counter),
-		mqttCalls:            vu.InitEnv().Registry.MustNewMetric(mqttCalls, metrics.Counter),
+func newMqttMetrics(vu extensionapi.VU) *mqttMetrics {
+	host, ok := vu.(extensionapi.Metrics)
+	if !ok {
+		panic("extension API metrics capability is unavailable")
 	}
+	register := func(name string) extensionapi.Metric {
+		metric, err := host.RegisterMetric(extensionapi.MetricSpec{Name: name, Kind: extensionapi.MetricCounter})
+		if err != nil {
+			panic(fmt.Errorf("register MQTT metric %q: %w", name, err))
+		}
+		return metric
+	}
+	dataSent, _ := host.BuiltinMetric(extensionapi.BuiltinDataSent)
+	dataReceived, _ := host.BuiltinMetric(extensionapi.BuiltinDataReceived)
+	return &mqttMetrics{host: host, dataSent: dataSent, dataReceived: dataReceived,
+		mqttMessagesSent: register(mqttMessagesSent), mqttMessagesReceived: register(mqttMessagesReceived),
+		mqttErrors: register(mqttErrors), mqttCalls: register(mqttCalls)}
 }

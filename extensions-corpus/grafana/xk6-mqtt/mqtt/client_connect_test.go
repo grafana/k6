@@ -1,26 +1,23 @@
 package mqtt
 
 import (
+	"context"
+	"errors"
 	"net"
-	"net/url"
 	"os"
 	"testing"
 
 	"github.com/grafana/sobek"
 	"github.com/grafana/xk6-mqtt/internal/broker"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/lib/netext"
 )
 
 func TestClientConnect(t *testing.T) {
 	t.Parallel()
 
 	runtime := newTestRuntime(t)
-	mm := newMqttMetrics(runtime.VU)
-	logger := runtime.VU.InitEnv().Logger
-
-	runtime.MoveToVUContext(newTestVUState(t)) // runtime.VU.InitEnv() will return nil after this
+	mm := newTestMetrics(runtime.VU)
+	logger := runtime.VU.Logger()
 
 	client := newTestClient(t, logger, runtime.VU, mm)
 
@@ -44,8 +41,6 @@ func TestClientConnect(t *testing.T) {
 
 	require.NoError(t, err)
 
-	runtime.EventLoop.WaitOnRegistered()
-
 	require.True(t, handlerCalled)
 }
 
@@ -65,10 +60,8 @@ func TestClientConnectAuthenticated(t *testing.T) {
 	addr := "tcp://" + tcpListener.Address()
 
 	runtime := newTestRuntime(t)
-	mm := newMqttMetrics(runtime.VU)
-	logger := runtime.VU.InitEnv().Logger
-
-	runtime.MoveToVUContext(newTestVUState(t)) // runtime.VU.InitEnv() will return nil after this
+	mm := newTestMetrics(runtime.VU)
+	logger := runtime.VU.Logger()
 
 	toValue := runtime.VU.Runtime().ToValue
 
@@ -94,8 +87,6 @@ func TestClientConnectAuthenticated(t *testing.T) {
 
 	require.NoError(t, err)
 
-	runtime.EventLoop.WaitOnRegistered()
-
 	require.True(t, handlerCalled)
 }
 
@@ -103,31 +94,18 @@ func TestClientConnectBlacklisted(t *testing.T) {
 	t.Parallel()
 
 	runtime := newTestRuntime(t)
-	mm := newMqttMetrics(runtime.VU)
-	logger := runtime.VU.InitEnv().Logger
+	mm := newTestMetrics(runtime.VU)
+	logger := runtime.VU.Logger()
 
-	runtime.MoveToVUContext(newTestVUState(t))
-
-	dialer, ok := runtime.VU.StateField.Dialer.(*netext.Dialer)
-	require.True(t, ok)
-
-	u, err := url.Parse(os.Getenv(broker.EnvBrokerAddress)) //nolint:forbidigo // test reads the embedded broker address from env
-	require.NoError(t, err)
-
-	dialer.Blacklist = []*lib.IPNet{
-		{
-			IPNet: net.IPNet{
-				IP:   net.ParseIP(u.Hostname()),
-				Mask: net.CIDRMask(24, 32),
-			},
-		},
+	runtime.VU.DialContextFunc = func(context.Context, string, string) (net.Conn, error) {
+		return nil, errors.New("is in a blacklisted range")
 	}
 
 	client := newTestClient(t, logger, runtime.VU, mm)
 
 	toValue := runtime.VU.Runtime().ToValue
 
-	err = runtime.EventLoop.Start(func() error {
+	err := runtime.EventLoop.Start(func() error {
 		return client.connect(toValue(os.Getenv(broker.EnvBrokerAddress)), nil) //nolint:forbidigo // test reads the embedded broker address from env
 	})
 
@@ -136,17 +114,14 @@ func TestClientConnectBlacklisted(t *testing.T) {
 
 	require.NoError(t, client.end(nil))
 
-	runtime.EventLoop.WaitOnRegistered()
 }
 
 func TestClientReconnectWithoutConnect(t *testing.T) {
 	t.Parallel()
 
 	runtime := newTestRuntime(t)
-	mm := newMqttMetrics(runtime.VU)
-	logger := runtime.VU.InitEnv().Logger
-
-	runtime.MoveToVUContext(newTestVUState(t))
+	mm := newTestMetrics(runtime.VU)
+	logger := runtime.VU.Logger()
 
 	client := newTestClient(t, logger, runtime.VU, mm)
 
@@ -158,5 +133,4 @@ func TestClientReconnectWithoutConnect(t *testing.T) {
 
 	require.NoError(t, client.end(nil))
 
-	runtime.EventLoop.WaitOnRegistered()
 }
