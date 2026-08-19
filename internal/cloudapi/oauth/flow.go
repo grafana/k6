@@ -108,6 +108,13 @@ type Flow struct {
 	// OpenInBrowser. A non-nil error only downgrades the UX: the URL is
 	// printed for the user to open manually.
 	OpenBrowser func(context.Context, string) error
+
+	// Listen creates the callback listener and reports the port the browser
+	// should be redirected to. Defaults to listenOnCallbackPort, which scans
+	// the port range a Grafana CLI callback is expected on. Tests replace it
+	// with an ephemeral port so that concurrent logins cannot land on a port a
+	// finished login has just released.
+	Listen func(context.Context) (net.Listener, int, error)
 }
 
 // Run opens the browser and blocks until the user completes the login, ctx is
@@ -126,7 +133,11 @@ func (f *Flow) Run(ctx context.Context) (*Result, error) {
 		openBrowser = OpenInBrowser
 	}
 
-	listener, port, err := listenOnCallbackPort(ctx)
+	listen := f.Listen
+	if listen == nil {
+		listen = listenOnCallbackPort
+	}
+	listener, port, err := listen(ctx)
 	if err != nil {
 		return nil, err
 	}

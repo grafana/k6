@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -102,6 +103,19 @@ func writeJSON(t *testing.T, w http.ResponseWriter, body any) {
 	assert.NoError(t, json.NewEncoder(w).Encode(body))
 }
 
+// listenEphemeral binds any free port. Tests must not share the fixed callback
+// port range: they run in parallel, and a port a finished flow has released can
+// be rebound by another flow while a callback for the first is still in flight,
+// delivering it to the wrong server.
+func listenEphemeral(ctx context.Context) (net.Listener, int, error) {
+	var lc net.ListenConfig
+	listener, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, 0, err
+	}
+	return listener, listener.Addr().(*net.TCPAddr).Port, nil
+}
+
 // runFlow drives a Flow against fake, returning what Run returned.
 func runFlow(t *testing.T, fake *fakeGrafana, mutate func(*Flow)) (*Result, error) {
 	t.Helper()
@@ -110,6 +124,7 @@ func runFlow(t *testing.T, fake *fakeGrafana, mutate func(*Flow)) (*Result, erro
 		StackURL:    fake.server.URL,
 		Out:         io.Discard,
 		OpenBrowser: func(_ context.Context, authURL string) error { go fake.visit(t, authURL); return nil },
+		Listen:      listenEphemeral,
 	}
 	if mutate != nil {
 		mutate(flow)
@@ -325,6 +340,7 @@ func TestFlowRunHonoursCancellation(t *testing.T) {
 		StackURL:    fake.server.URL,
 		Out:         io.Discard,
 		OpenBrowser: func(context.Context, string) error { return nil }, // never completed by the user
+		Listen:      listenEphemeral,
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -357,6 +373,7 @@ func TestCallbackIsSingleUse(t *testing.T) {
 	flow := &Flow{
 		StackURL: fake.server.URL,
 		Out:      io.Discard,
+		Listen:   listenEphemeral,
 		OpenBrowser: func(_ context.Context, authURL string) error {
 			u, err := url.Parse(authURL)
 			require.NoError(t, err)
