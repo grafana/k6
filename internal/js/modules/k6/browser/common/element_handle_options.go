@@ -571,20 +571,6 @@ func NewElementHandleWaitForElementStateOptions(defaultTimeout time.Duration) *E
 	}
 }
 
-// Parse parses the ElementHandleWaitForElementStateOptions from the given opts.
-func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "timeout" {
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-	return nil
-}
-
 // ElementHandleDispatchEventOptions are options for ElementHandle.dispatchEvent.
 type ElementHandleDispatchEventOptions struct {
 	*ElementHandleBaseOptions

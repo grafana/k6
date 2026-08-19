@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	maps0 "maps"
+	"time"
 
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // mapElementHandle to the JS module.
@@ -280,8 +282,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"waitForElementState": func(state string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleWaitForElementStateOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleWaitForElementStateOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing waitForElementState options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -338,4 +340,21 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	maps0.Copy(maps, jsHandleMap)
 
 	return maps
+}
+
+// parseElementHandleWaitForElementStateOptions parses the element handle wait for element state
+// options from a Sobek value.
+func parseElementHandleWaitForElementStateOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleWaitForElementStateOptions, error) {
+	ehopts := common.NewElementHandleWaitForElementStateOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ehopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "timeout" {
+			ehopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+	return ehopts, nil
 }
