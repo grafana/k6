@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/internal/event"
+	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/internal/ui/console"
 	"go.k6.io/k6/v2/internal/usage"
@@ -43,6 +44,11 @@ const (
 	// fetched by `k6 x`. Tests point this at httptest or an unreachable address
 	// to keep the command tree construction off the real network.
 	ProvisionCatalogURL = "K6_PROVISION_CATALOG_URL"
+
+	// UsageReportURL overrides the endpoint the anonymous usage report is sent
+	// to. It defaults to the production endpoint and lets tests point it at an
+	// httptest server to observe the report.
+	UsageReportURL = "K6_USAGE_REPORT_URL"
 
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
@@ -90,6 +96,7 @@ type GlobalState struct {
 
 	SecretsManager    *secretsource.Manager
 	CloudSecretSource *cloudsecrets.SecretSource
+	CloudLogPusher    *cloudlog.Pusher
 	Usage             *usage.Usage
 	TestStatus        *lib.TestStatus
 }

@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -155,6 +157,11 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			cliArgs:            []string{"--no-cloud-secrets"},
 			wantStderrContains: "the --no-cloud-secrets flag can only be used in conjunction with the --local-execution flag",
 		},
+		{
+			name:               "using --no-cloud-logs without --local-execution should fail",
+			cliArgs:            []string{"--no-cloud-logs"},
+			wantStderrContains: "the --no-cloud-logs flag can only be used in conjunction with the --local-execution flag",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -229,6 +236,11 @@ export default function() {};`
 			m := rc.GetMetrics()
 			m.SetPushUrl(srv.URL + "/v1/metrics")
 			rc.SetMetrics(m)
+			// Point the logs push_url at the test server too, so the
+			// configured pusher never contacts the real logs host.
+			l := rc.GetLogs()
+			l.SetPushUrl(srv.URL + logsPushPath)
+			rc.SetLogs(l)
 			resp.SetRuntimeConfig(rc)
 			writeProvJSON(w, http.StatusOK, resp)
 		})
@@ -318,6 +330,11 @@ export default function() {};`
 			m := rc.GetMetrics()
 			m.SetPushUrl(srv.URL + "/v1/metrics")
 			rc.SetMetrics(m)
+			// Point the logs push_url at the test server too, so the
+			// configured pusher never contacts the real logs host.
+			l := rc.GetLogs()
+			l.SetPushUrl(srv.URL + logsPushPath)
+			rc.SetLogs(l)
 			resp.SetRuntimeConfig(rc)
 			writeProvJSON(w, http.StatusOK, resp)
 		})
@@ -387,6 +404,11 @@ export default function() {
 			m := rc.GetMetrics()
 			m.SetPushUrl(srv.URL + "/v1/metrics")
 			rc.SetMetrics(m)
+			// Point the logs push_url at the test server too, so the
+			// configured pusher never contacts the real logs host.
+			l := rc.GetLogs()
+			l.SetPushUrl(srv.URL + logsPushPath)
+			rc.SetLogs(l)
 			resp.SetRuntimeConfig(rc)
 			writeProvJSON(w, http.StatusOK, resp)
 		})
@@ -496,6 +518,11 @@ export default function() {};`
 		m := rc.GetMetrics()
 		m.SetPushUrl(srv.URL + "/v1/metrics")
 		rc.SetMetrics(m)
+		// Point the logs push_url at the test server too, so the
+		// configured pusher never contacts the real logs host.
+		l := rc.GetLogs()
+		l.SetPushUrl(srv.URL + logsPushPath)
+		rc.SetLogs(l)
 		resp.SetRuntimeConfig(rc)
 		writeProvJSON(w, http.StatusOK, resp)
 	})
@@ -523,6 +550,472 @@ export default function() {};`
 
 	// --no-cloud-secrets must prevent the cloud source from being registered.
 	assert.Nil(t, ts.CloudSecretSource, "cloud secret source should not be registered when --no-cloud-secrets is set")
+}
+
+func TestCloudRunLocalExecutionCloudLogPusher(t *testing.T) {
+	t.Parallel()
+
+	// The VU logs one line so the pusher has a deterministic entry to push;
+	// console.log routes through the same logger the pusher hooks.
+	script := `
+export const options = {
+  cloud: {
+      name: 'Test cloud logs',
+      projectID: 123456,
+  },
+};
+export default function() { console.log('hello from the vu'); };`
+
+	t.Run("registers the pusher for --local-execution", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.NotNil(t, ts.CloudLogPusher,
+			"cloud log pusher should be registered for k6 cloud run --local-execution")
+
+		// The self-provisioned flow must configure the pusher from the
+		// provisioning response: streams are pushed with the scoped token
+		// and the result's TestRunID as the test_run_id label.
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		assert.Equal(t, "Bearer test-run-token-abc", auths[0])
+		assert.Contains(t, bodies[0],
+			fmt.Sprintf(`"test_run_id":"%d"`, provtest.DefaultTestRunID))
+	})
+
+	t.Run("configures the pusher from env for an externally-provisioned run", func(t *testing.T) {
+		t.Parallel()
+
+		rec := &logPushRecorder{}
+		const pushRefID = "99999"
+
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^" + logsPushPath + "$": http.HandlerFunc(rec.handler),
+			"POST ^/v1/tests$": http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				require.Fail(t, "CreateTestRun must not be called when K6_CLOUD_PUSH_REF_ID is set")
+			}),
+			"POST ^/provisioning/v1/": http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				require.Fail(t, "provisioning API must not be called when K6_CLOUD_PUSH_REF_ID is set")
+			}),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = pushRefID
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = srv.URL + logsPushPath
+		// An external orchestrator supplies the scoped metrics push creds
+		// (PR #6133); they must be set together, and the same token is used
+		// as the Bearer for the logs push.
+		ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v1/metrics"
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "ext-token"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		require.NotNil(t, ts.CloudLogPusher,
+			"cloud log pusher should be registered for an externally-provisioned --local-execution run")
+
+		// The externally-provisioned flow reads the logs config and token
+		// from env; the run id is the PushRefID.
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		assert.Equal(t, "Bearer ext-token", auths[0])
+		assert.Contains(t, bodies[0], `"test_run_id":"`+pushRefID+`"`)
+	})
+
+	t.Run("externally-provisioned run keeps test_run_id with empty allowed labels", func(t *testing.T) {
+		t.Parallel()
+
+		rec := &logPushRecorder{}
+		const pushRefID = "99999"
+
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^" + logsPushPath + "$": http.HandlerFunc(rec.handler),
+		})
+		t.Cleanup(srv.Close)
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = pushRefID
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = srv.URL + logsPushPath
+		ts.Env["K6_CLOUD_METRICS_PUSH_URL"] = srv.URL + "/v1/metrics"
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = "ext-token"
+		// An explicitly empty allow-list decodes to []string{}; the required
+		// test_run_id label must still survive rather than be stripped.
+		ts.Env["K6_CLOUD_LOGS_ALLOWED_LABELS"] = ""
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		assert.Contains(t, bodies[0], `"test_run_id":"`+pushRefID+`"`,
+			"test_run_id must survive an empty K6_CLOUD_LOGS_ALLOWED_LABELS")
+	})
+
+	t.Run("does not register the pusher with --no-cloud-logs", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--no-cloud-logs"})
+		rec := setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Nil(t, ts.CloudLogPusher,
+			"cloud log pusher should not be registered when --no-cloud-logs is set")
+		_, bodies := rec.snapshot()
+		assert.Empty(t, bodies, "no logs should be pushed when --no-cloud-logs is set")
+	})
+
+	t.Run("does not register the pusher for non-local-execution", func(t *testing.T) {
+		t.Parallel()
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
+		ts.CmdArgs = []string{"k6", "run", "test.js"}
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Nil(t, ts.CloudLogPusher,
+			"cloud log pusher should not be registered for a non-local-execution run")
+	})
+
+	// The subtests below mirror TestCloudMetricsPushCredentials (which pins the metrics
+	// push-credential resolution) for the cloud *log* push: the observable
+	// is which bearer token / URL k6 streams logs with across the
+	// self-provisioned, externally-provisioned and legacy paths. The
+	// sentinel token consts (scopedToken, bogusToken, extToken,
+	// staleConfigToken, orgToken) are shared with
+	// cmd_cloud_run_push_credentials_test.go.
+
+	// A2 (log): a stray K6_CLOUD_TEST_RUN_TOKEN in the env must NOT override
+	// the run-scoped token the self-provisioned flow gets from provisioning.
+	// The token is programmatic-only (no envconfig), so the stray is inert.
+	t.Run("self-provisioned log push ignores a stray token env var", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = bogusToken
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		for _, a := range auths {
+			assert.Equalf(t, "Bearer "+scopedToken, a,
+				"log push must use the run-scoped token, not the stray env token %q", bogusToken)
+		}
+	})
+
+	// A3 (log): a stray K6_CLOUD_LOGS_PUSH_URL must NOT override the
+	// provisioning-supplied logs URL. conf.Apply(runtime_config) overwrites
+	// the env value. If it leaked, the push would go to the unroutable host
+	// and the provisioning logs endpoint (rec) would record nothing.
+	t.Run("self-provisioned log push ignores a stray logs-push-URL env var", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = "http://stray.invalid/logs/push"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies,
+			"log push must hit the provisioning logs URL, not the stray env URL")
+		for _, a := range auths {
+			assert.Equal(t, "Bearer "+scopedToken, a)
+		}
+	})
+
+	// A4 (log): both stray env vars at once — scoped token + provisioning URL
+	// must still win.
+	t.Run("self-provisioned log push ignores both stray env vars", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = bogusToken
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = "http://stray.invalid/logs/push"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies,
+			"log push must hit the provisioning logs URL with the scoped token")
+		for _, a := range auths {
+			assert.Equal(t, "Bearer "+scopedToken, a)
+		}
+	})
+
+	// A8 (log): a stale testRunToken living in the k6 config file must NOT
+	// override the run-scoped token in the self-provisioned flow.
+	t.Run("self-provisioned log push ignores a stale config-file token", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		rec := setupLocalExecutionProvMock(t, ts)
+		cfg := []byte(`{"collectors":{"cloud":{"testRunToken":"` + staleConfigToken + `"}}}`)
+		require.NoError(t, ts.FS.MkdirAll(filepath.Dir(ts.Flags.ConfigFilePath), 0o755))
+		require.NoError(t, fsext.WriteFile(ts.FS, ts.Flags.ConfigFilePath, cfg, 0o644))
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		auths, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		for _, a := range auths {
+			assert.Equalf(t, "Bearer "+scopedToken, a,
+				"log push must use the run-scoped token, not the stale config token %q", staleConfigToken)
+		}
+	})
+
+	// B2 (log): partial scoped creds (only the token) must error before any
+	// log push happens.
+	t.Run("errors on partial scoped creds and pushes no logs", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = "99999"
+		ts.Env["K6_CLOUD_TEST_RUN_TOKEN"] = extToken // only one of the required pair
+		ts.ExpectedExitCode = -1
+
+		rec := &logPushRecorder{}
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^" + logsPushPath + "$": http.HandlerFunc(rec.handler),
+		})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		out := ts.Stdout.String() + ts.Stderr.String()
+		assert.Contains(t, out, "must be set together",
+			"expected a clear both-or-neither error for partial scoped creds")
+		_, bodies := rec.snapshot()
+		assert.Empty(t, bodies, "no cloud log push should happen when the run errors out")
+	})
+
+	// A logs push URL in the externally-provisioned flow is useless without the
+	// scoped token; it must error rather than silently stream nothing.
+	t.Run("errors when a logs push URL is set without a token", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"})
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = "99999"
+		ts.Env["K6_CLOUD_LOGS_PUSH_URL"] = "http://logs.invalid/push"
+		// No K6_CLOUD_TEST_RUN_TOKEN (nor the K6_CLOUD_METRICS_PUSH_URL it
+		// pairs with), so there is no token to authenticate the logs push.
+		ts.ExpectedExitCode = -1
+
+		srv := getTestServer(t, map[string]http.Handler{})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		out := ts.Stdout.String() + ts.Stderr.String()
+		assert.Contains(t, out, "K6_CLOUD_LOGS_PUSH_URL requires K6_CLOUD_TEST_RUN_TOKEN")
+	})
+
+	// A5/A6 (log): the legacy `k6 run --out=cloud` path must not register a
+	// cloud log pusher at all (log streaming is a --local-execution feature).
+	t.Run("does not register the pusher for k6 run --out=cloud", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
+		ts.Env["K6_CLOUD_TOKEN"] = orgToken
+		const refID = 1337
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/v1/tests$": http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				_, _ = fmt.Fprintf(w, `{"reference_id": "%d", "config": {}}`, refID)
+			}),
+		})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		assert.Nil(t, ts.CloudLogPusher,
+			"cloud log streaming is only for cloud run --local-execution, not --out=cloud")
+	})
+
+	// A6 (log): a PushRefID relay run with no scoped creds and no logs push
+	// URL must not push logs anywhere (the pusher stays unconfigured).
+	t.Run("relay run without a logs push URL pushes no logs", func(t *testing.T) {
+		t.Parallel()
+
+		ts := makeTestState(t, script, []string{"--local-execution"})
+		ts.Env["K6_CLOUD_PUSH_REF_ID"] = "99999"
+
+		rec := &logPushRecorder{}
+		srv := getTestServer(t, map[string]http.Handler{
+			"POST ^/v1/tests$":            failHandler(t, "CreateTestRun must not be called with PushRefID"),
+			"POST ^/provisioning/v1/":     failHandler(t, "provisioning API must not be called with PushRefID"),
+			"POST ^" + logsPushPath + "$": http.HandlerFunc(rec.handler),
+		})
+		t.Cleanup(srv.Close)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		assert.Empty(t, bodies,
+			"a relay run with no logs push URL must not push logs anywhere")
+	})
+
+	// "and more" (beyond the metrics matrix): the pusher must honour the
+	// backend-configured log level. The logger runs at debug (-v) so
+	// console.debug reaches the pusher hook; the provisioning logs config
+	// (level=info) must then drop it before pushing, while info survives.
+	t.Run("self-provisioned log push filters lines below the configured level", func(t *testing.T) {
+		t.Parallel()
+
+		lvlScript := `
+export const options = { cloud: { name: 'Test cloud logs', projectID: 123456 } };
+export default function() {
+	console.debug('debug-line-must-be-filtered');
+	console.log('info-line-must-be-pushed');
+};`
+		ts := makeTestState(t, lvlScript, []string{"--local-execution", "-v", "--log-output=stdout"})
+		rec := setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		all := strings.Join(bodies, "\n")
+		assert.Contains(t, all, "info-line-must-be-pushed",
+			"info-level lines should be pushed")
+		assert.NotContains(t, all, "debug-line-must-be-filtered",
+			"debug-level lines must be filtered out by the configured level (info)")
+	})
+
+	// A logged secret must reach the cloud only in redacted form: the
+	// secrets-redaction hook runs before the pusher observes an entry
+	// (root.go), so the push never carries the raw value. Guards that
+	// property end to end.
+	t.Run("redacts secrets before pushing logs", func(t *testing.T) {
+		t.Parallel()
+
+		const secret = "super-secret-value"
+		secretScript := `
+import secrets from "k6/secrets";
+export const options = { cloud: { name: 'Test cloud logs', projectID: 123456 } };
+export default async function() {
+	const s = await secrets.get("mykey");
+	console.log("the secret is " + s);
+};`
+		ts := makeTestState(t, secretScript, []string{
+			"--local-execution", "--no-cloud-secrets",
+			"--secret-source=mock=mykey=" + secret,
+		})
+		rec := setupLocalExecutionProvMock(t, ts)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		_, bodies := rec.snapshot()
+		require.NotEmpty(t, bodies, "expected at least one cloud log push")
+		all := strings.Join(bodies, "\n")
+		assert.Contains(t, all, "***SECRET_REDACTED***",
+			"the log line should reach the cloud only in redacted form")
+		assert.NotContains(t, all, secret,
+			"the raw secret must never reach the cloud log push")
+	})
+}
+
+// logsPushPath is the path the local-execution mocks use for the cloud
+// logs push endpoint, overriding the real host baked into
+// DefaultStartLocalExecutionResponse so tests never contact it.
+const logsPushPath = "/logs/v1/push"
+
+// logPushRecorder captures cloud log pushes received by the mock server so
+// tests can assert on the pusher wiring (auth header + test_run_id label).
+type logPushRecorder struct {
+	mu     sync.Mutex
+	auths  []string
+	bodies []string
+}
+
+func (r *logPushRecorder) handler(w http.ResponseWriter, req *http.Request) {
+	body, _ := io.ReadAll(req.Body)
+	r.mu.Lock()
+	r.auths = append(r.auths, req.Header.Get("Authorization"))
+	r.bodies = append(r.bodies, string(body))
+	r.mu.Unlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (r *logPushRecorder) snapshot() (auths, bodies []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.auths...), append([]string(nil), r.bodies...)
+}
+
+// setupLocalExecutionProvMock wires a provisioning mock server for a
+// k6 cloud run --local-execution flow and points ts at it. It mirrors the
+// handlers used by TestCloudRunLocalExecutionNoCloudSecrets. The returned
+// recorder captures any cloud log pushes; the logs push_url is overridden
+// onto the mock server so the real logs host is never contacted.
+func setupLocalExecutionProvMock(t *testing.T, ts *GlobalTestState) *logPushRecorder {
+	t.Helper()
+
+	rec := &logPushRecorder{}
+	srv := provtest.NewServer(t)
+
+	srv.HandleCreateLoadTest(123456, func(w http.ResponseWriter, _ *http.Request) {
+		res := k6cloud.NewLoadTestApiModelWithDefaults()
+		res.SetId(provtest.DefaultLoadTestID)
+		writeProvJSON(w, http.StatusCreated, res)
+	})
+
+	srv.HandleStartLocalExecution(provtest.DefaultLoadTestID, func(w http.ResponseWriter, _ *http.Request) {
+		resp := provtest.DefaultStartLocalExecutionResponse()
+		uploadURL := srv.URL + provtest.PresignedUploadPath
+		resp.SetArchiveUploadUrl(uploadURL)
+		resp.SetTestRunDetailsPageUrl(fmt.Sprintf("%s/runs/%d", srv.URL, provtest.DefaultTestRunID))
+		rc := resp.GetRuntimeConfig()
+		m := rc.GetMetrics()
+		m.SetPushUrl(srv.URL + "/v1/metrics")
+		rc.SetMetrics(m)
+		l := rc.GetLogs()
+		l.SetPushUrl(srv.URL + logsPushPath)
+		rc.SetLogs(l)
+		resp.SetRuntimeConfig(rc)
+		writeProvJSON(w, http.StatusOK, resp)
+	})
+
+	srv.HandlePresignedUpload(provtest.PresignedUploadPath, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv.HandleFetchTestRun(provtest.DefaultTestRunID, []v6.TestProgress{
+		{Status: v6.StatusInitializing},
+	})
+
+	srv.HandleNotify(provtest.DefaultTestRunID, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv.Mux.HandleFunc("POST "+logsPushPath, rec.handler)
+
+	srv.Mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+
+	return rec
 }
 
 func makeTestState(tb testing.TB, script string, cliFlags []string) *GlobalTestState {
