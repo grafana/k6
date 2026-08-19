@@ -109,6 +109,20 @@ func TestDialerAddrBlockHostnamesStar(t *testing.T) {
 	}
 }
 
+func TestDialerCheckHost(t *testing.T) {
+	t.Parallel()
+
+	dialer := NewDialer(net.Dialer{}, newResolver())
+	blocked, err := types.NewHostnameTrie([]string{"*.blocked.test"})
+	require.NoError(t, err)
+	dialer.BlockedHostnames = blocked
+
+	require.EqualError(t, dialer.CheckHost("api.blocked.test"),
+		"hostname (api.blocked.test) is in a blocked pattern (*.blocked.test)")
+	require.NoError(t, dialer.CheckHost("192.0.2.1"))
+	require.NoError(t, dialer.CheckHost("allowed.test"))
+}
+
 // Benchmarks /etc/hosts like hostname mapping
 func BenchmarkDialerHosts(b *testing.B) {
 	hosts, err := types.NewHosts(map[string]types.Host{

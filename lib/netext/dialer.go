@@ -87,6 +87,22 @@ func (d *Dialer) ResolveAddr(addr string) (net.IP, int, error) {
 	return remote.IP, remote.Port, nil
 }
 
+// CheckHost checks a logical hostname against the configured hostname-blocking
+// policy. It intentionally neither resolves the hostname nor opens a
+// connection; callers that perform protocol-specific networking can use it
+// before their own operation.
+func (d *Dialer) CheckHost(host string) error {
+	if d.BlockedHostnames == nil || net.ParseIP(host) != nil {
+		return nil
+	}
+
+	if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+		return BlockedHostError{hostname: host, match: match}
+	}
+
+	return nil
+}
+
 // IOSamples returns samples for data send and received since it last call and zeros out.
 // It uses the provided time as the sample time and tags and builtinMetrics to build the samples.
 func (d *Dialer) IOSamples(
@@ -138,9 +154,9 @@ func (d *Dialer) findRemote(addr string) (*types.Host, error) {
 	}
 
 	ip := net.ParseIP(host)
-	if d.BlockedHostnames != nil && ip == nil {
-		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
-			return nil, BlockedHostError{hostname: host, match: match}
+	if ip == nil {
+		if err := d.CheckHost(host); err != nil {
+			return nil, err
 		}
 	}
 

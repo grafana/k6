@@ -196,8 +196,8 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-redis` | Migrated | Uses `Network`, `TLS`, and `Promises`; its tests use the standalone API test host. |
 | `xk6-tls` | Migrated | Uses `Network` and `Promises`; no k6 dependency remains. |
 | `xk6-kafka` | Can migrate after execution-state capability | Metrics/tags and built-in byte metrics are available; it still needs an active-vs-init state capability. |
-| `xk6-dns` | Deferred | Promise/event-loop is available; needs metrics/tags and a DNS-query policy/multi-record lookup capability. |
-| `xk6-icmp` | Deferred | Promise/event-loop, environment, and logger are available; needs ICMP packet sockets and metrics/tags. |
+| `xk6-dns` | Can migrate | Use `NetworkPolicy.CheckHost()` for the queried logical name and own its DNS packets, nameserver choice, and response parsing. |
+| `xk6-icmp` | Can migrate | Use policy-aware `Network.LookupHost()` to resolve the target, then own ICMP packet-socket selection, privileges, and echo handling. |
 | `xk6-mqtt` | Migrated for native MQTT/TLS | Uses network, TLS, promises, logger, and metrics/tags. MQTT-over-WebSocket awaits a host-aware WebSocket capability. |
 | `xk6-tcp` | Migrated | Uses network, TLS, promises, logger, and metrics/tags. |
 | `xk6-loki` | Deferred | Logger is available; needs a k6-aware HTTP executor, current tags, VU ID, and metrics. |
@@ -220,10 +220,11 @@ one test fixture before being released. This keeps extensions independent from
 k6's broad dependency graph while allowing later API versions to add
 capabilities without breaking the small base contract.
 
-## Proposed next capabilities
+## Next capability proposal
 
-These are proposals only. They should be added in a later API version after a
-host adapter and standalone test-host implementation have been reviewed.
+The execution-context capability below remains a proposal. It should be added
+only after its host adapter and standalone test-host implementation have been
+reviewed.
 
 ### Execution context (Kafka)
 
@@ -248,78 +249,34 @@ Kafka uses this before its synchronous compatibility `produce()` and
 `consume()` calls, replacing its `vu.State() == nil` check. Its existing
 network, TLS, promise, logger, and metrics requirements are already covered.
 
-### DNS queries (xk6-dns)
+## Protocol networking building block
 
-`Network.LookupHost()` is intentionally a simple address lookup and may return
-the host-selected address. `xk6-dns` additionally needs all answers for a
-requested record type and an explicit nameserver while the host enforces its
-DNS and hostname-blocking policy on the *queried name*. The proposed optional
-capability is:
+### Advisory network policy (DNS and protocol-specific extensions)
+
+Extensions sometimes need to perform an operation whose logical target is not
+the address they connect to. For example, a DNS extension queries an explicit
+nameserver but must check the queried hostname first. The optional
+`NetworkPolicy` capability supplies that building block without giving an
+extension any k6 network types:
 
 ```go
-type DNSRecordType string
-
-const (
-    DNSRecordA    DNSRecordType = "A"
-    DNSRecordAAAA DNSRecordType = "AAAA"
-    DNSRecordTXT  DNSRecordType = "TXT"
-)
-
-type DNSQuery struct {
-    Name       string
-    Type       DNSRecordType
-    NameServer string // host:port
-}
-
-type DNS interface {
-    Query(context.Context, DNSQuery) ([]string, error)
-    LookupHost(context.Context, string) ([]string, error)
+type NetworkPolicy interface {
+    CheckHost(context.Context, host string) error
 }
 ```
 
-The host owns transport choice, retries, response validation, and policy
-enforcement. The extension receives only the normalized values it exposes to
-JavaScript. This avoids exposing k6's resolver and dialer types or making the
-extension reimplement hostname blocking around a raw UDP connection.
+`CheckHost()` checks only the host's hostname-blocking policy: it does not
+resolve the name or open a connection. It is intentionally advisory. An
+extension owns its protocol implementation and is responsible for applying the
+check before its operation; a host cannot reliably enforce every operation an
+extension can implement directly.
 
-### ICMP echo (xk6-icmp)
-
-Raw ICMP sockets have platform-specific privilege and sandbox requirements, so
-they should not be modelled as a general `net.PacketConn`. The host should own
-socket creation, address-policy enforcement, and the privileged/unprivileged
-fallback. The proposed optional capability is a bounded echo operation:
-
-```go
-type ICMPEchoRequest struct {
-    Target      string
-    Source      string
-    Count       int
-    Interval    time.Duration
-    Timeout     time.Duration
-    PayloadSize int
-}
-
-type ICMPEchoReply struct {
-    Sequence int
-    RTT      time.Duration
-    TTL      int
-}
-
-type ICMPEchoResult struct {
-    TargetIP string
-    Sent     int
-    Replies  []ICMPEchoReply
-}
-
-type ICMP interface {
-    Echo(context.Context, ICMPEchoRequest) (ICMPEchoResult, error)
-}
-```
-
-`xk6-icmp` retains its JavaScript API, logging, promises, tags, and metrics;
-it translates the result into its current per-packet metrics. A host that does
-not permit ICMP returns a dedicated capability-unavailable error rather than
-letting an extension bypass host policy with `icmp.ListenPacket()`.
+`Network.LookupHost()` remains the appropriate building block when an
+extension needs a host-policy-aware selected address. `xk6-icmp` can use it
+before its own `icmp.ListenPacket()` and packet handling, retaining the
+extension's platform-specific privileged/unprivileged fallback. `xk6-dns` can
+call `CheckHost()` for the DNS question, then retain ownership of DNS packet
+construction, transport, nameserver choice, retries, and response parsing.
 
 ## Temporary compatibility helper
 

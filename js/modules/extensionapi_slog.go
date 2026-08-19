@@ -8,7 +8,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var extensionAPIDiscardLogger = slog.New(slog.NewTextHandler(io.Discard, nil)) //nolint:gochecknoglobals
+func newExtensionAPIDiscardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
 
 // extensionAPISlogHandler adapts the stable slog logger exposed to extensions
 // to k6's current Logrus-based logging implementation.

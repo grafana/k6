@@ -28,6 +28,7 @@ type VU struct {
 	LoggerValue       *slog.Logger
 	DialContextFunc   func(context.Context, string, string) (net.Conn, error)
 	LookupHostFunc    func(context.Context, string) ([]string, error)
+	CheckHostFunc     func(context.Context, string) error
 	TLSClientFunc     func(context.Context, net.Conn, *tls.Config) (net.Conn, error)
 	EnabledSystemTag  map[extensionapi.SystemTag]bool
 	MetadataSystemTag map[extensionapi.SystemTag]bool
@@ -116,6 +117,14 @@ func (v *VU) LookupHost(ctx context.Context, host string) ([]string, error) {
 		return nil, extensionapi.ErrNetworkUnavailable
 	}
 	return v.LookupHostFunc(ctx, host)
+}
+
+// CheckHost implements extensionapi.NetworkPolicy.
+func (v *VU) CheckHost(ctx context.Context, host string) error {
+	if v.CheckHostFunc == nil {
+		return extensionapi.ErrNetworkPolicyUnavailable
+	}
+	return v.CheckHostFunc(ctx, host)
 }
 
 // TLSClient implements extensionapi.TLS.

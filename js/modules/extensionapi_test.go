@@ -52,6 +52,8 @@ func (extensionAPITestDialer) ResolveAddr(string) (net.IP, int, error) {
 	return net.ParseIP("192.0.2.1"), 0, nil
 }
 
+func (extensionAPITestDialer) CheckHost(string) error { return nil }
+
 func TestExtensionAPIVUNetwork(t *testing.T) {
 	t.Parallel()
 
@@ -81,6 +83,23 @@ func TestExtensionAPIVUNetworkUnavailable(t *testing.T) {
 	require.ErrorIs(t, err, extensionapi.ErrNetworkUnavailable)
 }
 
+func TestExtensionAPIVUNetworkPolicy(t *testing.T) {
+	t.Parallel()
+
+	vu := extensionAPIVU{vu: extensionAPITestVU{state: &lib.State{Dialer: extensionAPITestDialer{}}}}
+	policy, ok := any(vu).(extensionapi.NetworkPolicy)
+	require.True(t, ok)
+	require.NoError(t, policy.CheckHost(context.Background(), "example.test"))
+}
+
+func TestExtensionAPIVUNetworkPolicyUnavailable(t *testing.T) {
+	t.Parallel()
+
+	vu := extensionAPIVU{vu: extensionAPITestVU{}}
+	policy := any(vu).(extensionapi.NetworkPolicy)
+	require.ErrorIs(t, policy.CheckHost(context.Background(), "example.test"), extensionapi.ErrNetworkPolicyUnavailable)
+}
+
 func TestExtensionAPIVUTLSClient(t *testing.T) {
 	t.Parallel()
 
@@ -100,7 +119,7 @@ func TestExtensionAPIVUTLSClient(t *testing.T) {
 
 	serverURL, err := url.Parse(server.URL)
 	require.NoError(t, err)
-	dialer := net.Dialer{}
+	dialer := &net.Dialer{}
 	rawConnection, err := dialer.DialContext(context.Background(), "tcp", serverURL.Host)
 	require.NoError(t, err)
 	extensionTLSConfig := &tls.Config{
@@ -110,9 +129,7 @@ func TestExtensionAPIVUTLSClient(t *testing.T) {
 	}
 	connection, err := capability.TLSClient(context.Background(), rawConnection, extensionTLSConfig)
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, connection.Close())
-	})
+	defer func() { require.NoError(t, connection.Close()) }()
 
 	_, err = connection.Write([]byte("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n"))
 	require.NoError(t, err)
@@ -136,9 +153,7 @@ func TestExtensionAPIVUTLSClientUnavailable(t *testing.T) {
 	t.Parallel()
 
 	connection, peer := net.Pipe()
-	t.Cleanup(func() {
-		require.NoError(t, peer.Close())
-	})
+	defer func() { require.NoError(t, peer.Close()) }()
 	vu := extensionAPIVU{vu: extensionAPITestVU{}}
 	capability := any(vu).(extensionapi.TLS)
 	_, err := capability.TLSClient(context.Background(), connection, nil)

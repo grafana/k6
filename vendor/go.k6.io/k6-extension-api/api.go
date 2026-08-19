@@ -194,6 +194,19 @@ type Network interface {
 	LookupHost(ctx context.Context, host string) ([]string, error)
 }
 
+// ErrNetworkPolicyUnavailable is returned when a host cannot check a logical
+// hostname against its network policy in the current VU context.
+var ErrNetworkPolicyUnavailable = errors.New("extension API network policy capability is unavailable")
+
+// NetworkPolicy is an optional VU capability for checking a logical hostname
+// against the host's network policy without opening a connection or resolving
+// the name. Extensions retain ownership of protocol-specific operations, such
+// as DNS queries or packet sockets, and may call CheckHost before those
+// operations. Extensions obtain it with a type assertion from VU.
+type NetworkPolicy interface {
+	CheckHost(ctx context.Context, host string) error
+}
+
 // ErrTLSUnavailable is returned when a host cannot apply its TLS policy in
 // the current context, such as k6's init context.
 var ErrTLSUnavailable = errors.New("extension API TLS capability is unavailable")

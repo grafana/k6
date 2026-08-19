@@ -55,7 +55,7 @@ func (v extensionAPIVU) Logger() *slog.Logger {
 	if state := v.vu.State(); state != nil && state.Logger != nil {
 		return slog.New(newExtensionAPISlogHandler(state.Logger))
 	}
-	return extensionAPIDiscardLogger
+	return newExtensionAPIDiscardLogger()
 }
 
 func (v extensionAPIVU) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
@@ -88,6 +88,24 @@ func (v extensionAPIVU) LookupHost(ctx context.Context, host string) ([]string, 
 	}
 
 	return []string{ip.String()}, nil
+}
+
+func (v extensionAPIVU) CheckHost(ctx context.Context, host string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	state := v.vu.State()
+	if state == nil || state.Dialer == nil {
+		return extensionapi.ErrNetworkPolicyUnavailable
+	}
+
+	policy, ok := state.Dialer.(interface{ CheckHost(string) error })
+	if !ok {
+		return extensionapi.ErrNetworkPolicyUnavailable
+	}
+
+	return policy.CheckHost(host)
 }
 
 func (v extensionAPIVU) TLSClient(ctx context.Context, conn net.Conn, config *tls.Config) (net.Conn, error) {
