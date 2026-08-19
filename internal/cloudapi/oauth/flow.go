@@ -43,6 +43,11 @@ const (
 	// requests on to the stack's Grafana API.
 	proxyAPIPath = "/api/cli/v1/proxy"
 
+	// clientType names k6 to the login page, which uses it to say which
+	// application the user is authorizing. A login page that does not know the
+	// value falls back to generic copy, so sending it is harmless.
+	clientType = "k6"
+
 	// callback server port range. The first free port wins.
 	callbackPortFirst = 54321
 	callbackPortLast  = 54399
@@ -188,6 +193,7 @@ func (f *Flow) authURL(port int, sess session) string {
 	q.Set("state", sess.state)
 	q.Set("code_challenge", sess.challenge)
 	q.Set("code_challenge_method", "S256")
+	q.Set("client_type", clientType)
 	if f.DeviceName != "" {
 		q.Set("device_name", f.DeviceName)
 	}

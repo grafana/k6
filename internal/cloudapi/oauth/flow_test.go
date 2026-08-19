@@ -30,7 +30,7 @@ type fakeGrafana struct {
 
 	// seen records what the auth page was asked for.
 	seenChallenge, seenState, seenScopes string
-	seenVerifier                         string
+	seenClientType, seenVerifier         string
 }
 
 func newFakeGrafana(t *testing.T) *fakeGrafana {
@@ -78,6 +78,7 @@ func (f *fakeGrafana) visit(t *testing.T, authURL string) {
 	f.seenChallenge = q.Get("code_challenge")
 	f.seenState = q.Get("state")
 	f.seenScopes = q.Get("scopes")
+	f.seenClientType = q.Get("client_type")
 
 	callback := url.Values{}
 	callback.Set("state", q.Get("state"))
@@ -153,6 +154,9 @@ func TestFlowRun(t *testing.T) {
 	assert.NotEqual(t, fake.seenVerifier, fake.seenChallenge)
 	assert.Equal(t, fake.seenChallenge, session{verifier: fake.seenVerifier}.challengeFor())
 	assert.Equal(t, "grafana-api:read", fake.seenScopes)
+	// Names k6 on the login page, so the user is not asked to authorize some
+	// other tool.
+	assert.Equal(t, "k6", fake.seenClientType)
 }
 
 func TestFlowRunRejectsStateMismatch(t *testing.T) {
