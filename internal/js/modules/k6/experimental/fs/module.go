@@ -231,22 +231,15 @@ func (f *File) Read(into sobek.Value) (*sobek.Promise, error) {
 	}
 
 	intoObj := into.ToObject(f.vu.Runtime())
-	if !isUint8Array(f.vu.Runtime(), intoObj) {
-		err := reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
-		return promise, err
-	}
-
-	// Obtain the underlying ArrayBuffer from the Uint8Array
-	ab, ok := intoObj.Get("buffer").Export().(sobek.ArrayBuffer)
-	if !ok {
-		err := reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+	intoBytes, err := uint8ArrayViewBytes(f.vu.Runtime(), intoObj)
+	if err != nil {
+		err := reject(err)
 		return promise, err
 	}
 
 	// To avoid concurrency linked to modifying the runtime's `into` buffer from multiple
 	// goroutines we make sure to work on a separate copy, and will copy the bytes back
 	// into the runtime's `into` buffer once the promise is resolved.
-	intoBytes := ab.Bytes()
 	buffer := make([]byte, len(intoBytes))
 
 	// We register a callback to be executed by the VU's runtime.
@@ -337,6 +330,29 @@ func isUint8Array(rt *sobek.Runtime, o *sobek.Object) bool {
 	}
 
 	return true
+}
+
+// uint8ArrayViewBytes returns the exact byte slice addressed by a Uint8Array,
+// respecting byteOffset and byteLength so subarray() / offset views do not
+// read into or overwrite adjacent bytes in a shared ArrayBuffer.
+func uint8ArrayViewBytes(rt *sobek.Runtime, o *sobek.Object) ([]byte, error) {
+	if o == nil || !isUint8Array(rt, o) {
+		return nil, newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array")
+	}
+
+	ab, ok := o.Get("buffer").Export().(sobek.ArrayBuffer)
+	if !ok {
+		return nil, newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array")
+	}
+
+	byteOffset := int(o.Get("byteOffset").ToInteger())
+	byteLength := int(o.Get("byteLength").ToInteger())
+	backing := ab.Bytes()
+	if byteOffset < 0 || byteLength < 0 || byteOffset > len(backing) || byteLength > len(backing)-byteOffset {
+		return nil, newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array")
+	}
+
+	return backing[byteOffset : byteOffset+byteLength], nil
 }
 
 func exportInt(v sobek.Value) (int64, error) {

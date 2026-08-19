@@ -291,6 +291,76 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	// Regression: file.read() must write into the Uint8Array view, not the entire
+	// backing ArrayBuffer. Using a larger shared buffer with an offset view used to
+	// overwrite adjacent bytes and consume more file data than the view could hold.
+	t.Run("read into offset Uint8Array view should not touch adjacent bytes", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + testFileName
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("0123456789abcdefghij"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q);
+
+			const backing = new ArrayBuffer(21);
+			const prefix = new Uint8Array(backing, 0, 8);
+			const dest = new Uint8Array(backing, 8, 5);
+			const suffix = new Uint8Array(backing, 13, 8);
+			prefix.fill(0xAA);
+			suffix.fill(0xBB);
+
+			const bytesRead = await file.read(dest);
+			if (bytesRead !== 5) {
+				throw 'expected read to return 5, got ' + bytesRead + ' instead';
+			}
+
+			if (dest[0] !== 48 || dest[1] !== 49 || dest[2] !== 50 || dest[3] !== 51 || dest[4] !== 52) {
+				throw 'expected dest to be [48, 49, 50, 51, 52], got ' + Array.from(dest);
+			}
+
+			for (let i = 0; i < 8; i++) {
+				if (prefix[i] !== 0xAA) {
+					throw 'prefix corrupted at index ' + i + ': ' + prefix[i];
+				}
+				if (suffix[i] !== 0xBB) {
+					throw 'suffix corrupted at index ' + i + ': ' + suffix[i];
+				}
+			}
+
+			const rest = new Uint8Array(5);
+			const n2 = await file.read(rest);
+			if (n2 !== 5) {
+				throw 'expected second read to return 5 remaining view-sized bytes, got ' + n2;
+			}
+			if (rest[0] !== 53 || rest[1] !== 54 || rest[2] !== 55 || rest[3] !== 56 || rest[4] !== 57) {
+				throw 'expected rest to be [53, 54, 55, 56, 57], got ' + Array.from(rest);
+			}
+
+			const subBuf = new Uint8Array(10);
+			subBuf.fill(0xCC);
+			const view = subBuf.subarray(2, 7);
+			const n3 = await file.read(view);
+			if (n3 !== 5) {
+				throw 'expected subarray read to return 5, got ' + n3;
+			}
+			if (view[0] !== 97 || view[1] !== 98 || view[2] !== 99 || view[3] !== 100 || view[4] !== 101) {
+				throw 'expected view to be [97, 98, 99, 100, 101], got ' + Array.from(view);
+			}
+			if (subBuf[0] !== 0xCC || subBuf[1] !== 0xCC || subBuf[7] !== 0xCC || subBuf[8] !== 0xCC || subBuf[9] !== 0xCC) {
+				throw 'subarray read corrupted bytes outside the view: ' + Array.from(subBuf);
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("read called when end of file reached should return null and succeed", func(t *testing.T) {
 		t.Parallel()
 
