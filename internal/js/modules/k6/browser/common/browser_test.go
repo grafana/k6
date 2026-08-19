@@ -187,6 +187,41 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		require.Nil(t, page)
 	})
+
+	// A non-matching page event (popup, or another concurrent newPage in the
+	// same context) must not finish the wait or consume the target ID.
+	// Regression for: (1) createWaitForEventHandler closing on a false
+	// predicate; (2) a one-shot receive of the created target ID.
+	t.Run("ignores_unrelated_page_event", func(t *testing.T) {
+		t.Parallel()
+
+		const (
+			wantTargetID    target.ID = "want"
+			unrelatedTarget target.ID = "unrelated"
+		)
+
+		tc := newTestCase(browserContextID)
+		tc.b.pages[wantTargetID] = &Page{targetID: wantTargetID}
+		tc.b.browserOpts.Timeout = time.Second
+		tc.b.conn = fakeConn{
+			execute: func(ctx context.Context, method string, params, res any) error {
+				require.Equal(t, target.CommandCreateTarget, method)
+				v, _ := res.(*target.CreateTargetReturns)
+				v.TargetID = wantTargetID
+
+				// Emit a foreign page first (as a popup or sibling newPage
+				// would), then the page we actually created.
+				tc.bc.emit(EventBrowserContextPage, &Page{targetID: unrelatedTarget})
+				tc.bc.emit(EventBrowserContextPage, &Page{targetID: wantTargetID})
+				return nil
+			},
+		}
+
+		page, err := tc.b.newPageInContext(browserContextID)
+		require.NoError(t, err)
+		require.NotNil(t, page)
+		require.Equal(t, wantTargetID, page.targetID)
+	})
 }
 
 type fakeConn struct {

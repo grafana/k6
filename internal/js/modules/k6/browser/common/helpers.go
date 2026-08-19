@@ -139,30 +139,23 @@ func createWaitForEventHandler(
 			case <-evCancelCtx.Done():
 				return
 			case ev := <-chEvHandler:
-				if slices.Contains(events, ev.typ) {
-					if predicateFn != nil {
-						if predicateFn(ev.data) {
-							select {
-							case ch <- ev.data:
-							case <-evCancelCtx.Done():
-								return
-							}
-						}
-					} else {
-						select {
-						case ch <- nil:
-						case <-evCancelCtx.Done():
-							return
-						}
-					}
-					close(ch)
-
-					// We wait for one matching event only,
-					// then remove the event handler by cancelling context and stopping goroutine.
-					evCancelFn()
-
-					return
+				if !slices.Contains(events, ev.typ) {
+					continue
 				}
+				if predicateFn != nil && !predicateFn(ev.data) {
+					// Keep waiting: a non-matching event of the right type
+					// (e.g. another page in the same browser context) must not
+					// unblock the waiter.
+					continue
+				}
+				select {
+				case ch <- ev.data:
+					close(ch)
+					// One matching event is enough; remove the handler.
+					evCancelFn()
+				case <-evCancelCtx.Done():
+				}
+				return
 			}
 		}
 	}()
@@ -172,8 +165,9 @@ func createWaitForEventHandler(
 }
 
 // Returns a channel that will block until the predicateFn returns true.
-// This is similar to createWaitForEventHandler, except that it doesn't
-// stop waiting after the first received matching event.
+// Unlike createWaitForEventHandler, this keeps the handler registered until
+// the predicate matches (or the context is done), and does not require the
+// event type list to be checked separately from the predicate.
 func createWaitForEventPredicateHandler(
 	ctx context.Context, emitter EventEmitter, events []string,
 	predicateFn func(data any) bool,
