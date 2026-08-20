@@ -140,6 +140,44 @@ func promiseThen(
 	return newPromise, nil
 }
 
+// promiseThenReturn is like [promiseThen], but its callbacks return a [sobek.Value] which the
+// resulting promise adopts (i.e. if a callback returns a promise, the resulting promise follows
+// it). This is needed to implement the specification's "reacting to a promise ... returns X"
+// steps, where X may itself be a promise.
+func promiseThenReturn(
+	rt *sobek.Runtime,
+	promise *sobek.Promise,
+	onFulfilled, onRejected func(sobek.Value) sobek.Value,
+) (*sobek.Promise, error) {
+	val, err := rt.RunString(
+		`(function(promise, onFulfilled, onRejected) { return promise.then(onFulfilled, onRejected) })`)
+	if err != nil {
+		return nil, newError(RuntimeError, "unable to initialize promiseThenReturn internal helper function")
+	}
+
+	cal, ok := sobek.AssertFunction(val)
+	if !ok {
+		return nil, newError(RuntimeError, "the internal promiseThenReturn helper is not a function")
+	}
+
+	if onRejected == nil {
+		val, err = cal(sobek.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled))
+	} else {
+		val, err = cal(sobek.Undefined(), rt.ToValue(promise), rt.ToValue(onFulfilled), rt.ToValue(onRejected))
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	newPromise, ok := val.Export().(*sobek.Promise)
+	if !ok {
+		return nil, newError(RuntimeError, "unable to cast the internal promiseThenReturn helper's return value to a promise")
+	}
+
+	return newPromise, nil
+}
+
 // markPromiseHandled marks the given promise as handled to prevent unhandled rejection
 // tracking. See https://github.com/dop251/goja/issues/565.
 func markPromiseHandled(rt *sobek.Runtime, p *sobek.Promise) {
@@ -156,33 +194,6 @@ func throwableValue(err any) any {
 		return jsErr.Err()
 	}
 	return err
-}
-
-// isNumber returns true if the given sobek.Value holds a number
-func isNumber(value sobek.Value) bool {
-	_, isFloat := value.Export().(float64)
-	_, isInt := value.Export().(int64)
-
-	return isFloat || isInt
-}
-
-// isNonNegativeNumber implements the [IsNonNegativeNumber] algorithm.
-//
-// [IsNonNegativeNumber]: https://streams.spec.whatwg.org/#is-non-negative-number
-func isNonNegativeNumber(value sobek.Value) bool {
-	if common.IsNullish(value) {
-		return false
-	}
-
-	if !isNumber(value) {
-		return false
-	}
-
-	if value.ToFloat() < 0 || value.ToInteger() < 0 {
-		return false
-	}
-
-	return true
 }
 
 // setReadOnlyPropertyOf sets a read-only property on the given [sobek.Object].
