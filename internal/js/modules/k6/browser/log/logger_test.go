@@ -20,7 +20,7 @@ func TestReportCallerAddsCallerInfo(t *testing.T) {
 	base.SetFormatter(&logrus.JSONFormatter{})
 
 	l := New(base, "")
-	l.ReportCaller()
+	require.NoError(t, l.ReportCaller())
 
 	l.Debugf("category", "hello %s", "world")
 
@@ -34,4 +34,25 @@ func TestReportCallerAddsCallerInfo(t *testing.T) {
 	funcName, ok := entry["func"].(string)
 	require.True(t, ok, "func field should be present once ReportCaller is enabled")
 	assert.Contains(t, funcName, "Logger", "func should name the calling method")
+}
+
+// unsupportedFormatter is a logrus.Formatter that isn't a *logrus.TextFormatter
+// or *logrus.JSONFormatter, to exercise ReportCaller's default case.
+type unsupportedFormatter struct{}
+
+func (unsupportedFormatter) Format(*logrus.Entry) ([]byte, error) {
+	return nil, nil
+}
+
+func TestReportCallerReturnsErrorForUnsupportedFormatter(t *testing.T) {
+	t.Parallel()
+
+	base := logrus.New()
+	base.SetFormatter(unsupportedFormatter{})
+
+	l := New(base, "")
+
+	err := l.ReportCaller()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown formatter type")
 }
