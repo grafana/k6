@@ -66,6 +66,17 @@ func TestResponseError_Error(t *testing.T) {
 			},
 			expected: "(400/error) bad request",
 		},
+		{
+			name: "unauthorized 401 includes login hint",
+			respErr: ResponseError{
+				Response: &http.Response{StatusCode: http.StatusUnauthorized},
+				APIError: k6cloud.ErrorApiModel{
+					Message: "Invalid token",
+					Code:    "error",
+				},
+			},
+			expected: "(401/error) Invalid token. Run `k6 cloud login` to refresh your token",
+		},
 	}
 
 	for _, tt := range tests {
