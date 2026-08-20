@@ -667,6 +667,10 @@ func (r *Runner) runPart(
 		return nil, deadlineError
 	}
 
+	if v == nil && err == nil {
+		return nil, fmt.Errorf("%s() did not finish: it is still awaiting an operation that never completed", name)
+	}
+
 	return v, err
 }
 
