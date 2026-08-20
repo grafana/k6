@@ -142,12 +142,25 @@ func (l *Logger) ReportCaller() {
 			return f.Func.Name(), fmt.Sprintf("%s:%d", f.File, f.Line)
 		}
 	}
-	l.SetFormatter(&logrus.TextFormatter{
-		CallerPrettyfier: caller(),
-		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyFile: "caller",
-		},
-	})
+
+	fieldMap := logrus.FieldMap{
+		logrus.FieldKeyFile: "caller",
+	}
+
+	switch f := l.Formatter.(type) {
+	case *logrus.TextFormatter:
+		f.CallerPrettyfier = caller()
+		f.FieldMap = fieldMap
+	case *logrus.JSONFormatter:
+		f.CallerPrettyfier = caller()
+		f.FieldMap = fieldMap
+	default:
+		l.SetFormatter(&logrus.TextFormatter{
+			CallerPrettyfier: caller(),
+			FieldMap:         fieldMap,
+		})
+	}
+
 	l.SetReportCaller(true)
 }
 
