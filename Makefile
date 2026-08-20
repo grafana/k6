@@ -66,7 +66,7 @@ tests:
 
 ## grpc-e2e-tests: Runs the gRPC end-to-end tests (k6 and the gRPC server as separate processes).
 grpc-e2e-tests:
-	go test -tags grpc_e2e -race -count=1 -timeout 300s ./internal/e2e/grpc/...
+	go test -tags grpc_e2e -race -count=1 -timeout 600s ./internal/e2e/grpc/...
 
 ## check: Runs the linters and tests.
 check: lint tests

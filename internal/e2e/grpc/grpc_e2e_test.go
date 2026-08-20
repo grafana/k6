@@ -37,13 +37,12 @@ func repoRoot(t *testing.T) string {
 }
 
 // goBuild compiles the package at pkg into an executable at out, using the same
-// toolchain that runs the tests.
+// toolchain that runs the tests. It relies on the test's context (and thus the
+// `go test -timeout` value) for its deadline rather than imposing its own, which
+// would be redundant with — and never fire before — the outer test timeout.
 func goBuild(t *testing.T, root, out, pkg string) {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "go", "build", "-o", out, pkg)
+	cmd := exec.CommandContext(t.Context(), "go", "build", "-o", out, pkg)
 	cmd.Dir = root
 	if buildOut, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("failed to build %s: %v\n%s", pkg, err, buildOut)
@@ -52,17 +51,30 @@ func goBuild(t *testing.T, root, out, pkg string) {
 
 // startServer starts the helper gRPC server (already built at serverBin) in its
 // own process and returns the address it is listening on. The server is stopped
-// when the test's context is cancelled (i.e. during cleanup).
+// when the test's context is cancelled (i.e. during cleanup). As an extra
+// safety net, setPdeathsig asks the OS to kill it if the test process dies
+// without running cleanups (e.g. on a -timeout panic).
 func startServer(t *testing.T, serverBin string) string {
 	t.Helper()
 
 	cmd := exec.CommandContext(t.Context(), serverBin, "-addr", "127.0.0.1:0")
+	setPdeathsig(cmd)
+	// Ensure Wait() (and thus the process) is not held open indefinitely by a
+	// lingering stdout reader after the context kills the server.
+	cmd.WaitDelay = 10 * time.Second
 	stdout, err := cmd.StdoutPipe()
 	require.NoError(t, err)
 	cmd.Stderr = os.Stderr //nolint:forbidigo // surfacing server logs on failure is helpful
 	require.NoError(t, cmd.Start(), "failed to start gRPC server")
 
-	t.Cleanup(func() { _ = cmd.Wait() })
+	// Reap the process exactly once; done is closed when it exits.
+	var waitErr error
+	done := make(chan struct{})
+	go func() {
+		waitErr = cmd.Wait()
+		close(done)
+	}()
+	t.Cleanup(func() { <-done })
 
 	// The server prints "LISTENING <addr>" once it is bound and ready.
 	addrCh := make(chan string, 1)
@@ -79,6 +91,11 @@ func startServer(t *testing.T, serverBin string) string {
 	select {
 	case addr := <-addrCh:
 		return addr
+	case <-done:
+		// The server exited before it ever announced an address; report that
+		// directly instead of masking it as a timeout below.
+		t.Fatalf("gRPC server exited before it started listening: %v", waitErr)
+		return ""
 	case <-time.After(30 * time.Second):
 		t.Fatal("timed out waiting for gRPC server to start listening")
 		return ""
@@ -146,9 +163,13 @@ func TestGRPCSeparateProcess(t *testing.T) {
 			wantContain: []string{"Found feature called", "All done"},
 		},
 		{
+			// Assert on counts that the server computes and returns in the
+			// RouteSummary reply (5 points sent, 5 known features), so an empty
+			// or malformed reply would fail rather than pass on the script's
+			// unconditional log lines.
 			name:        "client_streaming_load_from_proto",
 			script:      "grpc_client_streaming.js",
-			wantContain: []string{"Finished trip with", "All done"},
+			wantContain: []string{"Finished trip with 5 points", "Passed 5 feature", "All done"},
 		},
 		{
 			name:        "unary_invoke_via_reflection",
@@ -168,12 +189,15 @@ func TestGRPCSeparateProcess(t *testing.T) {
 		})
 	}
 
-	// Negative control: if proto loading is broken (here: the .proto file cannot
-	// be found/parsed), the run MUST fail. This guards against a regression that
-	// silently succeeds without actually loading the definitions.
+	// Negative control: when the .proto file cannot be found (and therefore its
+	// types cannot be loaded), the run MUST fail — and fail for that reason. We
+	// assert both a non-zero exit and that the error names the missing file, so a
+	// script syntax error or a bad flag would not satisfy it.
 	t.Run("missing_proto_fails", func(t *testing.T) {
 		t.Parallel()
 		out, err := runK6(t, k6Bin, root, "grpc_invoke.js", addr, "./does-not-exist.proto")
 		require.Errorf(t, err, "k6 run must fail when the .proto cannot be loaded, got:\n%s", out)
+		assert.Containsf(t, out, "does-not-exist.proto",
+			"failure should reference the missing proto file, got:\n%s", out)
 	})
 }
