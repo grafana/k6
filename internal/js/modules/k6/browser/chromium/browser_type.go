@@ -562,7 +562,10 @@ func makeLogger(ctx context.Context, envLookup env.LookupFunc) (*log.Logger, err
 		}
 	}
 	if _, ok := envLookup(env.LogCaller); ok {
-		logger.ReportCaller()
+		err := logger.ReportCaller()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return logger, nil

@@ -136,19 +136,31 @@ func (l *Logger) DebugMode() bool {
 }
 
 // ReportCaller adds source file and function names to the log entries.
-func (l *Logger) ReportCaller() {
+func (l *Logger) ReportCaller() error {
 	caller := func() func(*runtime.Frame) (string, string) {
 		return func(f *runtime.Frame) (function string, file string) {
 			return f.Func.Name(), fmt.Sprintf("%s:%d", f.File, f.Line)
 		}
 	}
-	l.SetFormatter(&logrus.TextFormatter{
-		CallerPrettyfier: caller(),
-		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyFile: "caller",
-		},
-	})
+
+	fieldMap := logrus.FieldMap{
+		logrus.FieldKeyFile: "caller",
+	}
+
+	switch f := l.Formatter.(type) {
+	case *logrus.TextFormatter:
+		f.CallerPrettyfier = caller()
+		f.FieldMap = fieldMap
+	case *logrus.JSONFormatter:
+		f.CallerPrettyfier = caller()
+		f.FieldMap = fieldMap
+	default:
+		return fmt.Errorf("unknown formatter type %T", f)
+	}
+
 	l.SetReportCaller(true)
+
+	return nil
 }
 
 // SetCategoryFilter enables filtering logs by the filter regex.
