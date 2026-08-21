@@ -421,14 +421,6 @@ func (o *ElementHandlePressOptions) Parse(ctx context.Context, opts sobek.Value)
 	return nil
 }
 
-func (o *ElementHandlePressOptions) ToBaseOptions() *ElementHandleBaseOptions {
-	o2 := ElementHandleBaseOptions{}
-	o2.Force = false
-	o2.NoWaitAfter = o.NoWaitAfter
-	o2.Timeout = o.Timeout
-	return &o2
-}
-
 func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHandleScreenshotOptions {
 	return &ElementHandleScreenshotOptions{
 		Path:           "",
@@ -555,14 +547,6 @@ func (o *ElementHandleTypeOptions) Parse(ctx context.Context, opts sobek.Value) 
 		}
 	}
 	return nil
-}
-
-func (o *ElementHandleTypeOptions) ToBaseOptions() *ElementHandleBaseOptions {
-	o2 := ElementHandleBaseOptions{}
-	o2.Force = false
-	o2.NoWaitAfter = o.NoWaitAfter
-	o2.Timeout = o.Timeout
-	return &o2
 }
 
 func NewElementHandleWaitForElementStateOptions(defaultTimeout time.Duration) *ElementHandleWaitForElementStateOptions {
