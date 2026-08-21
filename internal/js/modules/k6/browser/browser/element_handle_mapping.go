@@ -222,8 +222,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"setChecked": func(checked bool, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleSetCheckedOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleSetCheckedOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing setChecked options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -231,8 +231,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"setInputFiles": func(files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleSetInputFilesOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleSetInputFilesOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
 			}
 			var pfiles common.Files
@@ -274,8 +274,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"uncheck": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleSetCheckedOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleSetCheckedOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing uncheck options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -542,6 +542,24 @@ func parseElementHandleTapOptions(
 		}
 	}
 	return ehtopts, nil
+}
+
+// parseElementHandleSetInputFilesOptions parses the element handle set input files options from a
+// Sobek value.
+func parseElementHandleSetInputFilesOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleSetInputFilesOptions, error) {
+	ehsifopts := common.NewElementHandleSetInputFilesOptions(defaultTimeout)
+
+	if k6common.IsNullish(opts) {
+		return ehsifopts, nil
+	}
+
+	err := parseElementHandleBaseOptions(&ehsifopts.ElementHandleBaseOptions, rt, opts)
+	if err != nil {
+		return ehsifopts, err
+	}
+
+	return ehsifopts, nil
 }
 
 // parseElementHandleClickOptions parses the element handle click options from a Sobek value.
