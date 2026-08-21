@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -431,43 +430,6 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 	}
 }
 
-// Parse parses the ElementHandleScreenshotOptions from the given opts.
-func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if common.IsNullish(opts) {
-		return nil
-	}
-
-	rt := k6ext.Runtime(ctx)
-	formatSpecified := false
-	obj := opts.ToObject(rt)
-	for _, k := range obj.Keys() {
-		switch k {
-		case "omitBackground":
-			o.OmitBackground = obj.Get(k).ToBoolean()
-		case "path":
-			o.Path = obj.Get(k).String()
-		case "quality":
-			o.Quality = obj.Get(k).ToInteger()
-		case "type":
-			if f, ok := imageFormatToID[obj.Get(k).String()]; ok {
-				o.Format = f
-				formatSpecified = true
-			}
-		case "timeout":
-			o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
-		}
-	}
-
-	// Infer file format by path if format not explicitly specified (default is PNG)
-	if o.Path != "" && !formatSpecified {
-		if strings.HasSuffix(o.Path, ".jpg") || strings.HasSuffix(o.Path, ".jpeg") {
-			o.Format = ImageFormatJPEG
-		}
-	}
-
-	return nil
-}
-
 func NewElementHandleSetCheckedOptions(defaultTimeout time.Duration) *ElementHandleSetCheckedOptions {
 	return &ElementHandleSetCheckedOptions{
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
@@ -475,51 +437,11 @@ func NewElementHandleSetCheckedOptions(defaultTimeout time.Duration) *ElementHan
 	}
 }
 
-// Parse parses the ElementHandleSetCheckedOptions from the given opts.
-func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "strict" {
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
-	return nil
-}
-
 func NewElementHandleTapOptions(defaultTimeout time.Duration) *ElementHandleTapOptions {
 	return &ElementHandleTapOptions{
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
 		Modifiers:                       []string{},
 	}
-}
-
-// Parse parses the ElementHandleTapOptions from the given opts.
-func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "modifiers" {
-				var m []string
-				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
-					return err
-				}
-				o.Modifiers = m
-			}
-		}
-	}
-	return nil
 }
 
 func NewElementHandleTypeOptions(defaultTimeout time.Duration) *ElementHandleTypeOptions {
