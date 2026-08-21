@@ -63,10 +63,6 @@ type ScrollIntoViewOptions struct {
 	Inline ScrollPosition `json:"inline"`
 }
 
-type ElementHandleCheckOptions struct {
-	ElementHandleBasePointerOptions
-}
-
 type ElementHandleClickOptions struct {
 	ElementHandleBasePointerOptions
 	Button     string   `json:"button"`
@@ -198,12 +194,6 @@ func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts sobek.
 		}
 	}
 	return nil
-}
-
-func NewElementHandleCheckOptions(defaultTimeout time.Duration) *ElementHandleCheckOptions {
-	return &ElementHandleCheckOptions{
-		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
-	}
 }
 
 // NewElementHandleSetInputFilesOptions creates a new ElementHandleSetInputFilesOption.
