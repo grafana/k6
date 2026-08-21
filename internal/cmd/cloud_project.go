@@ -9,12 +9,12 @@ type cmdCloudProject struct {
 	globalState *state.GlobalState
 }
 
-func getCmdCloudProject(cloudCmd *cmdCloud) *cobra.Command {
+func getCmdCloudProject(gs *state.GlobalState) *cobra.Command {
 	c := &cmdCloudProject{
-		globalState: cloudCmd.gs,
+		globalState: gs,
 	}
 
-	exampleText := getExampleText(cloudCmd.gs, `
+	exampleText := getExampleText(gs, `
   # List all projects in the configured stack
   $ {{.}} cloud project list
 
