@@ -2569,8 +2569,12 @@ type response struct {
 func TestPageOnResponse(t *testing.T) {
 	t.Parallel()
 
-	// Start and setup a webserver to test the page.on('request') handler.
-	tb := newTestBrowser(t, withHTTPServer())
+	// Skip the Go-level Chromium launch: this test only needs the HTTP server
+	// and drives the browser through the JS module after StartIteration.
+	// Launching both (newTestBrowser + IterStart) doubles Chromium processes
+	// and has caused flaky "error building browser on IterStart: canceled"
+	// failures under CI load (see #5124).
+	tb := newTestBrowser(t, withHTTPServer(), withSkipLaunch())
 
 	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
 		_, err := fmt.Fprintf(w, `<!DOCTYPE html>
@@ -2620,7 +2624,9 @@ func TestPageOnResponse(t *testing.T) {
 	//
 	// The code below is the JavaScript code that is executed in the k6 iteration.
 	// It will wait for all requests to be captured in returnValue, before returning.
-	gv, err := tb.vu.RunAsync(t, `
+	// Use RunPromise so a failed/interrupted RunAsync fails fast instead of
+	// panicking in ToPromise on a nil sobek.Value (#5124).
+	got := tb.vu.RunPromise(t, `
 		const context = await browser.newContext({locale: 'en-US', userAgent: 'some-user-agent'});
 		const page = await context.newPage();
 
@@ -2660,13 +2666,10 @@ func TestPageOnResponse(t *testing.T) {
 
 		return JSON.stringify(returnValue, null, 2);
 	`, tb.url("/home"))
-	require.NoError(t, err)
-
-	got := k6test.ToPromise(t, gv)
 
 	// Convert the result to a string and then to a slice of requests.
 	var responses []response
-	err = json.Unmarshal([]byte(got.Result().String()), &responses)
+	err := json.Unmarshal([]byte(got.Result().String()), &responses)
 	require.NoError(t, err)
 
 	// Normalize the date
