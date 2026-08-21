@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	maps0 "maps"
+	"strings"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -97,8 +98,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			})
 		},
 		"hover": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleHoverOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleHoverOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing element hover options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -164,8 +165,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			})
 		},
 		"press": func(key string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandlePressOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandlePressOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing press %q options: %w", key, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -173,8 +174,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleScreenshotOptions(eh.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleScreenshotOptions(rt, opts, eh.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing element handle screenshot options: %w", err)
 			}
 
@@ -243,8 +244,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"tap": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleTapOptions(eh.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleTapOptions(rt, opts, eh.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing element tap options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -264,8 +265,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			})
 		},
 		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewElementHandleTypeOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseElementHandleTypeOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing type options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -342,6 +343,48 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	return maps
 }
 
+// parseElementHandleTypeOptions parses the element handle type options from a Sobek value.
+func parseElementHandleTypeOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleTypeOptions, error) {
+	ehtopts := common.NewElementHandleTypeOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ehtopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "delay":
+			ehtopts.Delay = obj.Get(k).ToInteger()
+		case "noWaitAfter":
+			ehtopts.NoWaitAfter = obj.Get(k).ToBoolean()
+		case "timeout":
+			ehtopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+	return ehtopts, nil
+}
+
+// parseElementHandlePressOptions parses the element handle press options from a Sobek value.
+func parseElementHandlePressOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandlePressOptions, error) {
+	ehpopts := common.NewElementHandlePressOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ehpopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "delay":
+			ehpopts.Delay = obj.Get(k).ToInteger()
+		case "noWaitAfter":
+			ehpopts.NoWaitAfter = obj.Get(k).ToBoolean()
+		case "timeout":
+			ehpopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+	return ehpopts, nil
+}
+
 // parseElementHandleWaitForElementStateOptions parses the element handle wait for element state
 // options from a Sobek value.
 func parseElementHandleWaitForElementStateOptions(
@@ -359,6 +402,70 @@ func parseElementHandleWaitForElementStateOptions(
 	return ehopts, nil
 }
 
+// parseElementHandleScreenshotOptions parses the element handle screenshot options from a Sobek
+// value.
+func parseElementHandleScreenshotOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleScreenshotOptions, error) {
+	ehopts := common.NewElementHandleScreenshotOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ehopts, nil
+	}
+	formatSpecified := false
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "omitBackground":
+			ehopts.OmitBackground = obj.Get(k).ToBoolean()
+		case "path":
+			ehopts.Path = obj.Get(k).String()
+		case "quality":
+			ehopts.Quality = obj.Get(k).ToInteger()
+		case "type":
+			if f, ok := common.ImageIDFromString(obj.Get(k).String()); ok {
+				ehopts.Format = f
+				formatSpecified = true
+			}
+		case "timeout":
+			ehopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+
+	// Infer file format by path if format not explicitly specified (default is PNG)
+	if ehopts.Path != "" && !formatSpecified {
+		if strings.HasSuffix(ehopts.Path, ".jpg") || strings.HasSuffix(ehopts.Path, ".jpeg") {
+			ehopts.Format = common.ImageFormatJPEG
+		}
+	}
+	return ehopts, nil
+}
+
+// parseElementHandleHoverOptions parses the element handle hover options from a Sobek value.
+func parseElementHandleHoverOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleHoverOptions, error) {
+	ehhopts := common.NewElementHandleHoverOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ehhopts, nil
+	}
+	err := parseElementHandleBasePointerOptions(&ehhopts.ElementHandleBasePointerOptions, rt, opts)
+	if err != nil {
+		return ehhopts, err
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "modifiers" {
+			var m []string
+			if err := rt.ExportTo(obj.Get(k), &m); err != nil {
+				return ehhopts, err
+			}
+			ehhopts.Modifiers = m
+		}
+	}
+
+	return ehhopts, nil
+}
+
+// parseElementHandleSetCheckedOptions parses the element handle set checked options from a Sobek
+// value.
 func parseElementHandleSetCheckedOptions(
 	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleSetCheckedOptions, error) {
 	ehscopts := common.NewElementHandleSetCheckedOptions(defaultTimeout)
@@ -408,6 +515,33 @@ func parseElementHandleDblclickOptions(
 		}
 	}
 	return ehdopts, nil
+}
+
+// parseElementHandleTapOptions parses the element handle tap options from a Sobek value.
+func parseElementHandleTapOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleTapOptions, error) {
+	ehtopts := common.NewElementHandleTapOptions(defaultTimeout)
+
+	if k6common.IsNullish(opts) {
+		return ehtopts, nil
+	}
+
+	err := parseElementHandleBasePointerOptions(&ehtopts.ElementHandleBasePointerOptions, rt, opts)
+	if err != nil {
+		return ehtopts, err
+	}
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "modifiers" {
+			var m []string
+			if err := rt.ExportTo(obj.Get(k), &m); err != nil {
+				return ehtopts, err
+			}
+			ehtopts.Modifiers = m
+		}
+	}
+	return ehtopts, nil
 }
 
 // parseElementHandleClickOptions parses the element handle click options from a Sobek value.
