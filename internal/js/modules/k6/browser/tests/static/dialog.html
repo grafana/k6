@@ -17,8 +17,7 @@
                     div.textContent = 'alert dismissed';
                     break;
                 case "confirm":
-                    confirm("Click accept");
-                    div.textContent = 'confirm dismissed';
+                    div.textContent = confirm("Click accept") ? 'confirm accepted' : 'confirm dismissed';
                     break;
                 case "prompt":
                     prompt("Add text and then click accept");
