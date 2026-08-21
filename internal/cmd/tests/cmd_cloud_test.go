@@ -185,7 +185,28 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, `Thresholds have been crossed`)
+		assert.Contains(t, stdout, `Thresholds have been crossed, details at https://stack.grafana.com/a/k6-app/runs/123`)
+	})
+
+	t.Run("TestCloudTestFailedWithResultMessage", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil,
+			func() *cloudapiv6.TestProgress {
+				return &cloudapiv6.TestProgress{
+					Status:        cloudapiv6.StatusAborted,
+					Result:        cloudapiv6.ResultError,
+					ResultMessage: "There were problems starting your test",
+				}
+			})
+		ts.ExpectedExitCode = int(exitcodes.CloudTestRunFailed)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout,
+			`The test has failed: There were problems starting your test, details at https://stack.grafana.com/a/k6-app/runs/123`)
 	})
 
 	t.Run("TestCloudAbortedThreshold", func(t *testing.T) {
@@ -199,7 +220,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
-		assert.Contains(t, stdout, `Thresholds have been crossed`)
+		assert.Contains(t, stdout, `Thresholds have been crossed, details at https://stack.grafana.com/a/k6-app/runs/123`)
 	})
 
 	t.Run("TestCloudAbortedByUser", func(t *testing.T) {
