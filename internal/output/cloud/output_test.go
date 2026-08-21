@@ -430,6 +430,25 @@ func (m *provisioningNotifierMock) NotifyTestRunCompleted(_ context.Context, tes
 	return nil
 }
 
+// logDrainerMock implements the output's logDrainer for tests. onDrain, when
+// set, runs inside Drain so a test can observe ordering relative to notify.
+// ctxErr records ctx.Err() at call time so a test can assert the drain wasn't
+// handed an already-expired context.
+type logDrainerMock struct {
+	called  atomic.Bool
+	ctxErr  error
+	onDrain func()
+}
+
+func (m *logDrainerMock) Drain(ctx context.Context) error {
+	m.called.Store(true)
+	m.ctxErr = ctx.Err()
+	if m.onDrain != nil {
+		m.onDrain()
+	}
+	return nil
+}
+
 func TestOutputStart_ProvisioningMode(t *testing.T) {
 	t.Parallel()
 
@@ -510,12 +529,13 @@ func TestOutputStart_ProvisioningMode(t *testing.T) {
 		"queued metrics should be pushed through the injected metricsPusher")
 }
 
-// TestOutputStart_PushRefIDStillTakesPrecedence locks in cloud-Output
-// behaviour even if cmd ever populated both PushRefID and MetricsPushURL.
-// In practice, cmd/outputs_cloud.go:96-100 short-circuits on PushRefID
-// before MetricsPushURL is ever set — so this combination shouldn't
-// occur. This test is defensive against future cmd-layer regressions.
-func TestOutputStart_PushRefIDStillTakesPrecedence(t *testing.T) {
+// TestOutputStart_ExternallyProvisioned covers the flow where an
+// external service provisioned the run and passes the scoped push
+// creds (MetricsPushURL + TestRunToken) plus PushRefID via env. k6
+// must push to the provisioning URL with the scoped token but must
+// NOT build a notifier — the external service owns create/start/
+// notify (see testFinished, which returns early on PushRefID).
+func TestOutputStart_ExternallyProvisioned(t *testing.T) {
 	t.Parallel()
 
 	cfgJSON, err := json.Marshal(cloudapi.Config{
@@ -545,18 +565,122 @@ func TestOutputStart_PushRefIDStillTakesPrecedence(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// Inject a metrics-pusher mock so Start arms the provisioning push
+	// without constructing a real HTTP client (mirrors
+	// TestOutputStart_ProvisioningMode). provisioningNotifier is left nil
+	// to prove lazyInitProvisioning skips it when PushRefID is set.
+	out.metricsPusher = &metricsPusherMock{}
+
 	require.NoError(t, out.Start())
 
-	// PushRefID should win: testRunID should be set to the PushRefID value,
-	// not the testRunID from env.
+	// PushRefID still supplies the test run id.
 	assert.Equal(t, "99999", out.testRunID)
 
-	// The metricsPusher field should remain nil — provisioning mode was NOT
-	// entered because PushRefID took precedence.
-	assert.Nil(t, out.metricsPusher, "metricsPusher should be nil when PushRefID takes precedence")
-	assert.Nil(t, out.provisioningNotifier, "provisioningNotifier should be nil when PushRefID takes precedence")
+	// Provisioning push is armed on scoped-cred presence, even with PushRefID.
+	assert.True(t, out.provisioningMode)
+	assert.NotNil(t, out.metricsPusher)
+
+	// No notifier: the external service owns the run lifecycle.
+	assert.Nil(t, out.provisioningNotifier)
 
 	require.NoError(t, out.StopWithTestError(nil))
+}
+
+// TestOutputStart_ExternalProvisioned_RequiresBothCreds locks the
+// "no silent legacy fallback on partial config" behaviour: if only one
+// of the scoped push creds is set, Start errors (naming both env vars)
+// instead of quietly falling back to the legacy push endpoint.
+func TestOutputStart_ExternalProvisioned_RequiresBothCreds(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name           string
+		metricsPushURL null.String
+		testRunToken   null.String
+	}{
+		{
+			name:           "only MetricsPushURL set",
+			metricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+		},
+		{
+			name:         "only TestRunToken set",
+			testRunToken: null.StringFrom("scoped-test-run-token"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfgJSON, err := json.Marshal(cloudapi.Config{
+				Host:                  null.StringFrom("https://fake-cloud"),
+				Token:                 null.StringFrom("fake-token"),
+				PushRefID:             null.StringFrom("99999"),
+				MetricsPushURL:        tc.metricsPushURL,
+				TestRunToken:          tc.testRunToken,
+				APIVersion:            null.IntFrom(2),
+				AggregationPeriod:     types.NullDurationFrom(1 * time.Hour),
+				MetricPushInterval:    types.NullDurationFrom(1 * time.Hour),
+				AggregationWaitPeriod: types.NullDurationFrom(1 * time.Second),
+				MaxTimeSeriesInBatch:  null.IntFrom(1000),
+				MetricPushConcurrency: null.IntFrom(1),
+			})
+			require.NoError(t, err)
+
+			out, err := newOutput(output.Params{
+				Logger:     testutils.NewLogger(t),
+				JSONConfig: cfgJSON,
+				ScriptOptions: lib.Options{
+					Duration:   types.NullDurationFrom(1 * time.Second),
+					SystemTags: &metrics.DefaultSystemTagSet,
+				},
+				ScriptPath: &url.URL{Path: "/script.js"},
+				Usage:      usage.New(),
+			})
+			require.NoError(t, err)
+
+			err = out.Start()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "K6_CLOUD_METRICS_PUSH_URL")
+			assert.Contains(t, err.Error(), "K6_CLOUD_TEST_RUN_TOKEN")
+		})
+	}
+}
+
+// TestOutputStopWithTestError_ExternalProvisioned_NoNotifier locks the
+// invariant "notifier nil ⇒ PushRefID set ⇒ testFinished returns early":
+// with provisioningMode true and a nil notifier, Stop must not panic and
+// must neither notify nor call the legacy TestFinished.
+func TestOutputStopWithTestError_ExternalProvisioned_NoNotifier(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		clientMock := &cloudClientMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				PushRefID:      null.StringFrom("99999"),
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+			},
+			client:               clientMock,
+			provisioningNotifier: nil,
+			provisioningMode:     true,
+		}
+
+		out.versionedOutput = versionedOutputMock{
+			callback: func(_ string) {},
+		}
+
+		// Must not panic even though provisioningNotifier is nil while
+		// provisioningMode is true — testFinished returns early on PushRefID
+		// (so the nil notifier is never dereferenced, and notify never fires).
+		require.NoError(t, out.StopWithTestError(nil))
+
+		// Legacy TestFinished is not called either (PushRefID short-circuit).
+		assert.False(t, clientMock.testFinishedCalled)
+	})
 }
 
 func TestOutputStopWithTestError_ProvisioningMode_NoError(t *testing.T) {
@@ -663,5 +787,144 @@ func TestOutputStopWithTestError_PushRefID_NoNotifyNoTestFinished(t *testing.T) 
 		// PushRefID short-circuits: NEITHER notify NOR TestFinished called.
 		assert.False(t, notifierMock.called.Load())
 		assert.False(t, clientMock.testFinishedCalled)
+	})
+}
+
+// TestOutputStopWithTestError_DrainsLogsBeforeNotify locks the ordering fix:
+// the cloud log drainer is flushed before the run is notified complete, so
+// in-run logs land while the run is still open (afterwards the backend
+// rejects late pushes).
+func TestOutputStopWithTestError_DrainsLogsBeforeNotify(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+		drainerMock := &logDrainerMock{
+			onDrain: func() {
+				// Drain must run before notify: the notifier has not been
+				// called yet at drain time.
+				assert.Equal(t, int32(0), notifierMock.callCount.Load(),
+					"Drain must be called before NotifyTestRunCompleted")
+			},
+		}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NullDurationFrom(60 * time.Second),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           drainerMock,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		assert.True(t, drainerMock.called.Load(), "Drain must be called")
+		assert.True(t, notifierMock.called.Load(), "notify must still happen after drain")
+	})
+}
+
+// TestOutputStopWithTestError_PushRefID_DrainsLogs guards that the cloud log
+// drain runs even on the externally-provisioned (PushRefID) path, where notify
+// is skipped. If a future change tied the drain to notify, this flow would
+// silently lose its final log batch and no other test would catch it.
+func TestOutputStopWithTestError_PushRefID_DrainsLogs(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+		drainerMock := &logDrainerMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				PushRefID:      null.StringFrom("99999"),
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NullDurationFrom(60 * time.Second),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           drainerMock,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		// Drain runs even though the PushRefID path skips notify/TestFinished.
+		assert.True(t, drainerMock.called.Load(), "Drain must run on the PushRefID path too")
+		assert.False(t, notifierMock.called.Load(), "PushRefID path must not notify")
+		assert.False(t, clientMock.testFinishedCalled, "PushRefID path must not call TestFinished")
+	})
+}
+
+// TestOutputStopWithTestError_ZeroTimeoutDrainsWithoutDeadline guards that
+// K6_CLOUD_TIMEOUT=0 ("no timeout", as the other cloud clients treat it) does
+// not hand the drain an already-expired context, which would skip the flush
+// and let notify race it.
+func TestOutputStopWithTestError_ZeroTimeoutDrainsWithoutDeadline(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+		drainerMock := &logDrainerMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NewNullDuration(0, true), // K6_CLOUD_TIMEOUT=0
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           drainerMock,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+
+		assert.True(t, drainerMock.called.Load(), "Drain must be called")
+		assert.NoError(t, drainerMock.ctxErr,
+			"drain context must not be already expired when the timeout is 0 (no timeout)")
+	})
+}
+
+// TestOutputStopWithTestError_NilLogDrainerStillNotifies covers the
+// --out cloud / --no-cloud-logs case: with no drainer set, Stop neither
+// panics nor skips notify.
+func TestOutputStopWithTestError_NilLogDrainerStillNotifies(t *testing.T) {
+	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		notifierMock := &provisioningNotifierMock{}
+		clientMock := &cloudClientMock{}
+
+		out := &Output{
+			logger:    testutils.NewLogger(t),
+			testRunID: "12345",
+			config: cloudapi.Config{
+				MetricsPushURL: null.StringFrom("https://metrics.example.com/v2/metrics/123"),
+				TestRunToken:   null.StringFrom("scoped-test-run-token"),
+				Timeout:        types.NullDurationFrom(60 * time.Second),
+			},
+			client:               clientMock,
+			provisioningNotifier: notifierMock,
+			provisioningMode:     true,
+			logDrainer:           nil,
+		}
+		out.versionedOutput = versionedOutputMock{callback: func(string) {}}
+
+		require.NoError(t, out.StopWithTestError(nil))
+		assert.True(t, notifierMock.called.Load())
 	})
 }

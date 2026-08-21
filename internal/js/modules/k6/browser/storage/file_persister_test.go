@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -82,11 +82,6 @@ func TestLocalFilePersister(t *testing.T) {
 
 func TestRemoteFilePersister(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip("not supported on windows for now")
-		// actual problem is that the paths used are with reverse slash even when they get to be inside JSON
-		// which leads to them being parsed as escepe codes when they shouldn't
-	}
 
 	const (
 		basePath          = "screenshots"
@@ -239,7 +234,7 @@ func TestRemoteFilePersister(t *testing.T) {
 					// Does the response match the expected format?
 					wantPresignedURLBody := fmt.Sprintf(
 						tt.wantPresignedURLBody,
-						filepath.Join(basePath, tt.path),
+						path.Join(basePath, tt.path),
 					)
 					assert.JSONEq(t, wantPresignedURLBody, string(bb))
 

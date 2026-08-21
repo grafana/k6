@@ -1314,6 +1314,72 @@ func TestRequest(t *testing.T) {
 	})
 }
 
+// TestRequestFormBodyEncoding verifies how JS object bodies that get
+// auto-encoded as application/x-www-form-urlencoded handle null/undefined and
+// nested values. See https://github.com/grafana/k6/issues/1185.
+func TestRequestFormBodyEncoding(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	sr := tb.Replacer.Replace
+
+	// url.Values.Encode sorts keys alphabetically and preserves slice order
+	// within a key, so the encoded body is deterministic and can be asserted
+	// on directly.
+	t.Run("null and undefined are encoded as empty values", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {data: "something", another: null, missing: undefined});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "another=&data=something&missing=") {
+				throw new Error("wrong body: " + res.request.body);
+			}
+		`))
+		require.NoError(t, err)
+		assert.Nil(t, ts.hook.LastEntry())
+	})
+
+	t.Run("null inside an array is encoded as empty", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {c: ["one", null]});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "c=one&c=") { throw new Error("wrong body: " + res.request.body); }
+		`))
+		require.NoError(t, err)
+		assert.Nil(t, ts.hook.LastEntry())
+	})
+
+	t.Run("nested objects are not encoded as map[...] and log a warning", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {a: "x", nested: {inner: 1}});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "a=x&nested=") { throw new Error("wrong body: " + res.request.body); }
+		`))
+		require.NoError(t, err)
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "cannot urlencode a nested")
+	})
+
+	t.Run("arrays of objects are not encoded as map[...] and log a warning", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {items: [{x: 1}, {y: 2}]});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "items=&items=") { throw new Error("wrong body: " + res.request.body); }
+		`))
+		require.NoError(t, err)
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "cannot urlencode a nested")
+	})
+}
+
 func TestRequestCancellation(t *testing.T) {
 	t.Parallel()
 	ts := newTestCase(t)
