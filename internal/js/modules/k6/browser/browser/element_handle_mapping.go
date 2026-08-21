@@ -344,8 +344,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 }
 
 // parseElementHandleTypeOptions parses the element handle type options from a Sobek value.
+//
+//nolint:unparam
 func parseElementHandleTypeOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleTypeOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleTypeOptions, error) {
 	ehtopts := common.NewElementHandleTypeOptions(defaultTimeout)
 	if k6common.IsNullish(opts) {
 		return ehtopts, nil
@@ -365,8 +368,11 @@ func parseElementHandleTypeOptions(
 }
 
 // parseElementHandlePressOptions parses the element handle press options from a Sobek value.
+//
+//nolint:unparam
 func parseElementHandlePressOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandlePressOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandlePressOptions, error) {
 	ehpopts := common.NewElementHandlePressOptions(defaultTimeout)
 	if k6common.IsNullish(opts) {
 		return ehpopts, nil
@@ -387,8 +393,11 @@ func parseElementHandlePressOptions(
 
 // parseElementHandleWaitForElementStateOptions parses the element handle wait for element state
 // options from a Sobek value.
+//
+//nolint:unparam
 func parseElementHandleWaitForElementStateOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleWaitForElementStateOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleWaitForElementStateOptions, error) {
 	ehopts := common.NewElementHandleWaitForElementStateOptions(defaultTimeout)
 	if k6common.IsNullish(opts) {
 		return ehopts, nil
@@ -404,8 +413,11 @@ func parseElementHandleWaitForElementStateOptions(
 
 // parseElementHandleScreenshotOptions parses the element handle screenshot options from a Sobek
 // value.
+//
+//nolint:unparam
 func parseElementHandleScreenshotOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleScreenshotOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleScreenshotOptions, error) {
 	ehopts := common.NewElementHandleScreenshotOptions(defaultTimeout)
 	if k6common.IsNullish(opts) {
 		return ehopts, nil
@@ -441,7 +453,8 @@ func parseElementHandleScreenshotOptions(
 
 // parseElementHandleHoverOptions parses the element handle hover options from a Sobek value.
 func parseElementHandleHoverOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleHoverOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleHoverOptions, error) {
 	ehhopts := common.NewElementHandleHoverOptions(defaultTimeout)
 	if k6common.IsNullish(opts) {
 		return ehhopts, nil
@@ -467,7 +480,8 @@ func parseElementHandleHoverOptions(
 // parseElementHandleSetCheckedOptions parses the element handle set checked options from a Sobek
 // value.
 func parseElementHandleSetCheckedOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleSetCheckedOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleSetCheckedOptions, error) {
 	ehscopts := common.NewElementHandleSetCheckedOptions(defaultTimeout)
 	if k6common.IsNullish(opts) {
 		return ehscopts, nil
@@ -489,7 +503,8 @@ func parseElementHandleSetCheckedOptions(
 // parseElementHandleDblclickOptions parses the element handle double click options from a Sobek
 // value.
 func parseElementHandleDblclickOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleDblclickOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleDblclickOptions, error) {
 	ehdopts := common.NewElementHandleDblclickOptions(defaultTimeout)
 	if k6common.IsNullish(opts) {
 		return ehdopts, nil
@@ -519,7 +534,8 @@ func parseElementHandleDblclickOptions(
 
 // parseElementHandleTapOptions parses the element handle tap options from a Sobek value.
 func parseElementHandleTapOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleTapOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleTapOptions, error) {
 	ehtopts := common.NewElementHandleTapOptions(defaultTimeout)
 
 	if k6common.IsNullish(opts) {
@@ -547,7 +563,8 @@ func parseElementHandleTapOptions(
 // parseElementHandleSetInputFilesOptions parses the element handle set input files options from a
 // Sobek value.
 func parseElementHandleSetInputFilesOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleSetInputFilesOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleSetInputFilesOptions, error) {
 	ehsifopts := common.NewElementHandleSetInputFilesOptions(defaultTimeout)
 
 	if k6common.IsNullish(opts) {
@@ -564,7 +581,8 @@ func parseElementHandleSetInputFilesOptions(
 
 // parseElementHandleClickOptions parses the element handle click options from a Sobek value.
 func parseElementHandleClickOptions(
-	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration) (*common.ElementHandleClickOptions, error) {
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.ElementHandleClickOptions, error) {
 	ehcopts := common.NewElementHandleClickOptions(defaultTimeout)
 
 	if k6common.IsNullish(opts) {
@@ -598,7 +616,9 @@ func parseElementHandleClickOptions(
 
 // parseElementHandleBasePointerOptions parses the element handle base pointer options from a
 // Sobek value into o.
-func parseElementHandleBasePointerOptions(o *common.ElementHandleBasePointerOptions, rt *sobek.Runtime, opts sobek.Value) error {
+func parseElementHandleBasePointerOptions(
+	o *common.ElementHandleBasePointerOptions, rt *sobek.Runtime, opts sobek.Value,
+) error {
 	if k6common.IsNullish(opts) {
 		return nil
 	}
