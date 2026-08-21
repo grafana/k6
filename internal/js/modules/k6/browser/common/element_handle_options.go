@@ -206,11 +206,6 @@ func NewElementHandleCheckOptions(defaultTimeout time.Duration) *ElementHandleCh
 	}
 }
 
-// Parse parses the ElementHandleCheckOptions from the given opts.
-func (o *ElementHandleCheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	return o.ElementHandleBasePointerOptions.Parse(ctx, opts)
-}
-
 // NewElementHandleSetInputFilesOptions creates a new ElementHandleSetInputFilesOption.
 func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *ElementHandleSetInputFilesOptions {
 	return &ElementHandleSetInputFilesOptions{
