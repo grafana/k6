@@ -3,6 +3,7 @@ package browser
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/grafana/sobek"
 
@@ -170,8 +171,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"isInViewport": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameIsInViewportOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameIsInViewportOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing is in viewport options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -451,4 +452,27 @@ func parseLocatorOptions(rt *sobek.Runtime, opts sobek.Value) *common.LocatorOpt
 	}
 
 	return &popts
+}
+
+// parseFrameIsInViewportOptions parses the frame isInViewport options from a Sobek value.
+func parseFrameIsInViewportOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameIsInViewportOptions, error) {
+	vopts := common.NewFrameIsInViewportOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return vopts, nil
+	}
+
+	err := parseFrameBaseOptions(&vopts.FrameBaseOptions, rt, opts)
+	if err != nil {
+		return vopts, err
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "ratio" {
+			vopts.Ratio = obj.Get(k).ToFloat()
+		}
+	}
+
+	return vopts, nil
 }
