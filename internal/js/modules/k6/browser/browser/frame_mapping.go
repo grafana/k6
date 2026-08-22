@@ -60,8 +60,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"dispatchEvent": func(selector, typ string, eventInit, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameDispatchEventOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameDispatchEventOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing frame dispatch event options: %w", err)
 			}
 			earg := exportArg(eventInit)
@@ -697,6 +697,21 @@ func parseFrameTextContentOptions(
 		return tcopts, err
 	}
 	return tcopts, nil
+}
+
+// parseFrameDispatchEventOptions parses the frame dispatchEvent options from a Sobek value.
+func parseFrameDispatchEventOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameDispatchEventOptions, error) {
+	deopts := common.NewFrameDispatchEventOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return deopts, nil
+	}
+	if err := parseFrameBaseOptions(&deopts.FrameBaseOptions, rt, opts); err != nil {
+		return deopts, err
+	}
+	return deopts, nil
 }
 
 // parseFrameIsHiddenOptions parses the frame isHidden options from a Sobek value.
