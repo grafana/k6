@@ -103,8 +103,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"focus": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameBaseOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameBaseOptions(common.NewFrameBaseOptions(f.Timeout()), rt, opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing focus options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -121,8 +121,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			})
 		},
 		"getAttribute": func(selector, name string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameBaseOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameBaseOptions(common.NewFrameBaseOptions(f.Timeout()), rt, opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing getAttribute options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -577,4 +577,25 @@ func parseFrameWaitForLoadStateOptions(
 		}
 	}
 	return wlsopts, nil
+}
+
+// parseFrameBaseOptions parses the frame base options from a Sobek value into o.
+//
+//nolint:unparam
+func parseFrameBaseOptions(
+	o *common.FrameBaseOptions, rt *sobek.Runtime, opts sobek.Value,
+) (*common.FrameBaseOptions, error) {
+	if k6common.IsNullish(opts) {
+		return o, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "strict":
+			o.Strict = obj.Get(k).ToBoolean()
+		case "timeout":
+			o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+	return o, nil
 }
