@@ -2,8 +2,8 @@ package webcrypto
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/grafana/sobek"
@@ -36,60 +36,52 @@ type Crypto struct {
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
 func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
-	acceptedTypes := []JSType{
-		Int8ArrayConstructor,
-		Uint8ArrayConstructor,
-		Uint8ClampedArrayConstructor,
-		Int16ArrayConstructor,
-		Uint16ArrayConstructor,
-		Int32ArrayConstructor,
-		Uint32ArrayConstructor,
-	}
+	rt := c.vu.Runtime()
 
 	// 1.
-	if !IsInstanceOf(c.vu.Runtime(), typedArray, acceptedTypes...) {
-		common.Throw(c.vu.Runtime(), NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
+	// A missing, null or undefined argument used to reach the constructor
+	// lookup below and take the whole process down with a nil pointer
+	// dereference. Browsers and Node throw a TypeError the script can
+	// catch instead (#6320).
+	if common.IsNullish(typedArray) {
+		panic(rt.NewTypeError("typedArray parameter is missing, null or undefined"))
 	}
 
 	// 2.
-	// Obtain the length of the typed array, and throw a QuotaExceededError if
-	// it's too big, as specified in the [spec's] 10.2.1.2 paragraph.
-	// [spec]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
-	obj := typedArray.ToObject(c.vu.Runtime())
-	objLength, ok := obj.Get("length").ToNumber().Export().(int64)
-	if !ok {
-		common.Throw(c.vu.Runtime(), NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
-	}
-
-	if objLength > maxRandomValuesLength {
-		common.Throw(
-			c.vu.Runtime(),
-			NewError(
-				QuotaExceededError,
-				fmt.Sprintf("typedArray parameter is too big; maximum length is %d", maxRandomValuesLength),
-			),
-		)
-	}
-
-	// 3.
-	// Create a buffer of a matching size and fill
-	// it with random values.
+	// Identify and fill the view through its Go-side representation rather
+	// than its JS-visible properties. Exporting one of the IntegerArray
+	// types yields a slice aliasing the view's storage, so writing through
+	// it updates the JS array in place, and every element receives as many
+	// random bits as its width allows (#6318). Because the element count
+	// and width come from the view itself, overridden properties such as
+	// `length` or `constructor` can neither crash the process nor change
+	// how many bytes are written (#6320).
 	//
-	// We use crypto/rand.Read() here as it will use /dev/urandom or
-	// an equivalent on Unix-like systems, and CryptGenRandom()
-	// on Windows. This is the recommended way to generate random
-	// by the specification.
-	randomValues := make([]byte, objLength)
-	_, err := rand.Read(randomValues)
-	if err != nil {
-		common.Throw(c.vu.Runtime(), err)
-	}
-
-	for i := range objLength {
-		err := obj.Set(strconv.FormatInt(i, 10), randomValues[i])
-		if err != nil {
-			common.Throw(c.vu.Runtime(), err)
-		}
+	// The quota is specified on the view's byteLength, not its element
+	// count ([spec's] 10.2.1.2 paragraph): a Uint32Array(65536) asks for
+	// 256 KiB of randomness and is rejected the same way it is in browsers.
+	// [spec]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
+	switch view := typedArray.Export().(type) {
+	case []byte: // Uint8Array, Uint8ClampedArray
+		c.throwIfViewTooLong(rt, len(view), 1)
+		fillRandomBytes(view)
+	case []int8: // Int8Array
+		c.throwIfViewTooLong(rt, len(view), 1)
+		fillRandomBytes(view)
+	case []int16: // Int16Array
+		c.throwIfViewTooLong(rt, len(view), 2)
+		scatterRandomInt16s(view)
+	case []uint16: // Uint16Array
+		c.throwIfViewTooLong(rt, len(view), 2)
+		scatterRandomUint16s(view)
+	case []int32: // Int32Array
+		c.throwIfViewTooLong(rt, len(view), 4)
+		scatterRandomInt32s(view)
+	case []uint32: // Uint32Array
+		c.throwIfViewTooLong(rt, len(view), 4)
+		scatterRandomUint32s(view)
+	default:
+		common.Throw(rt, NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
 	}
 
 	// Although the input array has been modified in place,
@@ -97,7 +89,74 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	return typedArray
 }
 
-// MaxRandomValues is the maximum number of random values that can be generated
+// throwIfViewTooLong enforces the spec's 65536-byte quota on getRandomValues
+// input views, throwing a QuotaExceededError the script can catch.
+func (c *Crypto) throwIfViewTooLong(rt *sobek.Runtime, elements, elementSize int) {
+	if elements*elementSize > maxRandomValuesLength {
+		common.Throw(
+			rt,
+			NewError(
+				QuotaExceededError,
+				fmt.Sprintf(
+					"typedArray parameter is too big; maximum length is %d bytes",
+					maxRandomValuesLength,
+				),
+			),
+		)
+	}
+}
+
+// fillRandomBytes overwrites an 8-bit view's storage with fresh random bytes.
+// Signedness is irrelevant at this width: the bits are copied verbatim.
+func fillRandomBytes[E ~int8 | ~uint8](view []E) {
+	buf := make([]byte, len(view))
+	_, _ = rand.Read(buf)
+	for i, b := range buf {
+		view[i] = E(b)
+	}
+}
+
+// scatterRandomInt16s fills each 16-bit element with 16 fresh random bits.
+// The byte order used to assemble elements is an implementation detail: it is
+// only required to be consistent, since the result is uniformly random either
+// way.
+func scatterRandomInt16s(view []int16) {
+	buf := make([]byte, 2*len(view))
+	_, _ = rand.Read(buf)
+	for i := range view {
+		view[i] = int16(binary.LittleEndian.Uint16(buf[2*i:]))
+	}
+}
+
+// scatterRandomUint16s fills each 16-bit element with 16 fresh random bits.
+func scatterRandomUint16s(view []uint16) {
+	buf := make([]byte, 2*len(view))
+	_, _ = rand.Read(buf)
+	for i := range view {
+		view[i] = binary.LittleEndian.Uint16(buf[2*i:])
+	}
+}
+
+// scatterRandomInt32s fills each 32-bit element with 32 fresh random bits.
+func scatterRandomInt32s(view []int32) {
+	buf := make([]byte, 4*len(view))
+	_, _ = rand.Read(buf)
+	for i := range view {
+		view[i] = int32(binary.LittleEndian.Uint32(buf[4*i:]))
+	}
+}
+
+// scatterRandomUint32s fills each 32-bit element with 32 fresh random bits.
+func scatterRandomUint32s(view []uint32) {
+	buf := make([]byte, 4*len(view))
+	_, _ = rand.Read(buf)
+	for i := range view {
+		view[i] = binary.LittleEndian.Uint32(buf[4*i:])
+	}
+}
+
+// MaxRandomValues is the maximum number of random bytes that can be requested
+// from a single getRandomValues call.
 const maxRandomValuesLength = 65536
 
 // RandomUUID returns a [RFC4122] compliant v4 UUID string.
