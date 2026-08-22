@@ -51,8 +51,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			})
 		},
 		"dblclick": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameDblClickOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameDblclickOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing double click options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -526,6 +526,26 @@ func parseFrameCheckOptions(
 		return copts, err
 	}
 
+	copts.Strict = parseStrict(rt, opts)
+
+	return copts, nil
+}
+
+// parseFrameDblclickOptions parses the frame dblclick options from a Sobek value.
+func parseFrameDblclickOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameDblclickOptions, error) {
+	copts := common.NewFrameDblClickOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	dcopts, err := parseElementHandleDblclickOptions(rt, opts, defaultTimeout)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.ElementHandleDblclickOptions = *dcopts
 	copts.Strict = parseStrict(rt, opts)
 
 	return copts, nil
