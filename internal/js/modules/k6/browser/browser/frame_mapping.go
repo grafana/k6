@@ -232,8 +232,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"innerText": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameInnerTextOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameInnerTextOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing inner text options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -577,6 +577,21 @@ func parseFrameWaitForLoadStateOptions(
 		}
 	}
 	return wlsopts, nil
+}
+
+// parseFrameInnerTextOptions parses the frame innerText options from a Sobek value.
+func parseFrameInnerTextOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameInnerTextOptions, error) {
+	itopts := common.NewFrameInnerTextOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return itopts, nil
+	}
+	if err := parseFrameBaseOptions(&itopts.FrameBaseOptions, rt, opts); err != nil {
+		return itopts, err
+	}
+	return itopts, nil
 }
 
 // parseFrameInnerHTMLOptions parses the frame innerHTML options from a Sobek value.
