@@ -454,8 +454,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			return mapWaitForNavigation(vu, f, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForSelectorOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameWaitForSelectorOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
 			}
 
@@ -712,6 +712,34 @@ func parseFrameDispatchEventOptions(
 		return deopts, err
 	}
 	return deopts, nil
+}
+
+// parseFrameWaitForSelectorOptions parses the frame waitForSelector options from a Sobek value.
+func parseFrameWaitForSelectorOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameWaitForSelectorOptions, error) {
+	wsopts := common.NewFrameWaitForSelectorOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wsopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "state":
+			state := obj.Get(k).String()
+			if s, ok := common.DOMElementStateIDFromString(state); ok {
+				wsopts.State = s
+			} else {
+				return wsopts, fmt.Errorf("%q is not a valid DOM state", state)
+			}
+		case "strict":
+			wsopts.Strict = obj.Get(k).ToBoolean()
+		case "timeout":
+			wsopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+	return wsopts, nil
 }
 
 // parseFrameIsHiddenOptions parses the frame isHidden options from a Sobek value.

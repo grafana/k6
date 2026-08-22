@@ -292,8 +292,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForSelectorOptions(eh.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameWaitForSelectorOptions(rt, opts, eh.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {

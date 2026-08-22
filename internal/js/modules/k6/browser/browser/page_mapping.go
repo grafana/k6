@@ -605,8 +605,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return mapWaitForNavigation(vu, p, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameWaitForSelectorOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
 			}
 
