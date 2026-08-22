@@ -287,8 +287,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"isHidden": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsHiddenOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsHiddenOptions(rt, opts)
+			if err != nil {
 				return nil, fmt.Errorf("parse isHidden options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -296,8 +296,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"isVisible": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsVisibleOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsVisibleOptions(rt, opts)
+			if err != nil {
 				return nil, fmt.Errorf("parse isVisible options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -699,6 +699,28 @@ func parseFrameTextContentOptions(
 	return tcopts, nil
 }
 
+// parseFrameIsHiddenOptions parses the frame isHidden options from a Sobek value.
+//
+//nolint:unparam
+func parseFrameIsHiddenOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+) (*common.FrameIsHiddenOptions, error) {
+	tcopts := common.NewFrameIsHiddenOptions()
+	tcopts.Strict = parseStrict(rt, opts)
+	return tcopts, nil
+}
+
+// parseFrameIsVisibleOptions parses the frame isVisible options from a Sobek value.
+//
+//nolint:unparam
+func parseFrameIsVisibleOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+) (*common.FrameIsVisibleOptions, error) {
+	tcopts := common.NewFrameIsVisibleOptions()
+	tcopts.Strict = parseStrict(rt, opts)
+	return tcopts, nil
+}
+
 // parseFrameBaseOptions parses the frame base options from a Sobek value into o.
 //
 //nolint:unparam
@@ -718,4 +740,19 @@ func parseFrameBaseOptions(
 		}
 	}
 	return nil
+}
+
+func parseStrict(rt *sobek.Runtime, opts sobek.Value) bool {
+	var strict bool
+
+	if !k6common.IsNullish(opts) {
+		obj := opts.ToObject(rt)
+		for _, k := range obj.Keys() {
+			if k == "strict" {
+				strict = obj.Get(k).ToBoolean()
+			}
+		}
+	}
+
+	return strict
 }
