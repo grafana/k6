@@ -35,7 +35,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			return mcfs
 		},
 		"click": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameClickOptions(vu.Context(), opts, f.Timeout())
+			popts, err := parseFrameClickOptions(rt, opts, f.Timeout())
 			if err != nil {
 				return nil, err
 			}
@@ -94,8 +94,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"fill": func(selector, value string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameFillOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameFillOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing fill options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -214,8 +214,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"hover": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameHoverOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameHoverOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing hover options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -319,8 +319,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			return mapFrame(vu, f.ParentFrame())
 		},
 		"press": func(selector, key string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFramePressOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFramePressOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parse press options of selector %q on key %q: %w", selector, key, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -328,8 +328,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameSelectOptionOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameSelectOptionOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 
@@ -362,8 +362,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameSetInputFilesOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameSetInputFilesOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
 			}
 
@@ -377,8 +377,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"tap": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameTapOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameTapOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing frame tap options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -408,8 +408,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			})
 		},
 		"type": func(selector, text string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameTypeOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameTypeOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing type options: %w", err)
 			}
 
@@ -418,8 +418,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"uncheck": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameUncheckOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameUncheckOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
 			}
 
@@ -546,6 +546,171 @@ func parseFrameDblclickOptions(
 	}
 
 	copts.ElementHandleDblclickOptions = *dcopts
+	copts.Strict = parseStrict(rt, opts)
+
+	return copts, nil
+}
+
+// parseFrameSetInputFilesOptions parses the frame setInputFiles options from a Sobek value.
+func parseFrameSetInputFilesOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameSetInputFilesOptions, error) {
+	copts := common.NewFrameSetInputFilesOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	sopts, err := parseElementHandleSetInputFilesOptions(rt, opts, defaultTimeout)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.ElementHandleSetInputFilesOptions = *sopts
+
+	return copts, nil
+}
+
+// parseFrameTypeOptions parses the frame type options from a Sobek value.
+func parseFrameTypeOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameTypeOptions, error) {
+	copts := common.NewFrameTypeOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	ehopts, err := parseElementHandleTypeOptions(rt, opts, defaultTimeout)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.ElementHandleTypeOptions = *ehopts
+
+	return copts, nil
+}
+
+// parseFramePressOptions parses the frame press options from a Sobek value.
+func parseFramePressOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FramePressOptions, error) {
+	copts := common.NewFramePressOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	ehopts, err := parseElementHandlePressOptions(rt, opts, defaultTimeout)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.ElementHandlePressOptions = *ehopts
+
+	return copts, nil
+}
+
+// parseFrameFillOptions parses the frame fill options from a Sobek value.
+func parseFrameFillOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameFillOptions, error) {
+	copts := common.NewFrameFillOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	err := parseElementHandleBaseOptions(&copts.ElementHandleBaseOptions, rt, opts)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.Strict = parseStrict(rt, opts)
+
+	return copts, nil
+}
+
+// parseFrameUncheckOptions parses the frame uncheck options from a Sobek value.
+func parseFrameUncheckOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameUncheckOptions, error) {
+	copts := common.NewFrameUncheckOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	err := parseElementHandleBasePointerOptions(&copts.ElementHandleBasePointerOptions, rt, opts)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.Strict = parseStrict(rt, opts)
+
+	return copts, nil
+}
+
+// parseFrameTapOptions parses the frame tap options from a Sobek value.
+func parseFrameTapOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameTapOptions, error) {
+	copts := common.NewFrameTapOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	err := parseElementHandleBasePointerOptions(&copts.ElementHandleBasePointerOptions, rt, opts)
+	if err != nil {
+		return copts, err
+	}
+
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "modifiers":
+			var m []string
+			if err := rt.ExportTo(obj.Get(k), &m); err != nil {
+				return copts, err
+			}
+			copts.Modifiers = m
+		case "strict":
+			copts.Strict = obj.Get(k).ToBoolean()
+		}
+	}
+
+	return copts, nil
+}
+
+// parseFrameSelectOptionOptions parses the frame selectOption options from a Sobek value.
+func parseFrameSelectOptionOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameSelectOptionOptions, error) {
+	copts := common.NewFrameSelectOptionOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	err := parseElementHandleBaseOptions(&copts.ElementHandleBaseOptions, rt, opts)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.Strict = parseStrict(rt, opts)
+
+	return copts, nil
+}
+
+// parseFrameHoverOptions parses the frame hover options from a Sobek value.
+func parseFrameHoverOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameHoverOptions, error) {
+	copts := common.NewFrameHoverOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	ehopts, err := parseElementHandleHoverOptions(rt, opts, defaultTimeout)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.ElementHandleHoverOptions = *ehopts
 	copts.Strict = parseStrict(rt, opts)
 
 	return copts, nil

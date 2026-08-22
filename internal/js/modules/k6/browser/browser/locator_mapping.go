@@ -56,7 +56,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"click": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameClickOptions(vu.Context(), opts, lo.Timeout())
+			popts, err := parseFrameClickOptions(rt, opts, lo.Timeout())
 			if err != nil {
 				return nil, err
 			}

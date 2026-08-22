@@ -37,7 +37,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"click": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameClickOptions(vu.Context(), opts, p.MainFrame().Timeout())
+			popts, err := parseFrameClickOptions(rt, opts, p.MainFrame().Timeout())
 			if err != nil {
 				return nil, err
 			}
