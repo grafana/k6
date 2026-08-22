@@ -1,3 +1,3 @@
-# add-once-flag
+# `add-once-flag`
 
-Add --once flag for single-run execution mode
+Add `--once` for one VU and one iteration
