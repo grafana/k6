@@ -241,8 +241,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"inputValue": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameInputValueOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameInputValueOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing input value options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -250,8 +250,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"isChecked": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsCheckedOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsCheckedOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing isChecked options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -260,8 +260,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		},
 		"isDetached": f.IsDetached,
 		"isDisabled": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsDisabledOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsDisabledOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing isDisabled options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -269,8 +269,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"isEditable": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsEditableOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsEditableOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parse isEditable options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -278,8 +278,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"isEnabled": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsEnabledOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsEnabledOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parse isEnabled options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -386,8 +386,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"textContent": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameTextContentOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameTextContentOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing text content options: %w", err)
 			}
 
@@ -607,6 +607,96 @@ func parseFrameInnerHTMLOptions(
 		return ihopts, err
 	}
 	return ihopts, nil
+}
+
+// parseFrameIsCheckedOptions parses the frame isChecked options from a Sobek value.
+func parseFrameIsCheckedOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameIsCheckedOptions, error) {
+	icopts := common.NewFrameIsCheckedOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return icopts, nil
+	}
+	if err := parseFrameBaseOptions(&icopts.FrameBaseOptions, rt, opts); err != nil {
+		return icopts, err
+	}
+	return icopts, nil
+}
+
+// parseFrameIsDisabledOptions parses the frame isDisabled options from a Sobek value.
+func parseFrameIsDisabledOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameIsDisabledOptions, error) {
+	idopts := common.NewFrameIsDisabledOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return idopts, nil
+	}
+	if err := parseFrameBaseOptions(&idopts.FrameBaseOptions, rt, opts); err != nil {
+		return idopts, err
+	}
+	return idopts, nil
+}
+
+// parseFrameInputValueOptions parses the frame inputValue options from a Sobek value.
+func parseFrameInputValueOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameInputValueOptions, error) {
+	ivopts := common.NewFrameInputValueOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ivopts, nil
+	}
+	if err := parseFrameBaseOptions(&ivopts.FrameBaseOptions, rt, opts); err != nil {
+		return ivopts, err
+	}
+	return ivopts, nil
+}
+
+// parseFrameIsEditableOptions parses the frame isEditable options from a Sobek value.
+func parseFrameIsEditableOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameIsEditableOptions, error) {
+	ieopts := common.NewFrameIsEditableOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ieopts, nil
+	}
+	if err := parseFrameBaseOptions(&ieopts.FrameBaseOptions, rt, opts); err != nil {
+		return ieopts, err
+	}
+	return ieopts, nil
+}
+
+// parseFrameIsEnabledOptions parses the frame isEnabled options from a Sobek value.
+func parseFrameIsEnabledOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameIsEnabledOptions, error) {
+	ieopts := common.NewFrameIsEnabledOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ieopts, nil
+	}
+	if err := parseFrameBaseOptions(&ieopts.FrameBaseOptions, rt, opts); err != nil {
+		return ieopts, err
+	}
+	return ieopts, nil
+}
+
+// parseFrameTextContentOptions parses the frame textContent options from a Sobek value.
+func parseFrameTextContentOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameTextContentOptions, error) {
+	tcopts := common.NewFrameTextContentOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return tcopts, nil
+	}
+	if err := parseFrameBaseOptions(&tcopts.FrameBaseOptions, rt, opts); err != nil {
+		return tcopts, err
+	}
+	return tcopts, nil
 }
 
 // parseFrameBaseOptions parses the frame base options from a Sobek value into o.
