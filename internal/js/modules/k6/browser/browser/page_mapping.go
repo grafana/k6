@@ -79,8 +79,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"dispatchEvent": func(selector, typ string, eventInit, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameDispatchEventOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameDispatchEventOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing page dispatch event options: %w", err)
 			}
 			earg := exportArg(eventInit)
