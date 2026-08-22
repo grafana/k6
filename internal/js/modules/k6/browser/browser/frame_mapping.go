@@ -18,8 +18,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameCheckOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameCheckOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing new frame check options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -510,6 +510,25 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	}
 
 	return maps
+}
+
+// parseFrameCheckOptions parses the frame check options from a Sobek value.
+func parseFrameCheckOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameCheckOptions, error) {
+	copts := common.NewFrameCheckOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return copts, nil
+	}
+
+	err := parseElementHandleBasePointerOptions(&copts.ElementHandleBasePointerOptions, rt, opts)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.Strict = parseStrict(rt, opts)
+
+	return copts, nil
 }
 
 // parseFrameGotoOptions parses the frame goto options from a Sobek value.
