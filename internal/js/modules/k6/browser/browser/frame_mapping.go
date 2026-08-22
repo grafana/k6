@@ -441,8 +441,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"waitForLoadState": func(state string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForLoadStateOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameWaitForLoadStateOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
 			}
 
@@ -558,4 +558,23 @@ func parseFrameSetContentOptions(
 		}
 	}
 	return scopts, nil
+}
+
+// parseFrameWaitForLoadStateOptions parses the frame waitForLoadState options from a Sobek value.
+//
+//nolint:unparam
+func parseFrameWaitForLoadStateOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameWaitForLoadStateOptions, error) {
+	wlsopts := common.NewFrameWaitForLoadStateOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wlsopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "timeout" {
+			wlsopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		}
+	}
+	return wlsopts, nil
 }
