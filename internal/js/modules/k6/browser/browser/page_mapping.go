@@ -625,7 +625,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return mapWaitForURL(vu, p, url, opts)
+			return mapWaitForURL(rt, vu, p, url, opts)
 		},
 		"waitForResponse": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parsePageWaitForResponseOptions(vu.Context(), opts, p.Timeout())
@@ -993,7 +993,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable)
 	}
 }
 
-func mapWaitForURL(vu moduleVU, target interface {
+func mapWaitForURL(rt *sobek.Runtime, vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForURL(urlPattern string, opts *common.FrameWaitForURLOptions, rm common.RegExMatcher) error
 }, url sobek.Value, opts sobek.Value,
@@ -1001,8 +1001,8 @@ func mapWaitForURL(vu moduleVU, target interface {
 	if k6common.IsNullish(url) {
 		return nil, errors.New("missing required argument 'url'")
 	}
-	popts := common.NewFrameWaitForURLOptions(target.Timeout())
-	if err := popts.Parse(vu.Context(), opts); err != nil {
+	popts, err := parseFrameWaitForURLOptions(rt, opts, target.Timeout())
+	if err != nil {
 		return nil, fmt.Errorf("parsing waitForURL options: %w", err)
 	}
 
@@ -1013,6 +1013,29 @@ func mapWaitForURL(vu moduleVU, target interface {
 		defer stop()
 		return nil, target.WaitForURL(purl, popts, newRegExMatcher(ctx, vu, tq))
 	}), nil
+}
+
+// parseFrameWaitForURLOptions parses the frame waitForURL options from a Sobek value.
+func parseFrameWaitForURLOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameWaitForURLOptions, error) {
+	wuopts := common.NewFrameWaitForURLOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wuopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			wuopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if err := wuopts.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+				return wuopts, fmt.Errorf("parsing waitForURL options: %w", err)
+			}
+		}
+	}
+	return wuopts, nil
 }
 
 func mapWaitForNavigation(vu moduleVU, target interface {

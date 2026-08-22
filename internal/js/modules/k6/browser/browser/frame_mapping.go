@@ -474,7 +474,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return mapWaitForURL(vu, f, url, opts)
+			return mapWaitForURL(rt, vu, f, url, opts)
 		},
 	}
 	maps["$"] = func(selector string) *sobek.Promise {
