@@ -451,7 +451,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			return mapWaitForNavigation(vu, f, opts)
+			return mapWaitForNavigation(rt, vu, f, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameWaitForSelectorOptions(rt, opts, f.Timeout())

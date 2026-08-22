@@ -602,7 +602,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			return mapWaitForNavigation(vu, p, opts)
+			return mapWaitForNavigation(rt, vu, p, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameWaitForSelectorOptions(rt, opts, p.MainFrame().Timeout())
@@ -1038,13 +1038,13 @@ func parseFrameWaitForURLOptions(
 	return wuopts, nil
 }
 
-func mapWaitForNavigation(vu moduleVU, target interface {
+func mapWaitForNavigation(rt *sobek.Runtime, vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForNavigation(*common.FrameWaitForNavigationOptions, common.RegExMatcher) (*common.Response, error)
 }, opts sobek.Value,
 ) (*sobek.Promise, error) {
-	popts := common.NewFrameWaitForNavigationOptions(target.Timeout())
-	if err := popts.Parse(vu.Context(), opts); err != nil {
+	popts, err := parseFrameWaitForNavigationOptions(rt, opts, target.Timeout())
+	if err != nil {
 		return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
 	}
 
@@ -1066,6 +1066,39 @@ func mapWaitForNavigation(vu moduleVU, target interface {
 		}
 		return mapResponse(vu, resp), nil
 	}), nil
+}
+
+// parseFrameWaitForNavigationOptions parses the frame waitForNavigation options from a Sobek value.
+func parseFrameWaitForNavigationOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameWaitForNavigationOptions, error) {
+	wnopts := common.NewFrameWaitForNavigationOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wnopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "url":
+			var val string
+			switch obj.Get(k).ExportType() {
+			case reflect.TypeFor[string]():
+				val = fmt.Sprintf("'%s'", obj.Get(k).String()) // Strings require quotes
+			default: // JS Regex, CSS, numbers or booleans
+				val = obj.Get(k).String() // No quotes
+			}
+
+			wnopts.URL = val
+		case "timeout":
+			wnopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if err := wnopts.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+				return wnopts, fmt.Errorf("parsing waitForNavigation options: %w", err)
+			}
+		}
+	}
+	return wnopts, nil
 }
 
 func parsePageWaitForResponseOptions(
