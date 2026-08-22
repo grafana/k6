@@ -8,7 +8,7 @@ People use a run with 1 virtual user and 1 iteration to smoke test and functiona
 - Preserve the running scenario's name, `exec` target, `options` block including `options.browser`, `env`, and `tags`.
 - Replace every other scenario field. The result uses `shared-iterations` with `vus: 1`, `iterations: 1`, and the defaults for that executor.
 - Run the single effective scenario. If there is no scenario, create one named `default` and run the exported `default` function.
-- Fail when the effective configuration has two or more scenarios, without listing their names.
+- Fail when the effective configuration has two or more scenarios.
 - Fail when the effective configuration has no scenario and the script has no `default` function.
 - Reject `--once` combined with `--vus`, `--iterations`, `--duration`, or `--stage`, naming the conflicting flag.
 - Enable the behavior only through bare `--once` on the current command line. A `once` script option, `K6_ONCE`, `ONCE`, or a `once` field in a JSON config or archive leaves it off. The flag does not select a scenario.

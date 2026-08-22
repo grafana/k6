@@ -26,7 +26,7 @@ Discarded fields include the original `executor`, `vus`, `iterations`, `duration
 
 `--once` MUST leave `maxDuration` and `gracefulStop` unset. k6 MUST serialize them as `null` and apply the `shared-iterations` defaults at runtime: 10 minutes and 30 seconds.
 
-Iteration samples MUST use the preserved scenario name and tags.
+Iteration samples MUST use the preserved scenario tags. When the `scenario` system tag is enabled, they MUST also use the preserved scenario name.
 
 #### Scenario: Every executor becomes a scenario with one VU and one iteration
 
@@ -39,16 +39,16 @@ Iteration samples MUST use the preserved scenario name and tags.
   | `shared-iterations` | `vus: 8`, `iterations: 20`, `maxDuration: '1h'`, `gracefulStop: '5m'` |
   | `per-vu-iterations` | `vus: 8`, `iterations: 20`, `maxDuration: '1h'` |
   | `constant-vus` | `vus: 8`, `duration: '30s'`, `startTime: '30s'` |
-  | `ramping-vus` | `startVUs: 8`, one stage, `gracefulRampDown: '10s'` |
+  | `ramping-vus` | `startVUs: 8`, `stages: [{ duration: '30s', target: 16 }]`, `gracefulRampDown: '10s'` |
   | `constant-arrival-rate` | `rate: 100`, `timeUnit: '1s'`, `duration: '30s'`, `preAllocatedVUs: 10`, `maxVUs: 20` |
-  | `ramping-arrival-rate` | `startRate: 10`, `timeUnit: '1s'`, one stage, `preAllocatedVUs: 10`, `maxVUs: 20` |
+  | `ramping-arrival-rate` | `startRate: 10`, `timeUnit: '1s'`, `stages: [{ duration: '30s', target: 20 }]`, `preAllocatedVUs: 10`, `maxVUs: 20` |
 
 - **WHEN** the user runs each script with `k6 run --once`
 - **THEN** each `api` function prints a scenario named `api` with `executor: shared-iterations`, `vus: 1`, and `iterations: 1`
 - **AND** `startTime`, `maxDuration`, and `gracefulStop` are `null`
 - **AND** each execution banner shows `maxDuration: 10m0s` and `gracefulStop: 30s`
 - **AND** each run starts without the declared delay and completes one iteration
-- **AND** no effective scenario contains an original load value or a setting used only by the original executor
+- **AND** each printed scenario omits `duration`, `timeUnit`, `stages`, `rate`, `startRate`, `gracefulRampDown`, `preAllocatedVUs`, `startVUs`, and `maxVUs`
 
 #### Scenario: `--once` keeps the scenario identity and options
 
@@ -56,6 +56,9 @@ Iteration samples MUST use the preserved scenario name and tags.
 
   ```js
   import exec from 'k6/execution';
+  import { Counter } from 'k6/metrics';
+
+  const kept = new Counter('kept');
 
   export const options = {
     scenarios: {
@@ -73,6 +76,7 @@ Iteration samples MUST use the preserved scenario name and tags.
 
   export function api() {
     const scenario = exec.test.options.scenarios.api;
+    kept.add(1);
     console.log(`name=${exec.scenario.name} exec=${scenario.exec} executor=${scenario.executor} vus=${scenario.vus} iterations=${scenario.iterations} url=${__ENV.URL} browser=${scenario.options.browser.type}`);
   }
 
@@ -82,7 +86,7 @@ Iteration samples MUST use the preserved scenario name and tags.
 - **WHEN** the user runs `k6 run --once --out json=out.json keep.js`
 - **THEN** the log contains `name=api exec=api executor=shared-iterations vus=1 iterations=1 url=https://example.com browser=chromium` once
 - **AND** the log omits `DEFAULT-RAN`
-- **AND** every `type: Point` entry emitted by the scenario iteration in `out.json` has `data.tags.scenario: api` and `data.tags.team: core`
+- **AND** `out.json` contains exactly one `type: Point` entry for the `kept` metric, with `data.tags.scenario: api` and `data.tags.team: core`
 
 ### Requirement: One declared scenario chooses the function
 
@@ -156,13 +160,14 @@ If the effective configuration has no scenario and the script exports `default`,
 - **AND** its selected VU function and teardown do not read setup data
 - **WHEN** the user runs it with `k6 run --once` under each case:
 
-  | Source | Skip values |
-  | --- | --- |
-  | Command line | `--no-setup --no-teardown` |
-  | JSON config | `noSetup: true, noTeardown: true` |
+  | Source | Skip value | Required markers | Omitted marker |
+  | --- | --- | --- | --- |
+  | Command line | `--no-setup` | `API-RAN`, `TEARDOWN-RAN` | `SETUP-RAN` |
+  | Command line | `--no-teardown` | `SETUP-RAN`, `API-RAN` | `TEARDOWN-RAN` |
+  | JSON config | `noSetup: true` | `API-RAN`, `TEARDOWN-RAN` | `SETUP-RAN` |
+  | JSON config | `noTeardown: true` | `SETUP-RAN`, `API-RAN` | `TEARDOWN-RAN` |
 
-- **THEN** the log contains neither `SETUP-RAN` nor `TEARDOWN-RAN`
-- **AND** `API-RAN` appears once
+- **THEN** the log contains each required marker once and omits the row's omitted marker
 - **AND** k6 reports no script exception and exits with code 0
 
 ### Requirement: Other options still control the run
@@ -190,11 +195,14 @@ k6 MUST apply `--once` after it combines options from the script, environment, J
 #### Scenario: An execution segment can reduce the run to zero iterations
 
 - **GIVEN** `api.js`
-- **WHEN** the user runs `k6 run --once --execution-segment 0:1/2 --execution-segment-sequence 0,1/2,1 api.js`
-- **THEN** `API-RAN` appears once and the run reports one complete iteration
-- **BUT WHEN** the user runs `k6 run --once --execution-segment 1/2:1 --execution-segment-sequence 0,1/2,1 api.js`
-- **THEN** the log omits `API-RAN`, and k6 reports zero VUs and zero complete iterations
-- **AND** the process exits with code 0
+- **WHEN** the user runs `k6 run --once --execution-segment <value> --execution-segment-sequence 0,1/2,1 api.js` for each case:
+
+  | `--execution-segment` | Expected result |
+  | --- | --- |
+  | `0:1/2` | `API-RAN` appears once and the run reports one complete iteration |
+  | `1/2:1` | `API-RAN` does not appear, the run reports zero VUs and zero complete iterations, and the process exits with code 0 |
+
+- **THEN** each run matches its expected result
 
 ### Requirement: Script files, archives, and standard input work with `--once`
 
@@ -344,11 +352,11 @@ The local execution provisioning request MUST set `max_vus: 1` and `total_durati
 
 #### Scenario: Invalid field values and unknown executors still fail
 
-- **GIVEN** two scripts that export an `api` function and declare one scenario named `api` with `exec: 'api'`
+- **GIVEN** two scripts that export an `api` function which prints `API-RAN` and declare one scenario named `api` with `exec: 'api'`
 - **AND** one scenario has `executor: 'shared-iterations'`, `vus: 'not-a-number'`, and `iterations: 1`, while the other has `executor: 'not-an-executor'`
 - **WHEN** the user runs each script with `k6 run --once`
 - **THEN** k6 rejects each invalid configuration and exits with a code other than zero
-- **AND** no scenario iteration runs
+- **AND** `API-RAN` does not appear
 
 #### Scenario: Missing required functions still fail the run
 
@@ -356,19 +364,19 @@ The local execution provisioning request MUST set `max_vus: 1` and `total_durati
 
   | Configuration | Exports | Required error text |
   | --- | --- | --- |
-  | No scenarios | only `api` | `executor default: function 'default' not found in exports` |
-  | One scenario named `ui`, with no `exec` | only `api` | `executor ui: function 'default' not found in exports` |
-  | One scenario named `ui`, with `exec: 'target'` | only `api` | `executor ui: function 'target' not found in exports` |
+  | No scenarios | only `api`, which prints `API-RAN` | `executor default: function 'default' not found in exports` |
+  | One scenario named `ui`, with no `exec` | only `api`, which prints `API-RAN` | `executor ui: function 'default' not found in exports` |
+  | One scenario named `ui`, with `exec: 'target'` | only `api`, which prints `API-RAN` | `executor ui: function 'target' not found in exports` |
 
 - **WHEN** the user runs each fixture with `k6 run --once`
 - **THEN** each invocation reports its required text and exits with a code other than zero
-- **AND** no scenario iteration runs
+- **AND** `API-RAN` does not appear
 
 ### Requirement: `--once` rejects multiple scenarios
 
 With two or more effective scenarios, k6 MUST run init context to read the options, then reject `--once` before setup, VU initialization, browser launch, or any cloud request.
 
-The error MUST contain `the --once flag can run only a single scenario` and MUST NOT list the declared scenario names.
+The error MUST state that `--once` can run only with one scenario.
 
 #### Scenario: Exactly two scenarios fail through every run path
 
@@ -376,7 +384,7 @@ The error MUST contain `the --once flag can run only a single scenario` and MUST
 - **AND** setup and both scenario functions print distinct markers
 - **AND** `xray` is a browser scenario that calls the browser API
 - **AND** the user builds `multi.tar` from `multi.js`
-- **AND** `K6_BROWSER_EXECUTABLE_PATH` names a nonexistent executable
+- **AND** `K6_BROWSER_EXECUTABLE_PATH=/does/not/exist/chromium`
 - **WHEN** the user invokes each path:
 
   | Path | Input |
@@ -386,24 +394,23 @@ The error MUST contain `the --once flag can run only a single scenario` and MUST
   | `k6 cloud run --once` | `multi.js` or `multi.tar` |
   | `k6 cloud run --local-execution --once` | `multi.js` or `multi.tar` |
 
-- **THEN** each invocation reports the required error and exits with a code other than zero
-- **AND** the error contains neither `zulu` nor `xray`
+- **THEN** each invocation reports that `--once` can run only with one scenario and exits with a code other than zero
 - **AND** the log contains `INIT-RAN` but no setup or body markers
-- **AND** no browser executable lookup occurs
+- **AND** the log does not mention `/does/not/exist/chromium` or a browser executable error
 - **AND** no request reaches a cloud API
 
 #### Scenario: `K6_ITERATIONS` does not hide multiple scenarios
 
 - **GIVEN** `multi.js`
 - **WHEN** the user runs `K6_ITERATIONS=3 k6 run --once multi.js`
-- **THEN** k6 reports `the --once flag can run only a single scenario`
-- **AND** no scenario iteration runs
+- **THEN** k6 reports that `--once` can run only with one scenario
+- **AND** neither scenario function marker appears
 
 ### Requirement: `--once` rejects CLI load flags
 
 k6 MUST reject a command line that combines `--once` with `--vus`/`-u`, `--iterations`/`-i`, `--duration`/`-d`, or `--stage`/`-s`.
 
-k6 MUST report one line containing `the --once flag is not compatible with the --<name> flag`, using the conflicting flag's long name.
+k6 MUST identify `--once` and the conflicting flag by its long name.
 
 A value of zero MUST still count as a conflict.
 
@@ -412,19 +419,27 @@ A value of zero MUST still count as a conflict.
 - **GIVEN** `api.js`, which `--once` accepts on its own
 - **WHEN** the user runs `k6 run --once <added flag> api.js` for each row:
 
-  | Added flag | Required text in the error |
+  | Added flag | Conflicting long flag |
   | --- | --- |
-  | `--vus 1` or `-u 2` | `the --once flag is not compatible with the --vus flag` |
-  | `--iterations 2` or `-i 0` | `the --once flag is not compatible with the --iterations flag` |
-  | `--duration 2s` or `-d 2s` | `the --once flag is not compatible with the --duration flag` |
-  | `--stage 2s:2` or `-s 2s:2` | `the --once flag is not compatible with the --stage flag` |
+  | `--vus 1` or `-u 2` | `--vus` |
+  | `--iterations 2` or `-i 0` | `--iterations` |
+  | `--duration 2s` or `-d 2s` | `--duration` |
+  | `--stage 2s:2` or `-s 2s:2` | `--stage` |
 
-- **THEN** every invocation exits with a code other than zero before a scenario iteration runs
-- **AND** the error contains the required text
+- **THEN** every invocation exits with a code other than zero and `API-RAN` does not appear
+- **AND** the error identifies `--once` and the conflicting long flag
+
+#### Scenario: Cloud commands reject a CLI load flag with `--once`
+
+- **GIVEN** `api.js`
+- **WHEN** the user runs `k6 cloud run --once --iterations 2 api.js`
+- **AND** separately runs `k6 cloud run --local-execution --once --iterations 2 api.js`
+- **THEN** each command rejects the invocation and identifies the conflict between `--once` and `--iterations`
+- **AND** `API-RAN` does not appear and no cloud request starts
 
 ### Requirement: Only bare CLI `--once` turns the behavior on
 
-`--once` MUST be off by default. Only bare `--once` on the current command may turn the behavior on. The flag accepts no value and does not select a scenario.
+`--once` MUST be off by default. Only the bare form `--once` on the current command may turn the behavior on. It does not select a scenario.
 
 An exported `once` option, `K6_ONCE`, `ONCE`, a JSON `once` field, or an archive option named `once` MUST NOT turn the behavior on.
 
@@ -463,10 +478,10 @@ An exported `once` option, `K6_ONCE`, `ONCE`, a JSON `once` field, or an archive
 
 #### Scenario: `--once=api` cannot select a scenario
 
-- **GIVEN** `script.js` is a valid test script
+- **GIVEN** `script.js` is a valid test script whose default function prints `DEFAULT-RAN`
 - **WHEN** the user runs `k6 run --once=api script.js`
 - **THEN** k6 rejects the invocation as an invalid value for the `once` flag and exits with a code other than zero
-- **AND** no scenario iteration runs
+- **AND** `DEFAULT-RAN` does not appear
 
 ### Requirement: Archive and cloud upload reject `--once`
 
