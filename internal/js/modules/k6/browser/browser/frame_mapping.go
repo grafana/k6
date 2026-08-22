@@ -3,6 +3,7 @@ package browser
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/grafana/sobek"
 
@@ -199,11 +200,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
-			gopts := common.NewFrameGotoOptions(
-				f.Referrer(),
-				f.NavigationTimeout(),
-			)
-			if err := gopts.Parse(vu.Context(), opts); err != nil {
+			gopts, err := parseFrameGotoOptions(rt, opts, f.Referrer(), f.NavigationTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing frame navigation options to %q: %w", url, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -512,4 +510,29 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	}
 
 	return maps
+}
+
+// parseFrameGotoOptions parses the frame goto options from a Sobek value.
+func parseFrameGotoOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultReferrer string, defaultTimeout time.Duration,
+) (*common.FrameGotoOptions, error) {
+	gopts := common.NewFrameGotoOptions(defaultReferrer, defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return gopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "referer":
+			gopts.Referer = obj.Get(k).String()
+		case "timeout":
+			gopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if err := gopts.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+				return gopts, fmt.Errorf("parsing goto options: %w", err)
+			}
+		}
+	}
+	return gopts, nil
 }
