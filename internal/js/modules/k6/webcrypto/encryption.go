@@ -1,6 +1,7 @@
 package webcrypto
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 
@@ -56,5 +57,31 @@ func newEncryptDecrypter(
 		return nil, NewError(SyntaxError, errMsg)
 	}
 
+	// The BufferSource fields above (iv, counter, additionalData, label)
+	// alias the script's view or buffer after ExportTo, and the encrypter
+	// reads them later, in the callback goroutine — after the synchronous
+	// call has already returned its promise. Snapshot them now so a script
+	// reusing or mutating the buffer while the promise is pending cannot
+	// change (or race with) the bytes actually used, as the specification's
+	// "get a copy of the bytes" steps require (#6319).
+	snapshotParams(ed)
+
 	return ed, nil
+}
+
+// snapshotParams replaces every BufferSource field of the encrypt/decrypt
+// algorithm parameters with a copy, detaching the parameters from any storage
+// the script can still reach.
+func snapshotParams(ed EncryptDecrypter) {
+	switch p := ed.(type) {
+	case *AESCBCParams:
+		p.Iv = bytes.Clone(p.Iv)
+	case *AESCTRParams:
+		p.Counter = bytes.Clone(p.Counter)
+	case *AESGCMParams:
+		p.Iv = bytes.Clone(p.Iv)
+		p.AdditionalData = bytes.Clone(p.AdditionalData)
+	case *RSAOaepParams:
+		p.Label = bytes.Clone(p.Label)
+	}
 }
