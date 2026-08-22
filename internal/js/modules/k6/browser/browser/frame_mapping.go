@@ -103,8 +103,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"focus": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameBaseOptions(common.NewFrameBaseOptions(f.Timeout()), rt, opts)
-			if err != nil {
+			popts := common.NewFrameBaseOptions(f.Timeout())
+			if err := parseFrameBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing focus options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -121,8 +121,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			})
 		},
 		"getAttribute": func(selector, name string, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameBaseOptions(common.NewFrameBaseOptions(f.Timeout()), rt, opts)
-			if err != nil {
+			popts := common.NewFrameBaseOptions(f.Timeout())
+			if err := parseFrameBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing getAttribute options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -223,8 +223,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"innerHTML": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameInnerHTMLOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameInnerHTMLOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing inner HTML options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -579,14 +579,29 @@ func parseFrameWaitForLoadStateOptions(
 	return wlsopts, nil
 }
 
+// parseFrameInnerHTMLOptions parses the frame innerHTML options from a Sobek value.
+func parseFrameInnerHTMLOptions(
+	rt *sobek.Runtime, opts sobek.Value,
+	defaultTimeout time.Duration,
+) (*common.FrameInnerHTMLOptions, error) {
+	ihopts := common.NewFrameInnerHTMLOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return ihopts, nil
+	}
+	if err := parseFrameBaseOptions(&ihopts.FrameBaseOptions, rt, opts); err != nil {
+		return ihopts, err
+	}
+	return ihopts, nil
+}
+
 // parseFrameBaseOptions parses the frame base options from a Sobek value into o.
 //
 //nolint:unparam
 func parseFrameBaseOptions(
 	o *common.FrameBaseOptions, rt *sobek.Runtime, opts sobek.Value,
-) (*common.FrameBaseOptions, error) {
+) error {
 	if k6common.IsNullish(opts) {
-		return o, nil
+		return nil
 	}
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
@@ -597,5 +612,5 @@ func parseFrameBaseOptions(
 			o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
 		}
 	}
-	return o, nil
+	return nil
 }
