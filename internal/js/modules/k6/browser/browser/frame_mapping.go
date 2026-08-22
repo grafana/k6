@@ -353,8 +353,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"setContent": func(html string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameSetContentOptions(f.Page().NavigationTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameSetContentOptions(rt, opts, f.Page().NavigationTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing setContent options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -535,4 +535,27 @@ func parseFrameGotoOptions(
 		}
 	}
 	return gopts, nil
+}
+
+// parseFrameSetContentOptions parses the frame setContent options from a Sobek value.
+func parseFrameSetContentOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameSetContentOptions, error) {
+	scopts := common.NewFrameSetContentOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return scopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			scopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if err := scopts.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+				return scopts, fmt.Errorf("parsing setContent options: %w", err)
+			}
+		}
+	}
+	return scopts, nil
 }
