@@ -165,6 +165,11 @@ var pollingTypeToID = map[string]PollingType{ //nolint:gochecknoglobals
 	"interval": PollingInterval,
 }
 
+func PollingIDFromString(format string) (PollingType, bool) {
+	id, exists := pollingTypeToID[format]
+	return id, exists
+}
+
 // MarshalJSON marshals the enum as a quoted JSON string.
 func (p PollingType) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)

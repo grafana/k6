@@ -581,7 +581,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"viewportSize": p.ViewportSize,
 		"waitForFunction": func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
-				vu.Context(), p.Timeout(), pageFunc, opts, args...,
+				rt, p.Timeout(), pageFunc, opts, args...,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("page waitForFunction: %w", err)
@@ -814,10 +814,9 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 }
 
 func parseWaitForFunctionArgs(
-	ctx context.Context, timeout time.Duration, pageFunc, opts sobek.Value, gargs ...sobek.Value,
+	rt *sobek.Runtime, timeout time.Duration, pageFunc, opts sobek.Value, gargs ...sobek.Value,
 ) (string, *common.FrameWaitForFunctionOptions, []any, error) {
-	popts := common.NewFrameWaitForFunctionOptions(timeout)
-	err := popts.Parse(ctx, opts)
+	popts, err := parseFrameWaitForFunctionOptions(rt, opts, timeout)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("parsing waitForFunction options: %w", err)
 	}
@@ -829,6 +828,40 @@ func parseWaitForFunctionArgs(
 	}
 
 	return js, popts, exportArgs(gargs), nil
+}
+
+// parseFrameWaitForFunctionOptions parses the frame waitForFunction options from a Sobek value.
+func parseFrameWaitForFunctionOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameWaitForFunctionOptions, error) {
+	wfopts := common.NewFrameWaitForFunctionOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wfopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		v := obj.Get(k)
+		switch k {
+		case "timeout":
+			wfopts.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
+		case "polling":
+			switch v.ExportType().Kind() {
+			case reflect.Int64:
+				wfopts.Polling = common.PollingInterval
+				wfopts.Interval = v.ToInteger()
+			case reflect.String:
+				if p, ok := common.PollingIDFromString(v.ToString().String()); ok {
+					wfopts.Polling = p
+					break
+				}
+				fallthrough
+			default:
+				return wfopts, fmt.Errorf("wrong polling option value: %q; "+
+					`possible values: "raf", "mutation" or number`, v)
+			}
+		}
+	}
+	return wfopts, nil
 }
 
 // parseStringOrRegex parses a sobek.Value to return either a quoted string if it was a string,

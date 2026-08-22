@@ -430,7 +430,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"url": f.URL,
 		"waitForFunction": func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
-				vu.Context(), f.Timeout(), pageFunc, opts, args...,
+				rt, f.Timeout(), pageFunc, opts, args...,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("frame waitForFunction: %w", err)
