@@ -343,8 +343,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		},
 		"setChecked": func(selector string, checked bool, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameCheckOptions(f.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameCheckOptions(rt, opts, f.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing frame set check options: %w", err)
 			}
 
