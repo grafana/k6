@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -240,6 +241,45 @@ func TestConnectionOnAttachedToTarget(t *testing.T) {
 			require.Equal(t, tt.want, b.connectionOnAttachedToTarget(ev))
 		})
 	}
+}
+
+func TestBrowserContextDisposeAndLookupRace(t *testing.T) {
+	t.Parallel()
+
+	const browserContextID cdp.BrowserContextID = "context"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	b.context = &BrowserContext{id: browserContextID}
+	b.defaultContext = &BrowserContext{}
+	b.conn = fakeConn{
+		execute: func(context.Context, string, any, any) error {
+			return nil
+		},
+	}
+
+	const iterations = 100
+	var wg sync.WaitGroup
+
+	for range 3 { // make multiple goroutines
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				_ = b.disposeContext(browserContextID)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			for range iterations {
+				b.getDefaultBrowserContextOrMatchedID(browserContextID)
+			}
+		}()
+	}
+
+	wg.Wait()
 }
 
 // TestBrowserRejectedTarget ensures a target the connection accepts but the
