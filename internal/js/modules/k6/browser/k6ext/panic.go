@@ -11,7 +11,6 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/errext"
-	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // Abortf will shutdown the whole test run. This should
@@ -26,13 +25,12 @@ func Abortf(ctx context.Context, format string, a ...any) {
 	sharedPanic(ctx, failFunc, a...)
 }
 
-// Panicf will cause a panic with the given error which will stop
-// the current iteration. Before panicking, it will find the
+// Panicf will interrupt the runtime with the given error which will stop
+// the current iteration. Before interrupting, it will find the
 // browser process from the context and kill it if it still exists.
-// TODO: test.
 func Panicf(ctx context.Context, format string, a ...any) {
 	failFunc := func(rt *sobek.Runtime, a ...any) {
-		k6common.Throw(rt, BrowserError(fmt.Errorf(format, a...)))
+		rt.Interrupt(BrowserError(fmt.Errorf(format, a...)))
 	}
 	sharedPanic(ctx, failFunc, a...)
 }

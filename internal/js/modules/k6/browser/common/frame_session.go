@@ -698,6 +698,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 	}
 	if err := json.Unmarshal(auxData, &i); err != nil {
 		k6ext.Panicf(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
+		return
 	}
 
 	frame, ok := fs.manager.getFrameByID(i.FrameID)
@@ -797,6 +798,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 	if err != nil {
 		k6ext.Panicf(fs.ctx, "handling frameNavigated event to %q: %w",
 			frame.URL+frame.URLFragment, err)
+		return
 	}
 
 	// Only create a navigation span once from here, since a new page navigating
@@ -1102,6 +1104,7 @@ func (fs *FrameSession) onTargetCrashed() {
 	s, ok := fs.session.(*Session)
 	if !ok {
 		k6ext.Panicf(fs.ctx, "unexpected type %T", fs.session)
+		return
 	}
 	s.markAsCrashed()
 }
