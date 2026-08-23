@@ -181,7 +181,9 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	if err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
 		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
+	b.contextMu.Lock()
 	b.context = nil
+	b.contextMu.Unlock()
 
 	return nil
 }
