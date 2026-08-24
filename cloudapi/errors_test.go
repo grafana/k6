@@ -38,6 +38,19 @@ func TestErrorResponse_Error(t *testing.T) {
 	assert.Equal(t, expected, errResp.Error())
 }
 
+func TestErrorResponse_Error_Unauthorized(t *testing.T) {
+	t.Parallel()
+
+	errResp := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusUnauthorized},
+		Message:  "Invalid token",
+		Code:     123,
+	}
+
+	expected := "(401/E123) Invalid token\nRun `k6 cloud login` to authenticate"
+	assert.Equal(t, expected, errResp.Error())
+}
+
 func TestCheckResponse(t *testing.T) {
 	t.Parallel()
 

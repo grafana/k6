@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -43,6 +44,32 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `access token not configured`)
+	})
+
+	t.Run("TestCloudUnauthorizedToken", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, err := w.Write([]byte(`{"error":{"code":"error","message":"Invalid token"}}`))
+			assert.NoError(t, err)
+		}))
+		defer srv.Close()
+
+		ts := NewGlobalTestState(t)
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte("export default function() {}"), 0o644))
+		ts.CmdArgs = setupCmd([]string{"--verbose", "--log-output=stdout"})
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_TOKEN"] = "invalid-or-expired-token"
+		ts.Env["K6_CLOUD_STACK_ID"] = "1"
+		ts.ExpectedExitCode = -1
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, "(401/error) Invalid token")
+		assert.Contains(t, stdout, "Run `k6 cloud login` to authenticate")
 	})
 
 	t.Run("TestCloudStackNotConfigured", func(t *testing.T) {

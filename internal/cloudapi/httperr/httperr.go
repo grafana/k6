@@ -10,9 +10,13 @@ import (
 	"net/http"
 )
 
+// AuthRecoveryHint is the recovery guidance pointing users to `k6 cloud login`
+// when an authentication error occurs.
+const AuthRecoveryHint = "Run `k6 cloud login` to authenticate"
+
 var (
 	// ErrNotAuthenticated maps HTTP 401.
-	ErrNotAuthenticated = errors.New("failed to authenticate with k6 Cloud")
+	ErrNotAuthenticated = errors.New("failed to authenticate with k6 Cloud\n" + AuthRecoveryHint)
 	// ErrNotAuthorized maps HTTP 403.
 	ErrNotAuthorized = errors.New("not allowed to upload result to k6 Cloud")
 )

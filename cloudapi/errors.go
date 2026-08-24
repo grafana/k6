@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 var errUnknown = errors.New("an error occurred communicating with k6 Cloud")
@@ -69,6 +71,10 @@ func (e ResponseError) Error() string {
 
 	if len(code) > 0 {
 		msg = fmt.Sprintf("(%s) %s", code, msg)
+	}
+
+	if e.Response != nil && e.Response.StatusCode == http.StatusUnauthorized {
+		msg += "\n" + httperr.AuthRecoveryHint
 	}
 
 	return msg
