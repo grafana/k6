@@ -128,8 +128,9 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 
 			// Waits until the event that satisfies the predicate.
 			if popts.PredicateFn != nil {
+				captured := k6common.CaptureMetricContext(vu.State())
 				pred = func(p *common.Page) (bool, error) {
-					return queueTask(ctx, vu.get(ctx, p.TargetID()), func() (bool, error) {
+					return queueTaskWithMetricContext(ctx, vu.get(ctx, p.TargetID()), captured, func() (bool, error) {
 						v, err := popts.PredicateFn(rt.ToValue(p))
 						if err != nil {
 							return false, err
@@ -168,10 +169,18 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return rt.ToValue(mpages).ToObject(rt)
 		},
 		"newPage": func() *sobek.Promise {
+			var setNetworkTags func(*common.Page)
+			if k6common.AsyncMetricContextEnabled(vu.State()) {
+				tagsAndMeta := vu.State().Tags.GetCurrentValues()
+				setNetworkTags = func(page *common.Page) { page.SetNetworkFallbackTagsAndMeta(tagsAndMeta) }
+			}
 			return promise(vu, func() (any, error) {
 				page, err := bc.NewPage()
 				if err != nil {
 					return nil, err //nolint:wrapcheck
+				}
+				if setNetworkTags != nil {
+					setNetworkTags(page)
 				}
 				return mapPage(vu, page), nil
 			})

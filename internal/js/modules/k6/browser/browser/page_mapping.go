@@ -700,12 +700,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ctx := vu.Context()
 			tq := vu.get(ctx, p.TargetID())
 
+			captured := k6common.CaptureMetricContext(vu.State())
+
 			return promise(vu, func() (any, error) {
 				rpe, err := p.WaitForEvent(event, popts, func(pe common.PageEvent) (bool, error) {
 					if fn == nil {
 						return true, nil
 					}
-					return queueTask(ctx, tq, func() (bool, error) {
+					return queueTaskWithMetricContext(ctx, tq, captured, func() (bool, error) {
 						m, err := mapPageEvent(vu, pe)
 						if err != nil {
 							return false, err
@@ -765,7 +767,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		})
 	}
 
-	return maps
+	// CDP request events run outside the event loop, so keep the context of each mapped call available
+	// until its returned promise settles. Loader-associated requests take precedence when possible.
+	return withPageNetworkCalls(vu, p, maps)
 }
 
 // mapPageOn enables using various page.on event handlers with the page.on method.
@@ -794,9 +798,10 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 
 		ctx := vu.Context()
 		tq := vu.get(ctx, p.TargetID())
+		captured := k6common.CaptureMetricContext(vu.State())
 
 		return p.On(eventName, func(event common.PageEvent) error {
-			wait := queueTask(ctx, tq, func() (sobek.Value, error) {
+			wait := queueTaskWithMetricContext(ctx, tq, captured, func() (sobek.Value, error) {
 				_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
 				if err != nil {
 					return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
@@ -940,9 +945,10 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable)
 
 		ppath := parseStringOrRegex(path, false)
 		tq := vu.get(ctx, p.TargetID())
+		captured := k6common.CaptureMetricContext(vu.State())
 
 		route := func(r *common.Route) error {
-			_, err := queueTask(ctx, tq, func() (any, error) {
+			_, err := queueTaskWithMetricContext(ctx, tq, captured, func() (any, error) {
 				return cb(sobek.Undefined(), vu.Runtime().ToValue(mapRoute(vu, r)))
 			})()
 			if errors.Is(err, context.Canceled) {

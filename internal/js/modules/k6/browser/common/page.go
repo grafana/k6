@@ -27,6 +27,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
+	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
 // BlankPage represents a blank page.
@@ -271,6 +272,15 @@ type Page struct {
 
 	backgroundPage bool
 
+	// Supplies the fallback for requests that cannot be associated with an active browser operation.
+	networkFallbackTagsAndMeta atomic.Pointer[k6metrics.TagsAndMeta]
+	networkRecentOperation     *networkOperationContext
+	networkOperationID         atomic.Uint64
+	networkOperations          []*networkOperationContext
+	networkLoaderOperations    map[cdp.LoaderID]*networkOperationContext
+	networkFrameLoaders        map[cdp.FrameID]cdp.LoaderID
+	networkOperationsMu        sync.Mutex
+
 	eventCh            chan Event
 	eventHandlers      map[PageEventName][]pageEventHandlerRecord
 	eventHandlersMu    sync.RWMutex
@@ -321,6 +331,14 @@ func NewPage(
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		logger:           logger,
+	}
+
+	// Popup pages are created off the event loop, so inherit the context of the operation that opened
+	// them, or the opener's fallback when no operation is active.
+	if opener != nil {
+		if tagsAndMeta, ok := opener.getNetworkTagsAndMeta(); ok {
+			p.networkFallbackTagsAndMeta.Store(&tagsAndMeta)
+		}
 	}
 
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
@@ -1219,6 +1237,120 @@ func (p *Page) GetMouse() *Mouse {
 // GetTouchscreen returns the touchscreen for the page.
 func (p *Page) GetTouchscreen() *Touchscreen {
 	return p.Touchscreen
+}
+
+type networkOperationContext struct {
+	id          uint64
+	tagsAndMeta k6metrics.TagsAndMeta
+}
+
+// SetNetworkFallbackTagsAndMeta records the tags and metadata for requests that cannot be
+// associated with an active browser operation.
+func (p *Page) SetNetworkFallbackTagsAndMeta(tagsAndMeta k6metrics.TagsAndMeta) {
+	p.networkFallbackTagsAndMeta.Store(&tagsAndMeta)
+}
+
+// BeginNetworkOperation makes tagsAndMeta available to requests observed while the operation is
+// active and retains it for CDP request events that arrive just after the operation settles. Calling
+// cancel instead discards it because the browser operation did not start.
+func (p *Page) BeginNetworkOperation(tagsAndMeta k6metrics.TagsAndMeta) (complete, cancel func()) {
+	operation := &networkOperationContext{
+		id:          p.networkOperationID.Add(1),
+		tagsAndMeta: tagsAndMeta,
+	}
+	p.networkOperationsMu.Lock()
+	p.networkOperations = append(p.networkOperations, operation)
+	p.networkOperationsMu.Unlock()
+
+	var once sync.Once
+	remove := func(keepRecent bool) {
+		once.Do(func() {
+			p.networkOperationsMu.Lock()
+			defer p.networkOperationsMu.Unlock()
+			if keepRecent {
+				p.networkRecentOperation = operation
+			}
+			for i := range p.networkOperations {
+				if p.networkOperations[i].id != operation.id {
+					continue
+				}
+				p.networkOperations = append(p.networkOperations[:i], p.networkOperations[i+1:]...)
+				return
+			}
+		})
+	}
+	return func() { remove(true) }, func() { remove(false) }
+}
+
+func (p *Page) getNetworkTagsAndMeta() (k6metrics.TagsAndMeta, bool) {
+	tagsAndMeta, _, ok := p.getNetworkTagsAndMetaForRequest("", "", false, false)
+	return tagsAndMeta, ok
+}
+
+func (p *Page) getNetworkTagsAndMetaForRequest(
+	frameID cdp.FrameID,
+	loaderID cdp.LoaderID,
+	preferLoaderContext bool,
+	bindLoaderContext bool,
+) (k6metrics.TagsAndMeta, *networkOperationContext, bool) {
+	p.networkOperationsMu.Lock()
+	var operation *networkOperationContext
+	if preferLoaderContext && loaderID != "" {
+		operation = p.networkLoaderOperations[loaderID]
+	}
+	if operation == nil {
+		if n := len(p.networkOperations); n > 0 {
+			operation = p.networkOperations[n-1]
+		} else {
+			operation = p.networkRecentOperation
+		}
+	}
+	if bindLoaderContext && loaderID != "" && operation != nil {
+		p.bindNetworkLoaderOperationLocked(frameID, loaderID, operation)
+	}
+	p.networkOperationsMu.Unlock()
+
+	if operation != nil {
+		return operation.tagsAndMeta, operation, true
+	}
+
+	if tagsAndMeta := p.networkFallbackTagsAndMeta.Load(); tagsAndMeta != nil {
+		return *tagsAndMeta, nil, true
+	}
+	return k6metrics.TagsAndMeta{}, nil, false
+}
+
+func (p *Page) bindNetworkLoaderOperation(
+	frameID cdp.FrameID, loaderID cdp.LoaderID, operation *networkOperationContext,
+) {
+	if loaderID == "" || operation == nil {
+		return
+	}
+	p.networkOperationsMu.Lock()
+	defer p.networkOperationsMu.Unlock()
+	p.bindNetworkLoaderOperationLocked(frameID, loaderID, operation)
+}
+
+func (p *Page) bindNetworkLoaderOperationLocked(
+	frameID cdp.FrameID, loaderID cdp.LoaderID, operation *networkOperationContext,
+) {
+	if p.networkLoaderOperations == nil {
+		p.networkLoaderOperations = make(map[cdp.LoaderID]*networkOperationContext)
+		p.networkFrameLoaders = make(map[cdp.FrameID]cdp.LoaderID)
+	}
+	if previousLoaderID := p.networkFrameLoaders[frameID]; previousLoaderID != loaderID {
+		delete(p.networkLoaderOperations, previousLoaderID)
+	}
+	p.networkLoaderOperations[loaderID] = operation
+	p.networkFrameLoaders[frameID] = loaderID
+}
+
+func (p *Page) clearNetworkLoaderContext(frameID cdp.FrameID) {
+	p.networkOperationsMu.Lock()
+	loaderID := p.networkFrameLoaders[frameID]
+	delete(p.networkLoaderOperations, loaderID)
+	delete(p.networkFrameLoaders, frameID)
+	p.networkOperationsMu.Unlock()
 }
 
 // Goto will navigate the page to the specified URL and return a HTTP response object.

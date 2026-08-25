@@ -131,6 +131,17 @@ func queueTask[T any](
 	}
 }
 
+func queueTaskWithMetricContext[T any](
+	ctx context.Context,
+	tq *taskqueue.TaskQueue,
+	captured k6common.CapturedMetricContext,
+	fn func() (T, error),
+) (future func() (T, error)) {
+	return queueTask(ctx, tq, func() (T, error) {
+		return k6common.RunWithMetricContext(captured, fn)
+	})
+}
+
 // newTaskQueue returns a new [taskqueue.TaskQueue] that is closed after
 // the returned cancel function is called or when the VU's context is done.
 //

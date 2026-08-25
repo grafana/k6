@@ -511,5 +511,5 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		})
 	}
 
-	return maps
+	return withPageNetworkCalls(vu, f.Page(), maps)
 }

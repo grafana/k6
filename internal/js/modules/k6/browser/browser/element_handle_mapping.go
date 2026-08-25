@@ -337,5 +337,5 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	jsHandleMap := mapJSHandle(vu, eh)
 	maps0.Copy(maps, jsHandleMap)
 
-	return maps
+	return withPageNetworkCalls(vu, eh.Page(), maps)
 }
