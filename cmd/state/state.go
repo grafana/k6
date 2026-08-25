@@ -9,7 +9,6 @@ import (
 	"slices"
 	"strconv"
 	"sync"
-	"time"
 
 	"go.k6.io/k6/v2/lib"
 
@@ -161,11 +160,6 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		Level: logLevel,
 	}
 
-	fallbackFormatter := &logrus.TextFormatter{} // no fancy formatting here
-	if globalFlags.LogNanosecondTimestamps {
-		fallbackFormatter.TimestampFormat = time.RFC3339Nano
-	}
-
 	return &GlobalState{
 		Ctx:             ctx,
 		FS:              fsext.NewOsFs(),
@@ -187,7 +181,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		Logger:          logger,
 		FallbackLogger: &logrus.Logger{ // we may modify the other one
 			Out:       stderr,
-			Formatter: fallbackFormatter,
+			Formatter: new(logrus.TextFormatter), // no fancy formatting here
 			Hooks:     make(logrus.LevelHooks),
 			Level:     logrus.InfoLevel,
 		},
