@@ -11,6 +11,7 @@ import (
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/cloudapi/clientcfg"
 	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
@@ -82,18 +83,26 @@ func CheckResponse(r *http.Response, err error) error {
 		return err
 	}
 
+	var respErr error
 	var payload ResponseError
 	if err := json.Unmarshal(data, &payload); err != nil {
 		if classified := httperr.ClassifyStatus(r.StatusCode); classified != nil {
-			return classified
+			respErr = classified
+		} else {
+			respErr = fmt.Errorf(
+				"unexpected HTTP error from %s: %d %s",
+				r.Request.URL,
+				r.StatusCode,
+				http.StatusText(r.StatusCode),
+			)
 		}
-		return fmt.Errorf(
-			"unexpected HTTP error from %s: %d %s",
-			r.Request.URL,
-			r.StatusCode,
-			http.StatusText(r.StatusCode),
-		)
+	} else {
+		payload.Response = r
+		respErr = payload
 	}
-	payload.Response = r
-	return payload
+
+	if r.StatusCode == http.StatusUnauthorized {
+		return errext.WithHint(respErr, "Run `k6 cloud login` to authenticate")
+	}
+	return respErr
 }

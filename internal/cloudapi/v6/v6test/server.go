@@ -112,32 +112,21 @@ func NewServer(t *testing.T, cfg Config) *Server {
 	return s
 }
 
-// forcedErrorMessages mirrors the real k6 Cloud API's error body for each
-// status this mock can simulate via Config.ErrorStatus. Confirmed against
-// the live v6 API (2026-08-24): a validate_options call with an
-// invalid/expired token returns exactly this 401 body.
-var forcedErrorMessages = map[int]string{
-	http.StatusUnauthorized: "Invalid token",
-}
-
 // forcedErrorHandler short-circuits every request with the given status and
 // its real error body, regardless of route.
 func forcedErrorHandler(status int) http.Handler {
+	forcedErrorMessages := map[int]string{
+		http.StatusUnauthorized: "Invalid token",
+	}
+
 	msg, ok := forcedErrorMessages[status]
 	if !ok {
 		panic(fmt.Sprintf("v6test: no error body registered for status %d", status))
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		var body struct {
-			Error struct {
-				Message string `json:"message"`
-				Code    string `json:"code"`
-			} `json:"error"`
-		}
-		body.Error.Message = msg
-		body.Error.Code = "error"
-		writeJSON(w, status, body)
+		res := k6cloud.NewErrorResponseApiModel(*k6cloud.NewErrorApiModel(msg, "error"))
+		writeJSON(w, status, res)
 	})
 }
 
