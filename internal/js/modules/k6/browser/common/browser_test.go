@@ -260,26 +260,43 @@ func TestBrowserContextDisposeAndLookupRace(t *testing.T) {
 	}
 
 	const iterations = 100
-	var wg sync.WaitGroup
+	const workers = 3
+	var (
+		wg             sync.WaitGroup
+		disposeErrors  = make(chan error, workers*iterations)
+		lookupContexts = make(chan *BrowserContext, workers*iterations)
+	)
 
-	for range 3 { // make multiple goroutines
+	for range workers { // make multiple goroutines
 		wg.Add(2)
-		go func() {
+		go func() { // writes to context
 			defer wg.Done()
 			for range iterations {
-				_ = b.disposeContext(browserContextID)
+				disposeErrors <- b.disposeContext(browserContextID)
 			}
 		}()
 
-		go func() {
+		go func() { // reads from context
 			defer wg.Done()
 			for range iterations {
-				b.getDefaultBrowserContextOrMatchedID(browserContextID)
+				lookupContexts <- b.getDefaultBrowserContextOrMatchedID(browserContextID)
+				b.Context()
 			}
 		}()
 	}
 
 	wg.Wait()
+	close(disposeErrors)
+	close(lookupContexts)
+
+	for err := range disposeErrors {
+		require.NoError(t, err)
+	}
+	for browserContext := range lookupContexts {
+		require.NotNil(t, browserContext)
+	}
+	require.Nil(t, b.Context())
+	require.Same(t, b.defaultContext, b.getDefaultBrowserContextOrMatchedID(browserContextID))
 }
 
 // TestBrowserRejectedTarget ensures a target the connection accepts but the
