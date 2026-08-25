@@ -509,7 +509,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		})
 	}
 
-	return maps
+	return withPageNetworkCalls(vu, f.Page(), maps)
 }
 
 // parseFrameCheckOptions parses the frame check options from a Sobek value.

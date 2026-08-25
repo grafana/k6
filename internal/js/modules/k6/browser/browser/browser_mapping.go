@@ -6,6 +6,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // browserProvider is a function that provides a browser instance.
@@ -81,6 +82,11 @@ func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
 			}
+			var setNetworkTags func(*common.Page)
+			if k6common.AsyncMetricContextEnabled(vu.State()) {
+				tagsAndMeta := vu.State().Tags.GetCurrentValues()
+				setNetworkTags = func(page *common.Page) { page.SetNetworkFallbackTagsAndMeta(tagsAndMeta) }
+			}
 			return promise(vu, func() (any, error) {
 				b, err := browser()
 				if err != nil {
@@ -89,6 +95,9 @@ func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 				page, err := b.NewPage(popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
+				}
+				if setNetworkTags != nil {
+					setNetworkTags(page)
 				}
 				if err := initBrowserContext(b.Context(), vu.testRunID); err != nil {
 					return nil, err

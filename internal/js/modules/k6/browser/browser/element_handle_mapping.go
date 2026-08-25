@@ -340,7 +340,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	jsHandleMap := mapJSHandle(vu, eh)
 	maps0.Copy(maps, jsHandleMap)
 
-	return maps
+	return withPageNetworkCalls(vu, eh.Page(), maps)
 }
 
 // parseElementHandleTypeOptions parses the element handle type options from a Sobek value.

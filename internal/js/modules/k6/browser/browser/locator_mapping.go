@@ -16,7 +16,7 @@ import (
 //nolint:gocognit,funlen,cyclop
 func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	rt := vu.Runtime()
-	return mapping{
+	maps := mapping{
 		"all": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				all, err := lo.All()
@@ -41,7 +41,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				// We want to avoid errors when an element is not visible or detached and instead
 				// opt to return a nil rectangle -- this matches Playwright's behaviour.
 				if errors.Is(err, common.ErrElementNotVisible) || errors.Is(err, common.ErrElementNotAttachedToDOM) {
-					return nil, nil
+					return nil, nil //nolint:nilnil // Absence maps to JavaScript null.
 				}
 				return box, err
 			}), nil
@@ -227,7 +227,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 					return nil, err //nolint:wrapcheck
 				}
 				if !ok {
-					return nil, nil
+					return nil, nil //nolint:nilnil // Absence maps to JavaScript null.
 				}
 				return s, nil
 			}), nil
@@ -339,7 +339,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 					return nil, err //nolint:wrapcheck
 				}
 				if !ok {
-					return nil, nil
+					return nil, nil //nolint:nilnil // Absence maps to JavaScript null.
 				}
 				return s, nil
 			}), nil
@@ -432,6 +432,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 	}
+	return withPageNetworkCalls(vu, lo.Page(), maps)
 }
 
 func parseLocatorOptions(rt *sobek.Runtime, opts sobek.Value) *common.LocatorOptions {
