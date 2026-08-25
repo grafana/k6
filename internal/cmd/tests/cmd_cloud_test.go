@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"go.k6.io/k6/v2/errext/exitcodes"
@@ -49,7 +50,9 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 	t.Run("TestCloudUnauthorizedToken", func(t *testing.T) {
 		t.Parallel()
 
+		var reached atomic.Bool
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			reached.Store(true)
 			w.WriteHeader(http.StatusUnauthorized)
 			_, err := w.Write([]byte(`{"error":{"code":"error","message":"Invalid token"}}`))
 			assert.NoError(t, err)
@@ -57,16 +60,17 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		defer srv.Close()
 
 		ts := NewGlobalTestState(t)
-		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte("export default function() {}"), 0o644))
+		require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"),
+			[]byte("export let options = { cloud: { projectID: 1 } };\nexport default function() {}"), 0o644))
 		ts.CmdArgs = setupCmd([]string{"--verbose", "--log-output=stdout"})
 		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "invalid-or-expired-token"
 		ts.Env["K6_CLOUD_STACK_ID"] = "1"
-		ts.Env["K6_CLOUD_PROJECT_ID"] = "1"
 		ts.ExpectedExitCode = -1
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
+		assert.True(t, reached.Load(), "mock server handler should have been reached")
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "(401/error) Invalid token")

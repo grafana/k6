@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -92,7 +93,9 @@ func TestCloudProjectList(t *testing.T) {
 	t.Run("unauthorized token error includes recovery hint", func(t *testing.T) {
 		t.Parallel()
 
+		var reached atomic.Bool
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			reached.Store(true)
 			w.WriteHeader(http.StatusUnauthorized)
 			_, err := w.Write([]byte(`{"error":{"code":"error","message":"Invalid token"}}`))
 			assert.NoError(t, err)
@@ -108,6 +111,7 @@ func TestCloudProjectList(t *testing.T) {
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
+		assert.True(t, reached.Load(), "mock server handler should have been reached")
 		stdout := ts.Stdout.String()
 		assert.Contains(t, stdout, "(401/error) Invalid token")
 		assert.Contains(t, stdout, "Verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token, or credentials saved by k6 cloud login)")
