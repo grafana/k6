@@ -81,6 +81,7 @@ func (e *timers) call(callback sobek.Callable, args []sobek.Value) error {
 
 func (e *timers) setTimeout(callback sobek.Callable, delay float64, args ...sobek.Value) uint64 {
 	id := e.nextID()
+	callback = common.CaptureMetricContext(e.vu.State()).WrapSobekCallable(callback)
 	e.timerInitialization(callback, delay, args, false, id)
 	return id
 }
@@ -111,6 +112,7 @@ func (e *timers) freeEventLoopIfPossible() {
 
 func (e *timers) setInterval(callback sobek.Callable, delay float64, args ...sobek.Value) uint64 {
 	id := e.nextID()
+	callback = common.CaptureMetricContext(e.vu.State()).WrapSobekCallable(callback)
 	e.timerInitialization(callback, delay, args, true, id)
 	return id
 }
@@ -121,6 +123,8 @@ func (e *timers) clearInterval(id uint64) {
 
 // https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#timer-initialisation-steps
 // NOTE: previousId from the specification is always send and it is basically id
+//
+// Repeated timers must reuse the registration-time metric context when they rearm.
 func (e *timers) timerInitialization(
 	callback sobek.Callable, timeout float64, args []sobek.Value, repeat bool, id uint64,
 ) {
