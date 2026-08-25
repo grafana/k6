@@ -266,6 +266,9 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 			local:  event.NewEventSystem(100, b.preInitState.Logger),
 		},
 	}
+	if b.preInitState.FeatureFlags != nil && b.preInitState.FeatureFlags.AsyncMetricContext {
+		vuImpl.runtime.SetAsyncContextTracker(common.NewMetricContextTracker(vuImpl.State))
+	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	bi, err := b.instantiate(vuImpl, vuID)
 	if err != nil {
