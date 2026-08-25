@@ -3,6 +3,8 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,6 +87,30 @@ func TestCloudProjectList(t *testing.T) {
 		var projects []cloudapiv6.Project
 		require.NoError(t, json.Unmarshal([]byte(stdout), &projects))
 		assert.Empty(t, projects)
+	})
+
+	t.Run("unauthorized token error includes recovery hint", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, err := w.Write([]byte(`{"error":{"code":"error","message":"Invalid token"}}`))
+			assert.NoError(t, err)
+		}))
+		defer srv.Close()
+
+		ts := NewGlobalTestState(t)
+		ts.CmdArgs = []string{"k6", "cloud", "project", "list", "--verbose", "--log-output=stdout"}
+		ts.Env["K6_CLOUD_TOKEN"] = "invalid-token"
+		ts.Env["K6_CLOUD_STACK_ID"] = "1"
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.ExpectedExitCode = -1
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		assert.Contains(t, stdout, "(401/error) Invalid token")
+		assert.Contains(t, stdout, "Verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token, or credentials saved by k6 cloud login)")
 	})
 }
 

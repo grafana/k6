@@ -21,6 +21,7 @@ import (
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/build"
 	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 	"go.k6.io/k6/v2/internal/ui/pb"
 	"go.k6.io/k6/v2/lib"
 
@@ -29,7 +30,22 @@ import (
 	"github.com/spf13/pflag"
 )
 
-const cloudRunAuthPrefix = "Running cloud tests requires auth settings"
+const (
+	cloudRunAuthPrefix     = "Running cloud tests requires auth settings"
+	cloudTokenRecoveryHint = "Verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token, or credentials saved by k6 cloud login)"
+)
+
+// wrapCloudAuthError appends actionable recovery guidance when an error is an
+// authentication error (HTTP 401).
+func wrapCloudAuthError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, httperr.ErrNotAuthenticated) {
+		return fmt.Errorf("%w\n%s", err, cloudTokenRecoveryHint)
+	}
+	return err
+}
 
 var (
 	errCloudAuth = errors.New( //nolint:staticcheck // user-facing error message, capitalization is intentional
@@ -270,14 +286,14 @@ func runCloudTest(gs *state.GlobalState, cmd *cobra.Command, args []string, opts
 	}
 	projectID, err := prepCloudTestRun(globalCtx, gs, client, &cloudConfig, tmpCloudConfig, arc)
 	if err != nil {
-		return err
+		return wrapCloudAuthError(err)
 	}
 
 	modifyAndPrintBar(gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 
 	loadTest, err := client.UploadTest(globalCtx, name, projectID, arc)
 	if err != nil {
-		return fmt.Errorf("uploading test: %w", err)
+		return wrapCloudAuthError(fmt.Errorf("uploading test: %w", err))
 	}
 
 	if opts.uploadOnly {
@@ -300,7 +316,7 @@ func runCloudTest(gs *state.GlobalState, cmd *cobra.Command, args []string, opts
 
 	run, err := client.StartTest(globalCtx, loadTest.GetId())
 	if err != nil {
-		return fmt.Errorf("starting test: %w", err)
+		return wrapCloudAuthError(fmt.Errorf("starting test: %w", err))
 	}
 	testRunID := run.GetId()
 

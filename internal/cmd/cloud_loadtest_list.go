@@ -62,7 +62,7 @@ func (c *cmdCloudTestList) run(cmd *cobra.Command, _ []string) error {
 	}
 	tests, err := client.ListLoadTests(c.globalState.Ctx, projectID)
 	if err != nil {
-		return err
+		return wrapCloudAuthError(err)
 	}
 
 	if c.isJSON {

@@ -6,6 +6,7 @@ import (
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/stretchr/testify/assert"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 func TestResponseError_Error(t *testing.T) {
@@ -67,7 +68,7 @@ func TestResponseError_Error(t *testing.T) {
 			expected: "(400/error) bad request",
 		},
 		{
-			name: "unauthorized 401 error includes recovery hint",
+			name: "unauthorized 401 error with code",
 			respErr: ResponseError{
 				Response: &http.Response{StatusCode: http.StatusUnauthorized},
 				APIError: k6cloud.ErrorApiModel{
@@ -75,17 +76,17 @@ func TestResponseError_Error(t *testing.T) {
 					Code:    "error",
 				},
 			},
-			expected: "(401/error) Invalid token\nRun `k6 cloud login` to authenticate",
+			expected: "(401/error) Invalid token",
 		},
 		{
-			name: "unauthorized 401 without code includes recovery hint",
+			name: "unauthorized 401 without code",
 			respErr: ResponseError{
 				Response: &http.Response{StatusCode: http.StatusUnauthorized},
 				APIError: k6cloud.ErrorApiModel{
 					Message: "Unauthorized",
 				},
 			},
-			expected: "(401) Unauthorized\nRun `k6 cloud login` to authenticate",
+			expected: "(401) Unauthorized",
 		},
 	}
 
@@ -97,4 +98,29 @@ func TestResponseError_Error(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestResponseError_Is(t *testing.T) {
+	t.Parallel()
+
+	authErr := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusUnauthorized},
+		APIError: k6cloud.ErrorApiModel{Message: "Invalid token"},
+	}
+	assert.ErrorIs(t, authErr, httperr.ErrNotAuthenticated)
+	assert.NotErrorIs(t, authErr, httperr.ErrNotAuthorized)
+
+	forbiddenErr := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusForbidden},
+		APIError: k6cloud.ErrorApiModel{Message: "Forbidden"},
+	}
+	assert.ErrorIs(t, forbiddenErr, httperr.ErrNotAuthorized)
+	assert.NotErrorIs(t, forbiddenErr, httperr.ErrNotAuthenticated)
+
+	otherErr := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusBadRequest},
+		APIError: k6cloud.ErrorApiModel{Message: "Bad Request"},
+	}
+	assert.NotErrorIs(t, otherErr, httperr.ErrNotAuthenticated)
+	assert.NotErrorIs(t, otherErr, httperr.ErrNotAuthorized)
 }

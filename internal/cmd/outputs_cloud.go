@@ -155,7 +155,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		Archive:       testArchive,
 	})
 	if err != nil {
-		return err
+		return wrapCloudAuthError(err)
 	}
 
 	// Stash testRunID in env (existing pattern).

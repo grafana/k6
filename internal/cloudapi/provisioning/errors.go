@@ -21,6 +21,18 @@ func (e *ResponseError) Error() string {
 	return fmt.Sprintf("provisioning API error (%d): %s", e.StatusCode, e.Body)
 }
 
+// Is returns true if target is httperr.ErrNotAuthenticated and StatusCode is 401,
+// or if target is httperr.ErrNotAuthorized and StatusCode is 403.
+func (e *ResponseError) Is(target error) bool {
+	if target == httperr.ErrNotAuthenticated && e.StatusCode == http.StatusUnauthorized {
+		return true
+	}
+	if target == httperr.ErrNotAuthorized && e.StatusCode == http.StatusForbidden {
+		return true
+	}
+	return false
+}
+
 // CheckResponse checks an HTTP response from the provisioning API.
 // It returns nil if the status code is in the 2xx range, otherwise it
 // returns a *ResponseError with the status code and response body.

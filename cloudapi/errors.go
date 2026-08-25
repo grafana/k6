@@ -73,9 +73,17 @@ func (e ResponseError) Error() string {
 		msg = fmt.Sprintf("(%s) %s", code, msg)
 	}
 
-	if e.Response != nil && e.Response.StatusCode == http.StatusUnauthorized {
-		msg += "\n" + httperr.AuthRecoveryHint
-	}
-
 	return msg
+}
+
+// Is returns true if target is httperr.ErrNotAuthenticated and the response status code is 401,
+// or if target is httperr.ErrNotAuthorized and the response status code is 403.
+func (e ResponseError) Is(target error) bool {
+	if target == httperr.ErrNotAuthenticated && e.Response != nil && e.Response.StatusCode == http.StatusUnauthorized {
+		return true
+	}
+	if target == httperr.ErrNotAuthorized && e.Response != nil && e.Response.StatusCode == http.StatusForbidden {
+		return true
+	}
+	return false
 }

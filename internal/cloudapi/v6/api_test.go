@@ -70,7 +70,6 @@ func TestValidateToken(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, resp)
 		assert.Contains(t, err.Error(), "(401/error) Invalid token")
-		assert.Contains(t, err.Error(), "Run `k6 cloud login` to authenticate")
 	})
 
 	t.Run("network error should fail", func(t *testing.T) {

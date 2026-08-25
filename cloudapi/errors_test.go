@@ -47,8 +47,33 @@ func TestErrorResponse_Error_Unauthorized(t *testing.T) {
 		Code:     123,
 	}
 
-	expected := "(401/E123) Invalid token\nRun `k6 cloud login` to authenticate"
+	expected := "(401/E123) Invalid token"
 	assert.Equal(t, expected, errResp.Error())
+}
+
+func TestErrorResponse_Is(t *testing.T) {
+	t.Parallel()
+
+	authErr := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusUnauthorized},
+		Message:  "Invalid token",
+	}
+	assert.ErrorIs(t, authErr, httperr.ErrNotAuthenticated)
+	assert.NotErrorIs(t, authErr, httperr.ErrNotAuthorized)
+
+	forbiddenErr := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusForbidden},
+		Message:  "Forbidden",
+	}
+	assert.ErrorIs(t, forbiddenErr, httperr.ErrNotAuthorized)
+	assert.NotErrorIs(t, forbiddenErr, httperr.ErrNotAuthenticated)
+
+	otherErr := ResponseError{
+		Response: &http.Response{StatusCode: http.StatusBadRequest},
+		Message:  "Bad Request",
+	}
+	assert.NotErrorIs(t, otherErr, httperr.ErrNotAuthenticated)
+	assert.NotErrorIs(t, otherErr, httperr.ErrNotAuthorized)
 }
 
 func TestCheckResponse(t *testing.T) {

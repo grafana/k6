@@ -50,7 +50,7 @@ func (c *cmdCloudLoadZoneList) run(_ *cobra.Command, _ []string) error {
 
 	loadZones, err := client.ListLoadZones(c.globalState.Ctx)
 	if err != nil {
-		return err
+		return wrapCloudAuthError(err)
 	}
 
 	if c.isJSON {

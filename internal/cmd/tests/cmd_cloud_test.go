@@ -62,6 +62,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
 		ts.Env["K6_CLOUD_TOKEN"] = "invalid-or-expired-token"
 		ts.Env["K6_CLOUD_STACK_ID"] = "1"
+		ts.Env["K6_CLOUD_PROJECT_ID"] = "1"
 		ts.ExpectedExitCode = -1
 
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -69,7 +70,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, "(401/error) Invalid token")
-		assert.Contains(t, stdout, "Run `k6 cloud login` to authenticate")
+		assert.Contains(t, stdout, "Verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token, or credentials saved by k6 cloud login)")
 	})
 
 	t.Run("TestCloudStackNotConfigured", func(t *testing.T) {

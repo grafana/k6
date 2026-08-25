@@ -50,7 +50,7 @@ func (c *cmdCloudProjectList) run(_ *cobra.Command, _ []string) error {
 
 	projects, err := client.ListProjects(c.globalState.Ctx)
 	if err != nil {
-		return err
+		return wrapCloudAuthError(err)
 	}
 
 	if c.isJSON {
