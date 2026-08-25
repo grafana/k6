@@ -30,7 +30,8 @@ type (
 
 	// K6 represents an instance of the k6 module.
 	K6 struct {
-		vu modules.VU
+		vu          modules.VU
+		asyncGroups bool
 	}
 )
 
@@ -47,7 +48,17 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &K6{vu: vu}
+	asyncGroups := asyncGroupsEnabled(vu)
+	return &K6{vu: vu, asyncGroups: asyncGroups}
+}
+
+func asyncGroupsEnabled(vu modules.VU) bool {
+	if state := vu.State(); state != nil {
+		return common.AsyncMetricContextEnabled(state)
+	}
+	initEnv := vu.InitEnv()
+	return initEnv != nil && initEnv.TestPreInitState != nil &&
+		initEnv.FeatureFlags != nil && initEnv.FeatureFlags.AsyncMetricContext
 }
 
 // Exports returns the exports of the k6 module.
@@ -85,7 +96,10 @@ func (mi *K6) RandomSeed(seed int64) {
 	mi.vu.Runtime().SetRandSource(randSource)
 }
 
-// Group wraps a function call and executes it within the provided group name.
+// Group executes a callback under the provided group name.
+//
+// With the async-metric-context feature enabled, async callbacks retain their metric
+// context through promise reactions and group_duration covers their lifetime.
 func (mi *K6) Group(name string, val sobek.Value) (sobek.Value, error) {
 	state := mi.vu.State()
 	if state == nil {
@@ -99,12 +113,13 @@ func (mi *K6) Group(name string, val sobek.Value) (sobek.Value, error) {
 	if !ok {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
-	if common.IsAsyncFunction(mi.vu.Runtime(), val) {
+	if !mi.asyncGroups && common.IsAsyncFunction(mi.vu.Runtime(), val) {
 		return sobek.Undefined(), errors.New("group() does not support async functions as arguments, " +
 			"please see https://grafana.com/docs/k6/latest/javascript-api/k6/group/ for more info")
 	}
-	oldGroupName, _ := state.Tags.GetCurrentValues().Tags.Get(metrics.TagGroup.String())
-	// TODO: what are we doing if group is not tagged
+
+	parentTagsAndMeta := state.Tags.GetCurrentValues()
+	oldGroupName, _ := parentTagsAndMeta.Tags.Get(metrics.TagGroup.String())
 	newGroupName, err := lib.NewGroupPath(oldGroupName, name)
 	if err != nil {
 		return sobek.Undefined(), err
@@ -112,35 +127,63 @@ func (mi *K6) Group(name string, val sobek.Value) (sobek.Value, error) {
 
 	shouldUpdateTag := state.Options.SystemTags.Has(metrics.TagGroup)
 	if shouldUpdateTag {
-		state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, newGroupName)
-		})
+		setGroupTag(state, newGroupName)
 	}
+	var groupTagsAndMeta metrics.TagsAndMeta
+	if mi.asyncGroups {
+		groupTagsAndMeta = state.Tags.GetCurrentValues()
+	}
+	synchronous := true
+	var startTime, endTime time.Time
 	defer func() {
-		if shouldUpdateTag {
+		if synchronous {
+			if endTime.IsZero() {
+				endTime = time.Now()
+			}
+			durationTagsAndMeta := groupTagsAndMeta
+			if !mi.asyncGroups {
+				durationTagsAndMeta = state.Tags.GetCurrentValues()
+			}
+			emitGroupDuration(mi.vu, startTime, endTime, durationTagsAndMeta)
+		}
+		if mi.asyncGroups {
 			state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-				tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, oldGroupName)
+				*tagsAndMeta = parentTagsAndMeta
 			})
+		} else if shouldUpdateTag {
+			setGroupTag(state, oldGroupName)
 		}
 	}()
 
-	startTime := time.Now()
+	startTime = time.Now()
 	ret, err := fn(sobek.Undefined())
-	t := time.Now()
+	endTime = time.Now()
+	if err != nil || !mi.asyncGroups {
+		return ret, err
+	}
 
-	ctx := mi.vu.Context()
-	ctm := state.Tags.GetCurrentValues()
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: state.BuiltinMetrics.GroupDuration,
-			Tags:   ctm.Tags,
-		},
-		Time:     t,
-		Value:    metrics.D(t.Sub(startTime)),
-		Metadata: ctm.Metadata,
+	thenFn, isThenable := asThenable(ret)
+	if !isThenable {
+		return ret, nil
+	}
+
+	asyncResult, settled, err := mi.runAsyncGroup(startTime, groupTagsAndMeta, thenFn, ret)
+	if err != nil {
+		// A custom thenable may invoke a settlement handler synchronously. In that case the handler
+		// emitted the duration before its rejection propagated back through then().
+		synchronous = !settled
+		return nil, err
+	}
+	// Settlement handlers now own duration emission. Until they are installed successfully, the
+	// deferred synchronous path must retain ownership so an initialization error still emits once.
+	synchronous = false
+	return asyncResult, nil
+}
+
+func setGroupTag(state *lib.State, name string) {
+	state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, name)
 	})
-
-	return ret, err
 }
 
 // Check will emit check metrics for the provided checks.
