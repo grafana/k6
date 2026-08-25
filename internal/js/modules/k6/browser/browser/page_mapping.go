@@ -16,6 +16,52 @@ import (
 	k6common "go.k6.io/k6/v2/js/common"
 )
 
+var pageNetworkCalls = mappingCallSet{ //nolint:gochecknoglobals
+	"bringToFront":   nil,
+	"check":          nil,
+	"click":          nil,
+	"close":          nil,
+	"dblclick":       nil,
+	"dispatchEvent":  nil,
+	"emulateMedia":   nil,
+	"evaluate":       nil,
+	"evaluateHandle": nil,
+	"fill":           nil,
+	"focus":          nil,
+	"goBack":         nil,
+	"goForward":      nil,
+	"goto":           nil,
+	"hover":          nil,
+	"keyboard": {
+		"down":       nil,
+		"insertText": nil,
+		"press":      nil,
+		"type":       nil,
+		"up":         nil,
+	},
+	"mouse": {
+		"click":    nil,
+		"dblClick": nil,
+		"down":     nil,
+		"move":     nil,
+		"up":       nil,
+	},
+	"press":           nil,
+	"reload":          nil,
+	"selectOption":    nil,
+	"setChecked":      nil,
+	"setContent":      nil,
+	"setInputFiles":   nil,
+	"setViewportSize": nil,
+	"tap":             nil,
+	"touchscreen": {
+		"tap": nil,
+	},
+	"type":            nil,
+	"uncheck":         nil,
+	"waitForFunction": nil,
+}
+
 // mapPage to the JS module.
 //
 //nolint:funlen
@@ -700,12 +746,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			ctx := vu.Context()
 			tq := vu.get(ctx, p.TargetID())
 
+			captured := k6common.CaptureMetricContext(vu.State())
+
 			return promise(vu, func() (any, error) {
 				rpe, err := p.WaitForEvent(event, popts, func(pe common.PageEvent) (bool, error) {
 					if fn == nil {
 						return true, nil
 					}
-					return queueTask(ctx, tq, func() (bool, error) {
+					return queueTaskWithMetricContext(ctx, tq, captured, func() (bool, error) {
 						m, err := mapPageEvent(vu, pe)
 						if err != nil {
 							return false, err
@@ -765,7 +813,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		})
 	}
 
-	return maps
+	// CDP request events run outside the event loop. Keep network context active for calls that can
+	// initiate browser work, but do not let getters and waiters change the page fallback.
+	return withPageNetworkCalls(vu, p, maps, pageNetworkCalls)
 }
 
 // mapPageOn enables using various page.on event handlers with the page.on method.
@@ -794,9 +844,10 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 
 		ctx := vu.Context()
 		tq := vu.get(ctx, p.TargetID())
+		captured := k6common.CaptureMetricContext(vu.State())
 
 		return p.On(eventName, func(event common.PageEvent) error {
-			wait := queueTask(ctx, tq, func() (sobek.Value, error) {
+			wait := queueTaskWithMetricContext(ctx, tq, captured, func() (sobek.Value, error) {
 				_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
 				if err != nil {
 					return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
@@ -940,9 +991,10 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable)
 
 		ppath := parseStringOrRegex(path, false)
 		tq := vu.get(ctx, p.TargetID())
+		captured := k6common.CaptureMetricContext(vu.State())
 
 		route := func(r *common.Route) error {
-			_, err := queueTask(ctx, tq, func() (any, error) {
+			_, err := queueTaskWithMetricContext(ctx, tq, captured, func() (any, error) {
 				return cb(sobek.Undefined(), vu.Runtime().ToValue(mapRoute(vu, r)))
 			})()
 			if errors.Is(err, context.Canceled) {

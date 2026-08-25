@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/sobek"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
@@ -45,6 +46,163 @@ func customMappings() map[string]string {
 		// types other than 'disconnect' are supported.
 		// See: https://go.k6.io/k6/v2/js/modules/k6/browser/issues/913
 		"browserAPI.on": "",
+	}
+}
+
+func TestAroundMappingCallsIncludesSelectedNestedMappings(t *testing.T) {
+	t.Parallel()
+
+	var calls []string
+	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: sobek.New()}}
+	m := aroundMappingCalls(vu, mapping{
+		"top": func(value string) string {
+			calls = append(calls, "top:"+value)
+			return value
+		},
+		"skipped": func() {
+			calls = append(calls, "skipped")
+		},
+		"nested": mapping{
+			"call": func(value int) int {
+				calls = append(calls, "nested")
+				return value
+			},
+		},
+	}, mappingCallSet{
+		"top": nil,
+		"nested": {
+			"call": nil,
+		},
+	}, func() (func(), func()) {
+		calls = append(calls, "begin")
+		return func() { calls = append(calls, "complete") },
+			func() { calls = append(calls, "cancel") }
+	})
+
+	require.Equal(t, "value", m["top"].(func(string) string)("value"))
+	m["skipped"].(func())()
+	nested := m["nested"].(mapping)
+	require.Equal(t, 42, nested["call"].(func(int) int)(42))
+	require.Equal(t, []string{
+		"begin", "top:value", "complete",
+		"skipped",
+		"begin", "nested", "complete",
+	}, calls)
+}
+
+func TestAroundMappingCallsCancelsFailedCall(t *testing.T) {
+	t.Parallel()
+
+	expectedErr := assert.AnError
+	canceled := false
+	completed := false
+	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: sobek.New()}}
+	m := aroundMappingCalls(vu, mapping{
+		"call": func() (*sobek.Promise, error) { return nil, expectedErr },
+	}, mappingCallSet{"call": nil}, func() (func(), func()) {
+		return func() { completed = true }, func() { canceled = true }
+	})
+
+	promise, err := m["call"].(func() (*sobek.Promise, error))()
+	assert.Nil(t, promise)
+	assert.ErrorIs(t, err, expectedErr)
+	assert.False(t, completed)
+	assert.True(t, canceled)
+}
+
+func TestAroundMappingCallsKeepsOperationUntilPromiseSettles(t *testing.T) {
+	t.Parallel()
+
+	rt := sobek.New()
+	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: rt}}
+	promise, resolve, _ := rt.NewPromise()
+	active := false
+	m := aroundMappingCalls(vu, mapping{
+		"call": func() *sobek.Promise { return promise },
+	}, mappingCallSet{"call": nil}, func() (func(), func()) {
+		active = true
+		return func() { active = false }, func() { active = false }
+	})
+
+	wrapped := m["call"].(func() *sobek.Promise)()
+	assert.True(t, active)
+	require.NoError(t, resolve("result"))
+	_, err := rt.RunString(`0`)
+	require.NoError(t, err)
+	assert.False(t, active)
+	assert.Equal(t, sobek.PromiseStateFulfilled, wrapped.State())
+	assert.Equal(t, "result", wrapped.Result().String())
+}
+
+func BenchmarkAroundMappingCalls(b *testing.B) {
+	for name, mapped := range map[string]bool{
+		"direct":  false,
+		"wrapped": true,
+	} {
+		b.Run(name, func(b *testing.B) {
+			rt := sobek.New()
+			vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: rt}}
+			fn := func(value int64) int64 { return value }
+			if mapped {
+				fn = aroundMappingCalls(vu, mapping{"call": fn}, mappingCallSet{"call": nil}, func() (func(), func()) {
+					return func() {}, func() {}
+				})["call"].(func(int64) int64)
+			}
+			require.NoError(b, rt.Set("call", fn))
+			call, err := rt.RunString(`() => call(42)`)
+			require.NoError(b, err)
+			invoke, ok := sobek.AssertFunction(call)
+			require.True(b, ok)
+
+			b.ReportAllocs()
+			for b.Loop() {
+				_, err = invoke(sobek.Undefined())
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkAroundMappingPromiseCalls(b *testing.B) {
+	for name, mapped := range map[string]bool{
+		"direct":  false,
+		"wrapped": true,
+	} {
+		b.Run(name, func(b *testing.B) {
+			rt := sobek.New()
+			vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: rt}}
+			fn := func() *sobek.Promise {
+				promise, resolve, _ := rt.NewPromise()
+				if err := resolve(42); err != nil {
+					b.Fatal(err)
+				}
+				return promise
+			}
+			if mapped {
+				fn = aroundMappingCalls(vu, mapping{"call": fn}, mappingCallSet{"call": nil}, func() (func(), func()) {
+					return func() {}, func() {}
+				})["call"].(func() *sobek.Promise)
+			}
+			require.NoError(b, rt.Set("call", fn))
+			call, err := rt.RunString(`() => call()`)
+			require.NoError(b, err)
+			invoke, ok := sobek.AssertFunction(call)
+			require.True(b, ok)
+			drain, err := sobek.Compile("drain.js", "0", false)
+			require.NoError(b, err)
+
+			b.ReportAllocs()
+			for b.Loop() {
+				if _, err = invoke(sobek.Undefined()); err != nil {
+					b.Fatal(err)
+				}
+				if _, err = rt.RunProgram(drain); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 

@@ -318,6 +318,63 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	}
 }
 
+func TestNetworkManagerMetricsRetainRequestTagsAndMetadata(t *testing.T) {
+	t.Parallel()
+
+	registry := k6metrics.NewRegistry()
+	k6m := k6ext.RegisterCustomMetrics(registry)
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+
+	state := vu.State()
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag(k6metrics.TagGroup.String(), "::request")
+		tagsAndMeta.SetTag("phase", "request")
+		tagsAndMeta.SetMetadata("trace", "request")
+	})
+
+	now := time.Now()
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event: &network.EventRequestWillBeSent{
+			Request:   &network.Request{URL: "https://example.test/"},
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+		},
+		tagsAndMeta: state.Tags.GetCurrentValues(),
+	})
+	require.NoError(t, err)
+
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag(k6metrics.TagGroup.String(), "")
+		tagsAndMeta.SetTag("phase", "after")
+		tagsAndMeta.SetMetadata("trace", "after")
+	})
+
+	nm := &NetworkManager{
+		ctx:              vu.Context(),
+		vu:               vu,
+		customMetrics:    k6m,
+		eventInterceptor: &EventInterceptorMock{},
+	}
+	nm.emitRequestMetrics(req)
+	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
+		URL:    req.URL(),
+		Timing: &network.ResourceTiming{},
+	}, (*cdp.MonotonicTime)(&now))
+	nm.emitResponseMetrics(resp, req)
+
+	n := vu.AssertSamples(func(sample k6metrics.Sample) {
+		group, ok := sample.Tags.Get(k6metrics.TagGroup.String())
+		require.True(t, ok)
+		assert.Equal(t, "::request", group)
+		phase, ok := sample.Tags.Get("phase")
+		require.True(t, ok)
+		assert.Equal(t, "request", phase)
+		assert.Equal(t, "request", sample.Metadata["trace"])
+	})
+	assert.Equal(t, 4, n)
+}
+
 func TestRequestForOnLoadingFinished(t *testing.T) {
 	t.Parallel()
 

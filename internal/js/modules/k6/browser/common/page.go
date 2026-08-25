@@ -27,6 +27,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
+	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
 // BlankPage represents a blank page.
@@ -271,6 +272,13 @@ type Page struct {
 
 	backgroundPage bool
 
+	// Supplies the fallback for requests that cannot be associated with an active browser operation.
+	networkFallbackTagsAndMeta atomic.Pointer[k6metrics.TagsAndMeta]
+	networkRecentOperation     *networkOperationContext
+	networkOperationID         atomic.Uint64
+	networkOperations          []*networkOperationContext
+	networkOperationsMu        sync.RWMutex
+
 	eventCh            chan Event
 	eventHandlers      map[PageEventName][]pageEventHandlerRecord
 	eventHandlersMu    sync.RWMutex
@@ -321,6 +329,14 @@ func NewPage(
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		logger:           logger,
+	}
+
+	// Popup pages are created off the event loop, so inherit the context of the operation that opened
+	// them, or the opener's fallback when no operation is active.
+	if opener != nil {
+		if tagsAndMeta, ok := opener.getNetworkTagsAndMeta(); ok {
+			p.networkFallbackTagsAndMeta.Store(&tagsAndMeta)
+		}
 	}
 
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
@@ -1219,6 +1235,69 @@ func (p *Page) GetMouse() *Mouse {
 // GetTouchscreen returns the touchscreen for the page.
 func (p *Page) GetTouchscreen() *Touchscreen {
 	return p.Touchscreen
+}
+
+type networkOperationContext struct {
+	id          uint64
+	tagsAndMeta k6metrics.TagsAndMeta
+}
+
+// SetNetworkFallbackTagsAndMeta records the tags and metadata for requests that cannot be
+// associated with an active browser operation.
+func (p *Page) SetNetworkFallbackTagsAndMeta(tagsAndMeta k6metrics.TagsAndMeta) {
+	p.networkFallbackTagsAndMeta.Store(&tagsAndMeta)
+}
+
+// BeginNetworkOperation makes tagsAndMeta available to requests observed while the operation is
+// active and retains it for CDP request events that arrive just after the operation settles. Calling
+// cancel instead discards it because the browser operation did not start.
+func (p *Page) BeginNetworkOperation(tagsAndMeta k6metrics.TagsAndMeta) (complete, cancel func()) {
+	operation := &networkOperationContext{
+		id:          p.networkOperationID.Add(1),
+		tagsAndMeta: tagsAndMeta,
+	}
+	p.networkOperationsMu.Lock()
+	p.networkOperations = append(p.networkOperations, operation)
+	p.networkOperationsMu.Unlock()
+
+	var once sync.Once
+	remove := func(keepRecent bool) {
+		once.Do(func() {
+			p.networkOperationsMu.Lock()
+			defer p.networkOperationsMu.Unlock()
+			if keepRecent {
+				p.networkRecentOperation = operation
+			}
+			for i := range p.networkOperations {
+				if p.networkOperations[i].id != operation.id {
+					continue
+				}
+				p.networkOperations = append(p.networkOperations[:i], p.networkOperations[i+1:]...)
+				return
+			}
+		})
+	}
+	return func() { remove(true) }, func() { remove(false) }
+}
+
+func (p *Page) getNetworkTagsAndMeta() (k6metrics.TagsAndMeta, bool) {
+	p.networkOperationsMu.RLock()
+	if n := len(p.networkOperations); n > 0 {
+		tagsAndMeta := p.networkOperations[n-1].tagsAndMeta
+		p.networkOperationsMu.RUnlock()
+		return tagsAndMeta, true
+	}
+	if p.networkRecentOperation != nil {
+		tagsAndMeta := p.networkRecentOperation.tagsAndMeta
+		p.networkOperationsMu.RUnlock()
+		return tagsAndMeta, true
+	}
+	p.networkOperationsMu.RUnlock()
+
+	if tagsAndMeta := p.networkFallbackTagsAndMeta.Load(); tagsAndMeta != nil {
+		return *tagsAndMeta, true
+	}
+	return k6metrics.TagsAndMeta{}, false
 }
 
 // Goto will navigate the page to the specified URL and return a HTTP response object.

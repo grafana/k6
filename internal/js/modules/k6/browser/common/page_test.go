@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/v2/metrics"
 )
 
 // TestPageLocator can be removed later on when we add integration
@@ -165,4 +167,51 @@ func TestPageOn(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, p.eventHandlers[("metric")], 1)
 	})
+}
+
+func TestPageNetworkOperationContext(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	metricContext := func(name string) metrics.TagsAndMeta {
+		return metrics.TagsAndMeta{
+			Tags:     registry.RootTagSet().With("context", name),
+			Metadata: map[string]string{"context": name},
+		}
+	}
+	contextName := func(tagsAndMeta metrics.TagsAndMeta) string {
+		name, _ := tagsAndMeta.Tags.Get("context")
+		assert.Equal(t, name, tagsAndMeta.Metadata["context"])
+		return name
+	}
+
+	p := &Page{}
+	p.SetNetworkFallbackTagsAndMeta(metricContext("fallback"))
+	tagsAndMeta, ok := p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "fallback", contextName(tagsAndMeta))
+
+	firstComplete, _ := p.BeginNetworkOperation(metricContext("first"))
+	secondComplete, _ := p.BeginNetworkOperation(metricContext("second"))
+
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
+
+	firstComplete()
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
+
+	secondComplete()
+	secondComplete()
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
+
+	_, failedCancel := p.BeginNetworkOperation(metricContext("failed"))
+	failedCancel()
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
 }

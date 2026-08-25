@@ -10,6 +10,28 @@ import (
 	k6common "go.k6.io/k6/v2/js/common"
 )
 
+var frameNetworkCalls = mappingCallSet{ //nolint:gochecknoglobals
+	"check":           nil,
+	"click":           nil,
+	"dblclick":        nil,
+	"dispatchEvent":   nil,
+	"evaluate":        nil,
+	"evaluateHandle":  nil,
+	"fill":            nil,
+	"focus":           nil,
+	"goto":            nil,
+	"hover":           nil,
+	"press":           nil,
+	"selectOption":    nil,
+	"setChecked":      nil,
+	"setContent":      nil,
+	"setInputFiles":   nil,
+	"tap":             nil,
+	"type":            nil,
+	"uncheck":         nil,
+	"waitForFunction": nil,
+}
+
 // mapFrame to the JS module.
 //
 //nolint:funlen,gocognit,cyclop
@@ -511,5 +533,5 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		})
 	}
 
-	return maps
+	return withPageNetworkCalls(vu, f.Page(), maps, frameNetworkCalls)
 }

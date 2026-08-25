@@ -10,6 +10,24 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 )
 
+var elementHandleNetworkCalls = mappingCallSet{ //nolint:gochecknoglobals
+	"check":         nil,
+	"click":         nil,
+	"dblclick":      nil,
+	"dispatchEvent": nil,
+	"fill":          nil,
+	"focus":         nil,
+	"hover":         nil,
+	"press":         nil,
+	"selectOption":  nil,
+	"selectText":    nil,
+	"setChecked":    nil,
+	"setInputFiles": nil,
+	"tap":           nil,
+	"type":          nil,
+	"uncheck":       nil,
+}
+
 // mapElementHandle to the JS module.
 func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,funlen,cyclop
 	rt := vu.Runtime()
@@ -337,5 +355,5 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 	jsHandleMap := mapJSHandle(vu, eh)
 	maps0.Copy(maps, jsHandleMap)
 
-	return maps
+	return withPageNetworkCalls(vu, eh.Page(), maps, elementHandleNetworkCalls)
 }
