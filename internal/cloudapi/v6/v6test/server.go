@@ -58,6 +58,12 @@ type Config struct {
 
 	// LoadZones is the load zone list returned by the load-zones endpoint.
 	LoadZones []cloudapi.LoadZone
+
+	// ErrorStatus, when non-zero, makes every request fail with this HTTP
+	// status and the real k6 Cloud API's error body for it, instead of
+	// the endpoint's normal canned response. For testing how the CLI
+	// handles a failing API call (e.g. an invalid/expired token, a 5xx).
+	ErrorStatus int
 }
 
 // NewServer creates a test server that serves v6 API endpoints.
@@ -94,11 +100,45 @@ func NewServer(t *testing.T, cfg Config) *Server {
 		s.handleAbortTestRun,
 	)
 
-	srv := httptest.NewServer(mux)
+	var handler http.Handler = mux
+	if cfg.ErrorStatus != 0 {
+		handler = forcedErrorHandler(cfg.ErrorStatus)
+	}
+
+	srv := httptest.NewServer(handler)
 	s.Server = srv
 	t.Cleanup(srv.Close)
 
 	return s
+}
+
+// forcedErrorMessages mirrors the real k6 Cloud API's error body for each
+// status this mock can simulate via Config.ErrorStatus. Confirmed against
+// the live v6 API (2026-08-24): a validate_options call with an
+// invalid/expired token returns exactly this 401 body.
+var forcedErrorMessages = map[int]string{
+	http.StatusUnauthorized: "Invalid token",
+}
+
+// forcedErrorHandler short-circuits every request with the given status and
+// its real error body, regardless of route.
+func forcedErrorHandler(status int) http.Handler {
+	msg, ok := forcedErrorMessages[status]
+	if !ok {
+		panic(fmt.Sprintf("v6test: no error body registered for status %d", status))
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		var body struct {
+			Error struct {
+				Message string `json:"message"`
+				Code    string `json:"code"`
+			} `json:"error"`
+		}
+		body.Error.Message = msg
+		body.Error.Code = "error"
+		writeJSON(w, status, body)
+	})
 }
 
 func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {

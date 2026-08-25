@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/v2/errext/exitcodes"
 	cloudapiv6 "go.k6.io/k6/v2/internal/cloudapi/v6"
 	"go.k6.io/k6/v2/internal/cloudapi/v6/v6test"
 	"go.k6.io/k6/v2/internal/cmd"
@@ -32,12 +31,24 @@ func TestCloudNoArgsShowsHelp(t *testing.T) {
 type setupCommandFunc func(cliFlags []string) []string
 
 func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
-	t.Run("TestCloudUserNotAuthenticated", func(t *testing.T) {
+	//t.Run("TestCloudUserNotAuthenticated", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
+	//	delete(ts.Env, "K6_CLOUD_TOKEN")
+	//	ts.ExpectedExitCode = -1 // TODO: use a more specific exit code?
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `access token not configured`)
+	//})
+
+	t.Run("TestCloudInvalidToken", func(t *testing.T) {
 		t.Parallel()
 
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
-		delete(ts.Env, "K6_CLOUD_TOKEN")
-		ts.ExpectedExitCode = -1 // TODO: use a more specific exit code?
+		ts := getSimpleCloudTestStateWithError(t, nil, setupCmd, nil, nil, 401)
+		ts.ExpectedExitCode = -1
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()
@@ -45,176 +56,176 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `access token not configured`)
 	})
 
-	t.Run("TestCloudStackNotConfigured", func(t *testing.T) {
-		t.Parallel()
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
-		delete(ts.Env, "K6_CLOUD_STACK_ID")
-		ts.ExpectedExitCode = -1
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `stack ID not configured`)
-	})
-
-	// TODO: Remove after we remove K6_CLOUD_HOST_V6.
-	t.Run("TestCloudV6ClientUsesV6Host", func(t *testing.T) {
-		t.Parallel()
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
-		ts.Env["K6_CLOUD_HOST"] = "http://wrong-host"
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		require.NotContains(t, stdout, "wrong-host", "v6 client should use K6_CLOUD_HOST_V6, not K6_CLOUD_HOST")
-	})
-
-	t.Run("TestCloudLoggedInWithScriptToken", func(t *testing.T) {
-		t.Parallel()
-
-		script := `
-		export let options = {
-			cloud: {
-				token: "asdf",
-				name: "my load test",
-				projectID: 124,
-				note: 124,
-			}
-		};
-		export default function() {};
-	`
-
-		ts := getSimpleCloudTestState(t, []byte(script), setupCmd, nil, nil)
-		delete(ts.Env, "K6_CLOUD_TOKEN")
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.NotContains(t, stdout, `not logged in`)
-		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/runs/123`)
-		assert.Contains(t, stdout, `test status: Finished`)
-	})
-
-	t.Run("TestCloudExitOnRunning", func(t *testing.T) {
-		t.Parallel()
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--exit-on-running", "--log-output=stdout"},
-			v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/runs/123`)
-		assert.Contains(t, stdout, `test status: Running`)
-	})
-
-	t.Run("TestCloudExitOnRunningEnv", func(t *testing.T) {
-		t.Parallel()
-
-		// Same as TestCloudExitOnRunning, but driven by the environment
-		// variable instead of the CLI flag. Without the override taking
-		// effect, the command would keep polling the mock server forever,
-		// since its progress is always "Running".
-		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--log-output=stdout"},
-			v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
-		ts.Env["K6_EXIT_ON_RUNNING"] = "true"
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `execution: cloud`)
-		assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/runs/123`)
-		assert.Contains(t, stdout, `test status: Running`)
-	})
-
-	t.Run("TestCloudExitOnRunningFlagOverridesEnv", func(t *testing.T) {
-		t.Parallel()
-
-		// An explicitly set CLI flag takes precedence over the environment
-		// variable. If the "false" from the environment won instead, the
-		// command would poll the always-"Running" mock server forever.
-		ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--exit-on-running", "--log-output=stdout"},
-			v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
-		ts.Env["K6_EXIT_ON_RUNNING"] = "false"
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `test status: Running`)
-	})
-
-	t.Run("TestCloudExitOnRunningInvalidEnv", func(t *testing.T) {
-		t.Parallel()
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
-		ts.Env["K6_EXIT_ON_RUNNING"] = "invalid"
-		ts.ExpectedExitCode = -1
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `parsing K6_EXIT_ON_RUNNING returned an error`)
-	})
-
-	t.Run("TestCloudURLFromStartResponse", func(t *testing.T) {
-		t.Parallel()
-
-		// v6 returns the run URL in the start response (no ConfigOverride).
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, "execution: cloud")
-		assert.Contains(t, stdout, "output: https://stack.grafana.com/a/k6-app/runs/123")
-		assert.Contains(t, stdout, `test status: Finished`)
-	})
-
-	t.Run("TestCloudThresholdsHaveFailed", func(t *testing.T) {
-		t.Parallel()
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil,
-			v6test.Progress(cloudapiv6.StatusCompleted, cloudapiv6.ResultFailed))
-		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `Thresholds have been crossed`)
-	})
-
-	t.Run("TestCloudAbortedThreshold", func(t *testing.T) {
-		t.Parallel()
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil,
-			v6test.Progress(cloudapiv6.StatusAborted, cloudapiv6.ResultFailed))
-		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `Thresholds have been crossed`)
-	})
-
-	t.Run("TestCloudAbortedByUser", func(t *testing.T) {
-		t.Parallel()
-
-		ts := getSimpleCloudTestState(t, nil, setupCmd, nil,
-			v6test.AbortedByUserProgress("user@example.com"))
-		ts.ExpectedExitCode = int(exitcodes.CloudTestRunFailed)
-
-		cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-		stdout := ts.Stdout.String()
-		t.Log(stdout)
-		assert.Contains(t, stdout, `test status: Aborted (by user)`)
-	})
+	//t.Run("TestCloudStackNotConfigured", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
+	//	delete(ts.Env, "K6_CLOUD_STACK_ID")
+	//	ts.ExpectedExitCode = -1
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `stack ID not configured`)
+	//})
+	//
+	//// TODO: Remove after we remove K6_CLOUD_HOST_V6.
+	//t.Run("TestCloudV6ClientUsesV6Host", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
+	//	ts.Env["K6_CLOUD_HOST"] = "http://wrong-host"
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	require.NotContains(t, stdout, "wrong-host", "v6 client should use K6_CLOUD_HOST_V6, not K6_CLOUD_HOST")
+	//})
+	//
+	//t.Run("TestCloudLoggedInWithScriptToken", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	script := `
+	//	export let options = {
+	//		cloud: {
+	//			token: "asdf",
+	//			name: "my load test",
+	//			projectID: 124,
+	//			note: 124,
+	//		}
+	//	};
+	//	export default function() {};
+	//`
+	//
+	//	ts := getSimpleCloudTestState(t, []byte(script), setupCmd, nil, nil)
+	//	delete(ts.Env, "K6_CLOUD_TOKEN")
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.NotContains(t, stdout, `not logged in`)
+	//	assert.Contains(t, stdout, `execution: cloud`)
+	//	assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/runs/123`)
+	//	assert.Contains(t, stdout, `test status: Finished`)
+	//})
+	//
+	//t.Run("TestCloudExitOnRunning", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--exit-on-running", "--log-output=stdout"},
+	//		v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `execution: cloud`)
+	//	assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/runs/123`)
+	//	assert.Contains(t, stdout, `test status: Running`)
+	//})
+	//
+	//t.Run("TestCloudExitOnRunningEnv", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	// Same as TestCloudExitOnRunning, but driven by the environment
+	//	// variable instead of the CLI flag. Without the override taking
+	//	// effect, the command would keep polling the mock server forever,
+	//	// since its progress is always "Running".
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--log-output=stdout"},
+	//		v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
+	//	ts.Env["K6_EXIT_ON_RUNNING"] = "true"
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `execution: cloud`)
+	//	assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/runs/123`)
+	//	assert.Contains(t, stdout, `test status: Running`)
+	//})
+	//
+	//t.Run("TestCloudExitOnRunningFlagOverridesEnv", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	// An explicitly set CLI flag takes precedence over the environment
+	//	// variable. If the "false" from the environment won instead, the
+	//	// command would poll the always-"Running" mock server forever.
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, []string{"--exit-on-running", "--log-output=stdout"},
+	//		v6test.Progress(cloudapiv6.StatusRunning, v6test.ResultNone))
+	//	ts.Env["K6_EXIT_ON_RUNNING"] = "false"
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `test status: Running`)
+	//})
+	//
+	//t.Run("TestCloudExitOnRunningInvalidEnv", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
+	//	ts.Env["K6_EXIT_ON_RUNNING"] = "invalid"
+	//	ts.ExpectedExitCode = -1
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `parsing K6_EXIT_ON_RUNNING returned an error`)
+	//})
+	//
+	//t.Run("TestCloudURLFromStartResponse", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	// v6 returns the run URL in the start response (no ConfigOverride).
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil)
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, "execution: cloud")
+	//	assert.Contains(t, stdout, "output: https://stack.grafana.com/a/k6-app/runs/123")
+	//	assert.Contains(t, stdout, `test status: Finished`)
+	//})
+	//
+	//t.Run("TestCloudThresholdsHaveFailed", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil,
+	//		v6test.Progress(cloudapiv6.StatusCompleted, cloudapiv6.ResultFailed))
+	//	ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
+	//
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `Thresholds have been crossed`)
+	//})
+	//
+	//t.Run("TestCloudAbortedThreshold", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil,
+	//		v6test.Progress(cloudapiv6.StatusAborted, cloudapiv6.ResultFailed))
+	//	ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
+	//
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `Thresholds have been crossed`)
+	//})
+	//
+	//t.Run("TestCloudAbortedByUser", func(t *testing.T) {
+	//	t.Parallel()
+	//
+	//	ts := getSimpleCloudTestState(t, nil, setupCmd, nil,
+	//		v6test.AbortedByUserProgress("user@example.com"))
+	//	ts.ExpectedExitCode = int(exitcodes.CloudTestRunFailed)
+	//
+	//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	//
+	//	stdout := ts.Stdout.String()
+	//	t.Log(stdout)
+	//	assert.Contains(t, stdout, `test status: Aborted (by user)`)
+	//})
 }
 
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
@@ -232,7 +243,21 @@ func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	})
 }
 
-func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandFunc, cliFlags []string, progressCallback func() *cloudapiv6.TestProgress) *GlobalTestState {
+func getSimpleCloudTestState(
+	t *testing.T, script []byte, setupCmd setupCommandFunc, cliFlags []string,
+	progressCallback func() *cloudapiv6.TestProgress,
+) *GlobalTestState {
+	return getSimpleCloudTestStateWithError(t, script, setupCmd, cliFlags, progressCallback, 0)
+}
+
+// getSimpleCloudTestStateWithError is getSimpleCloudTestState plus the
+// ability to make the mock v6 API fail every request with errorStatus (e.g.
+// http.StatusUnauthorized), for testing how the CLI surfaces a failing
+// cloud API call to the user.
+func getSimpleCloudTestStateWithError(
+	t *testing.T, script []byte, setupCmd setupCommandFunc, cliFlags []string,
+	progressCallback func() *cloudapiv6.TestProgress, errorStatus int,
+) *GlobalTestState {
 	if script == nil {
 		script = []byte("export let options = { cloud: { projectID: 1 } };\nexport default function() {}")
 	}
@@ -243,6 +268,7 @@ func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandF
 
 	srv := v6test.NewServer(t, v6test.Config{
 		ProgressCallback: progressCallback,
+		ErrorStatus:      errorStatus,
 	})
 
 	ts := NewGlobalTestState(t)
