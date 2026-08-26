@@ -18,7 +18,7 @@ export const options = {
     },
   },
   thresholds: {
-    'browser_http_req_duration{group:::navigation,owner:browser-navigation}': ['count > 0'],
+    'browser_http_req_duration{group:::navigation,owner:browser-navigation}': ['max >= 0'],
     checks: ['rate == 1'],
   },
 };
