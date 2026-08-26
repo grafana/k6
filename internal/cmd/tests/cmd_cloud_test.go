@@ -55,7 +55,7 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		stdout := ts.Stdout.String()
 		t.Log(stdout)
 		assert.Contains(t, stdout, `Invalid token`, "the real API error message should still be shown")
-		assert.Contains(t, stdout, "hint=\"Run `k6 cloud login` to authenticate\"",
+		assert.Contains(t, stdout, "hint=\"Authenticate by running `k6 cloud login` or verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token)\"",
 			"a 401 should come with a recovery hint pointing at `k6 cloud login`")
 	})
 

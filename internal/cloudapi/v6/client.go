@@ -102,7 +102,9 @@ func CheckResponse(r *http.Response, err error) error {
 	}
 
 	if r.StatusCode == http.StatusUnauthorized {
-		return errext.WithHint(respErr, "Run `k6 cloud login` to authenticate")
+		return errext.WithHint(respErr,
+			"Authenticate by running `k6 cloud login` "+
+				"or verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token)")
 	}
 	return respErr
 }
