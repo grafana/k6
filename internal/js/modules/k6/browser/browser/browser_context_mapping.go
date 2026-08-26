@@ -20,13 +20,13 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 	}
 
 	rt := vu.Runtime()
-	return mapping{
-		"addCookies": func(cookies []*common.Cookie) *sobek.Promise {
+	return finishMapping(mapping{
+		"addCookies": passiveCall(func(cookies []*common.Cookie) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, bc.AddCookies(cookies) //nolint:wrapcheck
 			})
-		},
-		"addInitScript": func(script sobek.Value) *sobek.Promise {
+		}),
+		"addInitScript": passiveCall(func(script sobek.Value) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				if k6common.IsNullish(script) {
 					return nil, nil
@@ -54,33 +54,33 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 
 				return nil, bc.AddInitScript(source) //nolint:wrapcheck
 			})
-		},
-		"browser": func() mapping {
+		}),
+		"browser": passiveCall(func() mapping {
 			return mapBrowser(vu, func() (*common.Browser, error) {
 				return bc.Browser(), nil
 			})
-		},
-		"clearCookies": func() *sobek.Promise {
+		}),
+		"clearCookies": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, bc.ClearCookies() //nolint:wrapcheck
 			})
-		},
-		"clearPermissions": func() *sobek.Promise {
+		}),
+		"clearPermissions": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, bc.ClearPermissions() //nolint:wrapcheck
 			})
-		},
-		"close": func() *sobek.Promise {
+		}),
+		"close": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, bc.Close() //nolint:wrapcheck
 			})
-		},
-		"cookies": func(urls ...string) *sobek.Promise {
+		}),
+		"cookies": passiveCall(func(urls ...string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return bc.Cookies(urls...) //nolint:wrapcheck
 			})
-		},
-		"grantPermissions": func(permissions []string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"grantPermissions": passiveCall(func(permissions []string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := exportTo[common.GrantPermissionsOptions](vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing grant permission options: %w", err)
@@ -88,10 +88,10 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return promise(vu, func() (any, error) {
 				return nil, bc.GrantPermissions(permissions, popts)
 			}), nil
-		},
-		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
-		"setDefaultTimeout":           bc.SetDefaultTimeout,
-		"setGeolocation": func(geolocation sobek.Value) (*sobek.Promise, error) {
+		}),
+		"setDefaultNavigationTimeout": passiveCall(bc.SetDefaultNavigationTimeout),
+		"setDefaultTimeout":           passiveCall(bc.SetDefaultTimeout),
+		"setGeolocation": passiveCall(func(geolocation sobek.Value) (*sobek.Promise, error) {
 			gl, err := exportTo[common.Geolocation](vu.Runtime(), geolocation)
 			if err != nil {
 				return nil, fmt.Errorf("parsing geo location: %w", err)
@@ -99,8 +99,8 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return promise(vu, func() (any, error) {
 				return nil, bc.SetGeolocation(&gl)
 			}), nil
-		},
-		"setHTTPCredentials": func(httpCredentials sobek.Value) (*sobek.Promise, error) {
+		}),
+		"setHTTPCredentials": passiveCall(func(httpCredentials sobek.Value) (*sobek.Promise, error) {
 			creds, err := exportTo[common.Credentials](rt, httpCredentials)
 			if err != nil {
 				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
@@ -108,13 +108,13 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			return promise(vu, func() (any, error) {
 				return nil, bc.SetHTTPCredentials(creds) //nolint:staticcheck
 			}), nil
-		},
-		"setOffline": func(offline bool) *sobek.Promise {
+		}),
+		"setOffline": passiveCall(func(offline bool) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, bc.SetOffline(offline) //nolint:wrapcheck
 			})
-		},
-		"waitForEvent": func(event string, optsOrPredicate sobek.Value) (*sobek.Promise, error) {
+		}),
+		"waitForEvent": passiveCall(func(event string, optsOrPredicate sobek.Value) (*sobek.Promise, error) {
 			rt := vu.Runtime()
 			ctx := vu.Context()
 
@@ -152,8 +152,8 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				}
 				return mapPage(vu, p), nil
 			}), nil
-		},
-		"pages": func() *sobek.Object {
+		}),
+		"pages": passiveCall(func() *sobek.Object {
 			var (
 				mpages []mapping
 				pages  = bc.Pages()
@@ -167,8 +167,8 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			}
 
 			return rt.ToValue(mpages).ToObject(rt)
-		},
-		"newPage": func() *sobek.Promise {
+		}),
+		"newPage": passiveCall(func() *sobek.Promise {
 			var setNetworkTags func(*common.Page)
 			if k6common.AsyncMetricContextEnabled(vu.State()) {
 				tagsAndMeta := vu.State().Tags.GetCurrentValues()
@@ -184,8 +184,8 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				}
 				return mapPage(vu, page), nil
 			})
-		},
-	}
+		}),
+	})
 }
 
 // waitForEventOptions are the options used by the browserContext.waitForEvent API.
