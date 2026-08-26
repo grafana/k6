@@ -61,8 +61,8 @@ type Config struct {
 
 	// ErrorStatus, when non-zero, makes every request fail with this HTTP
 	// status and the real k6 Cloud API's error body for it, instead of
-	// the endpoint's normal canned response. For testing how the CLI
-	// handles a failing API call (e.g. an invalid/expired token, a 5xx).
+	// the endpoint's normal canned response. Requires the value to be present
+	// in the forcedErrorMessages map or will panic
 	ErrorStatus int
 }
 
