@@ -172,6 +172,8 @@ git log
 
 **Commit Guidelines**:
 - All commits must be created on behalf of the user listed in Git config (default behavior)
+- Every commit must be signed. Before committing, verify that commit signing is enabled and
+  confirm the resulting commit has a valid signature with `git log --show-signature -1`.
 - Write clear, descriptive commit messages that could be included in a changelog
 - Close related issues with commit messages: `Closes #123`, `Fixes #456`
 - Follow existing commit message style in the repository
