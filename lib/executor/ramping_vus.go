@@ -605,7 +605,6 @@ func (rs *rampingVUsRunState) runLoopsIfPossible(ctx context.Context, cancel fun
 	getVU := func() (lib.InitializedVU, error) {
 		pvu, err := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
 		if err != nil {
-			rs.executor.logger.WithError(err).Error("Cannot get a VU from the buffer")
 			cancel()
 			return pvu, err
 		}
@@ -697,8 +696,8 @@ func (rs *rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionSt
 		pv := raw.PlannedVUs
 		for ; cur < pv; cur++ {
 			if err := rs.vuHandles[cur].start(); err != nil {
-				// getVU() (invoked by start()) has already logged this failure,
-				// so we only record it here for Run() to return.
+				// Record the error so Run() can return it; the scheduler logs
+				// it once the executor returns.
 				rs.startErr = err
 				rs.cancel()
 				return

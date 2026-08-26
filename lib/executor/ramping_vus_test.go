@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
@@ -1215,7 +1216,8 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 }
 
 // TestRampingVUsVUStartError checks that a VU-start failure is returned by
-// Run() instead of being swallowed, and that it's logged exactly once.
+// Run() instead of being swallowed, and that the executor doesn't log it
+// itself, leaving that to the scheduler that receives the error.
 func TestRampingVUsVUStartError(t *testing.T) {
 	t.Parallel()
 
@@ -1233,9 +1235,9 @@ func TestRampingVUsVUStartError(t *testing.T) {
 	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
 	defer test.cancel()
 
-	// getVU() logs "Cannot get a VU from the buffer" at error level, but
-	// setupExecutor's hook only captures warn-level entries, so attach a
-	// dedicated error hook.
+	// getVU() no longer logs the failure itself: it's returned from Run()
+	// instead, and it's the scheduler's job to log it once it receives that
+	// result. Attach a dedicated error hook to prove the executor stays quiet.
 	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
 	test.executor.GetLogger().Logger.AddHook(errorHook)
 
@@ -1261,17 +1263,14 @@ func TestRampingVUsVUStartError(t *testing.T) {
 		t.Fatal("executor did not stop after a VU-start failure")
 	}
 
-	// Exactly one error-level entry is expected: getVU() logs the failure
-	// once. A second entry would mean the caller is still logging its own
-	// (now removed) duplicate "Cannot start a VU" line.
-	entries := errorHook.Drain()
-	require.Len(t, entries, 1)
-	assert.Contains(t, entries[0].Message, "Cannot get a VU from the buffer")
+	// Running the executor on its own must not log the failure: it's returned
+	// from Run() and the scheduler is the one that reports it.
+	require.Empty(t, errorHook.Drain())
 }
 
 // TestRampingVUsVUStartErrorMultiStage checks that, with a multi-stage ramp,
 // the executor stops after the first VU-start failure instead of carrying on
-// into later stages and reporting the same failure once per stage.
+// into later stages and hitting the same failure again for every later stage.
 func TestRampingVUsVUStartErrorMultiStage(t *testing.T) {
 	t.Parallel()
 
@@ -1290,6 +1289,9 @@ func TestRampingVUsVUStartErrorMultiStage(t *testing.T) {
 	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
 	defer test.cancel()
 
+	// The executor itself no longer logs VU-start failures (that's now the
+	// scheduler's job once Run() returns the error), so this hook is here to
+	// prove it stays quiet.
 	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
 	test.executor.GetLogger().Logger.AddHook(errorHook)
 
@@ -1312,10 +1314,26 @@ func TestRampingVUsVUStartErrorMultiStage(t *testing.T) {
 		t.Fatal("executor did not stop after a VU-start failure")
 	}
 
-	// The failure must be logged exactly once; a second entry means the
-	// executor kept going into later stages instead of stopping at the
-	// first failure.
-	entries := errorHook.Drain()
-	require.Len(t, entries, 1,
-		"the VU-start failure should be logged once; a repeat means later stages kept running")
+	// GetPlannedVU() itself still warns once per retry while it waits for a VU
+	// to free up, up to lib.MaxRetriesGetPlannedVU times, before it gives up
+	// and returns the error above (see lib.ExecutionState.GetPlannedVU()). The
+	// drain above returns immediately without warning, so the only warnings
+	// come from the executor: if iterateSteps() aborts on the first VU-start
+	// failure like it should, the executor only tries (and fails) to fetch a
+	// VU once, so we see exactly lib.MaxRetriesGetPlannedVU such warnings. If
+	// the early-abort regressed and the executor kept going into later stages
+	// instead, it would retry (and warn) again for every later stage,
+	// inflating the count past lib.MaxRetriesGetPlannedVU.
+	const wantWarnMsg = "Could not get a VU from the buffer for"
+	var gotVUBufferWarns int
+	for _, entry := range test.logHook.Drain() {
+		if strings.Contains(entry.Message, wantWarnMsg) {
+			gotVUBufferWarns++
+		}
+	}
+	require.Equal(t, lib.MaxRetriesGetPlannedVU, gotVUBufferWarns)
+
+	// No error should be logged by the executor at all: it's returned from
+	// Run() and it's the scheduler's job to log it, not the executor's.
+	require.Empty(t, errorHook.Drain())
 }
