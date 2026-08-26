@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowJs": true, // Mandatory for VSCode to pick up JS files
+    // begin: k6 settings from k6 DefinitelyTyped module
+    "module": "node16",
+    "lib": ["es6"],
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "types": [],
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true
+    // end: k6 settings from k6 DefinitelyTyped module
+  },
+  "exclude": ["node_modules", "build"],
+  "paths": {
+    "k6/x/sql": ["./index.d.ts"]
+  }
+}

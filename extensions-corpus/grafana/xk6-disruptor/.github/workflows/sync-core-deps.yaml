@@ -1,0 +1,40 @@
+name: Sync k6 core dependencies
+
+on:
+  schedule:
+    - cron: 3 14 * * *  # Every day at 3:14
+  workflow_dispatch: {}
+
+jobs:
+  sync-k6-deps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write  # Push branch.
+      pull-requests: write  # Create PR.
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BRANCH_NAME: ci-sync-deps
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        with:
+          go-version: "1.21"
+          cache: false
+      - name: Sync dependencies
+        run: |
+          ./hack/depsync.sh
+
+          if [[ -z "$(git status --porcelain --untracked-files=no)" ]]; then
+            echo "Nothing to do"
+            exit 0
+          fi
+
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          git commit -am "go.mod: sync dependencies with k6 core"
+          git push -f -u origin "$BRANCH_NAME"
+          
+          gh pr create --fill --body-file depsync-pr-body.txt || true # It is okay to fail if a PR already exists. 

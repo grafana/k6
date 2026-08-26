@@ -1,0 +1,28 @@
+# Go build and test artifacts
+*.test
+*.out
+coverage.out
+cover.out
+
+# Local binaries and build output
+bin/
+dist/
+k6
+xk6-kafka
+
+# Generated golangci-lint config (produced by `make lint` from the pinned k6-ci config)
+.golangci-base.yml
+.golangci.yml
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code personal settings (shared config under .claude/ is committed)
+.claude/settings.local.json
+
+# Local environment files
+.env
+.env.*
+!.env.example

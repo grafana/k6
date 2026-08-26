@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xk6-dns
+  title: xk6-dns
+  description: |
+    This is a DNS resolver extension for k6. It allows you to resolve DNS names to IP addresses in your k6 scripts.
+  annotations:
+    github.com/project-slug: grafana/xk6-dns
+spec:
+  type: library
+  owner: group:default/k6-core
+  lifecycle: production

@@ -1,0 +1,30 @@
+{
+  "typedocOptions": {
+    "entryPoints": ["./index.d.ts"],
+    "out": "build/docs",
+    "name": "xk6-client-prometheus-remote",
+    "readme": "none",
+    "hideGenerator": true,
+    "disableSources": true,
+    "navigation": {
+      "includeCategories": false,
+      "includeGroups": false,
+      "includeFolders": false
+    },
+    "categorizeByGroup": false,
+    "visibilityFilters": {},
+    "navigationLinks": {
+      "GitHub": "https://github.com/grafana/xk6-client-prometheus-remote"
+    }
+  },
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "ES6",
+    "paths": {
+      "k6/x/mqtt": ["./index.d.ts"]
+    },
+    "esModuleInterop": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

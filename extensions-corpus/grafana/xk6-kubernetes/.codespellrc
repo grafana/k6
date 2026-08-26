@@ -1,0 +1,2 @@
+[codespell]
+skip = ./.git,./go.mod,./go.sum,LICENSE.*

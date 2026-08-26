@@ -1,0 +1,12 @@
+name: "Auto assign maintainer to issue"
+on:
+  issues:
+    types: [opened]
+
+permissions: {}
+
+jobs:
+  assign-maintainer:
+    uses: grafana/k6/.github/workflows/issue-auto-assign.yml@8c3be52cc17dee055c9e8757a66fb97d946dd248  # v2.0.0
+    permissions:
+      issues: write

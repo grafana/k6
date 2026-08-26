@@ -1,0 +1,24 @@
+# Thin caller for the shared grafana/k6-ci workflow. The `uses:` SHA and the
+# `k6-ci-ref` input are pinned to the same commit; Renovate keeps them updated.
+# See grafana/k6-ci/README.md for details.
+name: k6 CI
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: grafana/k6-ci/.github/workflows/all.yml@9477260e6838640d56c28aa95bcbf9a884ab21f3
+    with:
+      # This repo is an xk6 extension, so keep extension testing on.
+      skip-extension-testing: false
+      # Run the multi-version Go tests.
+      skip-tests: false
+      # Pin to the same SHA as the `uses:` line above for a reproducible lint config.
+      k6-ci-ref: 9477260e6838640d56c28aa95bcbf9a884ab21f3

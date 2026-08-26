@@ -1,0 +1,68 @@
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+      branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check-modules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check module dependencies
+        run: |
+          go version
+          test -z "$(go mod tidy && git status go.* --porcelain)"
+          go mod verify
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Retrieve golangci-lint version
+        run: |
+          echo "Version=$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')" >> $GITHUB_OUTPUT
+        id: version
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: ${{ steps.version.outputs.Version }}
+          only-new-issues: true
+
+  codespell:
+    name: Codespell
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+         persist-credentials: false
+      - name: Codespell test
+        uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579 # v2.2
+        with:
+          ignore_words_file: .codespellignore
+        

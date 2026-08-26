@@ -1,0 +1,26 @@
+{
+  "name": "xk6-kafka",
+  "version": "0.11.0",
+  "description": "xk6-kafka is a k6 extension to load test Apache Kafka",
+  "main": "index.d.ts",
+  "packageManager": "yarn@1.22.22",
+  "repository": "git@github.com:mostafa/xk6-kafka.git",
+  "author": "Mostafa Moradian <mostafamoradian0@gmail.com>",
+  "license": "Apache-2.0",
+  "scripts": {
+    "sync-docs:v2": "node -e \"const fs=require('fs');fs.mkdirSync('v2',{recursive:true});fs.copyFileSync('index.d.ts','v2/index.d.ts');\"",
+    "generate-docs:v2": "yarn run sync-docs:v2 && yarn exec typedoc --options typedoc.json && prettier -w README.md index.d.ts typedoc.json v2",
+    "generate-docs": "yarn run generate-docs:v2",
+    "check-docs:v2": "yarn run generate-docs:v2 && git diff --exit-code -- v2/index.d.ts v2/docs",
+    "validate-d-ts": "tsc --ignoreConfig --lib es2015 --noEmit index.d.ts",
+    "prettify": "prettier -w ."
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.11.0"
+  },
+  "dependencies": {
+    "typescript": "^6.0.3"
+  }
+}

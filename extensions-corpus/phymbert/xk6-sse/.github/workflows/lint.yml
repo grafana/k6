@@ -1,0 +1,21 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - uses: actions/checkout@v6
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: --config=.golangci.yml

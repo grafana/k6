@@ -1,0 +1,16 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>grafana/grafana-renovate-config//presets/k6/k6-engine-base.json",
+    "github>grafana/grafana-renovate-config//presets/k6/k6-engine-automerge.json"
+  ],
+  "packageRules": [
+    {
+      "description": "Block lukechampine.com/frand updates to 1.5.0 or higher",
+      "matchPackageNames": [
+        "lukechampine.com/frand"
+      ],
+      "allowedVersions": "<1.5.0"
+    }
+  ]
+}

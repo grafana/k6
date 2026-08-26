@@ -1,0 +1,26 @@
+version: "3.3"
+
+services:
+  redis:
+    image: docker.io/bitnami/redis:7.0.8
+    user: root
+    restart: always
+    environment:
+      - ALLOW_EMPTY_PASSWORD=false
+      - REDIS_PASSWORD=tjkbZ8jrwz3pGiku
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+      - REDIS_EXTRA_FLAGS=--loglevel verbose --tls-auth-clients optional
+      - REDIS_TLS_ENABLED=yes
+      - REDIS_TLS_PORT=6379
+      - REDIS_TLS_CERT_FILE=/tls/redis.crt
+      - REDIS_TLS_KEY_FILE=/tls/redis.key
+      - REDIS_TLS_CA_FILE=/tls/ca.crt
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/bitnami/redis/data
+      - ./tests/tls:/tls
+
+volumes:
+  redis_data:
+    driver: local

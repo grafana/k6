@@ -1,0 +1,14 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xk6-disruptor
+  title: xk6-disruptor
+  description: |
+    xk6-disruptor is an extension adds fault injection capabilities to Grafana k6. It implements the ideas of the Chaos Engineering discipline and enables Grafana k6 users to test their system's reliability under turbulent conditions.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: grafana/xk6-disruptor
+spec:
+  type: tool
+  owner: group:default/k6-extensions
+  lifecycle: production

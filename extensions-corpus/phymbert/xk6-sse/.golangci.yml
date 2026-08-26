@@ -1,0 +1,105 @@
+run:
+  timeout: 10m
+
+issues:
+  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  max-same-issues: 0
+
+  # We want to try and improve the comments in the k6 codebase, so individual
+  # non-golint items from the default exclusion list will gradually be added
+  # to the exclude-rules below
+  exclude-use-default: false
+
+  exclude-rules:
+    # Exclude duplicate code and function length and complexity checking in test
+    # files (due to common repeats and long functions in test code)
+    - path: _(test|gen)\.go
+      linters:
+        - cyclop
+        - dupl
+        - gocognit
+        - funlen
+        - lll
+        - nestif
+        - stylecheck
+
+linters-settings:
+  exhaustive:
+    default-signifies-exhaustive: true
+  cyclop:
+    max-complexity: 25
+  dupl:
+    threshold: 150
+  goconst:
+    min-len: 10
+    min-occurrences: 5
+  funlen:
+    lines: 90
+    statements: 60
+
+linters:
+  disable-all: true
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - cyclop
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - gocritic
+    - gofmt
+    - gofumpt
+    - goimports
+    - gomoddirectives
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - importas
+    - ineffassign
+    - interfacebloat
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - revive
+    - reassign
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - stylecheck
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+  fast: false

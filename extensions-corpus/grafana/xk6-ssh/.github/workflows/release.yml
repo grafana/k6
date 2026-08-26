@@ -1,0 +1,20 @@
+name: Release
+
+permissions: {}
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  release:
+    name: Release
+    uses: grafana/xk6/.github/workflows/extension-release.yml@b302a90014ee698bbf3c9f7c908b79ec8dd8053b # v1.4.6
+    permissions:
+      contents: write
+    with:
+      go-version: 1.25.x
+      k6-version: v2.0.0-rc1
+      xk6-version: 1.4.1
+      os: '["linux","windows","darwin"]'
+      arch: '["amd64","arm64"]'

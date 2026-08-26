@@ -1,0 +1,40 @@
+# Publishes a GitHub Release with auto-generated notes when a semver tag is
+# pushed. This extension ships as a Go module (consumed via `xk6 build --with
+# ...@vX.Y.Z`), so there is no binary artifact to build — the release is the tag
+# plus notes. Notes are grouped by PR label via `.github/release.yml` (label PRs
+# to categorize them; unlabeled PRs land under "Other Changes").
+#
+# Cut a release by pushing a tag from `main`:
+#   git tag v1.2.3 && git push origin v1.2.3
+# A `-` in the tag (e.g. v1.2.3-rc.1) marks the release as a prerelease.
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Reject non-semver tags (the `v*` trigger alone would accept v1, vnext, ...).
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::tag '$TAG' is not semver (expected vX.Y.Z or vX.Y.Z-prerelease)"
+            exit 1
+          fi
+          prerelease=""
+          case "$TAG" in
+            *-*) prerelease="--prerelease" ;;
+          esac
+          gh release create "$TAG" --verify-tag --generate-notes --title "$TAG" $prerelease

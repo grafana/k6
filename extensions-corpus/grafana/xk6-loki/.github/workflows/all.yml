@@ -1,0 +1,63 @@
+name: Checks
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+  packages: read
+  actions: read
+  checks: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.3.0
+        with:
+          go-version: 1.26.x
+          cache: false
+      - name: Check dependencies
+        run: |
+          go version
+          test -z "$(go mod tidy  && git status --porcelain)"
+          go mod verify
+
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.3.0
+        with:
+          go-version: 1.26.x
+          cache: false
+      - name: Check build
+        run: |
+          go version
+          pwd && ls -l
+
+          go install go.k6.io/xk6/cmd/xk6@master
+          MODULE_NAME=`go list -m`
+
+          GOPRIVATE="go.k6.io/k6" xk6 build \
+            --output ./k6ext \
+            --with $MODULE_NAME="."
+          ./k6ext version

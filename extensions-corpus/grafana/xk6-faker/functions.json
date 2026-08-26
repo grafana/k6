@@ -1,0 +1,3616 @@
+{
+  "achAccountNumber": {
+    "display": "ACH Account Number",
+    "category": "payment",
+    "description": "A bank account number used for Automated Clearing House transactions and electronic transfers",
+    "example": "491527954328",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "achRoutingNumber": {
+    "display": "ACH Routing Number",
+    "category": "payment",
+    "description": "Unique nine-digit code used in the U.S. for identifying the bank and processing electronic transactions",
+    "example": "513715684",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "actionVerb": {
+    "display": "Action Verb",
+    "category": "word",
+    "description": "Verb Indicating a physical or mental action",
+    "example": "close",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "address": {
+    "display": "Address",
+    "category": "address",
+    "description": "Residential location including street, city, state, country and postal code",
+    "example": "{\n\t\"address\": \"364 Unionsville, Norfolk, Ohio 99536\",\n\t\"street\": \"364 Unionsville\",\n\t\"city\": \"Norfolk\",\n\t\"state\": \"Ohio\",\n\t\"zip\": \"99536\",\n\t\"country\": \"Lesotho\",\n\t\"latitude\": 88.792592,\n\t\"longitude\": 174.504681\n}",
+    "output": "Record\u003cstring,unknown\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "adjective": {
+    "display": "Adjective",
+    "category": "word",
+    "description": "Word describing or modifying a noun",
+    "example": "genuine",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverb": {
+    "display": "Adverb",
+    "category": "word",
+    "description": "Word that modifies verbs, adjectives, or other adverbs",
+    "example": "smoothly",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbDegree": {
+    "display": "Adverb Degree",
+    "category": "word",
+    "description": "Adverb that indicates the degree or intensity of an action or adjective",
+    "example": "intensely",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbFrequencyDefinite": {
+    "display": "Adverb Frequency Definite",
+    "category": "word",
+    "description": "Adverb that specifies how often an action occurs with a clear frequency",
+    "example": "hourly",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbFrequencyIndefinite": {
+    "display": "Adverb Frequency Indefinite",
+    "category": "word",
+    "description": "Adverb that specifies how often an action occurs without specifying a particular frequency",
+    "example": "occasionally",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbManner": {
+    "display": "Adverb Manner",
+    "category": "word",
+    "description": "Adverb that describes how an action is performed",
+    "example": "stupidly",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbPhrase": {
+    "display": "Adverb Phrase",
+    "category": "word",
+    "description": "Phrase that modifies a verb, adjective, or another adverb, providing additional information.",
+    "example": "fully gladly",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbPlace": {
+    "display": "Adverb Place",
+    "category": "word",
+    "description": "Adverb that indicates the location or direction of an action",
+    "example": "east",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbTimeDefinite": {
+    "display": "Adverb Time Definite",
+    "category": "word",
+    "description": "Adverb that specifies the exact time an action occurs",
+    "example": "now",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "adverbTimeIndefinite": {
+    "display": "Adverb Time Indefinite",
+    "category": "word",
+    "description": "Adverb that gives a general or unspecified time frame",
+    "example": "already",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "animal": {
+    "display": "Animal",
+    "category": "animal",
+    "description": "Living creature with the ability to move, eat, and interact with its environment",
+    "example": "elk",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "animalType": {
+    "display": "Animal Type",
+    "category": "animal",
+    "description": "Type of animal, such as mammals, birds, reptiles, etc.",
+    "example": "amphibians",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "appAuthor": {
+    "display": "App Author",
+    "category": "app",
+    "description": "Person or group creating and developing an application",
+    "example": "Qado Energy, Inc.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "appName": {
+    "display": "App Name",
+    "category": "app",
+    "description": "Software program designed for a specific purpose or task on a computer or mobile device",
+    "example": "Parkrespond",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "appVersion": {
+    "display": "App Version",
+    "category": "app",
+    "description": "Particular release of an application in Semantic Versioning format",
+    "example": "1.12.14",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerAlcohol": {
+    "display": "Beer Alcohol",
+    "category": "beer",
+    "description": "Measures the alcohol content in beer",
+    "example": "2.7%",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerBlg": {
+    "display": "Beer BLG",
+    "category": "beer",
+    "description": "Scale indicating the concentration of extract in worts",
+    "example": "6.4°Blg",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerHop": {
+    "display": "Beer Hop",
+    "category": "beer",
+    "description": "The flower used in brewing to add flavor, aroma, and bitterness to beer",
+    "example": "Glacier",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerIbu": {
+    "display": "Beer IBU",
+    "category": "beer",
+    "description": "Scale measuring bitterness of beer from hops",
+    "example": "29 IBU",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerMalt": {
+    "display": "Beer Malt",
+    "category": "beer",
+    "description": "Processed barley or other grains, provides sugars for fermentation and flavor to beer",
+    "example": "Munich",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerName": {
+    "display": "Beer Name",
+    "category": "beer",
+    "description": "Specific brand or variety of beer",
+    "example": "Duvel",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerStyle": {
+    "display": "Beer Style",
+    "category": "beer",
+    "description": "Distinct characteristics and flavors of beer",
+    "example": "European Amber Lager",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "beerYeast": {
+    "display": "Beer Yeast",
+    "category": "beer",
+    "description": "Microorganism used in brewing to ferment sugars, producing alcohol and carbonation in beer",
+    "example": "1388 - Belgian Strong Ale",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "bird": {
+    "display": "Bird",
+    "category": "animal",
+    "description": "Distinct species of birds",
+    "example": "goose",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "bitcoinAddress": {
+    "display": "Bitcoin Address",
+    "category": "payment",
+    "description": "Cryptographic identifier used to receive, store, and send Bitcoin cryptocurrency in a peer-to-peer network",
+    "example": "1lWLbxojXq6BqWX7X60VkcDIvYA",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "bitcoinPrivateKey": {
+    "display": "Bitcoin Private Key",
+    "category": "payment",
+    "description": "Secret, secure code that allows the owner to access and control their Bitcoin holdings",
+    "example": "5vrbXTADWJ6sQBSYd6lLkG97jljNc0X9VPBvbVqsIH9lWOLcoqg",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "blurb": {
+    "display": "Blurb",
+    "category": "company",
+    "description": "Brief description or summary of a company's purpose, products, or services",
+    "example": "word",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "book": {
+    "display": "Book",
+    "category": "book",
+    "description": "Written or printed work consisting of pages bound together, covering various subjects or stories",
+    "example": "{\n\t\"title\": \"Anna Karenina\",\n\t\"author\": \"Toni Morrison\",\n\t\"genre\": \"Thriller\"\n}",
+    "output": "Record\u003cstring,string\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "bookAuthor": {
+    "display": "Book Author",
+    "category": "book",
+    "description": "The individual who wrote or created the content of a book",
+    "example": "Mark Twain",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "bookGenre": {
+    "display": "Book Genre",
+    "category": "book",
+    "description": "Category or type of book defined by its content, style, or form",
+    "example": "Adventure",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "bookTitle": {
+    "display": "Book Title",
+    "category": "book",
+    "description": "The specific name given to a book",
+    "example": "Hamlet",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "boolean": {
+    "display": "Boolean",
+    "category": "numbers",
+    "description": "Data type that represents one of two possible values, typically true or false",
+    "example": "true",
+    "output": "boolean",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "breakfast": {
+    "display": "Breakfast",
+    "category": "food",
+    "description": "First meal of the day, typically eaten in the morning",
+    "example": "Blueberry banana happy face pancakes",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "bs": {
+    "display": "BS",
+    "category": "company",
+    "description": "Random bs company word",
+    "example": "front-end",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "buzzword": {
+    "display": "Buzzword",
+    "category": "company",
+    "description": "Trendy or overused term often used in business to sound impressive",
+    "example": "disintermediate",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "car": {
+    "display": "Car",
+    "category": "car",
+    "description": "Wheeled motor vehicle used for transportation",
+    "example": "{\n\t\"type\": \"Passenger car mini\",\n\t\"fuel\": \"Gasoline\",\n\t\"transmission\": \"Automatic\",\n\t\"brand\": \"Fiat\",\n\t\"model\": \"Freestyle Fwd\",\n\t\"year\": 1991\n}",
+    "output": "Record\u003cstring,unknown\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "carFuelType": {
+    "display": "Car Fuel Type",
+    "category": "car",
+    "description": "Type of energy source a car uses",
+    "example": "CNG",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "carMaker": {
+    "display": "Car Maker",
+    "category": "car",
+    "description": "Company or brand that manufactures and designs cars",
+    "example": "Nissan",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "carModel": {
+    "display": "Car Model",
+    "category": "car",
+    "description": "Specific design or version of a car produced by a manufacturer",
+    "example": "Aveo",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "carTransmissionType": {
+    "display": "Car Transmission Type",
+    "category": "car",
+    "description": "Mechanism a car uses to transmit power from the engine to the wheels",
+    "example": "Manual",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "carType": {
+    "display": "Car Type",
+    "category": "car",
+    "description": "Classification of cars based on size, use, or body style",
+    "example": "Passenger car mini",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "cat": {
+    "display": "Cat",
+    "category": "animal",
+    "description": "Various breeds that define different cats",
+    "example": "Chausie",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "celebrityActor": {
+    "display": "Celebrity Actor",
+    "category": "celebrity",
+    "description": "Famous person known for acting in films, television, or theater",
+    "example": "Brad Pitt",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "celebrityBusiness": {
+    "display": "Celebrity Business",
+    "category": "celebrity",
+    "description": "High-profile individual known for significant achievements in business or entrepreneurship",
+    "example": "Elon Musk",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "celebritySport": {
+    "display": "Celebrity Sport",
+    "category": "celebrity",
+    "description": "Famous athlete known for achievements in a particular sport",
+    "example": "Michael Phelps",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "chromeUserAgent": {
+    "display": "Chrome User Agent",
+    "category": "internet",
+    "description": "The specific identification string sent by the Google Chrome web browser when making requests on the internet",
+    "example": "Mozilla/5.0 (X11; Linux i686) AppleWebKit/5312 (KHTML, like Gecko) Chrome/39.0.836.0 Mobile Safari/5312",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "city": {
+    "display": "City",
+    "category": "address",
+    "description": "Part of a country with significant population, often a central hub for culture and commerce",
+    "example": "Marcelside",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "color": {
+    "display": "Color",
+    "category": "color",
+    "description": "Hue seen by the eye, returns the name of the color like red or blue",
+    "example": "MediumOrchid",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "comment": {
+    "display": "Comment",
+    "category": "word",
+    "description": "Statement or remark expressing an opinion, observation, or reaction",
+    "example": "wow",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "company": {
+    "display": "Company",
+    "category": "company",
+    "description": "Designated official name of a business or organization",
+    "example": "Moen, Pagac and Wuckert",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "companySuffix": {
+    "display": "Company Suffix",
+    "category": "company",
+    "description": "Suffix at the end of a company name, indicating business structure, like 'Inc.' or 'LLC'",
+    "example": "Inc",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "connective": {
+    "display": "Connective",
+    "category": "word",
+    "description": "Word used to connect words or sentences",
+    "example": "such as",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "connectiveCasual": {
+    "display": "Connective Casual",
+    "category": "word",
+    "description": "Connective word used to indicate a cause-and-effect relationship between events or actions",
+    "example": "an outcome of",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "connectiveComparitive": {
+    "display": "Connective Comparitive",
+    "category": "word",
+    "description": "Connective word used to indicate a comparison between two or more things",
+    "example": "in addition",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "connectiveComplaint": {
+    "display": "Connective Complaint",
+    "category": "word",
+    "description": "Connective word used to express dissatisfaction or complaints about a situation",
+    "example": "besides",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "connectiveExamplify": {
+    "display": "Connective Examplify",
+    "category": "word",
+    "description": "Connective word used to provide examples or illustrations of a concept or idea",
+    "example": "then",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "connectiveListing": {
+    "display": "Connective Listing",
+    "category": "word",
+    "description": "Connective word used to list or enumerate items or examples",
+    "example": "firstly",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "connectiveTime": {
+    "display": "Connective Time",
+    "category": "word",
+    "description": "Connective word used to indicate a temporal relationship between events or actions",
+    "example": "finally",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "country": {
+    "display": "Country",
+    "category": "address",
+    "description": "Nation with its own government and defined territory",
+    "example": "United States of America",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "countryAbbreviation": {
+    "display": "Country Abbreviation",
+    "category": "address",
+    "description": "Shortened 2-letter form of a country's name",
+    "example": "US",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "creditCard": {
+    "display": "Credit Card",
+    "category": "payment",
+    "description": "Plastic card allowing users to make purchases on credit, with payment due at a later date",
+    "example": "{\n\t\"type\": \"UnionPay\",\n\t\"number\": \"4364599489953698\",\n\t\"exp\": \"02/24\",\n\t\"cvv\": \"300\"\n}",
+    "output": "Record\u003cstring,unknown\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "creditCardCVV": {
+    "display": "Credit Card CVV",
+    "category": "payment",
+    "description": "Three or four-digit security code on a credit card used for online and remote transactions",
+    "example": "513",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "creditCardExp": {
+    "display": "Credit Card Exp",
+    "category": "payment",
+    "description": "Date when a credit card becomes invalid and cannot be used for transactions",
+    "example": "01/21",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "creditCardExpMonth": {
+    "display": "Credit Card Exp Month",
+    "category": "payment",
+    "description": "Month of the date when a credit card becomes invalid and cannot be used for transactions",
+    "example": "11",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "creditCardExpYear": {
+    "display": "Credit Card Exp Year",
+    "category": "payment",
+    "description": "Year of the date when a credit card becomes invalid and cannot be used for transactions",
+    "example": "28",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "creditCardNumber": {
+    "display": "Credit Card Number",
+    "category": "payment",
+    "description": "Unique numerical identifier on a credit card used for making electronic payments and transactions",
+    "example": "4136459948995369",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "types",
+        "display": "Types",
+        "type": "string[]",
+        "optional": false,
+        "default": "all",
+        "options": [
+          "visa",
+          "mastercard",
+          "american-express",
+          "diners-club",
+          "discover",
+          "jcb",
+          "unionpay",
+          "maestro",
+          "elo",
+          "hiper",
+          "hipercard"
+        ],
+        "description": "A select number of types you want to use when generating a credit card number"
+      },
+      {
+        "field": "bins",
+        "display": "Bins",
+        "type": "string[]",
+        "optional": true,
+        "default": "",
+        "options": null,
+        "description": "Optional list of prepended bin numbers to pick from"
+      },
+      {
+        "field": "gaps",
+        "display": "Gaps",
+        "type": "boolean",
+        "optional": false,
+        "default": "false",
+        "options": null,
+        "description": "Whether or not to have gaps in number"
+      }
+    ],
+    "any": null
+  },
+  "creditCardNumberFormatted": {
+    "display": "Credit Card Number Formatted",
+    "category": "payment",
+    "description": "Unique numerical identifier on a credit card used for making electronic payments and transactions",
+    "example": "4136-4599-4899-5369",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "creditCardType": {
+    "display": "Credit Card Type",
+    "category": "payment",
+    "description": "Classification of credit cards based on the issuing company",
+    "example": "Visa",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "currency": {
+    "display": "Currency",
+    "category": "payment",
+    "description": "Medium of exchange, often in the form of paper money or coins, used for trade and transactions",
+    "example": "{\n\t\"short\": \"IQD\",\n\t\"long\": \"Iraq Dinar\"\n}",
+    "output": "Record\u003cstring,string\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "currencyLong": {
+    "display": "Currency Long",
+    "category": "payment",
+    "description": "Complete name of a specific currency used for official identification in financial transactions",
+    "example": "United States Dollar",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "currencyShort": {
+    "display": "Currency Short",
+    "category": "payment",
+    "description": "Short 3-letter word used to represent a specific currency",
+    "example": "USD",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "cusip": {
+    "display": "CUSIP",
+    "category": "finance",
+    "description": "Unique identifier for securities, especially bonds, in the United States and Canada",
+    "example": "38259P508",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "databaseError": {
+    "display": "Database error",
+    "category": "error",
+    "description": "A problem or issue encountered while accessing or managing a database",
+    "example": "sql error",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "date": {
+    "display": "Date",
+    "category": "time",
+    "description": "Representation of a specific day, month, and year, often used for chronological reference",
+    "example": "2006-01-02T15:04:05Z07:00",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "format",
+        "display": "Format",
+        "type": "string",
+        "optional": false,
+        "default": "RFC3339",
+        "options": [
+          "ANSIC",
+          "UnixDate",
+          "RubyDate",
+          "RFC822",
+          "RFC822Z",
+          "RFC850",
+          "RFC1123",
+          "RFC1123Z",
+          "RFC3339",
+          "RFC3339Nano"
+        ],
+        "description": "Date time string format output. You may also use golang time format or java time format"
+      }
+    ],
+    "any": null
+  },
+  "dateRange": {
+    "display": "DateRange",
+    "category": "time",
+    "description": "Random date between two ranges",
+    "example": "2006-01-02T15:04:05Z07:00",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "startdate",
+        "display": "Start Date",
+        "type": "string",
+        "optional": false,
+        "default": "1970-01-01",
+        "options": null,
+        "description": "Start date time string"
+      },
+      {
+        "field": "enddate",
+        "display": "End Date",
+        "type": "string",
+        "optional": false,
+        "default": "2024-03-13",
+        "options": null,
+        "description": "End date time string"
+      },
+      {
+        "field": "format",
+        "display": "Format",
+        "type": "string",
+        "optional": false,
+        "default": "yyyy-MM-dd",
+        "options": null,
+        "description": "Date time string format"
+      }
+    ],
+    "any": null
+  },
+  "day": {
+    "display": "Day",
+    "category": "time",
+    "description": "24-hour period equivalent to one rotation of Earth on its axis",
+    "example": "12",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "demonstrativeAdjective": {
+    "display": "Demonstrative Adjective",
+    "category": "word",
+    "description": "Adjective used to point out specific things",
+    "example": "this",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "descriptiveAdjective": {
+    "display": "Descriptive Adjective",
+    "category": "word",
+    "description": "Adjective that provides detailed characteristics about a noun",
+    "example": "brave",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "dessert": {
+    "display": "Dessert",
+    "category": "food",
+    "description": "Sweet treat often enjoyed after a meal",
+    "example": "French napoleons",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "dice": {
+    "display": "Dice",
+    "category": "game",
+    "description": "Small, cube-shaped objects used in games of chance for random outcomes",
+    "example": "[5, 2, 3]",
+    "output": "number[]",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "numdice",
+        "display": "Number of Dice",
+        "type": "number",
+        "optional": false,
+        "default": "1",
+        "options": null,
+        "description": "Number of dice to roll"
+      },
+      {
+        "field": "sides",
+        "display": "Number of Sides",
+        "type": "number[]",
+        "optional": false,
+        "default": "[6]",
+        "options": null,
+        "description": "Number of sides on each dice"
+      }
+    ],
+    "any": null
+  },
+  "digit": {
+    "display": "Digit",
+    "category": "strings",
+    "description": "Numerical symbol used to represent numbers",
+    "example": "0",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "digitN": {
+    "display": "DigitN",
+    "category": "strings",
+    "description": "string of length N consisting of ASCII digits",
+    "example": "0136459948",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "count",
+        "display": "Count",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Number of digits to generate"
+      }
+    ],
+    "any": null
+  },
+  "dinner": {
+    "display": "Dinner",
+    "category": "food",
+    "description": "Evening meal, typically the day's main and most substantial meal",
+    "example": "Wild addicting dip",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "dog": {
+    "display": "Dog",
+    "category": "animal",
+    "description": "Various breeds that define different dogs",
+    "example": "Norwich Terrier",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "domainName": {
+    "display": "Domain Name",
+    "category": "internet",
+    "description": "Human-readable web address used to identify websites on the internet",
+    "example": "centraltarget.biz",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "domainSuffix": {
+    "display": "Domain Suffix",
+    "category": "internet",
+    "description": "The part of a domain name that comes after the last dot, indicating its type or purpose",
+    "example": "org",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "drink": {
+    "display": "Drink",
+    "category": "food",
+    "description": "Liquid consumed for hydration, pleasure, or nutritional benefits",
+    "example": "Soda",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "email": {
+    "display": "Email",
+    "category": "person",
+    "description": "Electronic mail used for sending digital messages and communication over the internet",
+    "example": "markusmoen@pagac.net",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "emoji": {
+    "display": "Emoji",
+    "category": "emoji",
+    "description": "Digital symbol expressing feelings or ideas in text messages and online chats",
+    "example": "🤣",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "emojiAlias": {
+    "display": "Emoji Alias",
+    "category": "emoji",
+    "description": "Alternative name or keyword used to represent a specific emoji in text or code",
+    "example": "smile",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "emojiCategory": {
+    "display": "Emoji Category",
+    "category": "emoji",
+    "description": "Group or classification of emojis based on their common theme or use, like 'smileys' or 'animals'",
+    "example": "Smileys \u0026 Emotion",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "emojiDescription": {
+    "display": "Emoji Description",
+    "category": "emoji",
+    "description": "Brief explanation of the meaning or emotion conveyed by an emoji",
+    "example": "face vomiting",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "emojiTag": {
+    "display": "Emoji Tag",
+    "category": "emoji",
+    "description": "Label or keyword associated with an emoji to categorize or search for it easily",
+    "example": "happy",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "error": {
+    "display": "Error",
+    "category": "error",
+    "description": "Message displayed by a computer or software when a problem or mistake is encountered",
+    "example": "syntax error",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "errorObjectWord": {
+    "display": "Error object word",
+    "category": "error",
+    "description": "Various categories conveying details about encountered errors",
+    "example": "protocol",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "farmAnimal": {
+    "display": "Farm Animal",
+    "category": "animal",
+    "description": "Animal name commonly found on a farm",
+    "example": "Chicken",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "fileExtension": {
+    "display": "File Extension",
+    "category": "file",
+    "description": "Suffix appended to a filename indicating its format or type",
+    "example": "nes",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "fileMimeType": {
+    "display": "File Mime Type",
+    "category": "file",
+    "description": "Defines file format and nature for browsers and email clients using standardized identifiers",
+    "example": "application/json",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "firefoxUserAgent": {
+    "display": "Firefox User Agent",
+    "category": "internet",
+    "description": "The specific identification string sent by the Firefox web browser when making requests on the internet",
+    "example": "Mozilla/5.0 (Macintosh; U; PPC Mac OS X 10_8_3 rv:7.0) Gecko/1900-07-01 Firefox/37.0",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "firstName": {
+    "display": "First Name",
+    "category": "person",
+    "description": "The name given to a person at birth",
+    "example": "Markus",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "float32": {
+    "display": "Float32",
+    "category": "numbers",
+    "description": "Data type representing floating-point numbers with 32 bits of precision in computing",
+    "example": "3.1128167e+37",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "float32Range": {
+    "display": "Float32 Range",
+    "category": "numbers",
+    "description": "Float32 value between given range",
+    "example": "914774.6",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Minimum float32 value"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Maximum float32 value"
+      }
+    ],
+    "any": null
+  },
+  "float64": {
+    "display": "Float64",
+    "category": "numbers",
+    "description": "Data type representing floating-point numbers with 64 bits of precision in computing",
+    "example": "1.644484108270445e+307",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "float64Range": {
+    "display": "Float64 Range",
+    "category": "numbers",
+    "description": "Float64 value between given range",
+    "example": "914774.5585333086",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Minimum float64 value"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Maximum float64 value"
+      }
+    ],
+    "any": null
+  },
+  "fruit": {
+    "display": "Fruit",
+    "category": "food",
+    "description": "Edible plant part, typically sweet, enjoyed as a natural snack or dessert",
+    "example": "Peach",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "futureTime": {
+    "display": "FutureTime",
+    "category": "time",
+    "description": "Date that has occurred after the current moment in time",
+    "example": "2107-01-24 13:00:35.820738079 +0000 UTC",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "gRPCError": {
+    "display": "gRPC error",
+    "category": "error",
+    "description": "Communication failure in the high-performance, open-source universal RPC framework",
+    "example": "client protocol error",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "gamertag": {
+    "display": "Gamertag",
+    "category": "game",
+    "description": "User-selected online username or alias used for identification in games",
+    "example": "footinterpret63",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "gender": {
+    "display": "Gender",
+    "category": "person",
+    "description": "Classification based on social and cultural norms that identifies an individual",
+    "example": "male",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hackerAbbreviation": {
+    "display": "Hacker Abbreviation",
+    "category": "hacker",
+    "description": "Abbreviations and acronyms commonly used in the hacking and cybersecurity community",
+    "example": "ADP",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hackerAdjective": {
+    "display": "Hacker Adjective",
+    "category": "hacker",
+    "description": "Adjectives describing terms often associated with hackers and cybersecurity experts",
+    "example": "wireless",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hackerNoun": {
+    "display": "Hacker Noun",
+    "category": "hacker",
+    "description": "Noun representing an element, tool, or concept within the realm of hacking and cybersecurity",
+    "example": "driver",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hackerPhrase": {
+    "display": "Hacker Phrase",
+    "category": "hacker",
+    "description": "Informal jargon and slang used in the hacking and cybersecurity community",
+    "example": "If we calculate the program, we can get to the AI pixel through the redundant XSS matrix!",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hackerVerb": {
+    "display": "Hacker Verb",
+    "category": "hacker",
+    "description": "Verbs associated with actions and activities in the field of hacking and cybersecurity",
+    "example": "synthesize",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hackeringVerb": {
+    "display": "Hackering Verb",
+    "category": "hacker",
+    "description": "Verb describing actions and activities related to hacking, often involving computer systems and security",
+    "example": "connecting",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "helpingVerb": {
+    "display": "Helping Verb",
+    "category": "word",
+    "description": "Auxiliary verb that helps the main verb complete the sentence",
+    "example": "be",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hexColor": {
+    "display": "Hex Color",
+    "category": "color",
+    "description": "Six-digit code representing a color in the color model",
+    "example": "#a99fb4",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hexUint128": {
+    "display": "HexUint128",
+    "category": "numbers",
+    "description": "Hexadecimal representation of an 128-bit unsigned integer",
+    "example": "0x875469578e51b5e56c95b64681d147a1",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hexUint16": {
+    "display": "HexUint16",
+    "category": "numbers",
+    "description": "Hexadecimal representation of an 16-bit unsigned integer",
+    "example": "0x8754",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hexUint256": {
+    "display": "HexUint256",
+    "category": "numbers",
+    "description": "Hexadecimal representation of an 256-bit unsigned integer",
+    "example": "0x875469578e51b5e56c95b64681d147a12cde48a4f417231b0c486abbc263e48d",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hexUint32": {
+    "display": "HexUint32",
+    "category": "numbers",
+    "description": "Hexadecimal representation of an 32-bit unsigned integer",
+    "example": "0x87546957",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hexUint64": {
+    "display": "HexUint64",
+    "category": "numbers",
+    "description": "Hexadecimal representation of an 64-bit unsigned integer",
+    "example": "0x875469578e51b5e5",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hexUint8": {
+    "display": "HexUint8",
+    "category": "numbers",
+    "description": "Hexadecimal representation of an 8-bit unsigned integer",
+    "example": "0x87",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hipsterParagraph": {
+    "display": "Hipster Paragraph",
+    "category": "hipster",
+    "description": "Paragraph showcasing the use of trendy and unconventional vocabulary associated with hipster culture",
+    "example": "Microdosing roof chia echo pickled meditation cold-pressed raw denim fingerstache normcore sriracha pork belly. Wolf try-hard pop-up blog tilde hashtag health butcher waistcoat paleo portland vinegar. Microdosing sartorial blue bottle slow-carb freegan five dollar toast you probably haven't heard of them asymmetrical chia farm-to-table narwhal banjo. Gluten-free blog authentic literally synth vinyl meh ethical health fixie banh mi Yuccie. Try-hard drinking squid seitan cray VHS echo chillwave hammock kombucha food truck sustainable.\n\nPug bushwick hella tote bag cliche direct trade waistcoat yr waistcoat knausgaard pour-over master. Pitchfork jean shorts franzen flexitarian distillery hella meggings austin knausgaard crucifix wolf heirloom. Crucifix food truck you probably haven't heard of them trust fund fixie gentrify pitchfork stumptown mlkshk umami chambray blue bottle. 3 wolf moon swag +1 biodiesel knausgaard semiotics taxidermy meh artisan hoodie +1 blue bottle. Fashion axe forage mixtape Thundercats pork belly whatever 90's beard selfies chambray cred mlkshk.\n\nShabby chic typewriter VHS readymade lo-fi bitters PBR\u0026B gentrify lomo raw denim freegan put a bird on it. Raw denim cliche dreamcatcher pug fixie park trust fund migas fingerstache sriracha +1 mustache. Tilde shoreditch kickstarter franzen dreamcatcher green juice mustache neutra polaroid stumptown organic schlitz. Flexitarian ramps chicharrones kogi lo-fi mustache tilde forage street church-key williamsburg taxidermy. Chia mustache plaid mumblecore squid slow-carb disrupt Thundercats goth shoreditch master direct trade.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "paragraphcount",
+        "display": "Paragraph Count",
+        "type": "number",
+        "optional": false,
+        "default": "2",
+        "options": null,
+        "description": "Number of paragraphs"
+      },
+      {
+        "field": "sentencecount",
+        "display": "Sentence Count",
+        "type": "number",
+        "optional": false,
+        "default": "2",
+        "options": null,
+        "description": "Number of sentences in a paragraph"
+      },
+      {
+        "field": "wordcount",
+        "display": "Word Count",
+        "type": "number",
+        "optional": false,
+        "default": "5",
+        "options": null,
+        "description": "Number of words in a sentence"
+      },
+      {
+        "field": "paragraphseparator",
+        "display": "Paragraph Separator",
+        "type": "string",
+        "optional": false,
+        "default": "\u003cbr /\u003e",
+        "options": null,
+        "description": "String value to add between paragraphs"
+      }
+    ],
+    "any": null
+  },
+  "hipsterSentence": {
+    "display": "Hipster Sentence",
+    "category": "hipster",
+    "description": "Sentence showcasing the use of trendy and unconventional vocabulary associated with hipster culture",
+    "example": "Microdosing roof chia echo pickled.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "wordcount",
+        "display": "Word Count",
+        "type": "number",
+        "optional": false,
+        "default": "5",
+        "options": null,
+        "description": "Number of words in a sentence"
+      }
+    ],
+    "any": null
+  },
+  "hipsterWord": {
+    "display": "Hipster Word",
+    "category": "hipster",
+    "description": "Trendy and unconventional vocabulary used by hipsters to express unique cultural preferences",
+    "example": "microdosing",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hobby": {
+    "display": "Hobby",
+    "category": "person",
+    "description": "An activity pursued for leisure and pleasure",
+    "example": "Swimming",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "hour": {
+    "display": "Hour",
+    "category": "time",
+    "description": "Unit of time equal to 60 minutes",
+    "example": "8",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "httpClientError": {
+    "display": "HTTP client error",
+    "category": "error",
+    "description": "Failure or issue occurring within a client software that sends requests to web servers",
+    "example": "request timeout",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "httpError": {
+    "display": "HTTP error",
+    "category": "error",
+    "description": "A problem with a web http request",
+    "example": "invalid method",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "httpMethod": {
+    "display": "HTTP Method",
+    "category": "internet",
+    "description": "Verb used in HTTP requests to specify the desired action to be performed on a resource",
+    "example": "HEAD",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "httpServerError": {
+    "display": "HTTP server error",
+    "category": "error",
+    "description": "Failure or issue occurring within a server software that recieves requests from clients",
+    "example": "internal server error",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "httpStatusCode": {
+    "display": "HTTP Status Code",
+    "category": "internet",
+    "description": "Random http status code",
+    "example": "200",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "httpStatusCodeSimple": {
+    "display": "HTTP Status Code Simple",
+    "category": "internet",
+    "description": "Three-digit number returned by a web server to indicate the outcome of an HTTP request",
+    "example": "404",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "httpVersion": {
+    "display": "HTTP Version",
+    "category": "internet",
+    "description": "Number indicating the version of the HTTP protocol used for communication between a client and a server",
+    "example": "HTTP/1.1",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "imageUrl": {
+    "display": "Image URL",
+    "category": "internet",
+    "description": "Web address pointing to an image file that can be accessed and displayed online",
+    "example": "https://picsum.photos/500/500",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "width",
+        "display": "Width",
+        "type": "number",
+        "optional": false,
+        "default": "500",
+        "options": null,
+        "description": "Image width in px"
+      },
+      {
+        "field": "height",
+        "display": "Height",
+        "type": "number",
+        "optional": false,
+        "default": "500",
+        "options": null,
+        "description": "Image height in px"
+      }
+    ],
+    "any": null
+  },
+  "indefiniteAdjective": {
+    "display": "Indefinite Adjective",
+    "category": "word",
+    "description": "Adjective describing a non-specific noun",
+    "example": "few",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "inputName": {
+    "display": "Input Name",
+    "category": "internet",
+    "description": "Attribute used to define the name of an input element in web forms",
+    "example": "first_name",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "int16": {
+    "display": "Int16",
+    "category": "numbers",
+    "description": "Signed 16-bit integer, capable of representing values from 32,768 to 32,767",
+    "example": "2200",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "int32": {
+    "display": "Int32",
+    "category": "numbers",
+    "description": "Signed 32-bit integer, capable of representing values from -2,147,483,648 to 2,147,483,647",
+    "example": "-1072427943",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "int64": {
+    "display": "Int64",
+    "category": "numbers",
+    "description": "Signed 64-bit integer, capable of representing values from -9,223,372,036,854,775,808 to -9,223,372,036,854,775,807",
+    "example": "-8379641344161477543",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "int8": {
+    "display": "Int8",
+    "category": "numbers",
+    "description": "Signed 8-bit integer, capable of representing values from -128 to 127",
+    "example": "24",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "intRange": {
+    "display": "IntRange",
+    "category": "numbers",
+    "description": "Integer value between given range",
+    "example": "-8379477543",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Minimum int value"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Maximum int value"
+      }
+    ],
+    "any": null
+  },
+  "interjection": {
+    "display": "Interjection",
+    "category": "word",
+    "description": "Word expressing emotion",
+    "example": "wow",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "interrogativeAdjective": {
+    "display": "Interrogative Adjective",
+    "category": "word",
+    "description": "Adjective used to ask questions",
+    "example": "what",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "intransitiveVerb": {
+    "display": "Intransitive Verb",
+    "category": "word",
+    "description": "Verb that does not require a direct object to complete its meaning",
+    "example": "laugh",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "ipv4Address": {
+    "display": "IPv4 Address",
+    "category": "internet",
+    "description": "Numerical label assigned to devices on a network for identification and communication",
+    "example": "222.83.191.222",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "ipv6Address": {
+    "display": "IPv6 Address",
+    "category": "internet",
+    "description": "Numerical label assigned to devices on a network, providing a larger address space than IPv4 for internet communication",
+    "example": "2001:cafe:8898:ee17:bc35:9064:5866:d019",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "isin": {
+    "display": "ISIN",
+    "category": "finance",
+    "description": "International standard code for uniquely identifying securities worldwide",
+    "example": "CVLRQCZBXQ97",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "job": {
+    "display": "Job",
+    "category": "company",
+    "description": "Position or role in employment, involving specific tasks and responsibilities",
+    "example": "{\n\t\"company\": \"ClearHealthCosts\",\n\t\"title\": \"Agent\",\n\t\"descriptor\": \"Future\",\n\t\"level\": \"Tactics\"\n}",
+    "output": "Record\u003cstring,string\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "jobDescriptor": {
+    "display": "Job Descriptor",
+    "category": "company",
+    "description": "Word used to describe the duties, requirements, and nature of a job",
+    "example": "Central",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "jobLevel": {
+    "display": "Job Level",
+    "category": "company",
+    "description": "Random job level",
+    "example": "Assurance",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "jobTitle": {
+    "display": "Job Title",
+    "category": "company",
+    "description": "Specific title for a position or role within a company or organization",
+    "example": "Director",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "language": {
+    "display": "Language",
+    "category": "language",
+    "description": "System of communication using symbols, words, and grammar to convey meaning between individuals",
+    "example": "Kazakh",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "languageAbbreviation": {
+    "display": "Language Abbreviation",
+    "category": "language",
+    "description": "Shortened form of a language's name",
+    "example": "kk",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "languageBcp": {
+    "display": "Language BCP",
+    "category": "language",
+    "description": "Set of guidelines and standards for identifying and representing languages in computing and internet protocols",
+    "example": "en-US",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "lastName": {
+    "display": "Last Name",
+    "category": "person",
+    "description": "The family name or surname of an individual",
+    "example": "Daniel",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "latitude": {
+    "display": "Latitude",
+    "category": "address",
+    "description": "Geographic coordinate specifying north-south position on Earth's surface",
+    "example": "-73.534056",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "latitudeRange": {
+    "display": "Latitude Range",
+    "category": "address",
+    "description": "Latitude number between the given range (default min=0, max=90)",
+    "example": "22.921026",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "0",
+        "options": null,
+        "description": "Minimum range"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "90",
+        "options": null,
+        "description": "Maximum range"
+      }
+    ],
+    "any": null
+  },
+  "letter": {
+    "display": "Letter",
+    "category": "strings",
+    "description": "Character or symbol from the American Standard Code for Information Interchange (ASCII) character set",
+    "example": "g",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "letterN": {
+    "display": "LetterN",
+    "category": "strings",
+    "description": "ASCII string with length N",
+    "example": "gbRMaRxHki",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "count",
+        "display": "Count",
+        "type": "number",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Number of digits to generate"
+      }
+    ],
+    "any": null
+  },
+  "lexify": {
+    "display": "Lexify",
+    "category": "strings",
+    "description": "Replace ? with random generated letters",
+    "example": "?????@??????.com =\u003e billy@mister.com",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "str",
+        "display": "String",
+        "type": "string",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "String value to replace ?'s"
+      }
+    ],
+    "any": null
+  },
+  "linkingVerb": {
+    "display": "Linking Verb",
+    "category": "word",
+    "description": "Verb that Connects the subject of a sentence to a subject complement",
+    "example": "was",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "logLevel": {
+    "display": "Log Level",
+    "category": "internet",
+    "description": "Classification used in logging to indicate the severity or priority of a log entry",
+    "example": "error",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "longitude": {
+    "display": "Longitude",
+    "category": "address",
+    "description": "Geographic coordinate indicating east-west position on Earth's surface",
+    "example": "-147.068112",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "longitudeRange": {
+    "display": "Longitude Range",
+    "category": "address",
+    "description": "Longitude number between the given range (default min=0, max=180)",
+    "example": "-8.170450",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "0",
+        "options": null,
+        "description": "Minimum range"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "180",
+        "options": null,
+        "description": "Maximum range"
+      }
+    ],
+    "any": null
+  },
+  "loremIpsumParagraph": {
+    "display": "Lorem Ipsum Paragraph",
+    "category": "word",
+    "description": "Paragraph of the Lorem Ipsum placeholder text used in design and publishing",
+    "example": "Quia quae repellat consequatur quidem nisi quo qui voluptatum accusantium quisquam amet. Quas et ut non dolorem ipsam aut enim assumenda mollitia harum ut. Dicta similique veniam nulla voluptas at excepturi non ad maxime at non. Eaque hic repellat praesentium voluptatem qui consequuntur dolor iusto autem velit aut. Fugit tempore exercitationem harum consequatur voluptatum modi minima aut eaque et et.\n\nAut ea voluptatem dignissimos expedita odit tempore quod aut beatae ipsam iste. Minus voluptatibus dolorem maiores eius sed nihil vel enim odio voluptatem accusamus. Natus quibusdam temporibus tenetur cumque sint necessitatibus dolorem ex ducimus iusto ex. Voluptatem neque dicta explicabo officiis et ducimus sit ut ut praesentium pariatur. Illum molestias nisi at dolore ut voluptatem accusantium et fugiat et ut.\n\nExplicabo incidunt reprehenderit non quia dignissimos recusandae vitae soluta quia et quia. Aut veniam voluptas consequatur placeat sapiente non eveniet voluptatibus magni velit eum. Nobis vel repellendus sed est qui autem laudantium quidem quam ullam consequatur. Aut iusto ut commodi similique quae voluptatem atque qui fugiat eum aut. Quis distinctio consequatur voluptatem vel aliquid aut laborum facere officiis iure tempora.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "paragraphcount",
+        "display": "Paragraph Count",
+        "type": "number",
+        "optional": false,
+        "default": "2",
+        "options": null,
+        "description": "Number of paragraphs"
+      },
+      {
+        "field": "sentencecount",
+        "display": "Sentence Count",
+        "type": "number",
+        "optional": false,
+        "default": "2",
+        "options": null,
+        "description": "Number of sentences in a paragraph"
+      },
+      {
+        "field": "wordcount",
+        "display": "Word Count",
+        "type": "number",
+        "optional": false,
+        "default": "5",
+        "options": null,
+        "description": "Number of words in a sentence"
+      },
+      {
+        "field": "paragraphseparator",
+        "display": "Paragraph Separator",
+        "type": "string",
+        "optional": false,
+        "default": "\u003cbr /\u003e",
+        "options": null,
+        "description": "String value to add between paragraphs"
+      }
+    ],
+    "any": null
+  },
+  "loremIpsumSentence": {
+    "display": "Lorem Ipsum Sentence",
+    "category": "word",
+    "description": "Sentence of the Lorem Ipsum placeholder text used in design and publishing",
+    "example": "Quia quae repellat consequatur quidem.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "wordcount",
+        "display": "Word Count",
+        "type": "number",
+        "optional": false,
+        "default": "5",
+        "options": null,
+        "description": "Number of words in a sentence"
+      }
+    ],
+    "any": null
+  },
+  "loremIpsumWord": {
+    "display": "Lorem Ipsum Word",
+    "category": "word",
+    "description": "Word of the Lorem Ipsum placeholder text used in design and publishing",
+    "example": "quia",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "lunch": {
+    "display": "Lunch",
+    "category": "food",
+    "description": "Midday meal, often lighter than dinner, eaten around noon",
+    "example": "No bake hersheys bar pie",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "macAddress": {
+    "display": "MAC Address",
+    "category": "internet",
+    "description": "Unique identifier assigned to network interfaces, often used in Ethernet networks",
+    "example": "cb:ce:06:94:22:e9",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "middleName": {
+    "display": "Middle Name",
+    "category": "person",
+    "description": "Name between a person's first name and last name",
+    "example": "Belinda",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftAnimal": {
+    "display": "Minecraft animal",
+    "category": "minecraft",
+    "description": "Non-hostile creatures in Minecraft, often used for resources and farming",
+    "example": "chicken",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftArmorPart": {
+    "display": "Minecraft armor part",
+    "category": "minecraft",
+    "description": "Component of an armor set in Minecraft, such as a helmet, chestplate, leggings, or boots",
+    "example": "helmet",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftArmorTier": {
+    "display": "Minecraft armor tier",
+    "category": "minecraft",
+    "description": "Classification system for armor sets in Minecraft, indicating their effectiveness and protection level",
+    "example": "iron",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftBiome": {
+    "display": "Minecraft biome",
+    "category": "minecraft",
+    "description": "Distinctive environmental regions in the game, characterized by unique terrain, vegetation, and weather",
+    "example": "forest",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftDye": {
+    "display": "Minecraft dye",
+    "category": "minecraft",
+    "description": "Items used to change the color of various in-game objects",
+    "example": "white",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftFood": {
+    "display": "Minecraft food",
+    "category": "minecraft",
+    "description": "Consumable items in Minecraft that provide nourishment to the player character",
+    "example": "apple",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftMobBoss": {
+    "display": "Minecraft mob boss",
+    "category": "minecraft",
+    "description": "Powerful hostile creature in the game, often found in challenging dungeons or structures",
+    "example": "ender dragon",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftMobHostile": {
+    "display": "Minecraft mob hostile",
+    "category": "minecraft",
+    "description": "Aggressive creatures in the game that actively attack players when encountered",
+    "example": "spider",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftMobNeutral": {
+    "display": "Minecraft mob neutral",
+    "category": "minecraft",
+    "description": "Creature in the game that only becomes hostile if provoked, typically defending itself when attacked",
+    "example": "bee",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftMobPassive": {
+    "display": "Minecraft mob passive",
+    "category": "minecraft",
+    "description": "Non-aggressive creatures in the game that do not attack players",
+    "example": "cow",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftOre": {
+    "display": "Minecraft ore",
+    "category": "minecraft",
+    "description": "Naturally occurring minerals found in the game Minecraft, used for crafting purposes",
+    "example": "coal",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftTool": {
+    "display": "Minecraft tool",
+    "category": "minecraft",
+    "description": "Items in Minecraft designed for specific tasks, including mining, digging, and building",
+    "example": "shovel",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftVillagerJob": {
+    "display": "Minecraft villager job",
+    "category": "minecraft",
+    "description": "The profession or occupation assigned to a villager character in the game",
+    "example": "farmer",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftVillagerLevel": {
+    "display": "Minecraft villager level",
+    "category": "minecraft",
+    "description": "Measure of a villager's experience and proficiency in their assigned job or profession",
+    "example": "master",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftVillagerStation": {
+    "display": "Minecraft villager station",
+    "category": "minecraft",
+    "description": "Designated area or structure in Minecraft where villagers perform their job-related tasks and trading",
+    "example": "furnace",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftWeapon": {
+    "display": "Minecraft weapon",
+    "category": "minecraft",
+    "description": "Tools and items used in Minecraft for combat and defeating hostile mobs",
+    "example": "bow",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftWeather": {
+    "display": "Minecraft weather",
+    "category": "minecraft",
+    "description": "Atmospheric conditions in the game that include rain, thunderstorms, and clear skies, affecting gameplay and ambiance",
+    "example": "rain",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minecraftWood": {
+    "display": "Minecraft wood",
+    "category": "minecraft",
+    "description": "Natural resource in Minecraft, used for crafting various items and building structures",
+    "example": "oak",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "minute": {
+    "display": "Minute",
+    "category": "time",
+    "description": "Unit of time equal to 60 seconds",
+    "example": "34",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "month": {
+    "display": "Month",
+    "category": "time",
+    "description": "Division of the year, typically 30 or 31 days long",
+    "example": "1",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "monthString": {
+    "display": "Month String",
+    "category": "time",
+    "description": "String Representation of a month name",
+    "example": "September",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "movie": {
+    "display": "Movie",
+    "category": "movie",
+    "description": "A story told through moving pictures and sound",
+    "example": "{\n\t\"name\": \"Psycho\",\n\t\"genre\": \"Mystery\"\n}",
+    "output": "Record\u003cstring,string\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "movieGenre": {
+    "display": "Movie Genre",
+    "category": "movie",
+    "description": "Category that classifies movies based on common themes, styles, and storytelling approaches",
+    "example": "Action",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "movieName": {
+    "display": "Movie Name",
+    "category": "movie",
+    "description": "Title or name of a specific film used for identification and reference",
+    "example": "The Matrix",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "name": {
+    "display": "Name",
+    "category": "person",
+    "description": "The given and family name of an individual",
+    "example": "Markus Moen",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "namePrefix": {
+    "display": "Name Prefix",
+    "category": "person",
+    "description": "A title or honorific added before a person's name",
+    "example": "Mr.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nameSuffix": {
+    "display": "Name Suffix",
+    "category": "person",
+    "description": "A title or designation added after a person's name",
+    "example": "Jr.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nanosecond": {
+    "display": "Nanosecond",
+    "category": "time",
+    "description": "Unit of time equal to One billionth (10^-9) of a second",
+    "example": "196446360",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "niceColors": {
+    "display": "Nice Colors",
+    "category": "color",
+    "description": "Attractive and appealing combinations of colors, returns an list of color hex codes",
+    "example": "[\"#cfffdd\",\"#b4dec1\",\"#5c5863\",\"#a85163\",\"#ff1f4c\"]",
+    "output": "string[]",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "noun": {
+    "display": "Noun",
+    "category": "word",
+    "description": "Person, place, thing, or idea, named or referred to in a sentence",
+    "example": "aunt",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounAbstract": {
+    "display": "Noun Abstract",
+    "category": "word",
+    "description": "Ideas, qualities, or states that cannot be perceived with the five senses",
+    "example": "confusion",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounCollectiveAnimal": {
+    "display": "Noun Collective Animal",
+    "category": "word",
+    "description": "Group of animals, like a 'pack' of wolves or a 'flock' of birds",
+    "example": "party",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounCollectivePeople": {
+    "display": "Noun Collective People",
+    "category": "word",
+    "description": "Group of people or things regarded as a unit",
+    "example": "body",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounCollectiveThing": {
+    "display": "Noun Collective Thing",
+    "category": "word",
+    "description": "Group of objects or items, such as a 'bundle' of sticks or a 'cluster' of grapes",
+    "example": "hand",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounCommon": {
+    "display": "Noun Common",
+    "category": "word",
+    "description": "General name for people, places, or things, not specific or unique",
+    "example": "part",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounConcrete": {
+    "display": "Noun Concrete",
+    "category": "word",
+    "description": "Names for physical entities experienced through senses like sight, touch, smell, or taste",
+    "example": "snowman",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounCountable": {
+    "display": "Noun Countable",
+    "category": "word",
+    "description": "Items that can be counted individually",
+    "example": "neck",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounDeterminer": {
+    "display": "Noun Determiner",
+    "category": "word",
+    "description": "Word that introduces a noun and identifies it as a noun",
+    "example": "your",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounPhrase": {
+    "display": "Noun Phrase",
+    "category": "word",
+    "description": "Phrase with a noun as its head, functions within sentence like a noun",
+    "example": "a tribe",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounProper": {
+    "display": "Noun Proper",
+    "category": "word",
+    "description": "Specific name for a particular person, place, or organization",
+    "example": "John",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "nounUncountable": {
+    "display": "Noun Uncountable",
+    "category": "word",
+    "description": "Items that can't be counted individually",
+    "example": "seafood",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "number": {
+    "display": "Number",
+    "category": "numbers",
+    "description": "Mathematical concept used for counting, measuring, and expressing quantities or values",
+    "example": "14866",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "-2147483648",
+        "options": null,
+        "description": "Minimum integer value"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "2147483647",
+        "options": null,
+        "description": "Maximum integer value"
+      }
+    ],
+    "any": null
+  },
+  "numerify": {
+    "display": "Numerify",
+    "category": "strings",
+    "description": "Replace # with random numerical values",
+    "example": "(###)###-#### =\u003e (555)867-5309",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "str",
+        "display": "String",
+        "type": "string",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "String value to replace #'s"
+      }
+    ],
+    "any": null
+  },
+  "operaUserAgent": {
+    "display": "Opera User Agent",
+    "category": "internet",
+    "description": "The specific identification string sent by the Opera web browser when making requests on the internet",
+    "example": "Opera/8.39 (Macintosh; U; PPC Mac OS X 10_8_7; en-US) Presto/2.9.335 Version/10.00",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "paragraph": {
+    "display": "Paragraph",
+    "category": "word",
+    "description": "Distinct section of writing covering a single theme, composed of multiple sentences",
+    "example": "Interpret context record river mind press self should compare property outcome divide. Combine approach sustain consult discover explanation direct address church husband seek army. Begin own act welfare replace press suspect stay link place manchester specialist. Arrive price satisfy sign force application hair train provide basis right pay. Close mark teacher strengthen information attempt head touch aim iron tv take.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "paragraphcount",
+        "display": "Paragraph Count",
+        "type": "number",
+        "optional": false,
+        "default": "2",
+        "options": null,
+        "description": "Number of paragraphs"
+      },
+      {
+        "field": "sentencecount",
+        "display": "Sentence Count",
+        "type": "number",
+        "optional": false,
+        "default": "2",
+        "options": null,
+        "description": "Number of sentences in a paragraph"
+      },
+      {
+        "field": "wordcount",
+        "display": "Word Count",
+        "type": "number",
+        "optional": false,
+        "default": "5",
+        "options": null,
+        "description": "Number of words in a sentence"
+      },
+      {
+        "field": "paragraphseparator",
+        "display": "Paragraph Separator",
+        "type": "string",
+        "optional": false,
+        "default": "\u003cbr /\u003e",
+        "options": null,
+        "description": "String value to add between paragraphs"
+      }
+    ],
+    "any": null
+  },
+  "password": {
+    "display": "Password",
+    "category": "internet",
+    "description": "Secret word or phrase used to authenticate access to a system or account",
+    "example": "EEP+wwpk 4lU-eHNXlJZ4n K9%v\u0026TZ9e",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "lower",
+        "display": "Lower",
+        "type": "boolean",
+        "optional": false,
+        "default": "true",
+        "options": null,
+        "description": "Whether or not to add lower case characters"
+      },
+      {
+        "field": "upper",
+        "display": "Upper",
+        "type": "boolean",
+        "optional": false,
+        "default": "true",
+        "options": null,
+        "description": "Whether or not to add upper case characters"
+      },
+      {
+        "field": "numeric",
+        "display": "Numeric",
+        "type": "boolean",
+        "optional": false,
+        "default": "true",
+        "options": null,
+        "description": "Whether or not to add numeric characters"
+      },
+      {
+        "field": "special",
+        "display": "Special",
+        "type": "boolean",
+        "optional": false,
+        "default": "true",
+        "options": null,
+        "description": "Whether or not to add special characters"
+      },
+      {
+        "field": "space",
+        "display": "Space",
+        "type": "boolean",
+        "optional": false,
+        "default": "false",
+        "options": null,
+        "description": "Whether or not to add spaces"
+      },
+      {
+        "field": "length",
+        "display": "Length",
+        "type": "number",
+        "optional": false,
+        "default": "12",
+        "options": null,
+        "description": "Number of characters in password"
+      }
+    ],
+    "any": null
+  },
+  "pastTime": {
+    "display": "PastTime",
+    "category": "time",
+    "description": "Date that has occurred before the current moment in time",
+    "example": "2007-01-24 13:00:35.820738079 +0000 UTC",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "person": {
+    "display": "Person",
+    "category": "person",
+    "description": "Personal data, like name and contact details, used for identification and communication",
+    "example": "{\n\t\"first_name\": \"Markus\",\n\t\"last_name\": \"Moen\",\n\t\"gender\": \"male\",\n\t\"ssn\": \"275413589\",\n\t\"image\": \"https://picsum.photos/208/500\",\n\t\"hobby\": \"Lacrosse\",\n\t\"job\": {\n\t\t\"company\": \"Intermap Technologies\",\n\t\t\"title\": \"Developer\",\n\t\t\"descriptor\": \"Direct\",\n\t\t\"level\": \"Paradigm\"\n\t},\n\t\"address\": {\n\t\t\"address\": \"369 North Cornerbury, Miami, North Dakota 24259\",\n\t\t\"street\": \"369 North Cornerbury\",\n\t\t\"city\": \"Miami\",\n\t\t\"state\": \"North Dakota\",\n\t\t\"zip\": \"24259\",\n\t\t\"country\": \"Ghana\",\n\t\t\"latitude\": -6.662595,\n\t\t\"longitude\": 23.921575\n\t},\n\t\"contact\": {\n\t\t\"phone\": \"3023202027\",\n\t\t\"email\": \"lamarkoelpin@heaney.biz\"\n\t},\n\t\"credit_card\": {\n\t\t\"type\": \"Maestro\",\n\t\t\"number\": \"39800889982276\",\n\t\t\"exp\": \"01/29\",\n\t\t\"cvv\": \"932\"\n\t}\n}",
+    "output": "Record\u003cstring,unknown\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "petName": {
+    "display": "Pet Name",
+    "category": "animal",
+    "description": "Affectionate nickname given to a pet",
+    "example": "Ozzy Pawsborne",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "phone": {
+    "display": "Phone",
+    "category": "person",
+    "description": "Numerical sequence used to contact individuals via telephone or mobile devices",
+    "example": "6136459948",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "phoneFormatted": {
+    "display": "Phone Formatted",
+    "category": "person",
+    "description": "Formatted phone number of a person",
+    "example": "136-459-9489",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "phrase": {
+    "display": "Phrase",
+    "category": "word",
+    "description": "A small group of words standing together",
+    "example": "time will tell",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "possessiveAdjective": {
+    "display": "Possessive Adjective",
+    "category": "word",
+    "description": "Adjective indicating ownership or possession",
+    "example": "my",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "preposition": {
+    "display": "Preposition",
+    "category": "word",
+    "description": "Words used to express the relationship of a noun or pronoun to other words in a sentence",
+    "example": "other than",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "prepositionCompound": {
+    "display": "Preposition Compound",
+    "category": "word",
+    "description": "Preposition that can be formed by combining two or more prepositions",
+    "example": "according to",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "prepositionDouble": {
+    "display": "Preposition Double",
+    "category": "word",
+    "description": "Two-word combination preposition, indicating a complex relation",
+    "example": "before",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "prepositionPhrase": {
+    "display": "Preposition Phrase",
+    "category": "word",
+    "description": "Phrase starting with a preposition, showing relation between elements in a sentence.",
+    "example": "out the black thing",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "prepositionSimple": {
+    "display": "Preposition Simple",
+    "category": "word",
+    "description": "Single-word preposition showing relationships between 2 parts of a sentence",
+    "example": "out",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "price": {
+    "display": "Price",
+    "category": "payment",
+    "description": "The amount of money or value assigned to a product, service, or asset in a transaction",
+    "example": "92.26",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "0",
+        "options": null,
+        "description": "Minimum price value"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "1000",
+        "options": null,
+        "description": "Maximum price value"
+      }
+    ],
+    "any": null
+  },
+  "product": {
+    "display": "Product",
+    "category": "product",
+    "description": "An item created for sale or use",
+    "example": "{\n\t\"name\": \"olive copper monitor\",\n\t\"description\": \"Backwards caused quarterly without week it hungry thing someone him regularly. Whomever this revolt hence from his timing as quantity us these yours.\",\n\t\"categories\": [\n\t\t\"clothing\",\n\t\t\"tools and hardware\"\n\t],\n\t\"price\": 7.61,\n\t\"features\": [\n\t\t\"ultra-lightweight\"\n\t],\n\t\"color\": \"navy\",\n\t\"material\": \"brass\",\n\t\"upc\": \"012780949980\"\n}",
+    "output": "Record\u003cstring,unknown\u003e",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "productCategory": {
+    "display": "Product Category",
+    "category": "product",
+    "description": "Classification grouping similar products based on shared characteristics or functions",
+    "example": "clothing",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "productDescription": {
+    "display": "Product Description",
+    "category": "product",
+    "description": "Explanation detailing the features and characteristics of a product",
+    "example": "Backwards caused quarterly without week it hungry thing someone him regularly. Whomever this revolt hence from his timing as quantity us these yours.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "productFeature": {
+    "display": "Product Feature",
+    "category": "product",
+    "description": "Specific characteristic of a product that distinguishes it from others products",
+    "example": "ultra-lightweight",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "productMaterial": {
+    "display": "Product Material",
+    "category": "product",
+    "description": "The substance from which a product is made, influencing its appearance, durability, and properties",
+    "example": "brass",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "productName": {
+    "display": "Product Name",
+    "category": "product",
+    "description": "Distinctive title or label assigned to a product for identification and marketing",
+    "example": "olive copper monitor",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "productUpc": {
+    "display": "Product UPC",
+    "category": "product",
+    "description": "Standardized barcode used for product identification and tracking in retail and commerce",
+    "example": "012780949980",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "programmingLanguage": {
+    "display": "Programming Language",
+    "category": "language",
+    "description": "Formal system of instructions used to create software and perform computational tasks",
+    "example": "Go",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronoun": {
+    "display": "Pronoun",
+    "category": "word",
+    "description": "Word used in place of a noun to avoid repetition",
+    "example": "me",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounDemonstrative": {
+    "display": "Pronoun Demonstrative",
+    "category": "word",
+    "description": "Pronoun that points out specific people or things",
+    "example": "this",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounIndefinite": {
+    "display": "Pronoun Indefinite",
+    "category": "word",
+    "description": "Pronoun that does not refer to a specific person or thing",
+    "example": "few",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounInterrogative": {
+    "display": "Pronoun Interrogative",
+    "category": "word",
+    "description": "Pronoun used to ask questions",
+    "example": "what",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounObject": {
+    "display": "Pronoun Object",
+    "category": "word",
+    "description": "Pronoun used as the object of a verb or preposition",
+    "example": "it",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounPersonal": {
+    "display": "Pronoun Personal",
+    "category": "word",
+    "description": "Pronoun referring to a specific persons or things",
+    "example": "it",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounPossessive": {
+    "display": "Pronoun Possessive",
+    "category": "word",
+    "description": "Pronoun indicating ownership or belonging",
+    "example": "mine",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounReflective": {
+    "display": "Pronoun Reflective",
+    "category": "word",
+    "description": "Pronoun referring back to the subject of the sentence",
+    "example": "myself",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "pronounRelative": {
+    "display": "Pronoun Relative",
+    "category": "word",
+    "description": "Pronoun that introduces a clause, referring back to a noun or pronoun",
+    "example": "as",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "properAdjective": {
+    "display": "Proper Adjective",
+    "category": "word",
+    "description": "Adjective derived from a proper noun, often used to describe nationality or origin",
+    "example": "Afghan",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "quantitativeAdjective": {
+    "display": "Quantitative Adjective",
+    "category": "word",
+    "description": "Adjective that indicates the quantity or amount of something",
+    "example": "a little",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "question": {
+    "display": "Question",
+    "category": "word",
+    "description": "Statement formulated to inquire or seek clarification",
+    "example": "Roof chia echo?",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "quote": {
+    "display": "Quote",
+    "category": "word",
+    "description": "Direct repetition of someone else's words",
+    "example": "\"Roof chia echo.\" - Lura Lockman",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "randomInt": {
+    "display": "Random Int",
+    "category": "numbers",
+    "description": "Randomly selected value from a slice of int",
+    "example": "-1,2,-3,4 =\u003e -3",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "ints",
+        "display": "Integers",
+        "type": "number[]",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Delimited separated integers"
+      }
+    ],
+    "any": null
+  },
+  "randomString": {
+    "display": "Random String",
+    "category": "strings",
+    "description": "Return a random string from a string array",
+    "example": "hello,world,whats,up =\u003e world",
+    "output": "string[]",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "strs",
+        "display": "Strings",
+        "type": "string[]",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Delimited separated strings"
+      }
+    ],
+    "any": null
+  },
+  "randomUint": {
+    "display": "Random Uint",
+    "category": "numbers",
+    "description": "Randomly selected value from a slice of uint",
+    "example": "1,2,3,4 =\u003e 4",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "uints",
+        "display": "Unsigned Integers",
+        "type": "number[]",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Delimited separated unsigned integers"
+      }
+    ],
+    "any": null
+  },
+  "rgbColor": {
+    "display": "RGB Color",
+    "category": "color",
+    "description": "Color defined by red, green, and blue light values",
+    "example": "[85, 224, 195]",
+    "output": "number[]",
+    "content_type": "application/json",
+    "params": null,
+    "any": null
+  },
+  "runtimeError": {
+    "display": "Runtime error",
+    "category": "error",
+    "description": "Malfunction occuring during program execution, often causing abrupt termination or unexpected behavior",
+    "example": "address out of bounds",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "safariUserAgent": {
+    "display": "Safari User Agent",
+    "category": "internet",
+    "description": "The specific identification string sent by the Safari web browser when making requests on the internet",
+    "example": "Mozilla/5.0 (iPad; CPU OS 8_3_2 like Mac OS X; en-US) AppleWebKit/531.15.6 (KHTML, like Gecko) Version/4.0.5 Mobile/8B120 Safari/6531.15.6",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "safeColor": {
+    "display": "Safe Color",
+    "category": "color",
+    "description": "Colors displayed consistently on different web browsers and devices",
+    "example": "black",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "school": {
+    "display": "School",
+    "category": "person",
+    "description": "An institution for formal education and learning",
+    "example": "Harborview State Academy",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "second": {
+    "display": "Second",
+    "category": "time",
+    "description": "Unit of time equal to 1/60th of a minute",
+    "example": "43",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "sentence": {
+    "display": "Sentence",
+    "category": "word",
+    "description": "Set of words expressing a statement, question, exclamation, or command",
+    "example": "Interpret context record river mind.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "wordcount",
+        "display": "Word Count",
+        "type": "number",
+        "optional": false,
+        "default": "5",
+        "options": null,
+        "description": "Number of words in a sentence"
+      }
+    ],
+    "any": null
+  },
+  "shuffleInts": {
+    "display": "Shuffle Ints",
+    "category": "numbers",
+    "description": "Shuffles an array of ints",
+    "example": "1,2,3,4 =\u003e 3,1,4,2",
+    "output": "number[]",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "ints",
+        "display": "Integers",
+        "type": "number[]",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Delimited separated integers"
+      }
+    ],
+    "any": null
+  },
+  "shuffleStrings": {
+    "display": "Shuffle Strings",
+    "category": "strings",
+    "description": "Shuffle an array of strings",
+    "example": "hello,world,whats,up =\u003e whats,world,hello,up",
+    "output": "string[]",
+    "content_type": "application/json",
+    "params": [
+      {
+        "field": "strs",
+        "display": "Strings",
+        "type": "string[]",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Delimited separated strings"
+      }
+    ],
+    "any": null
+  },
+  "simpleSentence": {
+    "display": "Simple Sentence",
+    "category": "word",
+    "description": "Group of words that expresses a complete thought",
+    "example": "A tribe fly the lemony kitchen.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "slogan": {
+    "display": "Slogan",
+    "category": "company",
+    "description": "Catchphrase or motto used by a company to represent its brand or values",
+    "example": "Universal seamless Focus, interactive.",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "snack": {
+    "display": "Snack",
+    "category": "food",
+    "description": "Random snack",
+    "example": "Small, quick food item eaten between meals",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "ssn": {
+    "display": "SSN",
+    "category": "person",
+    "description": "Unique nine-digit identifier used for government and financial purposes in the United States",
+    "example": "296446360",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "state": {
+    "display": "State",
+    "category": "address",
+    "description": "Governmental division within a country, often having its own laws and government",
+    "example": "Illinois",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "stateAbbreviation": {
+    "display": "State Abbreviation",
+    "category": "address",
+    "description": "Shortened 2-letter form of a country's state",
+    "example": "IL",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "street": {
+    "display": "Street",
+    "category": "address",
+    "description": "Public road in a city or town, typically with houses and buildings on each side",
+    "example": "364 East Rapidsborough",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "streetName": {
+    "display": "Street Name",
+    "category": "address",
+    "description": "Name given to a specific road or street",
+    "example": "View",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "streetNumber": {
+    "display": "Street Number",
+    "category": "address",
+    "description": "Numerical identifier assigned to a street",
+    "example": "13645",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "streetPrefix": {
+    "display": "Street Prefix",
+    "category": "address",
+    "description": "Directional or descriptive term preceding a street name, like 'East' or 'Main'",
+    "example": "Lake",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "streetSuffix": {
+    "display": "Street Suffix",
+    "category": "address",
+    "description": "Designation at the end of a street name indicating type, like 'Avenue' or 'Street'",
+    "example": "land",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "teams": {
+    "display": "Teams",
+    "category": "person",
+    "description": "Randomly split people into teams",
+    "example": "{\n\t\"Team 1\": [\n\t\t\"Justin\",\n\t\t\"Connor\",\n\t\t\"Jeff\"\n\t],\n\t\"Team 2\": [\n\t\t\"Sharon\",\n\t\t\"Fabian\",\n\t\t\"Billy\"\n\t],\n\t\"Team 3\": [\n\t\t\"Steve\",\n\t\t\"Robert\"\n\t]\n}",
+    "output": "Record\u003cstring, Array\u003cstring\u003e\u003e",
+    "content_type": "application/json",
+    "params": [
+      {
+        "field": "people",
+        "display": "Strings",
+        "type": "string[]",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Array of people"
+      },
+      {
+        "field": "teams",
+        "display": "Strings",
+        "type": "string[]",
+        "optional": false,
+        "default": "",
+        "options": null,
+        "description": "Array of teams"
+      }
+    ],
+    "any": null
+  },
+  "timezone": {
+    "display": "Timezone",
+    "category": "time",
+    "description": "Region where the same standard time is used, based on longitudinal divisions of the Earth",
+    "example": "Kaliningrad Standard Time",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "timezoneAbbreviation": {
+    "display": "Timezone Abbreviation",
+    "category": "time",
+    "description": "Abbreviated 3-letter word of a timezone",
+    "example": "KST",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "timezoneFull": {
+    "display": "Timezone Full",
+    "category": "time",
+    "description": "Full name of a timezone",
+    "example": "(UTC+03:00) Kaliningrad, Minsk",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "timezoneOffset": {
+    "display": "Timezone Offset",
+    "category": "time",
+    "description": "The difference in hours from Coordinated Universal Time (UTC) for a specific region",
+    "example": "3",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "timezoneRegion": {
+    "display": "Timezone Region",
+    "category": "time",
+    "description": "Geographic area sharing the same standard time",
+    "example": "America/Alaska",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "transitiveVerb": {
+    "display": "Transitive Verb",
+    "category": "word",
+    "description": "Verb that requires a direct object to complete its meaning",
+    "example": "follow",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "uint16": {
+    "display": "Uint16",
+    "category": "numbers",
+    "description": "Unsigned 16-bit integer, capable of representing values from 0 to 65,535",
+    "example": "34968",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "uint32": {
+    "display": "Uint32",
+    "category": "numbers",
+    "description": "Unsigned 32-bit integer, capable of representing values from 0 to 4,294,967,295",
+    "example": "1075055705",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "uint64": {
+    "display": "Uint64",
+    "category": "numbers",
+    "description": "Unsigned 64-bit integer, capable of representing values from 0 to 18,446,744,073,709,551,615",
+    "example": "843730692693298265",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "uint8": {
+    "display": "Uint8",
+    "category": "numbers",
+    "description": "Unsigned 8-bit integer, capable of representing values from 0 to 255",
+    "example": "152",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "uintRange": {
+    "display": "UintRange",
+    "category": "numbers",
+    "description": "Non-negative integer value between given range",
+    "example": "1075055705",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": [
+      {
+        "field": "min",
+        "display": "Min",
+        "type": "number",
+        "optional": false,
+        "default": "0",
+        "options": null,
+        "description": "Minimum uint value"
+      },
+      {
+        "field": "max",
+        "display": "Max",
+        "type": "number",
+        "optional": false,
+        "default": "4294967295",
+        "options": null,
+        "description": "Maximum uint value"
+      }
+    ],
+    "any": null
+  },
+  "url": {
+    "display": "URL",
+    "category": "internet",
+    "description": "Web address that specifies the location of a resource on the internet",
+    "example": "http://www.principalproductize.biz/target",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "userAgent": {
+    "display": "User Agent",
+    "category": "internet",
+    "description": "String sent by a web browser to identify itself when requesting web content",
+    "example": "Mozilla/5.0 (Windows NT 5.0) AppleWebKit/5362 (KHTML, like Gecko) Chrome/37.0.834.0 Mobile Safari/5362",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "username": {
+    "display": "Username",
+    "category": "internet",
+    "description": "Unique identifier assigned to a user for accessing an account or system",
+    "example": "Daniel1364",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "uuid": {
+    "display": "UUID",
+    "category": "strings",
+    "description": "128-bit identifier used to uniquely identify objects or entities in computer systems",
+    "example": "590c1440-9888-45b0-bd51-a817ee07c3f2",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "validationError": {
+    "display": "Validation error",
+    "category": "error",
+    "description": "Occurs when input data fails to meet required criteria or format specifications",
+    "example": "missing required field",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "vegetable": {
+    "display": "Vegetable",
+    "category": "food",
+    "description": "Edible plant or part of a plant, often used in savory cooking or salads",
+    "example": "Amaranth Leaves",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "verb": {
+    "display": "Verb",
+    "category": "word",
+    "description": "Word expressing an action, event or state",
+    "example": "release",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "verbPhrase": {
+    "display": "Verb Phrase",
+    "category": "word",
+    "description": "Phrase that Consists of a verb and its modifiers, expressing an action or state",
+    "example": "a tribe",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "weekday": {
+    "display": "Weekday",
+    "category": "time",
+    "description": "Day of the week excluding the weekend",
+    "example": "Friday",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "word": {
+    "display": "Word",
+    "category": "word",
+    "description": "Basic unit of language representing a concept or thing, consisting of letters and having meaning",
+    "example": "man",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "year": {
+    "display": "Year",
+    "category": "time",
+    "description": "Period of 365 days, the time Earth takes to orbit the Sun",
+    "example": "1900",
+    "output": "number",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  },
+  "zip": {
+    "display": "Zip",
+    "category": "address",
+    "description": "Numerical code for postal address sorting, specific to a geographic area",
+    "example": "13645",
+    "output": "string",
+    "content_type": "text/plain",
+    "params": null,
+    "any": null
+  }
+}

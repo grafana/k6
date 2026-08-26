@@ -1,0 +1,27 @@
+name: Go
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Install xk6
+      run: go install go.k6.io/xk6/cmd/xk6@latest
+
+    - name: Go tests
+      run: go test -race ./...
+
+    - name: Integration test from source
+      run: ./tests.sh

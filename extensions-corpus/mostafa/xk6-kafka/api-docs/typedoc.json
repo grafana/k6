@@ -1,0 +1,11 @@
+{
+  "theme": "markdown",
+  "hideBreadcrumbs": true,
+  "disableSources": false,
+  "plugin": ["typedoc-plugin-markdown"],
+  "out": "./v2/docs",
+  "entryPoints": ["./v2/index.d.ts"],
+  "readme": "none",
+  "disableGit": true,
+  "sourceLinkTemplate": "https://github.com/mostafa/xk6-kafka/blob/main/api-docs/v2/{path}#L{line}"
+}

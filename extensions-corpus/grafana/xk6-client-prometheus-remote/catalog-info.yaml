@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xk6-client-prometheus-remote
+  title: xk6-client-prometheus-remote
+  description: |
+    A k6 extension for testing Prometheus Remote Write endpoints
+  annotations:
+    github.com/project-slug: grafana/xk6-client-prometheus-remote
+spec:
+  type: library
+  owner: group:default/k6-extensions
+  lifecycle: production

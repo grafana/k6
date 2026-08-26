@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xk6-sql-driver-mysql
+  title: xk6-sql-driver-mysql
+  description: |
+    xk6-sql driver extension for MySQL database support
+  annotations:
+    github.com/project-slug: grafana/xk6-sql-driver-mysql
+spec:
+  type: library
+  owner: group:default/k6-extensions
+  lifecycle: production

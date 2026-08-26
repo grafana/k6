@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xk6-kubernetes
+  title: xk6-kubernetes
+  description: |
+    Client extension for interacting with Kubernetes clusters from your k6 tests.
+  annotations:
+    github.com/project-slug: grafana/xk6-kubernetes
+spec:
+  type: library
+  owner: group:default/k6-extensions
+  lifecycle: production

@@ -1,0 +1,98 @@
+[tools]
+go = "1.26"
+node = "24"
+podman = "6"
+golangci-lint = "2"
+"go:go.k6.io/xk6" = "1"
+"npm:prettier" = "3"
+"github:zizmorcore/zizmor" = "1"
+"npm:yarn" = "1"
+
+[tasks."deps:api-docs"]
+dir = "api-docs"
+sources = ["package.json", "yarn.lock"]
+outputs = ["node_modules"]
+run = "yarn install"
+
+[tasks.build]
+depends = ["build:go", "build:api-docs"]
+
+[tasks."build:go"]
+sources = ["pkg/**/*"]
+outputs = ["k6*"]
+run = "CGO_ENABLED=1 xk6 build --with github.com/mostafa/xk6-kafka/v2@latest=."
+
+[tasks."build:api-docs"]
+depends = ["deps:api-docs"]
+dir = "api-docs"
+sources = ["api-docs/**/*.ts"]
+outputs = ["docs/**", "v2/**"]
+run = "yarn run generate-docs:v2"
+
+[tasks.test]
+depends = ["test:unit", "test:smoke", "test:integration"]
+
+[tasks."test:unit"]
+run = "CGO_ENABLED=1 go test ./... -race"
+
+[tasks."test:smoke"]
+depends = ["build:go"]
+run = "./k6 run --quiet -d 2s scripts/v2/smoke/basic.js"
+
+[tasks."test:integration"]
+depends = ["build:go"]
+run = '''
+#!/usr/bin/env bash
+for f in $(find scripts/v2/integration -maxdepth 1 -type f -name '*.js' | sort); do
+    ./k6 run --quiet "$f"
+done
+'''
+
+[tasks.format]
+depends = ["format:go", "format:api-docs", "format:scripts"]
+
+[tasks."format:go"]
+run = "golangci-lint fmt"
+
+[tasks."format:api-docs"]
+run = "prettier --write api-docs/**/*.ts"
+
+[tasks."format:scripts"]
+run = "prettier --write scripts/**/*.js"
+
+[tasks.lint]
+depends = ["lint:go", "lint:scripts", "lint:api-docs", "lint:actions"]
+
+[tasks."lint:go"]
+sources = ["compat.go", "pkg/**/*.go", "go.mod", "go.sum"]
+run = "golangci-lint run"
+
+[tasks."lint:scripts"]
+sources = ["scripts/**/*.js"]
+run = "prettier --check scripts/**/*.js"
+
+[tasks."lint:api-docs"]
+depends = ["lint:api-docs:prettier", "lint:api-docs:validate"]
+
+[tasks."lint:api-docs:prettier"]
+sources = ["api-docs/**/*.ts"]
+run = "prettier --check api-docs/**/*.ts"
+
+[tasks."lint:api-docs:validate"]
+depends = ["deps:api-docs"]
+dir = "api-docs"
+sources = ["api-docs/**/*.ts"]
+run = "yarn run validate-d-ts"
+
+[tasks."lint:actions"]
+sources = [".github/**.yaml", ".github/*.yml"]
+run = "zizmor ."
+
+[tasks."verify"]
+depends = ["build", "test", "lint"]
+
+[tasks.services]
+run = "podman run -e ADV_HOST=localhost -p 2181:2181 -p 3030:3030 -p 8081-8083:8081-8083 -p 9581-9585:9581-9585 -p 9092:9092 lensesio/fast-data-dev:3.9.0"
+
+[settings]
+lockfile = true

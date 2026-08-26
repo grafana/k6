@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  push:
+    tags: [ "v*.*.*" ]
+
+permissions: {}
+
+jobs:
+  release:
+    name: Release
+    uses: grafana/xk6/.github/workflows/extension-release.yml@b302a90014ee698bbf3c9f7c908b79ec8dd8053b # v1.4.6
+    permissions:
+      contents: write
+    with:
+      cgo: true
+      go-version: "1.25.x"
+      os: '["linux", "windows", "darwin"]'
+      arch: '["amd64", "arm64"]'
+      k6-version: "v2.0.0-rc1"
+      xk6-version: "1.4.1"
+      # TEMPORARY: keep SQL driver extensions disabled until they release with k6 v2 support.
+      # If included now, they still pull k6 v1, which conflicts with xk6-sql using k6 v2.
+      # with: |
+      #   github.com/grafana/xk6-sql-driver-ramsql
+      #   github.com/grafana/xk6-sql-driver-sqlite3
+      #   github.com/grafana/xk6-sql-driver-mysql
+      #   github.com/grafana/xk6-sql-driver-postgres

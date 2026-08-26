@@ -1,0 +1,51 @@
+version: "2"
+linters:
+  default: all
+  disable:
+    - cyclop
+    - depguard
+    - exhaustruct
+    - forcetypeassert
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - gocyclo
+    - godox
+    - gomodguard
+    - ireturn
+    - nestif
+    - nlreturn
+    - nolintlint
+    - noinlineerr
+    - paralleltest
+    - revive
+    - testpackage
+    - testifylint
+    - varnamelen
+    - wsl
+    - wsl_v5
+    - wrapcheck
+  settings:
+    goconst:
+      min-len: 3
+      min-occurrences: 4
+  exclusions:
+    rules:
+      - path: (.+)_test\.go
+        linters:
+          - goconst
+      - path: pkg/kafka/(avro|confluent_config|reader|schema_registry|topic)\.go
+        linters:
+          - goconst
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

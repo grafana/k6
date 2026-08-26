@@ -1,0 +1,13 @@
+name: Lint Pull Request
+on: pull_request
+
+jobs:
+  check-signed-commits:
+    name: Check Signed Commits in PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check Signed Commits in PR
+        uses: 1Password/check-signed-commits-action@ed2885f3ed2577a4f5d3c3fe895432a557d23d52

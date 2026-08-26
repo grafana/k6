@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xk6-ssh
+  title: xk6-ssh
+  description: |
+    Client extension for interacting with a host over SSH as part of your k6 test.
+  annotations:
+    github.com/project-slug: grafana/xk6-ssh
+spec:
+  type: library
+  owner: group:default/k6-extensions
+  lifecycle: production

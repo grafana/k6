@@ -1,0 +1,54 @@
+# Broker-backed integration tests. The shared grafana/k6-ci workflow has no
+# Kafka, so this job starts a single-node Kafka (KRaft) via the repo's
+# compose.yaml — the same broker `make integration` uses locally — and runs
+# `make it` against it. The tests require KAFKA_BROKER, so an unreachable broker
+# fails the job (no silent skip).
+name: integration
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+          check-latest: true
+
+      - name: Install xk6
+        uses: grafana/setup-xk6@97b842b765bd3fea56db7195e98c5f61cab8fe46 # v1.1.1
+        with:
+          xk6-version: 1.4.5
+
+      - name: Start Kafka (single-node KRaft)
+        run: make broker-up
+
+      - name: Integration tests
+        env:
+          KAFKA_BROKER: localhost:9092
+          KAFKA_SASL_BROKER: localhost:9094
+          SCHEMA_REGISTRY_URL: http://localhost:8081
+        run: make it
+
+      - name: Kafka logs on failure
+        if: failure()
+        run: docker compose logs kafka || true
+
+      - name: Stop Kafka
+        if: always()
+        run: make broker-down

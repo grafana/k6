@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package disruptor.testproto;
+
+option go_package="github.com/grafana/pkg/testutils/grpc/ping";
+
+
+message PingResponse {
+  string message = 1;
+}
+
+message PingRequest {
+  int32 error = 1;
+  string message = 2;
+  map<string, string> headers = 3;
+  map<string, string> trailers = 4;
+
+}
+
+service PingService {
+  rpc Ping(PingRequest) returns (PingResponse) {}
+}
+

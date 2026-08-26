@@ -1,0 +1,5 @@
+* text=auto
+
+go.sum linguist-generated=true
+api-docs/docs/* linguist-generated=true
+fixtures/* linguist-generated=true

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["./index.d.ts"],
+  "out": "build/docs",
+  "name": "xk6-sql",
+  "readme": "none",
+  "hideGenerator": true,
+  "disableSources": true,
+  "navigation": {
+    "includeCategories": false,
+    "includeGroups": false,
+    "includeFolders": false
+  },
+  "categorizeByGroup": false,
+  "visibilityFilters": {},
+  "navigationLinks": {
+    "GitHub": "https://github.com/grafana/xk6-sql"
+  }
+}

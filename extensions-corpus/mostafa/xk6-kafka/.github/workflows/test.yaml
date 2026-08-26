@@ -1,0 +1,228 @@
+name: Test xk6-kafka
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+
+permissions: {}
+
+jobs:
+  lint-and-docs:
+    name: Lint and docs
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Go 🧑‍💻
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: "1.26.1"
+          check-latest: true
+          cache: false
+
+      - name: Install API docs dependencies 📚
+        working-directory: api-docs
+        run: corepack yarn install --frozen-lockfile
+
+      - name: Run prettier for linting scripts, configs and docs 🧹
+        uses: creyD/prettier_action@8c18391fdc98ed0d884c6345f03975edac71b8f0 # v4.6
+        with:
+          dry: True
+
+      - name: Lint code issues 🚨
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+
+      - name: Validate declarations 📐
+        working-directory: api-docs
+        run: corepack yarn run validate-d-ts
+
+      - name: Verify versioned API docs 📖
+        working-directory: api-docs
+        run: corepack yarn run check-docs:v2
+
+  smoke-build-matrix:
+    name: Smoke build (${{ matrix.os }}, Go ${{ matrix.go-version }}, k6 ${{ matrix.k6-version }})
+    runs-on: ${{ matrix.os }}
+    needs:
+      - lint-and-docs
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            go-version: "1.26.0"
+            k6-version: "v1.7.0"
+          - os: ubuntu-latest
+            go-version: "1.26.1"
+            k6-version: "v1.7.1"
+          - os: macos-latest
+            go-version: "1.26.1"
+            k6-version: "v1.7.1"
+          - os: windows-latest
+            go-version: "1.26.1"
+            k6-version: "v1.7.1"
+    defaults:
+      run:
+        shell: bash
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Go 🧑‍💻
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: ${{ matrix.go-version }}
+          check-latest: true
+          cache: false
+
+      - name: Install Windows MinGW-w64 toolchain 🧰
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@cafece8e6baf9247cf9b1bf95097b0b983cc558d # v2.31.0
+        with:
+          msystem: MINGW64
+          path-type: inherit
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+
+      - name: Install Linux native build prerequisites 🧰
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config librdkafka-dev
+
+      - name: Install macOS native build prerequisites 🧰
+        if: runner.os == 'macOS'
+        run: brew install pkg-config librdkafka
+
+      - name: Compile package graph 🔬
+        if: runner.os != 'Windows'
+        run: go test ./... -run=^$
+
+      - name: Verify Windows GCC toolchain 🪟
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          which gcc
+          gcc --version
+
+      - name: Compile package graph on Windows 🔬
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          CC: gcc
+          CXX: g++
+        run: go test ./... -run=^$
+
+      - name: Install xk6 and smoke build xk6-kafka 🏗️
+        if: runner.os != 'Windows'
+        run: |
+          go install go.k6.io/xk6/cmd/xk6@latest
+          xk6 build "${{ matrix.k6-version }}" --with github.com/mostafa/xk6-kafka/v2@latest=.
+
+      - name: Install xk6 and smoke build xk6-kafka on Windows 🏗️
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          CC: gcc
+          CXX: g++
+        run: |
+          go install go.k6.io/xk6/cmd/xk6@latest
+          xk6 build "${{ matrix.k6-version }}" --with github.com/mostafa/xk6-kafka/v2@latest=.
+
+  linux-validation:
+    name: Linux race and integration
+    runs-on: ubuntu-latest
+    needs:
+      - lint-and-docs
+      - smoke-build-matrix
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      CGO_ENABLED: "1"
+      XK6_KAFKA_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+    services:
+      kafka:
+        image: lensesio/fast-data-dev:3.9.0
+        ports:
+          - 2181:2181
+          - 3030:3030
+          - 8081-8083:8081-8083
+          - 9581-9585:9581-9585
+          - 9092:9092
+        env:
+          RUNTESTS: "0"
+          ADV_HOST: "127.0.0.1"
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Go 🧑‍💻
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+        with:
+          go-version: "1.26.1"
+          check-latest: true
+          cache: false
+
+      - name: Install Linux native build prerequisites 🧰
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y netcat-openbsd pkg-config librdkafka-dev
+
+      - name: Install xk6 and build xk6-kafka 🏗️
+        run: |
+          go install go.k6.io/xk6/cmd/xk6@latest
+          xk6 build "v1.7.1" --with github.com/mostafa/xk6-kafka/v2@latest=.
+
+      - name: Wait for Kafka and Schema Registry ⏳
+        run: |
+          for _ in $(seq 1 60); do
+            if nc -z 127.0.0.1 9092 && curl -fsS http://127.0.0.1:8081/subjects >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Run Go tests with race detector 🔬
+        run: go test -race -cover -covermode atomic -coverprofile=profile.cov -v ./...
+
+      - name: Report coverage to coveralls 📈
+        uses: shogo82148/actions-goveralls@25f5320d970fb565100cf1993ada29be1bb196a1 # v1.10.0
+        with:
+          path-to-profile: profile.cov
+
+      - name: Run v2 smoke script 🧪
+        run: ./k6 run --quiet -d 2s scripts/v2/smoke/basic.js
+
+      - name: Run v2 integration scripts 🧪
+        run: |
+          for f in $(find scripts/v2/integration -maxdepth 1 -type f -name '*.js' | sort); do
+            ./k6 run --quiet "$f"
+          done

@@ -1,0 +1,15 @@
+version: '3.9'
+
+services:
+  openssh-server:
+    image: linuxserver/openssh-server:latest@sha256:9c5e178975fcc3917853f5e37cbf135ad7deb11de504ab0f460cc81a2e1eb539
+    environment:
+      - PUBLIC_KEY=
+        ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDFj+MNxxbNXjHBM6M8btIkeAoeLkGt5fkmlAW7lYDcRIQj06FX0SGWK+yL2kHY6sxJJbmxchSmb4J/BJkHY22+OuWjxfO/YIEL3faWmwbISgPnky7R77IW7M95OBzOQvWXv2AXUlXatqg6GDmeCQlqLHzfKgwUHosP61tGMnFf8NFOtBNIgKpopODSqD3eq79bv//9NHu0xbajheL01Yg3XbvFYKlo0thvYITqvC+kX++K9PyrwSK/LPGIW0xqXvFEwlDqOcSrIbfkzRPkco6/3ANfPrYDlnT1MpTcPJGH31wk85AUPE6axK0CL4vsEICrhmXJff2hqRKHvAjMhU+deHlb3DCMwJ8dkFpuRBs9FQbIOjC/mrNTEm9JFCOQj3/y/TwyxjYQk/SaUFGWuYgIOmfnKfDWJ2LS3woEJKvUAdaH55NlKkedvoOWNTcHmaWzEalCy4bSAA0knn+ubfHQ0pqQ2P+Eg3BEikMIh7crlVfGTOCh2q+5ccpVNY004YE= sshuser@docker.local
+
+        ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCfkmVvkzolLnS3vAYZFpGZ4YG8Obe6DIkhKT0n4yG2I2WDspahBacQjBgXy7RuQffhFo82xttWOYlMj7TRBohUl3g9FfWolzDcPGEHYre7t+tgOVtwSug4G+uATddtYCEYQYciZoTM8Fv/Y6ViYAx5aOF2O7G+dvIEjaUgWM5Z7ZGaMwl5KXX7/uLcivJM2aIWEEW4D+MZjj3muIyH4Fu4LQXi5AoyjZ01UBsCv3vMWCjB/uDCovqgp+lKNP/NhC+pLPSJL6LGp/MK3YyKdnK1G6lCy+c5NNnopgNL1b8gleqUPXlVVQ8DOvUv75mnlsHGDjWWNRwhMLwk3fLzrkwXa7xp6K8YUsvdFd5m3VYWZuvN0yUJgdlodlF35fLPKyUVCsh5dwBCPfQiPso8L7Q0+RpgYDg89eBrQ08uvOlgQtd+cglhgcEm7VsY+Usbb6VOF84uAabKW1Ifp2eAFr6ockIshy+thUvfLiV5CwADSHUYumRPAKR2oPisax0oQWcc/GBurE3nQA+nfKO7ZBw3akUTwdvS/WOLngMxiv5UQM4VGlsyf0fu9Kh1f7kS8mZs9Nlvpl1susUyvP2ZuVELBPPMwTy20QzjPsUIqsLA5gFjb5E3SsdBUmksU1E2EIGTgkjBPA8YuC8OWDHylT2tMEiC0s3ZDOd2BlCra32S5Q== your_email@example.com
+      - PASSWORD_ACCESS=true
+      - USER_PASSWORD=secret-password
+      - USER_NAME=sshuser
+    ports:
+      - "2222:2222"

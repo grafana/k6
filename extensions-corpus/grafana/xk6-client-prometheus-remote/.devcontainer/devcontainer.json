@@ -1,0 +1,38 @@
+{
+  "name": "xk6-client-prometheus-remote",
+  "image": "mcr.microsoft.com/devcontainers/base:2-bookworm",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": ["--fast"]
+      },
+      "extensions": [
+        "EditorConfig.EditorConfig",
+        "esbenp.prettier-vscode",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github"
+      ]
+    }
+  },
+
+  // Do not change the formatting of this property, it is used by renovate regex to detect versions
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/go:1": { "version": "1.25", "golangciLintVersion": "2.5.0" },
+    "ghcr.io/guiyomh/features/goreleaser:0": { "version": "2.9.0" },
+    "ghcr.io/michidk/devcontainers-features/bun:1": { "version": "1.2.12" },
+    "ghcr.io/szkiba/devcontainer-features/gosec:1": { "version": "2.22.4" },
+    "ghcr.io/szkiba/devcontainer-features/govulncheck:1": { "version": "1.1.4" },
+    "ghcr.io/szkiba/devcontainer-features/bats:1": { "version": "1.11.1" },
+    "ghcr.io/szkiba/devcontainer-features/cdo:1": { "version": "0.1.2" },
+    "ghcr.io/szkiba/devcontainer-features/mdcode:1": { "version": "0.2.0" },
+    "ghcr.io/grafana/devcontainer-features/xk6:1": { "version": "1.4.1" }
+  },
+
+  "remoteEnv": {
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}"
+  }
+}

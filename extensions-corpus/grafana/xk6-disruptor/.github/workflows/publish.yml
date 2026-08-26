@@ -1,0 +1,215 @@
+name: publish 
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+env:
+  REGISTRY: ghcr.io
+  DISRUPTOR_IMAGE_NAME: grafana/xk6-disruptor
+  AGENT_IMAGE_NAME: grafana/xk6-disruptor-agent
+
+permissions:
+  contents: read
+
+jobs:
+
+  build-binaries:
+      runs-on: ubuntu-latest
+      permissions:
+        contents: read
+        packages: write
+      outputs:
+        version: ${{ steps.export-version.outputs.version}}
+        pkg_version: ${{ steps.export-version.outputs.pkg_version }}
+        image_version: ${{ steps.export-version.outputs.image_version }}
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install xk6 (k6 extension builder)
+        run: |
+          go install go.k6.io/xk6/cmd/xk6@latest
+      - name: Install nfpm (dep and rpm package builder)
+        run: |
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.16.0
+      - name: get-version
+        run: |
+          COMMIT="$(git rev-parse --short HEAD)"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+              VERSION=$GITHUB_REF_NAME
+              IMAGE_VERSION=$VERSION
+          else
+              VERSION=""
+              IMAGE_VERSION="latest"
+          fi
+          PKG_VERSION=${VERSION:-dev-$COMMIT}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "PKG_VERSION=$PKG_VERSION" >> $GITHUB_ENV
+          echo "IMAGE_VERSION=$IMAGE_VERSION" >> $GITHUB_ENV
+      - name: build and package disruptor
+        env:
+          VERSION: ${{ env.VERSION }}
+          PKG_VERSION: ${{ env.PKG_VERSION }}
+        run: |
+          if [[ -n $VERSION ]]; then 
+            VERSION="-v $VERSION"
+          fi
+          ./release.sh $VERSION -r $PKG_VERSION
+      - name: Build and package agent
+        env:
+          PKG_VERSION: ${{ env.PKG_VERSION }}
+        run: |
+          for ARCH in "amd64" "arm64"; do
+            AGENT="xk6-disruptor-agent"
+            GOARCH=$ARCH CGO_ENABLED=0 go build -o build/$AGENT-linux-$ARCH ./cmd/agent
+            tar -zcf dist/$AGENT-${PKG_VERSION}-linux-$ARCH.tar.gz -C build/ $AGENT-linux-$ARCH
+          done
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: binaries
+          path: dist/
+          retention-days: 7
+      - name: Export version
+        id: export-version
+        env:
+          VERSION: ${{ env.VERSION }}
+          PKG_VERSION: ${{ env.PKG_VERSION }}
+          IMAGE_VERSION: ${{ env.IMAGE_VERSION }}
+        run: |
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "pkg_version=$PKG_VERSION" >> $GITHUB_OUTPUT
+          echo "image_version=$IMAGE_VERSION" >> $GITHUB_OUTPUT
+
+  build-windows-installer:
+    runs-on: windows-2022
+    needs: [build-binaries]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: get package info
+        run: |
+          # remove 'v' from version as windows only manage numeric version numbers
+          $Env:VERSION=$Env:GITHUB_REF_NAME.trim("v")
+          echo "VERSION=$Env:VERSION" >> $Env:GITHUB_ENV
+          echo "PKGNAME=xk6-disruptor-v$Env:VERSION-windows-amd64" >> $Env:GITHUB_ENV
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          persist-credentials: false
+      - name: Download binaries
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: binaries
+          path: dist
+      - name: Install wix tools
+        run: |
+          curl -Lso wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
+          Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\packaging\wix311\
+      - name: Unzip Windows binary
+        run: |
+          Expand-Archive -Path ".\dist\$Env:PKGNAME.zip" -DestinationPath .\packaging\
+      - name: Build msi
+        run: |
+          cd .\packaging
+          .\wix311\candle.exe -arch x64 "-dVERSION=$Env:VERSION" xk6disruptor.wxs
+          .\wix311\light.exe -ext WixUIExtension -o "$Env:PKGNAME.msi" xk6disruptor.wixobj
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-installer
+          path: |
+            packaging/*.msi
+          retention-days: 7
+
+  publish-images:
+    runs-on: ubuntu-latest
+    needs: [build-binaries]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download binaries
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: binaries
+          path: dist
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3.7.0
+      - name: Set up Docker buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          version: v0.9.1
+          cache-binary: false
+      - name: Log into ghcr.io
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push disruptor image
+        env:
+          IMAGE_VERSION: "${{needs.build-binaries.outputs.image_version}}"
+          PKG_VERSION: "${{ needs.build-binaries.outputs.pkg_version }}"
+        run: |
+          IMAGE_TAG="$REGISTRY/$DISRUPTOR_IMAGE_NAME:${IMAGE_VERSION:-latest}"
+          mkdir images/disruptor/build/
+          cat dist/xk6-disruptor-${PKG_VERSION}-linux-*.tar.gz | tar -xzf - -i -C images/disruptor/build/
+          docker buildx build -t $IMAGE_TAG --platform=linux/amd64,linux/arm64 images/disruptor --push
+      - name: Build and push agent image
+        env:
+          IMAGE_VERSION: "${{needs.build-binaries.outputs.image_version}}"
+          PKG_VERSION: "${{ needs.build-binaries.outputs.pkg_version }}"
+        run: |
+          IMAGE_TAG="$REGISTRY/$AGENT_IMAGE_NAME:${IMAGE_VERSION:-latest}"
+          mkdir images/agent/build/
+          cat dist/xk6-disruptor-agent-${PKG_VERSION}-linux-*.tar.gz | tar -xzf - -i -C images/agent/build/
+          docker buildx build -t $IMAGE_TAG --platform=linux/amd64,linux/arm64 images/agent --push
+
+  release-packages:
+    runs-on: ubuntu-latest
+    needs: [build-binaries, build-windows-installer]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+        with:
+          persist-credentials: false
+      - name: Download binaries
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: binaries
+          path: dist
+      - name: Download Windows installer
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: windows-installer
+          path: dist
+      - name: Generate checksum file
+        run: sha256sum dist/* > "xk6-disruptor-${GITHUB_REF_NAME}-checksums.txt"
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" ./dist/*

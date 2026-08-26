@@ -1,0 +1,18 @@
+# Configures the auto-generated notes for GitHub Releases (used by the release
+# workflow's `gh release create --generate-notes`). Merged PRs are grouped by
+# label; the labels below match the repo's label set. PRs without a matching
+# label fall into "Other Changes", so label PRs to get categorized notes.
+changelog:
+  categories:
+    - title: Features
+      labels: [enhancement]
+    - title: Fixes
+      labels: [bug]
+    - title: Security
+      labels: [security]
+    - title: Documentation
+      labels: [documentation]
+    - title: Dependencies
+      labels: [github-actions, update-major, update-minor, update-patch, automerge-security-update]
+    - title: Other Changes
+      labels: ["*"]

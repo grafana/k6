@@ -1,0 +1,13 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: xk6-redis
+  title: xk6-redis
+  description: |
+    A k6 extension to test the performance of a Redis instance.
+  annotations:
+    github.com/project-slug: grafana/xk6-redis
+spec:
+  type: library
+  owner: group:default/k6-core
+  lifecycle: production

@@ -1,0 +1,46 @@
+{
+  "name": "xk6-ssh",
+  "image": "mcr.microsoft.com/devcontainers/base:1-bookworm",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": ["--fast"],
+        "go.buildTags": "codegen"
+      },
+      "extensions": [
+        "EditorConfig.EditorConfig",
+        "esbenp.prettier-vscode",
+        "github.vscode-github-actions",
+        "github.vscode-pull-request-github",
+        "jetmartin.bats",
+        "mads-hartmann.bash-ide-vscode",
+        "foxundermoon.shell-format"
+      ]
+    }
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "1.25",
+      "golangciLintVersion": "2.4.0"
+    },
+    "ghcr.io/guiyomh/features/goreleaser:0": { "version": "2.9.0" },
+    "ghcr.io/michidk/devcontainers-features/bun:1": { "version": "1.2.12" },
+    "ghcr.io/szkiba/devcontainer-features/gosec:1": { "version": "2.22.4" },
+    "ghcr.io/szkiba/devcontainer-features/govulncheck:1": {
+      "version": "1.1.4"
+    },
+    "ghcr.io/szkiba/devcontainer-features/cdo:1": { "version": "0.1.2" },
+    "ghcr.io/szkiba/devcontainer-features/mdcode:1": { "version": "0.2.0" },
+    "ghcr.io/szkiba/devcontainer-features/bats:1": { "version": "1.11.1" },
+    "ghcr.io/grafana/devcontainer-features/xk6:1": { "version": "0.19.2" }
+  },
+
+  "remoteEnv": {
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "GITHUB_TOKEN": "${localEnv:GITHUB_TOKEN}",
+    "XK6_EARLY_ACCESS": "true"
+  }
+}

@@ -1,0 +1,25 @@
+name: Publish TechDocs
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'catalog-info.yaml'
+      - '.github/workflows/publish-techdocs.yaml'
+concurrency:
+  group: '${{ github.workflow }}-${{ github.ref }}'
+  cancel-in-progress: true
+permissions: {}
+jobs:
+  publish-docs:
+    uses: grafana/shared-workflows/.github/workflows/publish-techdocs.yaml@main
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      namespace: default
+      kind: component
+      name: xk6-disruptor
+      default-working-directory: .

@@ -1,0 +1,21 @@
+name: "xk6-disruptor"
+arch: amd64
+platform: "linux"
+version: "${PKG_VERSION}"
+version_schema: semver
+section: "default"
+maintainer: "Raintank Inc. d.b.a. Grafana Labs"
+description: |
+  Fault injection for k6 tests.
+depends:
+- ca-certificates
+homepage: "https://github.com/grafana/xk6-disruptor"
+license: "AGPL-3.0"
+contents:
+- src: "xk6-disruptor-linux-amd64"
+  dst: /usr/bin/xk6-disruptor
+
+deb:
+  compression: xz
+  fields:
+    Bugs: https://github.com/grafana/xk6-disruptor/issues
