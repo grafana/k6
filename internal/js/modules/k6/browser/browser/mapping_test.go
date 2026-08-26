@@ -55,18 +55,18 @@ func TestAroundMappingCallsIncludesAllNestedMappings(t *testing.T) {
 	var calls []string
 	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: sobek.New()}}
 	m := aroundMappingCalls(vu, mapping{
-		"top": func(value string) string {
+		"top": networkCall(func(value string) string {
 			calls = append(calls, "top:"+value)
 			return value
-		},
-		"skipped": func() {
+		}),
+		"skipped": networkCall(func() {
 			calls = append(calls, "skipped")
-		},
+		}),
 		"nested": mapping{
-			"call": func(value int) int {
+			"call": networkCall(func(value int) int {
 				calls = append(calls, "nested")
 				return value
-			},
+			}),
 		},
 	}, func() (func(), func()) {
 		calls = append(calls, "begin")
@@ -85,6 +85,36 @@ func TestAroundMappingCallsIncludesAllNestedMappings(t *testing.T) {
 	}, calls)
 }
 
+func TestAroundMappingCallsLeavesPassiveCallsUnwrapped(t *testing.T) {
+	t.Parallel()
+
+	started := false
+	called := false
+	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: sobek.New()}}
+	m := aroundMappingCalls(vu, mapping{
+		"call": passiveCall(func() { called = true }),
+	}, func() (func(), func()) {
+		started = true
+		return func() {}, func() {}
+	})
+
+	m["call"].(func())()
+	assert.True(t, called)
+	assert.False(t, started)
+}
+
+func TestFinishMappingRequiresExplicitCallClassification(t *testing.T) {
+	t.Parallel()
+
+	require.PanicsWithValue(t, `browser mapping call "nested.call" must be classified`, func() {
+		finishMapping(mapping{
+			"nested": mapping{
+				"call": func() {},
+			},
+		})
+	})
+}
+
 func TestAroundMappingCallsCancelsFailedCall(t *testing.T) {
 	t.Parallel()
 
@@ -93,7 +123,7 @@ func TestAroundMappingCallsCancelsFailedCall(t *testing.T) {
 	completed := false
 	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: sobek.New()}}
 	m := aroundMappingCalls(vu, mapping{
-		"call": func() (*sobek.Promise, error) { return nil, expectedErr },
+		"call": networkCall(func() (*sobek.Promise, error) { return nil, expectedErr }),
 	}, func() (func(), func()) {
 		return func() { completed = true }, func() { canceled = true }
 	})
@@ -113,7 +143,7 @@ func TestAroundMappingCallsKeepsOperationUntilPromiseSettles(t *testing.T) {
 	promise, resolve, _ := rt.NewPromise()
 	active := false
 	m := aroundMappingCalls(vu, mapping{
-		"call": func() *sobek.Promise { return promise },
+		"call": networkCall(func() *sobek.Promise { return promise }),
 	}, func() (func(), func()) {
 		active = true
 		return func() { active = false }, func() { active = false }
@@ -139,7 +169,7 @@ func BenchmarkAroundMappingCalls(b *testing.B) {
 			vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: rt}}
 			fn := func(value int64) int64 { return value }
 			if mapped {
-				fn = aroundMappingCalls(vu, mapping{"call": fn}, func() (func(), func()) {
+				fn = aroundMappingCalls(vu, mapping{"call": networkCall(fn)}, func() (func(), func()) {
 					return func() {}, func() {}
 				})["call"].(func(int64) int64)
 			}
@@ -176,7 +206,7 @@ func BenchmarkAroundMappingPromiseCalls(b *testing.B) {
 				return promise
 			}
 			if mapped {
-				fn = aroundMappingCalls(vu, mapping{"call": fn}, func() (func(), func()) {
+				fn = aroundMappingCalls(vu, mapping{"call": networkCall(fn)}, func() (func(), func()) {
 					return func() {}, func() {}
 				})["call"].(func() *sobek.Promise)
 			}

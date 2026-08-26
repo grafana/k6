@@ -18,19 +18,88 @@ import (
 // mapping is a type for mapping our module API to sobek.
 // It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
-type mapping = map[string]any
+type mapping map[string]any
+
+type mappingCallKind uint8
+
+const (
+	mappingCallPassive mappingCallKind = iota + 1
+	mappingCallNetwork
+)
+
+type mappingCall struct {
+	fn   any
+	kind mappingCallKind
+}
+
+// Browser requests can arrive after the mapped call that initiated them settles. Requiring every
+// callable to choose a kind prevents a passive waiter from silently becoming a competing operation.
+func passiveCall(fn any) mappingCall {
+	return mappingCall{fn: fn, kind: mappingCallPassive}
+}
+
+func networkCall(fn any) mappingCall {
+	return mappingCall{fn: fn, kind: mappingCallNetwork}
+}
+
+func finishMapping(m mapping) mapping {
+	return finishMappingCalls(moduleVU{}, m, nil, "")
+}
 
 func withPageNetworkCalls(vu moduleVU, page *common.Page, m mapping) mapping {
-	if page == nil || !k6common.AsyncMetricContextEnabled(vu.State()) {
-		return m
-	}
-	return aroundMappingCalls(vu, m, func() (complete, cancel func()) {
-		state := vu.State()
-		if state == nil || state.Tags == nil {
-			return func() {}, func() {}
+	var begin func() (complete, cancel func())
+	if page != nil && k6common.AsyncMetricContextEnabled(vu.State()) {
+		begin = func() (complete, cancel func()) {
+			state := vu.State()
+			if state == nil || state.Tags == nil {
+				return func() {}, func() {}
+			}
+			return page.BeginNetworkOperation(state.Tags.GetCurrentValues())
 		}
-		return page.BeginNetworkOperation(state.Tags.GetCurrentValues())
-	})
+	}
+	return finishMappingCalls(vu, m, begin, "")
+}
+
+func finishMappingCalls(
+	vu moduleVU,
+	m mapping,
+	begin func() (complete, cancel func()),
+	path string,
+) mapping {
+	for name, value := range m {
+		callPath := name
+		if path != "" {
+			callPath = path + "." + name
+		}
+		switch value := value.(type) {
+		case mapping:
+			m[name] = finishMappingCalls(vu, value, begin, callPath)
+		case mappingCall:
+			fn := reflect.ValueOf(value.fn)
+			if !fn.IsValid() || fn.Kind() != reflect.Func {
+				panic(fmt.Sprintf("browser mapping %q classifies non-callable %T", callPath, value.fn))
+			}
+			switch value.kind {
+			case mappingCallPassive:
+				m[name] = value.fn
+			case mappingCallNetwork:
+				if begin == nil {
+					m[name] = value.fn
+					break
+				}
+				m[name], _ = aroundMappingCall(vu, value.fn, begin)
+			default:
+				panic(fmt.Sprintf("browser mapping call %q has invalid classification", callPath))
+			}
+		default:
+			valueType := reflect.TypeOf(value)
+			if valueType != nil && valueType.Kind() == reflect.Func {
+				panic(fmt.Sprintf("browser mapping call %q must be classified", callPath))
+			}
+			m[name] = value
+		}
+	}
+	return m
 }
 
 func aroundMappingCalls(
@@ -38,16 +107,7 @@ func aroundMappingCalls(
 	m mapping,
 	begin func() (complete, cancel func()),
 ) mapping {
-	for name, value := range m {
-		if nested, ok := value.(mapping); ok {
-			m[name] = aroundMappingCalls(vu, nested, begin)
-			continue
-		}
-		if wrapped, ok := aroundMappingCall(vu, value, begin); ok {
-			m[name] = wrapped
-		}
-	}
-	return m
+	return finishMappingCalls(vu, m, begin, "")
 }
 
 func aroundMappingCall(

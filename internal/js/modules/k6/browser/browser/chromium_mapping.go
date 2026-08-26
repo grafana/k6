@@ -11,8 +11,8 @@ import (
 
 // mapChromium maps the Chromium browser type API to the JS module.
 func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
-	return mapping{
-		"connectOverCDP": func(wsEndpoint string) *sobek.Promise {
+	return finishMapping(mapping{
+		"connectOverCDP": passiveCall(func(wsEndpoint string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				iter := vu.State().Iteration
 
@@ -35,6 +35,6 @@ func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
 					return b, nil
 				}), nil
 			})
-		},
-	}
+		}),
+	})
 }
