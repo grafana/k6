@@ -2,9 +2,10 @@
 package loki
 
 import (
+	"errors"
 	"fmt"
+	"log/slog"
 	"math/rand"
-	"net/http"
 	"net/url"
 	"reflect"
 	"time"
@@ -13,10 +14,8 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/xk6-loki/flog"
 	"github.com/prometheus/common/model"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/metrics"
+	"go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 var (
@@ -33,80 +32,76 @@ var (
 //
 // See examples/simple.js for a full example how to use the xk6-loki extension.
 func init() {
-	modules.Register("k6/x/loki", new(LokiRoot))
+	extensionapi.Register("k6/x/loki", new(LokiRoot))
 }
 
-var _ modules.Module = &LokiRoot{}
+var _ extensionapi.Module = &LokiRoot{}
 
 type lokiMetrics struct {
-	ClientUncompressedBytes  *metrics.Metric
-	ClientLines              *metrics.Metric
-	BytesProcessedTotal      *metrics.Metric
-	BytesProcessedPerSeconds *metrics.Metric
-	LinesProcessedTotal      *metrics.Metric
-	LinesProcessedPerSeconds *metrics.Metric
+	ClientUncompressedBytes  extensionapi.Metric
+	ClientLines              extensionapi.Metric
+	BytesProcessedTotal      extensionapi.Metric
+	BytesProcessedPerSeconds extensionapi.Metric
+	LinesProcessedTotal      extensionapi.Metric
+	LinesProcessedPerSeconds extensionapi.Metric
 }
 
 // LokiRoot is the root module
 type LokiRoot struct{}
 
-func (*LokiRoot) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*LokiRoot) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	m, err := registerMetrics(vu)
 	if err != nil {
 		common.Throw(vu.Runtime(), err)
 	}
 
-	logger := vu.InitEnv().Logger.WithField("component", "xk6-loki")
-	return &Loki{vu: vu, metrics: m, logger: logger}
+	logger, ok := vu.(extensionapi.Logger)
+	if !ok {
+		common.Throw(vu.Runtime(), errors.New("extension API logger capability is unavailable"))
+	}
+	return &Loki{vu: vu, metrics: m, logger: logger.Logger().With("component", "xk6-loki")}
 }
 
-func registerMetrics(vu modules.VU) (lokiMetrics, error) {
-	var err error
-	registry := vu.InitEnv().Registry
+func registerMetrics(vu extensionapi.VU) (lokiMetrics, error) {
+	metrics, ok := vu.(extensionapi.Metrics)
+	if !ok {
+		return lokiMetrics{}, extensionapi.ErrMetricsUnavailable
+	}
+	register := func(name string, kind extensionapi.MetricKind, unit extensionapi.MetricUnit) (extensionapi.Metric, error) {
+		return metrics.RegisterMetric(extensionapi.MetricSpec{Name: name, Kind: kind, Unit: unit})
+	}
 	m := lokiMetrics{}
-
-	m.ClientUncompressedBytes, err = registry.NewMetric("loki_client_uncompressed_bytes", metrics.Counter, metrics.Data)
-	if err != nil {
+	var err error
+	if m.ClientUncompressedBytes, err = register("loki_client_uncompressed_bytes", extensionapi.MetricCounter, extensionapi.MetricUnitData); err != nil {
 		return m, err
 	}
-
-	m.ClientLines, err = registry.NewMetric("loki_client_lines", metrics.Counter, metrics.Default)
-	if err != nil {
+	if m.ClientLines, err = register("loki_client_lines", extensionapi.MetricCounter, extensionapi.MetricUnitDefault); err != nil {
 		return m, err
 	}
-
-	m.BytesProcessedTotal, err = registry.NewMetric("loki_bytes_processed_total", metrics.Counter, metrics.Data)
-	if err != nil {
+	if m.BytesProcessedTotal, err = register("loki_bytes_processed_total", extensionapi.MetricCounter, extensionapi.MetricUnitData); err != nil {
 		return m, err
 	}
-
-	m.BytesProcessedPerSeconds, err = registry.NewMetric("loki_bytes_processed_per_second", metrics.Trend, metrics.Data)
-	if err != nil {
+	if m.BytesProcessedPerSeconds, err = register("loki_bytes_processed_per_second", extensionapi.MetricTrend, extensionapi.MetricUnitData); err != nil {
 		return m, err
 	}
-
-	m.LinesProcessedTotal, err = registry.NewMetric("loki_lines_processed_total", metrics.Counter, metrics.Default)
-	if err != nil {
+	if m.LinesProcessedTotal, err = register("loki_lines_processed_total", extensionapi.MetricCounter, extensionapi.MetricUnitDefault); err != nil {
 		return m, err
 	}
-
-	m.LinesProcessedPerSeconds, err = registry.NewMetric("loki_lines_processed_per_second", metrics.Trend, metrics.Default)
-	if err != nil {
+	if m.LinesProcessedPerSeconds, err = register("loki_lines_processed_per_second", extensionapi.MetricTrend, extensionapi.MetricUnitDefault); err != nil {
 		return m, err
 	}
-
 	return m, nil
 }
 
 // Loki is the k6 extension that can be imported in the Javascript test file.
 type Loki struct {
-	vu      modules.VU
+	vu      extensionapi.VU
 	metrics lokiMetrics
-	logger  logrus.FieldLogger
+	logger  *slog.Logger
 }
 
-func (r *Loki) Exports() modules.Exports {
-	return modules.Exports{
+func (r *Loki) Exports() extensionapi.Exports {
+	return extensionapi.Exports{
 		Named: map[string]interface{}{
 			"Config":    r.config,
 			"Client":    r.client,
@@ -145,13 +140,11 @@ func (r *Loki) config(c sobek.ConstructorCall) *sobek.Object {
 		}
 	}
 
-	r.logger.Debug(fmt.Sprintf(
-		"url=%s timeout=%s protobufRatio=%f cardinalities=%v randSeed=%d",
-		&config.URL, config.Timeout, config.ProtobufRatio, config.Cardinalities, config.RandSeed,
-	))
+	r.logger.Debug("configured Loki client", "url", &config.URL, "timeout", config.Timeout,
+		"protobuf_ratio", config.ProtobufRatio, "cardinalities", config.Cardinalities, "rand_seed", config.RandSeed)
 
 	if config.TenantID == "" {
-		r.logger.Warn("Running in multi-tenant-mode. Each VU has its own X-Scope-OrgID")
+		r.logger.Warn("running in multi-tenant mode; each VU has its own X-Scope-OrgID")
 	}
 
 	return rt.ToValue(config).ToObject(rt)
@@ -269,7 +262,6 @@ func (r *Loki) client(c sobek.ConstructorCall) *sobek.Object {
 	}
 
 	return rt.ToValue(&Client{
-		client:  &http.Client{},
 		cfg:     config,
 		vu:      r.vu,
 		metrics: r.metrics,

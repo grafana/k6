@@ -1,8 +1,8 @@
 package sse
 
 import (
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 type (
@@ -12,8 +12,8 @@ type (
 )
 
 var (
-	_ modules.Module   = &RootModule{}
-	_ modules.Instance = &sse{}
+	_ extensionapi.Module   = &RootModule{}
+	_ extensionapi.Instance = &sse{}
 )
 
 // New returns a pointer to a new RootModule instance.
@@ -23,7 +23,7 @@ func New() *RootModule {
 
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
-func (*RootModule) NewModuleInstance(m modules.VU) modules.Instance {
+func (*RootModule) NewModuleInstance(m extensionapi.VU) extensionapi.Instance {
 	rt := m.Runtime()
 	mi := &sse{
 		vu: m,
@@ -46,5 +46,5 @@ func (*RootModule) NewModuleInstance(m modules.VU) modules.Instance {
 }
 
 func init() {
-	modules.Register("k6/x/sse", new(RootModule))
+	extensionapi.Register("k6/x/sse", new(RootModule))
 }

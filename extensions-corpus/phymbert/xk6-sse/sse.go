@@ -9,38 +9,31 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/http/cookiejar"
-	"net/http/httptrace"
-	"strconv"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
-	httpModule "go.k6.io/k6/v2/js/modules/k6/http"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 type (
 	// sse represents a module instance of the sse module.
 	sse struct {
-		vu      modules.VU
+		vu      extensionapi.VU
 		obj     *sobek.Object
 		metrics *sseMetrics
 	}
 )
 
 // ErrSSEInInitContext is returned when sse are using in the init context
-var ErrSSEInInitContext = common.NewInitContextError("using sse in the init context is not supported")
+var ErrSSEInInitContext = errors.New("using sse in the init context is not supported")
 
 // Client is the representation of the sse returned to the js.
 type Client struct {
@@ -52,12 +45,11 @@ type Client struct {
 	done          chan struct{}
 	shutdownOnce  sync.Once
 
-	tagsAndMeta    *metrics.TagsAndMeta
-	samplesOutput  chan<- metrics.SampleContainer
-	builtinMetrics *metrics.BuiltinMetrics
-	sseMetrics     *sseMetrics
-	cancelRequest  context.CancelFunc
-	httpClient     *http.Client
+	tags          extensionapi.Tags
+	metrics       extensionapi.Metrics
+	sseMetrics    *sseMetrics
+	cancelRequest context.CancelFunc
+	httpResponse  *extensionapi.HTTPResponse
 }
 
 // HTTPResponse is the http response returned by sse.open.
@@ -70,52 +62,49 @@ type HTTPResponse struct {
 
 // Event represents a Server-Sent Event
 type Event struct {
-	ID      string
+	ID      string `js:"id"`
 	Comment string
 	Name    string
 	Data    string
 }
 
 type sseOpenArgs struct {
-	setupFn     sobek.Callable
-	headers     http.Header
-	method      string
-	body        string
-	cookieJar   *cookiejar.Jar
-	tagsAndMeta *metrics.TagsAndMeta
-	timeout     time.Duration
+	setupFn   sobek.Callable
+	headers   http.Header
+	method    string
+	body      string
+	cookieJar http.CookieJar
+	tags      extensionapi.Tags
+	timeout   time.Duration
 }
 
 // Exports returns the exports of the sse module.
-func (mi *sse) Exports() modules.Exports {
-	return modules.Exports{Default: mi.obj}
+func (mi *sse) Exports() extensionapi.Exports {
+	return extensionapi.Exports{Default: mi.obj}
 }
 
 // Open establishes a http client connection based on the parameters provided.
 func (mi *sse) Open(url string, args ...sobek.Value) (*HTTPResponse, error) {
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
-	state := mi.vu.State()
-	if state == nil {
+	if execution, ok := mi.vu.(extensionapi.Execution); ok && execution.ExecutionPhase() != extensionapi.ExecutionPhaseVU {
 		return nil, ErrSSEInInitContext
 	}
+	metrics, ok := mi.vu.(extensionapi.Metrics)
+	if !ok {
+		return nil, extensionapi.ErrMetricsUnavailable
+	}
 
-	parsedArgs, err := parseConnectArgs(state, rt, args...)
+	parsedArgs, err := parseConnectArgs(metrics, rt, args...)
 	if err != nil {
 		return nil, err
 	}
 
-	parsedArgs.tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
-
-	client, connEndHook, err := mi.open(ctx, state, rt, url, parsedArgs)
-	defer connEndHook()
+	client, err := mi.open(ctx, rt, url, parsedArgs, metrics)
 	if err != nil {
 		// Pass the error to the user script before exiting immediately
 		client.handleEvent("error", rt.ToValue(err))
-		if state.Options.Throw.Bool {
-			return nil, err
-		}
-		return client.wrapHTTPResponse(err.Error()), nil
+		return nil, err
 	}
 
 	// Run the user-provided set up function
@@ -139,15 +128,12 @@ func (mi *sse) Open(url string, args ...sobek.Value) (*HTTPResponse, error) {
 	for {
 		select {
 		case event := <-readEventChan:
-			metrics.PushIfNotDone(ctx, client.samplesOutput, metrics.Sample{
-				TimeSeries: metrics.TimeSeries{
-					Metric: client.sseMetrics.SSEEventReceived,
-					Tags:   client.tagsAndMeta.Tags,
-				},
-				Time:     time.Now(),
-				Metadata: client.tagsAndMeta.Metadata,
-				Value:    1,
-			})
+			_ = client.metrics.Emit(ctx, []extensionapi.Sample{{
+				Metric: client.sseMetrics.SSEEventReceived,
+				Value:  1,
+				Time:   time.Now(),
+				Tags:   client.tags,
+			}})
 
 			client.handleEvent("event", rt.ToValue(event))
 
@@ -169,46 +155,27 @@ func (mi *sse) Open(url string, args ...sobek.Value) (*HTTPResponse, error) {
 	}
 }
 
-func (mi *sse) open(ctx context.Context, state *lib.State, rt *sobek.Runtime,
-	url string, args *sseOpenArgs,
-) (*Client, func(), error) {
-	reqCtx, cancel := context.WithCancel(ctx)
+func (mi *sse) open(
+	ctx context.Context, rt *sobek.Runtime, url string, args *sseOpenArgs, metrics extensionapi.Metrics,
+) (*Client, error) {
+	var reqCtx context.Context
+	var cancel context.CancelFunc
+	if args.timeout > 0 {
+		reqCtx, cancel = context.WithTimeout(ctx, args.timeout)
+	} else {
+		reqCtx, cancel = context.WithCancel(ctx)
+	}
 
 	sseClient := Client{
-		ctx:            ctx,
-		rt:             rt,
-		url:            url,
-		eventHandlers:  make(map[string][]sobek.Callable),
-		done:           make(chan struct{}),
-		samplesOutput:  state.Samples,
-		tagsAndMeta:    args.tagsAndMeta,
-		builtinMetrics: state.BuiltinMetrics,
-		sseMetrics:     mi.metrics,
-		cancelRequest:  cancel,
-	}
-
-	// Overriding the NextProtos to avoid talking http2
-	var tlsConfig *tls.Config
-	if state.TLSConfig != nil {
-		tlsConfig = state.TLSConfig.Clone()
-		tlsConfig.NextProtos = []string{"http/1.1"}
-	}
-
-	sseClient.httpClient = &http.Client{
-		// FUTURE: support falling back on global timeout re: https://github.com/grafana/k6/issues/3932
-		Timeout: args.timeout,
-		Transport: &http.Transport{
-			DialContext:     state.Dialer.DialContext,
-			Proxy:           http.ProxyFromEnvironment,
-			TLSClientConfig: tlsConfig,
-			// FIXME phymbert: it would be more interesting to allow reusing the transport across iterations
-			DisableKeepAlives: state.Options.NoConnectionReuse.ValueOrZero() || state.Options.NoVUConnectionReuse.ValueOrZero(),
-		},
-	}
-
-	// httpClient.Jar must never be nil
-	if args.cookieJar != nil {
-		sseClient.httpClient.Jar = args.cookieJar
+		ctx:           ctx,
+		rt:            rt,
+		url:           url,
+		eventHandlers: make(map[string][]sobek.Callable),
+		done:          make(chan struct{}),
+		tags:          args.tags,
+		metrics:       metrics,
+		sseMetrics:    mi.metrics,
+		cancelRequest: cancel,
 	}
 
 	httpMethod := http.MethodGet
@@ -218,7 +185,7 @@ func (mi *sse) open(ctx context.Context, state *lib.State, rt *sobek.Runtime,
 
 	req, err := http.NewRequestWithContext(reqCtx, httpMethod, url, strings.NewReader(args.body))
 	if err != nil {
-		return &sseClient, nil, err
+		return &sseClient, err
 	}
 
 	req.Header.Set("Accept", "text/event-stream")
@@ -228,36 +195,29 @@ func (mi *sse) open(ctx context.Context, state *lib.State, rt *sobek.Runtime,
 		}
 	}
 
-	// Wrap the request to retrieve the server IP tag
-	trace := &httptrace.ClientTrace{
-		GotConn: func(connInfo httptrace.GotConnInfo) {
-			if state.Options.SystemTags.Has(metrics.TagIP) {
-				if ip, _, err2 := net.SplitHostPort(connInfo.Conn.RemoteAddr().String()); err2 == nil {
-					args.tagsAndMeta.SetSystemTagOrMeta(metrics.TagIP, ip)
-				}
-			}
-		},
+	httpClient, ok := mi.vu.(extensionapi.HTTP)
+	if !ok {
+		return &sseClient, extensionapi.ErrHTTPUnavailable
 	}
 
-	//nolint:contextcheck // parent context already passed in the request
-	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
-
-	connStart := time.Now()
-	//nolint:bodyclose // Body is deferred closed in closeResponseBody
-	resp, err := sseClient.httpClient.Do(req)
-	connEnd := time.Now()
-
-	if resp != nil {
-		sseClient.resp = resp
-		if state.Options.SystemTags.Has(metrics.TagStatus) {
-			args.tagsAndMeta.SetSystemTagOrMeta(
-				metrics.TagStatus, strconv.Itoa(resp.StatusCode))
-		}
+	//nolint:bodyclose // response body is closed by closeResponseBody.
+	response, err := httpClient.Do(reqCtx, req, extensionapi.HTTPOptions{
+		Jar:          args.cookieJar,
+		Tags:         args.tags,
+		ForceHTTP1:   true,
+		DeferMetrics: true,
+	})
+	if response != nil {
+		sseClient.httpResponse = response
+		sseClient.resp = response.Response
+		sseClient.tags = metrics.WithSystemTags(sseClient.tags, map[extensionapi.SystemTag]string{
+			extensionapi.SystemTagURL:    url,
+			extensionapi.SystemTagStatus: fmt.Sprintf("%d", response.Response.StatusCode),
+			extensionapi.SystemTagProto:  response.Response.Proto,
+		})
 	}
 
-	connEndHook := sseClient.pushSSEMetrics(connStart, connEnd)
-
-	return &sseClient, connEndHook, err
+	return &sseClient, err
 }
 
 // On is used to configure what the client should do on each event.
@@ -271,7 +231,6 @@ func (c *Client) On(event string, handler sobek.Value) {
 func (c *Client) Close() error {
 	err := c.closeResponseBody()
 	c.cancelRequest()
-	c.httpClient.CloseIdleConnections()
 	return err
 }
 
@@ -291,7 +250,12 @@ func (c *Client) closeResponseBody() error {
 	var err error
 
 	c.shutdownOnce.Do(func() {
-		err = c.resp.Body.Close()
+		if c.resp != nil {
+			err = c.resp.Body.Close()
+		}
+		if c.httpResponse != nil && c.httpResponse.Complete != nil {
+			c.httpResponse.Complete()
+		}
 		if err != nil {
 			c.handleEvent("error", c.rt.ToValue(err))
 		}
@@ -299,65 +263,6 @@ func (c *Client) closeResponseBody() error {
 	})
 
 	return err
-}
-
-func (c *Client) pushSSEMetrics(connStart, connEnd time.Time) func() {
-	connDuration := metrics.D(connEnd.Sub(connStart))
-
-	metrics.PushIfNotDone(c.ctx, c.samplesOutput, metrics.ConnectedSamples{
-		Samples: []metrics.Sample{
-			{
-				TimeSeries: metrics.TimeSeries{
-					Metric: c.builtinMetrics.HTTPReqSending,
-					Tags:   c.tagsAndMeta.Tags,
-				},
-				Time:     connStart,
-				Metadata: c.tagsAndMeta.Metadata,
-				Value:    connDuration,
-			},
-		},
-		Tags: c.tagsAndMeta.Tags,
-		Time: connStart,
-	})
-
-	return func() {
-		end := time.Now()
-		requestDuration := metrics.D(end.Sub(connStart))
-
-		metrics.PushIfNotDone(c.ctx, c.samplesOutput, metrics.ConnectedSamples{
-			Samples: []metrics.Sample{
-				{
-					TimeSeries: metrics.TimeSeries{
-						Metric: c.builtinMetrics.HTTPReqs,
-						Tags:   c.tagsAndMeta.Tags,
-					},
-					Time:     end,
-					Metadata: c.tagsAndMeta.Metadata,
-					Value:    1,
-				},
-				{
-					TimeSeries: metrics.TimeSeries{
-						Metric: c.builtinMetrics.HTTPReqSending,
-						Tags:   c.tagsAndMeta.Tags,
-					},
-					Time:     end,
-					Metadata: c.tagsAndMeta.Metadata,
-					Value:    connDuration,
-				},
-				{
-					TimeSeries: metrics.TimeSeries{
-						Metric: c.builtinMetrics.HTTPReqDuration,
-						Tags:   c.tagsAndMeta.Tags,
-					},
-					Time:     end,
-					Metadata: c.tagsAndMeta.Metadata,
-					Value:    requestDuration,
-				},
-			},
-			Tags: c.tagsAndMeta.Tags,
-			Time: end,
-		})
-	}
 }
 
 // Wraps SSE in a channel, follow the SSE format described in:
@@ -462,7 +367,7 @@ func (c *Client) wrapHTTPResponse(errMessage string) *HTTPResponse {
 	return &sseResponse
 }
 
-func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) (*sseOpenArgs, error) {
+func parseConnectArgs(metrics extensionapi.Metrics, rt *sobek.Runtime, args ...sobek.Value) (*sseOpenArgs, error) {
 	// The params argument is optional
 	var callableV, paramsV sobek.Value
 	switch len(args) {
@@ -482,14 +387,11 @@ func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) 
 	}
 
 	headers := make(http.Header)
-	headers.Set("User-Agent", state.Options.UserAgent.String)
-	tagsAndMeta := state.Tags.GetCurrentValues()
 	parsedArgs := &sseOpenArgs{
-		setupFn:     setupFn,
-		headers:     headers,
-		cookieJar:   state.CookieJar,
-		tagsAndMeta: &tagsAndMeta,
-		timeout:     0,
+		setupFn: setupFn,
+		headers: headers,
+		tags:    metrics.WithSystemTags(metrics.CurrentTags(), map[extensionapi.SystemTag]string{extensionapi.SystemTagSubproto: ""}),
+		timeout: 0,
 	}
 
 	if sobek.IsUndefined(paramsV) || sobek.IsNull(paramsV) {
@@ -521,16 +423,26 @@ func parseConnectOptionalArgs(paramsV sobek.Value, rt *sobek.Runtime, parsedArgs
 				parsedArgs.headers.Set(key, headersObj.Get(key).String())
 			}
 		case "tags":
-			if err := common.ApplyCustomUserTags(rt, parsedArgs.tagsAndMeta, params.Get(k)); err != nil {
-				return fmt.Errorf("invalid sse.open() metric tags: %w", err)
+			tagsValue := params.Get(k)
+			if sobek.IsUndefined(tagsValue) || sobek.IsNull(tagsValue) {
+				continue
 			}
+			tagsObject := tagsValue.ToObject(rt)
+			if tagsObject == nil {
+				continue
+			}
+			tags := make(map[string]string, len(tagsObject.Keys()))
+			for _, key := range tagsObject.Keys() {
+				tags[key] = tagsObject.Get(key).String()
+			}
+			parsedArgs.tags = parsedArgs.tags.With(tags)
 		case "jar":
 			jarV := params.Get(k)
 			if sobek.IsUndefined(jarV) || sobek.IsNull(jarV) {
 				continue
 			}
-			if v, ok := jarV.Export().(*httpModule.CookieJar); ok {
-				parsedArgs.cookieJar = v.Jar
+			if jar, ok := exportedCookieJar(jarV.Export()); ok {
+				parsedArgs.cookieJar = jar
 			}
 		case "method":
 			parsedArgs.method = strings.TrimSpace(params.Get(k).ToString().String())
@@ -549,6 +461,32 @@ func parseConnectOptionalArgs(paramsV sobek.Value, rt *sobek.Runtime, parsedArgs
 		}
 	}
 	return nil
+}
+
+func exportedCookieJar(value any) (http.CookieJar, bool) {
+	if jar, ok := value.(http.CookieJar); ok {
+		return jar, true
+	}
+
+	// Older k6/http CookieJar values predate its implementation of
+	// net/http.CookieJar but expose the same Jar field. This preserves custom
+	// jars across supported host versions without importing a k6 package.
+	reflected := reflect.ValueOf(value)
+	if reflected.Kind() == reflect.Ptr {
+		if reflected.IsNil() {
+			return nil, false
+		}
+		reflected = reflected.Elem()
+	}
+	if reflected.Kind() != reflect.Struct {
+		return nil, false
+	}
+	field := reflected.FieldByName("Jar")
+	if !field.IsValid() || !field.CanInterface() {
+		return nil, false
+	}
+	jar, ok := field.Interface().(http.CookieJar)
+	return jar, ok
 }
 
 func hasPrefix(s []byte, prefix string) bool {

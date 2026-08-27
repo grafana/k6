@@ -13,6 +13,7 @@ import (
 	"log/slog"
 	"maps"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,43 @@ type VU interface {
 type Environment interface {
 	LookupEnv(key string) (value string, ok bool)
 }
+
+// ErrHTTPUnavailable is returned when the host cannot execute an HTTP request
+// in the current context.
+var ErrHTTPUnavailable = errors.New("extension API HTTP capability is unavailable")
+
+// HTTPOptions selects host-owned HTTP behavior for an extension request.
+type HTTPOptions struct {
+	Jar            http.CookieJar
+	Tags           Tags
+	ForceHTTP1     bool
+	DeferMetrics   bool
+	ExpectedStatus func(int) bool
+}
+
+// HTTPResponse wraps the standard-library response returned by the host.
+type HTTPResponse struct{ *http.Response }
+
+// HTTP is an optional VU capability for executing requests through the host's
+// HTTP stack, including its cookies, transport policies, and metrics.
+type HTTP interface {
+	Do(context.Context, *http.Request, HTTPOptions) (*HTTPResponse, error)
+}
+
+// ExecutionPhase identifies whether a module instance is running in init or
+// VU execution context.
+type ExecutionPhase uint8
+
+const (
+	ExecutionPhaseInit ExecutionPhase = iota
+	ExecutionPhaseVU
+)
+
+// Execution is an optional VU capability exposing the current execution phase.
+type Execution interface{ ExecutionPhase() ExecutionPhase }
+
+// VUIdentity is an optional VU capability exposing a stable numeric VU ID.
+type VUIdentity interface{ VUID() uint64 }
 
 // Logger is an optional VU capability for structured extension logging. The
 // logger uses the Go standard library's log/slog API; extensions must not

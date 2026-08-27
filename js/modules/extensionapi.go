@@ -1,11 +1,14 @@
 package modules
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 
@@ -13,6 +16,7 @@ import (
 
 	extensionapi "go.k6.io/k6-extension-api"
 
+	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -29,6 +33,56 @@ func (a extensionAPIModuleAdapter) NewModuleInstance(vu VU) Instance {
 
 type extensionAPIVU struct {
 	vu VU
+}
+
+func (v extensionAPIVU) Do(
+	ctx context.Context, request *http.Request, options extensionapi.HTTPOptions,
+) (*extensionapi.HTTPResponse, error) {
+	state := v.vu.State()
+	initEnv := v.vu.InitEnv()
+	if state == nil || state.Transport == nil || initEnv == nil || initEnv.Registry == nil {
+		return nil, extensionapi.ErrHTTPUnavailable
+	}
+	tags := state.Tags.GetCurrentValues()
+	if values, metadata := options.Tags.Values(), options.Tags.Metadata(); values != nil || metadata != nil {
+		tags = metrics.TagsAndMeta{Tags: initEnv.Registry.RootTagSet().WithTagsFromMap(values), Metadata: metadata}
+	}
+	jar := http.CookieJar(state.CookieJar)
+	if options.Jar != nil {
+		jar = options.Jar
+	}
+	response, err := httpext.MakeRequestWithLiveResponse(ctx, state, request, httpext.LiveRequestOptions{
+		TagsAndMeta:      tags,
+		Jar:              jar,
+		ResponseCallback: options.ExpectedStatus,
+	})
+	if err != nil || response == nil || options.DeferMetrics {
+		return &extensionapi.HTTPResponse{Response: response}, err
+	}
+	body, readErr := io.ReadAll(response.Body)
+	closeErr := response.Body.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	response.Body = io.NopCloser(bytes.NewReader(body))
+	return &extensionapi.HTTPResponse{Response: response}, nil
+}
+
+func (v extensionAPIVU) ExecutionPhase() extensionapi.ExecutionPhase {
+	if v.vu.State() == nil {
+		return extensionapi.ExecutionPhaseInit
+	}
+	return extensionapi.ExecutionPhaseVU
+}
+
+func (v extensionAPIVU) VUID() uint64 {
+	if state := v.vu.State(); state != nil {
+		return state.VUID
+	}
+	return 0
 }
 
 func (v extensionAPIVU) Context() context.Context {

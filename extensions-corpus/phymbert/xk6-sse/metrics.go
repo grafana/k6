@@ -3,34 +3,30 @@ package sse
 import (
 	"errors"
 
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6-extension-api"
 )
 
 // MetricEventName is the sse event metric of the module
 const MetricEventName = "sse_event"
 
 type sseMetrics struct {
-	SSEEventReceived *metrics.Metric
+	SSEEventReceived extensionapi.Metric
 }
 
 // registerMetrics registers the metrics for the sse module in the metrics registry
-func registerMetrics(vu modules.VU) (sseMetrics, error) {
-	var err error
-	m := sseMetrics{}
-	env := vu.InitEnv()
-	if env == nil {
-		return m, errors.New("missing env")
-	}
-	registry := env.Registry
-	if registry == nil {
-		return m, errors.New("missing registry")
+func registerMetrics(vu extensionapi.VU) (sseMetrics, error) {
+	metrics, ok := vu.(extensionapi.Metrics)
+	if !ok {
+		return sseMetrics{}, errors.New("extension API metrics capability is unavailable")
 	}
 
-	m.SSEEventReceived, err = registry.NewMetric(MetricEventName, metrics.Counter)
+	metric, err := metrics.RegisterMetric(extensionapi.MetricSpec{
+		Name: MetricEventName,
+		Kind: extensionapi.MetricCounter,
+	})
 	if err != nil {
-		return m, err
+		return sseMetrics{}, err
 	}
 
-	return m, nil
+	return sseMetrics{SSEEventReceived: metric}, nil
 }

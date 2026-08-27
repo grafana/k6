@@ -5,13 +5,12 @@ package remotewrite
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math"
 	"math/rand"
 	"net/http"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,10 +21,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/prometheus/prompb"
 	"github.com/xhit/go-str2duration/v2"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/lib/netext/httpext"
+	"go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/protoadapt"
@@ -41,27 +38,27 @@ var (
 // Register the extension on module initialization, available to
 // import from JS as "k6/x/remotewrite".
 func init() {
-	modules.Register("k6/x/remotewrite", new(remoteWriteModule))
+	extensionapi.Register("k6/x/remotewrite", new(remoteWriteModule))
 }
 
 // RemoteWrite is the k6 extension for interacting Prometheus Remote Write endpoints.
 type RemoteWrite struct {
-	vu modules.VU
+	vu extensionapi.VU
 }
 
 type remoteWriteModule struct{}
 
-var _ modules.Module = &remoteWriteModule{}
+var _ extensionapi.Module = &remoteWriteModule{}
 
-func (r *remoteWriteModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (r *remoteWriteModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	return &RemoteWrite{
 		vu: vu,
 	}
 }
 
 // Exports returns the exports of the module for k6.
-func (r *RemoteWrite) Exports() modules.Exports {
-	return modules.Exports{
+func (r *RemoteWrite) Exports() extensionapi.Exports {
+	return extensionapi.Exports{
 		Named: map[string]any{
 			"Client":                   r.xclient,
 			"Sample":                   r.sample,
@@ -74,7 +71,19 @@ func (r *RemoteWrite) Exports() modules.Exports {
 // Client is the client wrapper.
 type Client struct {
 	cfg *Config
-	vu  modules.VU
+	vu  extensionapi.VU
+}
+
+// Response is the portable JavaScript representation returned by store methods.
+// It deliberately exposes only the response data this module documents.
+type Response struct {
+	Status     int               `json:"status"`
+	StatusText string            `json:"status_text"`
+	Headers    map[string]string `json:"headers"`
+}
+
+func emptyResponse() Response {
+	return Response{Headers: make(map[string]string)}
 }
 
 // Config holds the configuration for the Prometheus Remote Write client.
@@ -98,7 +107,7 @@ func (r *RemoteWrite) xclient(c sobek.ConstructorCall) *sobek.Object {
 	}
 
 	if config.Url == "" {
-		log.Fatal(ErrURLRequired)
+		common.Throw(rt, ErrURLRequired)
 	}
 
 	if config.UserAgent == "" {
@@ -177,10 +186,10 @@ func xtimeseries(labels map[string]string, samples []Sample) *Timeseries {
 }
 
 // StoreGenerated generates and stores synthetic time series data for load testing.
-func (c *Client) StoreGenerated(totalSeries, batches, batchSize, batch int64) (httpext.Response, error) {
+func (c *Client) StoreGenerated(totalSeries, batches, batchSize, batch int64) (Response, error) {
 	ts, err := generateSeries(totalSeries, batches, batchSize, batch)
 	if err != nil {
-		return *httpext.NewResponse(), err
+		return emptyResponse(), err
 	}
 
 	return c.Store(ts)
@@ -244,7 +253,7 @@ func generateCardinalityLabels(totalSeries, seriesID int64) []Label {
 }
 
 // Store sends the provided time series to the Prometheus Remote Write endpoint.
-func (c *Client) Store(ts []Timeseries) (httpext.Response, error) {
+func (c *Client) Store(ts []Timeseries) (Response, error) {
 	batch := make([]prompb.TimeSeries, 0, len(ts))
 
 	for _, t := range ts {
@@ -427,10 +436,10 @@ func (c *Client) StoreFromTemplates(
 	minValue, maxValue int,
 	timestamp int64, minSeriesID, maxSeriesID int,
 	labelsTemplate map[string]string,
-) (httpext.Response, error) {
+) (Response, error) {
 	template, err := compileLabelTemplates(labelsTemplate)
 	if err != nil {
-		return *httpext.NewResponse(), err
+		return emptyResponse(), err
 	}
 
 	return c.StoreFromPrecompiledTemplates(minValue, maxValue, timestamp, minSeriesID, maxSeriesID, template)
@@ -487,10 +496,9 @@ func (c *Client) StoreFromPrecompiledTemplates(
 	minValue, maxValue int,
 	timestamp int64, minSeriesID, maxSeriesID int,
 	template *labelTemplates,
-) (httpext.Response, error) {
-	state := c.vu.State()
-	if state == nil {
-		return *httpext.NewResponse(), errors.New("State is nil")
+) (Response, error) {
+	if execution, ok := c.vu.(extensionapi.Execution); ok && execution.ExecutionPhase() != extensionapi.ExecutionPhaseVU {
+		return emptyResponse(), errors.New("remote-write requests are not supported in the init context")
 	}
 
 	// #nosec G404 -- This is test data generation for load testing, not cryptographic use
@@ -498,7 +506,7 @@ func (c *Client) StoreFromPrecompiledTemplates(
 
 	buf, err := generateFromPrecompiledTemplates(r, minValue, maxValue, timestamp, minSeriesID, maxSeriesID, template)
 	if err != nil {
-		return *httpext.NewResponse(), err
+		return emptyResponse(), err
 	}
 
 	b := buf.Bytes()
@@ -506,21 +514,17 @@ func (c *Client) StoreFromPrecompiledTemplates(
 	compressed := make([]byte, len(b)/9) // the general size is actually between 1/9 and 1/10th but this is closed enough
 	compressed = snappy.Encode(compressed, b)
 
-	res, err := c.send(state, compressed)
+	res, err := c.send(compressed)
 	if err != nil {
-		return *httpext.NewResponse(), errors.Wrap(err, "remote-write request failed")
+		return emptyResponse(), errors.Wrap(err, "remote-write request failed")
 	}
-
-	res.Request.Body = ""
 
 	return res, nil
 }
 
-func (c *Client) store(batch []prompb.TimeSeries) (httpext.Response, error) {
-	// Required for k6 metrics
-	state := c.vu.State()
-	if state == nil {
-		return *httpext.NewResponse(), errors.New("State is nil")
+func (c *Client) store(batch []prompb.TimeSeries) (Response, error) {
+	if execution, ok := c.vu.(extensionapi.Execution); ok && execution.ExecutionPhase() != extensionapi.ExecutionPhaseVU {
+		return emptyResponse(), errors.New("remote-write requests are not supported in the init context")
 	}
 
 	req := prompb.WriteRequest{
@@ -529,29 +533,33 @@ func (c *Client) store(batch []prompb.TimeSeries) (httpext.Response, error) {
 
 	data, err := proto.Marshal(protoadapt.MessageV2Of(&req))
 	if err != nil {
-		return *httpext.NewResponse(), errors.Wrap(err, "failed to marshal remote-write request")
+		return emptyResponse(), errors.Wrap(err, "failed to marshal remote-write request")
 	}
 
 	compressed := snappy.Encode(nil, data)
 
-	res, err := c.send(state, compressed)
+	res, err := c.send(compressed)
 	if err != nil {
-		return *httpext.NewResponse(), errors.Wrap(err, "remote-write request failed")
+		return emptyResponse(), errors.Wrap(err, "remote-write request failed")
 	}
-
-	res.Request.Body = ""
 
 	return res, nil
 }
 
 // send sends a batch of samples to the HTTP endpoint, the request is the proto marshalled
 // and encoded bytes.
-func (c *Client) send(state *lib.State, req []byte) (httpext.Response, error) {
-	httpResp := httpext.NewResponse()
-
-	r, err := http.NewRequestWithContext(c.vu.Context(), http.MethodPost, c.cfg.Url, nil)
+func (c *Client) send(body []byte) (Response, error) {
+	duration, err := str2duration.ParseDuration(c.cfg.Timeout)
 	if err != nil {
-		return *httpResp, err
+		return emptyResponse(), err
+	}
+
+	ctx, cancel := context.WithTimeout(c.vu.Context(), duration)
+	defer cancel()
+
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.Url, bytes.NewReader(body))
+	if err != nil {
+		return emptyResponse(), err
 	}
 
 	for k, v := range c.cfg.Headers {
@@ -572,33 +580,27 @@ func (c *Client) send(state *lib.State, req []byte) (httpext.Response, error) {
 		r.Header.Set("X-Scope-Orgid", c.cfg.TenantName)
 	}
 
-	duration, err := str2duration.ParseDuration(c.cfg.Timeout)
-	if err != nil {
-		return *httpResp, err
+	httpClient, ok := c.vu.(extensionapi.HTTP)
+	if !ok {
+		return emptyResponse(), extensionapi.ErrHTTPUnavailable
 	}
 
-	u, err := url.Parse(c.cfg.Url)
+	response, err := httpClient.Do(ctx, r, extensionapi.HTTPOptions{})
 	if err != nil {
-		return *httpResp, err
+		return emptyResponse(), err
+	}
+	defer response.Response.Body.Close() //nolint:errcheck // response body is only discarded
+
+	headers := make(map[string]string, len(response.Response.Header))
+	for key, values := range response.Response.Header {
+		headers[key] = strings.Join(values, ",")
 	}
 
-	url, _ := httpext.NewURL(c.cfg.Url, u.Host+u.Path)
-
-	response, err := httpext.MakeRequest(c.vu.Context(), state, &httpext.ParsedHTTPRequest{
-		URL:              &url,
-		Req:              r,
-		Body:             bytes.NewBuffer(req),
-		Throw:            state.Options.Throw.Bool,
-		Redirects:        state.Options.MaxRedirects,
-		Timeout:          duration,
-		ResponseCallback: ResponseCallback,
-		TagsAndMeta:      state.Tags.GetCurrentValues(),
-	})
-	if err != nil {
-		return *httpResp, err
-	}
-
-	return *response, err
+	return Response{
+		Status:     response.Response.StatusCode,
+		StatusText: response.Response.Status,
+		Headers:    headers,
+	}, nil
 }
 
 func generateFromPrecompiledTemplates(

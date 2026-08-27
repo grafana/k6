@@ -14,7 +14,7 @@ import (
 	"github.com/grafana/loki/pkg/push"
 	json "github.com/mailru/easyjson"
 	"github.com/prometheus/common/model"
-	"go.k6.io/k6/js/common"
+	"go.k6.io/k6-extension-api/common"
 )
 
 var LabelValuesFormat = []string{"apache_common", "apache_combined", "apache_error", "rfc3164", "rfc5424", "json", "logfmt"}
@@ -155,7 +155,10 @@ func (c *Client) newBatch(numStreams, minBatchSize, maxBatchSize int) *Batch {
 		Streams:   make(map[string]*push.Stream, numStreams),
 		CreatedAt: time.Now(),
 	}
-	state := c.vu.State()
+	vuID, err := c.vuID()
+	if err != nil {
+		common.Throw(c.vu.Runtime(), err)
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -171,7 +174,7 @@ func (c *Client) newBatch(numStreams, minBatchSize, maxBatchSize int) *Batch {
 	for i := 0; i < numStreams; i++ {
 		labels := c.getRandomLabelSet()
 		if _, ok := labels[model.InstanceLabel]; !ok {
-			labels[model.InstanceLabel] = model.LabelValue(fmt.Sprintf("vu%d.%s", state.VUID, hostname))
+			labels[model.InstanceLabel] = model.LabelValue(fmt.Sprintf("vu%d.%s", vuID, hostname))
 		}
 		stream := &push.Stream{Labels: labels.String()}
 		batch.Streams[stream.Labels] = stream

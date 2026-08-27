@@ -22,6 +22,7 @@ type transport struct {
 	state            *lib.State
 	tagsAndMeta      *metrics.TagsAndMeta
 	responseCallback func(int) bool
+	baseTransport    http.RoundTripper
 
 	lastRequest     *unfinishedRequest
 	lastRequestLock *sync.Mutex
@@ -60,12 +61,17 @@ func newTransport(
 	state *lib.State,
 	tagsAndMeta *metrics.TagsAndMeta,
 	responseCallback func(int) bool,
+	baseTransport http.RoundTripper,
 ) *transport {
+	if baseTransport == nil {
+		baseTransport = state.Transport
+	}
 	return &transport{
 		ctx:              ctx,
 		state:            state,
 		tagsAndMeta:      tagsAndMeta,
 		responseCallback: responseCallback,
+		baseTransport:    baseTransport,
 		lastRequestLock:  new(sync.Mutex),
 	}
 }
@@ -203,7 +209,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	tracer := &Tracer{}
 	// nosemgrep: dynamic-httptrace-clienttrace // this is a false possitive
 	reqWithTracer := req.WithContext(httptrace.WithClientTrace(ctx, tracer.Trace()))
-	resp, err := t.state.Transport.RoundTrip(reqWithTracer)
+	resp, err := t.baseTransport.RoundTrip(reqWithTracer)
 
 	var netError net.Error
 	if errors.As(err, &netError) && netError.Timeout() {

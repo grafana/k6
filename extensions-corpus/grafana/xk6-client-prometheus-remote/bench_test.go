@@ -11,9 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/test"
 )
 
 func BenchmarkCompileTemplatesSimple(b *testing.B) {
@@ -71,7 +70,7 @@ var benchmarkLabels = map[string]string{
 
 type testServer struct {
 	server *httptest.Server
-	vu     *modulestest.VU
+	vu     *extensionapitest.VU
 	count  *int64
 }
 
@@ -88,28 +87,20 @@ func newTestServer(tb testing.TB) *testServer {
 		w.WriteHeader(http.StatusOK)
 		atomic.AddInt64(ts.count, 1)
 	}))
-	registry := metrics.NewRegistry()
-	ch := make(chan metrics.SampleContainer)
-
 	tb.Cleanup(func() {
 		ts.server.Close()
-		close(ch) // this might need to be elsewhere
 	})
 
-	ts.vu = new(modulestest.VU)
-	ts.vu.CtxField = context.Background()
-
-	ts.vu.StateField = new(lib.State)
-	ts.vu.StateField.Transport = ts.server.Client().Transport
-	ts.vu.StateField.BufferPool = lib.NewBufferPool()
-	ts.vu.StateField.Samples = ch
-	ts.vu.StateField.BuiltinMetrics = metrics.RegisterBuiltinMetrics(registry)
-	ts.vu.StateField.Tags = lib.NewVUStateTags(registry.RootTagSet())
-
-	go func() {
-		for range ch { //nolint:revive // we just need to drain the channel
-		}
-	}()
+	ts.vu = &extensionapitest.VU{
+		ContextValue: context.Background(),
+		HTTPDoFunc: func(ctx context.Context, request *http.Request, _ extensionapi.HTTPOptions) (*extensionapi.HTTPResponse, error) {
+			response, err := ts.server.Client().Do(request.WithContext(ctx))
+			if err != nil {
+				return nil, err
+			}
+			return &extensionapi.HTTPResponse{Response: response}, nil
+		},
+	}
 
 	return ts
 }

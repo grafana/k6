@@ -1,99 +1,52 @@
 package loki
 
 import (
-	"context"
+	"math/rand"
 	"testing"
 
 	gofakeit "github.com/brianvoe/gofakeit/v6"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	"github.com/grafana/xk6-loki/flog"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
-func BenchmarkNewBatch(b *testing.B) {
-	samples := make(chan metrics.SampleContainer)
-	state := &lib.State{
-		Samples: samples,
-		VUID:    15,
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-
-	vu := &modulestest.VU{
-		CtxField:   ctx,
-		StateField: state,
-	}
-	defer cancel()
-	defer close(samples)
-	go func() { // this is so that we read the send samples
-		for range samples {
-		}
-	}()
-	faker := gofakeit.New(12345)
-	cardinalities := map[string]int{
-		"app":       5,
-		"namespace": 10,
-		"pod":       100,
-	}
-	streams, minBatchSize, maxBatchSize := 5, 500, 1000
-	labels := newLabelPool(faker, cardinalities)
-
-	c := Client{
-		vu:     vu,
+func newBenchmarkClient() Client {
+	random := rand.New(rand.NewSource(12345)) //nolint:gosec // deterministic benchmark input
+	faker := gofakeit.NewCustom(random)
+	labels := newLabelPool(faker, map[string]int{
+		"app": 5, "namespace": 10, "pod": 100,
+	})
+	return Client{
+		vu:     &extensionapitest.VU{VUIDValue: 15},
+		rand:   random,
+		faker:  faker,
+		flog:   flog.New(random, faker),
 		labels: transformLabelPool(labels),
 	}
-	b.ResetTimer()
+}
+
+func BenchmarkNewBatch(b *testing.B) {
+	c := newBenchmarkClient()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_ = c.newBatch(streams, minBatchSize, maxBatchSize)
+	b.ResetTimer()
+	for range b.N {
+		_ = c.newBatch(5, 500, 1000)
 	}
 }
 
 func BenchmarkEncode(b *testing.B) {
-	samples := make(chan metrics.SampleContainer)
-	state := &lib.State{
-		Samples: samples,
-		VUID:    15,
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-
-	vu := &modulestest.VU{
-		CtxField:   ctx,
-		StateField: state,
-	}
-
-	defer cancel()
-	defer close(samples)
-	go func() { // this is so that we read the send samples
-		for range samples {
-		}
-	}()
-	faker := gofakeit.New(12345)
-	cardinalities := map[string]int{
-		"app":       5,
-		"namespace": 10,
-		"pod":       100,
-	}
-	streams, minBatchSize, maxBatchSize := 5, 500, 1000
-	labels := newLabelPool(faker, cardinalities)
-
-	c := Client{
-		vu:     vu,
-		labels: transformLabelPool(labels),
-	}
-	batch := c.newBatch(streams, minBatchSize, maxBatchSize)
-
+	c := newBenchmarkClient()
+	batch := c.newBatch(5, 500, 1000)
 	b.Run("encode protobuf", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_, _, _ = batch.encodeSnappy()
 		}
 	})
-
 	b.Run("encode json", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_, _, _ = batch.encodeJSON()
 		}
 	})
