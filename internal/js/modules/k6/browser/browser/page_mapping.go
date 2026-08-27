@@ -796,7 +796,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			waitTimeout func() time.Duration
 		}{
 			common.PageEventConsole:         {mapp: mapConsoleMessage},
-			common.PageEventDialog:          {mapp: mapDialog, wait: true, waitTimeout: p.Timeout},
+			common.PageEventDialog:          {mapp: mapDialog, wait: true, waitTimeout: p.Timeout, propagateErr: true},
 			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true, propagateErr: true},
 			common.PageEventRequest:         {mapp: mapRequestEvent},
 			common.PageEventResponse:        {mapp: mapResponseEvent},

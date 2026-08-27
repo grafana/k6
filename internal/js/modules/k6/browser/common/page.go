@@ -561,7 +561,8 @@ func (p *Page) onDialog(dialog *Dialog) {
 	}
 	for handle := range p.eventHandlersByName(PageEventDialog) {
 		if err := handle(PageEvent{Dialog: dialog}); err != nil {
-			p.logger.Warnf("onDialog", "handler returned an error: %v", err)
+			p.logger.Errorf("onDialog", "handler returned an error: %v", err)
+			return
 		}
 	}
 }
