@@ -343,6 +343,8 @@ func (t *Tracer) Done() *Trail {
 	if tlsHandshakeDone != 0 && tlsHandshakeStart != 0 {
 		trail.TLSHandshaking = time.Duration(tlsHandshakeDone - tlsHandshakeStart)
 	}
+	// Sending starts once the connection is obtained, whether it is plain, TLS,
+	// reused, or tunneled through an HTTPS proxy.
 	if gotConn != 0 && wroteRequest > gotConn {
 		trail.Sending = time.Duration(wroteRequest - gotConn)
 	}
