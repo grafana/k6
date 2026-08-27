@@ -33,6 +33,7 @@ export default async function () {
       check(dialog, {
         'dialog type is alert': (d) => d.type() === 'alert',
         'dialog message is correct': (d) => d.message() === 'hello from k6 browser',
+        'dialog page is not null': (d) => d.page() !== null,
       });
       await dialog.accept();
     });
