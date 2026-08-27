@@ -202,6 +202,25 @@ func (ts *testState) addHandler(uri string, upgrader *websocket.Upgrader, messag
 	}))
 }
 
+func runOnEventLoopWithTimeout(t *testing.T, runtime *modulestest.Runtime, code string) error {
+	t.Helper()
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := runtime.RunOnEventLoop(code)
+		result <- err
+	}()
+
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(3 * time.Second):
+		runtime.CancelContext()
+		t.Fatal("event loop did not finish")
+		return nil
+	}
+}
+
 type testMessage struct {
 	kind int
 	data []byte
@@ -235,29 +254,130 @@ func TestClearedExpiredTimerDoesNotCloseConnectingWebSocket(t *testing.T) {
 	})
 
 	require.NoError(t, ts.runtime.VU.RuntimeField.Set("waitForRequest", func() { <-requestStarted }))
-	require.NoError(t, ts.runtime.VU.RuntimeField.Set("sleep20", func() { time.Sleep(20 * time.Millisecond) }))
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("sleep", time.Sleep))
 
-	result := make(chan error, 1)
-	go func() {
-		_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+	err := runOnEventLoopWithTimeout(t, ts.runtime, ts.tb.Replacer.Replace(`
 			const ws = new WebSocket("WSBIN_URL/ws-delayed-failure");
-			ws.onerror = () => {};
+			ws.onerror = () => call("error");
 
-			setTimeout(() => ws.close(), 1000);
+			setTimeout(() => {
+				call("close timer");
+				ws.close();
+			}, 1000);
 			const canceledTimer = setTimeout(() => {}, 10);
 
 			waitForRequest();
-			sleep20();
+			sleep(20_000_000);
 			clearTimeout(canceledTimer);
 		`))
-		result <- err
-	}()
+	require.NoError(t, err)
+	require.Equal(t, []string{"error", "close timer"}, ts.callRecorder.Recorded())
+}
+
+func TestCloseWhileConnectingCancelsHandshake(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	requestStarted := make(chan struct{})
+	requestCanceled := make(chan struct{})
+	ts.tb.Mux.HandleFunc("/ws-pending-handshake", func(_ http.ResponseWriter, req *http.Request) {
+		close(requestStarted)
+		<-req.Context().Done()
+		close(requestCanceled)
+	})
+
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("waitForRequest", func() { <-requestStarted }))
+	err := runOnEventLoopWithTimeout(t, ts.runtime, ts.tb.Replacer.Replace(`
+		const ws = new WebSocket("WSBIN_URL/ws-pending-handshake");
+		ws.onerror = () => call("error:" + ws.readyState);
+		ws.onclose = () => call("close:" + ws.readyState);
+
+		waitForRequest();
+		call("before:" + ws.readyState);
+		ws.close();
+		call("after:" + ws.readyState);
+	`))
+	require.NoError(t, err)
+	require.Equal(t, []string{"before:0", "after:2", "error:3", "close:3"}, ts.callRecorder.Recorded())
 
 	select {
-	case err := <-result:
-		require.NoError(t, err)
-	case <-time.After(3 * time.Second):
-		t.Fatal("event loop did not finish after clearing the expired timer")
+	case <-requestCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("WebSocket handshake was not canceled")
+	}
+}
+
+func TestCloseWhileHandshakeBecomesEstablished(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	upgraded := make(chan struct{})
+	serverDone := make(chan struct{})
+	ts.tb.Mux.HandleFunc("/ws-close-during-upgrade", func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if err != nil {
+			ts.errors <- fmt.Errorf("cannot upgrade request: %w", err)
+			return
+		}
+		close(upgraded)
+		defer close(serverDone)
+		defer func() { _ = conn.Close() }()
+		for {
+			if _, _, err = conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	})
+
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("waitForUpgrade", func() { <-upgraded }))
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("sleep", time.Sleep))
+	err := runOnEventLoopWithTimeout(t, ts.runtime, ts.tb.Replacer.Replace(`
+		const ws = new WebSocket("WSBIN_URL/ws-close-during-upgrade");
+		ws.onopen = () => call("open");
+		ws.onerror = () => call("error:" + ws.readyState);
+		ws.onclose = () => call("close:" + ws.readyState);
+
+		waitForUpgrade();
+		sleep(20_000_000);
+		call("before:" + ws.readyState);
+		ws.close();
+		call("after:" + ws.readyState);
+	`))
+	require.NoError(t, err)
+	require.Equal(t, []string{"before:0", "after:2", "close:3"}, ts.callRecorder.Recorded())
+
+	select {
+	case <-serverDone:
+	case <-time.After(time.Second):
+		t.Fatal("established WebSocket connection was not closed")
+	}
+}
+
+func TestContextCancelWhileConnectingCancelsHandshake(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	requestStarted := make(chan struct{})
+	requestCanceled := make(chan struct{})
+	ts.tb.Mux.HandleFunc("/ws-canceled-context", func(_ http.ResponseWriter, req *http.Request) {
+		close(requestStarted)
+		<-req.Context().Done()
+		close(requestCanceled)
+	})
+
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("waitForRequest", func() { <-requestStarted }))
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("cancel", ts.runtime.CancelContext))
+	err := runOnEventLoopWithTimeout(t, ts.runtime, ts.tb.Replacer.Replace(`
+		new WebSocket("WSBIN_URL/ws-canceled-context");
+		waitForRequest();
+		cancel();
+	`))
+	require.NoError(t, err)
+
+	select {
+	case <-requestCanceled:
+	case <-time.After(time.Second):
+		t.Fatal("WebSocket handshake survived VU context cancellation")
 	}
 }
 
@@ -1606,7 +1726,7 @@ func testArrayBufferViewBufferedAmount(t *testing.T, viewName string) {
 			if (ws.bufferedAmount != sent.byteLength) {
 				throw new Error("Expected " + sent.byteLength + " bufferedAmount got " + ws.bufferedAmount);
 			}
-			ws.onmessage = async (e) => {
+			ws.onmessage = (e) => {
 				if (ws.bufferedAmount != 0) {
 					throw new Error("Expected 0 bufferedAmount got " + ws.bufferedAmount);
 				}
@@ -1718,6 +1838,30 @@ func TestCloseWithReasonTooLong(t *testing.T) {
 	require.ErrorContains(t, err, "SyntaxError: Failed to execute 'close' on 'WebSocket': The message must not be greater than 123 bytes")
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+}
+
+func TestCloseValidatesArgumentsWhenClosed(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		const ws = new WebSocket("WSBIN_URL/ws-echo");
+		ws.onopen = () => ws.close();
+		ws.onclose = () => {
+			try {
+				ws.close(1001);
+			} catch (_) {
+				call("invalid code");
+			}
+			try {
+				ws.close(1000, "a really really long reason about why we are closing this connection, which is clearly over the top and too long, long enough to be longer than the allowed amount of 123 bytes");
+			} catch (_) {
+				call("invalid reason");
+			}
+		};
+	`))
+	require.NoError(t, err)
+	require.Equal(t, []string{"invalid code", "invalid reason"}, ts.callRecorder.Recorded())
 }
 
 func TestRemoteCloseWithCodeAndReason(t *testing.T) {
