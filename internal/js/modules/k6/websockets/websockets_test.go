@@ -223,6 +223,44 @@ func TestBasic(t *testing.T) {
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
 }
 
+func TestClearedExpiredTimerDoesNotCloseConnectingWebSocket(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+	requestStarted := make(chan struct{})
+	ts.tb.Mux.HandleFunc("/ws-delayed-failure", func(w http.ResponseWriter, _ *http.Request) {
+		close(requestStarted)
+		time.Sleep(250 * time.Millisecond)
+		http.Error(w, "handshake failed", http.StatusBadRequest)
+	})
+
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("waitForRequest", func() { <-requestStarted }))
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("sleep20", func() { time.Sleep(20 * time.Millisecond) }))
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+			const ws = new WebSocket("WSBIN_URL/ws-delayed-failure");
+			ws.onerror = () => {};
+
+			setTimeout(() => ws.close(), 1000);
+			const canceledTimer = setTimeout(() => {}, 10);
+
+			waitForRequest();
+			sleep20();
+			clearTimeout(canceledTimer);
+		`))
+		result <- err
+	}()
+
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("event loop did not finish after clearing the expired timer")
+	}
+}
+
 func TestBasicSendBlob(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)
