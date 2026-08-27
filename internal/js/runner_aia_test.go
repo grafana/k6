@@ -145,7 +145,9 @@ func TestVUIntegrationAIAFetching(t *testing.T) {
 	intermediarDER = interCert.Raw // set before any request arrives
 	aiaMu.Unlock()
 
-	leafCertPEM, leafKeyPEM := rsaLeafWithAIA(t, "127.0.0.1", interCert, interKey, aiaURL)
+	// Use "localhost" so SNI carries a ServerName; Go strips IP literals from SNI
+	// and the AIA wrapper fails closed on empty ServerName.
+	leafCertPEM, leafKeyPEM := rsaLeafWithAIA(t, "localhost", interCert, interKey, aiaURL)
 
 	// ── 4. Start TLS server that sends only the leaf (no intermediate chain) ──
 
@@ -155,7 +157,7 @@ func TestVUIntegrationAIAFetching(t *testing.T) {
 
 	_, port, err := net.SplitHostPort(tlsSrv.Listener.Addr().String())
 	require.NoError(t, err)
-	serverAddr := "127.0.0.1:" + port
+	serverAddr := "localhost:" + port
 
 	rootPool := x509.NewCertPool()
 	rootPool.AddCert(rootCert)
