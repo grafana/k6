@@ -47,6 +47,13 @@ func leafOnlyTLSServer(t testing.TB, c *tlstest.Chain) *httptest.Server {
 	return srv
 }
 
+// Rewrites 127.0.0.1 → localhost so the wrapper sees a non-empty ServerName (Go strips
+// IPs from SNI, and the wrapper fails closed on empty). The test chain's leaf has
+// "localhost" as a DNS SAN.
+func leafOnlyTLSServerURL(srv *httptest.Server) string {
+	return strings.Replace(srv.URL, "127.0.0.1", "localhost", 1)
+}
+
 func startAIAServer(t testing.TB, h http.Handler) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(h)
@@ -83,7 +90,7 @@ func TestWrapTLSConfigForAIAFetching_HappyPath(t *testing.T) {
 	tlsSrv := leafOnlyTLSServer(t, chain)
 
 	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
-	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
 	require.NoError(t, err, "AIA fetching should resolve the incomplete chain")
 	_ = resp.Body.Close()
 }
@@ -104,7 +111,7 @@ func TestWrapTLSConfigForAIAFetching_CompleteChainPassesThrough(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
-	resp, err := testHTTPClient(t, wrappedCfg).Get(srv.URL) //nolint:noctx
+	resp, err := testHTTPClient(t, wrappedCfg).Get(strings.Replace(srv.URL, "127.0.0.1", "localhost", 1)) //nolint:noctx
 	require.NoError(t, err, "complete chain should succeed without any AIA fetch")
 	_ = resp.Body.Close()
 }
@@ -351,14 +358,14 @@ func TestAIAFetcher_CacheIsolatedBetweenFetchers(t *testing.T) {
 	fetcherB := NewAIAFetcher(nil)
 
 	// Fetcher A warms its cache.
-	respA, errA := testHTTPClient(t, fetcherA.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(tlsSrv.URL) //nolint:noctx
+	respA, errA := testHTTPClient(t, fetcherA.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
 	require.NoError(t, errA)
 	_ = respA.Body.Close()
 	hitsAfterA := atomic.LoadInt32(&aiaHits)
 	require.Equal(t, int32(1), hitsAfterA, "fetcher A should have fetched once")
 
 	// Fetcher B, independently, must hit the AIA server again — no shared cache.
-	respB, errB := testHTTPClient(t, fetcherB.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(tlsSrv.URL) //nolint:noctx
+	respB, errB := testHTTPClient(t, fetcherB.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
 	require.NoError(t, errB)
 	_ = respB.Body.Close()
 	hitsAfterB := atomic.LoadInt32(&aiaHits)
@@ -386,6 +393,30 @@ func TestWrapTLSConfigForAIAFetching_HostnameMismatchRejected(t *testing.T) {
 	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
 	closeBody(resp)
 	require.Error(t, err, "wrong hostname must be rejected even after AIA succeeds")
+}
+
+// IP-literal targets have empty ServerName (SNI drops IPs). Since we've disabled stdlib
+// hostname verification to interpose AIA, the wrapper must fail closed.
+func TestWrapTLSConfigForAIAFetching_IPLiteralTargetRejected(t *testing.T) {
+	t.Parallel()
+
+	h := &tlstest.AIAHandler{}
+	aiaSrv := startAIAServer(t, h)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
+	h.SetCert(chain.IntermediateDER)
+
+	tlsSrv := leafOnlyTLSServer(t, chain)
+
+	// httptest URLs use 127.0.0.1; Go strips IPs from SNI so ServerName is "".
+	wrappedCfg := NewAIAFetcher(nil).Wrap(
+		&tls.Config{RootCAs: chain.RootPool},
+		nullLogger(),
+	)
+
+	resp, err := testHTTPClient(t, wrappedCfg).Get(tlsSrv.URL) //nolint:noctx
+	closeBody(resp)
+	require.Error(t, err, "IP-literal target must be rejected when tlsAIAFetch is enabled")
+	assert.Contains(t, err.Error(), "IP-literal target")
 }
 
 // newBenchClient forces a fresh TCP+TLS handshake per request (no keep-alive, no session tickets).

@@ -179,10 +179,13 @@ func (f *AIAFetcher) verifyWithAIA(
 
 func buildVerifyConnFn() func(tls.ConnectionState) error {
 	return func(cs tls.ConnectionState) error {
-		// Empty ServerName = IP-only dial without SNI, no hostname to verify.
-		// Matches Go stdlib (x509.VerifyOptions.DNSName is skipped when empty).
+		// Empty ServerName = IP-literal target (Go strips IPs from SNI). We've disabled
+		// stdlib chain-and-hostname verification to interpose AIA, so fail closed rather
+		// than accept any valid chain.
 		if cs.ServerName == "" {
-			return nil
+			return errors.New(
+				"tlsAIAFetch: cannot verify hostname for IP-literal target " +
+					"(SNI is not sent for IP addresses); use a hostname, or disable tlsAIAFetch")
 		}
 		return cs.PeerCertificates[0].VerifyHostname(cs.ServerName)
 	}
