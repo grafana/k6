@@ -3533,3 +3533,78 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	assert.NotContains(t, stderr, "plz-secret-value")
 }
+
+func TestLogNanosecondTimestampsFlag(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		additionalArg string
+		assertFunc    func(log string, t *testing.T)
+	}{
+		{
+			name:          "json format with cli switch",
+			additionalArg: "--log-format=json",
+			assertFunc: func(log string, t *testing.T) {
+				parsed := &struct {
+					Msg  string
+					Time time.Time
+				}{}
+
+				require.NoError(t, json.Unmarshal([]byte(log), parsed))
+				assert.NotZero(t, parsed.Time.Nanosecond(), "Logged timestamp should have nanoseconds")
+			},
+		},
+		{
+			name:          "default format with color disabled with cli switch",
+			additionalArg: "--no-color",
+			assertFunc: func(log string, t *testing.T) {
+				pairs := strings.Split(log, " ")
+				require.NotZero(t, len(pairs))
+
+				keyValue := strings.Split(pairs[0], "=")
+				require.Len(t, keyValue, 2)
+				require.Equal(t, "time", keyValue[0])
+				timestamp, err := time.Parse(time.RFC3339Nano, strings.Trim(keyValue[1], "\""))
+				require.NoError(t, err)
+
+				assert.NotZero(t, timestamp.Nanosecond(), "Logged timestamp should have nanoseconds")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mainScript := `
+				export default function () {
+					console.log("test 1 xdgf");
+				};
+			`
+
+			ts := NewGlobalTestState(t)
+			ts.Flags.LogNanosecondTimestamps = true
+
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+			ts.CmdArgs = []string{"k6", "run", "script.js", tc.additionalArg}
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			logs := strings.Trim(ts.Stderr.String(), "\n")
+			lines := strings.Split(logs, "\n")
+			require.NotZero(t, len(lines))
+
+			found := false
+			for _, line := range lines {
+				if strings.Contains(line, "test 1 xdgf") {
+					tc.assertFunc(line, t)
+					found = true
+					break
+				}
+			}
+
+			require.True(t, found, "expected log line containing marker not found")
+		})
+	}
+}
