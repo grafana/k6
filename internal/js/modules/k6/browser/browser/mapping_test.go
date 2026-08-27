@@ -875,9 +875,10 @@ type workerAPI interface {
 }
 
 type dialogAPI interface {
-	Accept(promptText ...string) error
-	Dismiss() error
+	Accept(promptText ...string) *sobek.Promise
+	Dismiss() *sobek.Promise
 	Type() string
 	Message() string
 	DefaultValue() string
+	Page() mapping
 }
