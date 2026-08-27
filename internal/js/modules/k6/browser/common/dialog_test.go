@@ -53,7 +53,7 @@ func newTestDialog(ctx context.Context, ms *mockSession, opts ...func(*cdppage.E
 	for _, o := range opts {
 		o(event)
 	}
-	return newDialog(cdp.WithExecutor(ctx, ms), ms, event)
+	return newDialog(cdp.WithExecutor(ctx, ms), ms, nil, event)
 }
 
 func TestDialogType(t *testing.T) {
@@ -144,7 +144,7 @@ func TestDialogDismiss(t *testing.T) {
 	assert.False(t, params.Accept)
 }
 
-func TestDialogAcceptIdempotent(t *testing.T) {
+func TestDialogAcceptAlreadyHandledErrors(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -153,11 +153,12 @@ func TestDialogAcceptIdempotent(t *testing.T) {
 
 	require.NoError(t, d.Accept())
 	ms.lastMethod = ""
-	require.NoError(t, d.Accept())
-	assert.Empty(t, ms.lastMethod)
+	err := d.Accept()
+	require.ErrorIs(t, err, errDialogAlreadyHandled)
+	assert.Empty(t, ms.lastMethod, "no CDP call should be made on a handled dialog")
 }
 
-func TestDialogDismissIdempotent(t *testing.T) {
+func TestDialogDismissAlreadyHandledErrors(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
@@ -166,8 +167,32 @@ func TestDialogDismissIdempotent(t *testing.T) {
 
 	require.NoError(t, d.Dismiss())
 	ms.lastMethod = ""
-	require.NoError(t, d.Dismiss())
-	assert.Empty(t, ms.lastMethod)
+	err := d.Dismiss()
+	require.ErrorIs(t, err, errDialogAlreadyHandled)
+	assert.Empty(t, ms.lastMethod, "no CDP call should be made on a handled dialog")
+}
+
+func TestDialogHandled(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	d := newTestDialog(ctx, ms)
+
+	assert.False(t, d.Handled())
+	require.NoError(t, d.Accept())
+	assert.True(t, d.Handled())
+}
+
+func TestDialogPage(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	p := &Page{}
+	event := &cdppage.EventJavascriptDialogOpening{Type: cdppage.DialogTypeAlert}
+	d := newDialog(cdp.WithExecutor(ctx, ms), ms, p, event)
+	assert.Same(t, p, d.Page())
 }
 
 func TestDialogAcceptPropagatesError(t *testing.T) {

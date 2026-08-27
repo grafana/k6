@@ -413,15 +413,15 @@ func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavas
 		return
 	}
 
-	dialog := newDialog(fs.ctx, fs.session, event)
+	dialog := newDialog(fs.ctx, fs.session, fs.page, event)
 	fs.page.onDialog(dialog)
 
-	// Route the fallback dismiss through dialog.Dismiss() so the mutex and
-	// handled flag are respected: if the handler already called Accept() or
-	// Dismiss(), this is a no-op; otherwise it sends the CDP dismiss command.
-	if err := dialog.Dismiss(); err != nil {
-		fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening",
-			"failed to dismiss dialog box: %v", err)
+	// Auto-dismiss only if the handler did not already accept or dismiss.
+	if !dialog.Handled() {
+		if err := dialog.Dismiss(); err != nil {
+			fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening",
+				"failed to dismiss dialog box: %v", err)
+		}
 	}
 }
 
