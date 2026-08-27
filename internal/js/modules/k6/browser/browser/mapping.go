@@ -18,7 +18,7 @@ import (
 // mapping is a type for mapping our module API to sobek.
 // It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
-type mapping map[string]any
+type mapping = map[string]any
 
 type mappingCallKind uint8
 

@@ -115,6 +115,24 @@ func TestFinishMappingRequiresExplicitCallClassification(t *testing.T) {
 	})
 }
 
+func TestFinishMappingPreservesReturnedMappings(t *testing.T) {
+	t.Parallel()
+
+	rt := sobek.New()
+	m := finishMapping(mapping{
+		"context": passiveCall(func() mapping {
+			return finishMapping(mapping{
+				"pages": passiveCall(func() int { return 1 }),
+			})
+		}),
+	})
+	require.NoError(t, rt.Set("browser", m))
+
+	value, err := rt.RunString(`browser.context().pages()`)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), value.ToInteger())
+}
+
 func TestAroundMappingCallsCancelsFailedCall(t *testing.T) {
 	t.Parallel()
 
