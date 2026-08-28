@@ -14,7 +14,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/xk6-disruptor/pkg/disruptors"
 	"github.com/grafana/xk6-disruptor/pkg/kubernetes"
-	"go.k6.io/k6/js/common"
+	"go.k6.io/k6-extension-api/common"
 )
 
 // TODO: call directly Convert from API methods

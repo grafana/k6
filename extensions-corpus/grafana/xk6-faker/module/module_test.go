@@ -1,33 +1,22 @@
-package module_test
+package module
 
 import (
 	"testing"
 
-	"github.com/grafana/xk6-faker/module"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
 )
 
 func Test_Default_Faker(t *testing.T) {
 	t.Parallel()
 
-	runtime := modulestest.NewRuntime(t)
-	runtime.VU.InitEnvField.RuntimeOptions.Env = map[string]string{"XK6_FAKER_SEED": "11"}
+	runtime := sobek.New()
+	exports := New().NewModuleInstance(testVU{
+		runtime: runtime, environment: map[string]string{"XK6_FAKER_SEED": "11"},
+	}).Exports()
+	require.NoError(t, runtime.Set("faker", exports.Default))
 
-	runtime.VU.InitEnvField.LookupEnv = func(key string) (string, bool) {
-		val, ok := runtime.VU.InitEnvField.RuntimeOptions.Env[key]
-
-		return val, ok
-	}
-
-	err := runtime.SetupModuleSystem(map[string]any{module.ImportPath: module.New()}, nil, nil)
-
-	require.NoError(t, err)
-
-	val, err := runtime.RunOnEventLoop(`
-	let faker = require("` + module.ImportPath + `")
-	faker.default.call("username")
-	`)
+	val, err := runtime.RunString("faker.call('username')")
 
 	require.NoError(t, err)
 	require.Equal(t, "Abshire5538", val.String())
@@ -36,15 +25,11 @@ func Test_Default_Faker(t *testing.T) {
 func Test_New_Faker(t *testing.T) {
 	t.Parallel()
 
-	runtime := modulestest.NewRuntime(t)
-	err := runtime.SetupModuleSystem(map[string]any{module.ImportPath: module.New()}, nil, nil)
+	runtime := sobek.New()
+	exports := New().NewModuleInstance(testVU{runtime: runtime}).Exports()
+	require.NoError(t, runtime.Set("Faker", exports.Named["Faker"]))
 
-	require.NoError(t, err)
-
-	val, err := runtime.RunOnEventLoop(`
-	let faker = require("` + module.ImportPath + `")
-	new faker.Faker(11).call("username")
-	`)
+	val, err := runtime.RunString("new Faker(11).call('username')")
 
 	require.NoError(t, err)
 	require.Equal(t, "Abshire5538", val.String())

@@ -11,9 +11,11 @@ registry. As a result, extensions use stable interfaces while k6 retains
 ownership of its runtime, load-test state, metrics engine, network stack, and
 automatic extension provisioning.
 
-The current custom binary composition is in `cmd/k6-extension-api`. It links
-the two migrated extension clones and is intentionally a nested module, so it
-does not alter the root k6 module's vendored dependency set.
+The current custom binary composition is in `cmd/k6-extension-api`. It declares
+all migrated clones and is intentionally a nested module, so it does not alter
+the root k6 module's vendored dependency set. The initial binary was built and
+run with msgpack and SSH; rebuilding the expanded composition requires the Go
+checksum database entry for Kubernetes dependencies.
 
 ## Implemented v1 surface
 
@@ -54,15 +56,38 @@ The k6 adapter:
 The public `VU` interface will not be expanded with k6 types. New features
 must be optional, host-neutral capability interfaces.
 
-## Migrated and verified
+### Environment capability
+
+`Environment` is the first optional capability:
+
+```go
+type Environment interface {
+    LookupEnv(key string) (value string, ok bool)
+}
+```
+
+An extension obtains it with `vu.(extensionapi.Environment)`. k6 adapts its
+configured environment lookup into this capability without exposing `InitEnv`
+or any other k6 type.
+
+## Migrated
 
 | Extension | Shape | Result |
 | --- | --- | --- |
 | `github.com/tango-tango/xk6-msgpack` | Per-VU module using Sobek `Runtime()` | Migrated. `pack()`/`unpack()` round-trip passes in the custom binary. |
 | `github.com/grafana/xk6-ssh` | Raw shared Go default export | Migrated. The custom binary imports it and exposes `connect()`. |
+| `github.com/grafana/xk6-faker` | Per-VU module using Sobek and `Environment` | Migrated. Its complete Go test suite passes. |
+| `github.com/grafana/xk6-disruptor` | Per-VU module using context and Sobek | Migrated. Its complete Go test suite passes. |
+| `github.com/grafana/xk6-kubernetes` | Per-VU module using context and Sobek | Migrated. Its complete Go test suite passes. |
+| `github.com/grafana/xk6-sql` | Per-VU module using context and Sobek | Migrated. Production packages build; its legacy test harness still imports the old k6 module test API. |
+| `github.com/grafana/xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | SQL driver registration modules | Migrated. Each repository builds. MySQL now uses `crypto/tls` version constants. |
 
-The custom binary test script imports both modules. It uses an isolated empty
-config file so it does not depend on a user-level k6 configuration.
+The custom binary test script imports every migrated module except disruptor
+and directly exercises msgpack and SSH. Disruptor initializes its Kubernetes
+client at module-instantiation time and therefore requires a reachable cluster;
+the binary links it but the no-external-service smoke test deliberately avoids
+instantiating it. The script uses an isolated empty config file so it does not
+depend on a user-level k6 configuration.
 
 ## Catalog migration assessment
 
@@ -74,11 +99,11 @@ validate the release tag registered for that k6 catalog version.
 | --- | --- | --- |
 | `xk6-msgpack` | Migrated | None. |
 | `xk6-ssh` | Migrated | None. Preserve its intentionally shared export. |
-| `xk6-disruptor` | Can migrate now | Replace `common.Throw` with a Sobek-native error helper built on `Runtime()`. |
-| `xk6-kubernetes` | Can migrate now | Same Sobek error conversion; all execution uses `Context()`. |
-| `xk6-sql` | Can migrate now | Uses `Context()` plus direct Sobek values/symbols. |
-| `xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | Can migrate with `xk6-sql` | Drivers are registration shims. MySQL must replace four `netext` TLS-version constants. |
-| `xk6-faker` | Deferred | Needs a host-neutral environment lookup capability for `XK6_FAKER_SEED`. |
+| `xk6-disruptor` | Migrated | Uses the standalone `common.Throw` helper. |
+| `xk6-kubernetes` | Migrated | Uses the standalone `common.Throw` helper. |
+| `xk6-sql` | Migrated | Its production code no longer needs k6; legacy tests need standalone test helpers. |
+| `xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | Migrated | Drivers are registration shims; MySQL uses `crypto/tls` constants. |
+| `xk6-faker` | Migrated | Uses the optional `Environment` capability for `XK6_FAKER_SEED`. |
 | `xk6-redis` | Deferred | Needs a promise/event-loop bridge, active-vs-init state, and host dialer/TLS policy. |
 | `xk6-tls` | Deferred | Needs promise settlement on the JS event loop and a host dialer. |
 | `xk6-kafka` | Deferred | Needs metrics declaration/emission, current tags, built-in byte metrics, and active-vs-init state. |
@@ -113,3 +138,12 @@ Each capability should be designed against at least one migrated extension and
 one test fixture before being released. This keeps extensions independent from
 k6's broad dependency graph while allowing later API versions to add
 capabilities without breaking the small base contract.
+
+## Temporary compatibility helper
+
+`go.k6.io/k6-extension-api/common.Throw(runtime, err)` is available for the
+small set of extensions that synchronously turn a Go error into a JavaScript
+exception. It preserves a supplied Sobek exception and otherwise uses
+`Runtime.NewGoError()`, retaining the JavaScript stack. The helper depends only
+on Sobek, does not expose k6 types, and is deliberately separate from the base
+module interface.

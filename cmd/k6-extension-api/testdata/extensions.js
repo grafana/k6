@@ -1,15 +1,25 @@
 import msgpack from "k6/x/msgpack";
 import ssh from "k6/x/ssh";
+import { Faker } from "k6/x/faker";
+import "k6/x/kubernetes";
+import "k6/x/sql";
+import "k6/x/sql/driver/azuresql";
+import "k6/x/sql/driver/clickhouse";
+import "k6/x/sql/driver/mysql";
+import "k6/x/sql/driver/postgres";
+import "k6/x/sql/driver/sqlserver";
 
 export const options = { vus: 1, iterations: 1 };
 
 export default function () {
-	console.log(msgpack)
-  const value = msgpack.unpack(msgpack.pack({ answer: 42 }));
-  if (value.answer !== 42) {
-    throw new Error("MessagePack extension did not round-trip its value");
-  }
-  if (typeof ssh.connect !== "function") {
-    throw new Error("SSH extension was not registered");
-  }
+	const value = msgpack.unpack(msgpack.pack({ answer: 42 }));
+	if (value.answer !== 42) {
+		throw new Error("MessagePack extension did not round-trip its value");
+	}
+	if (typeof ssh.connect !== "function") {
+		throw new Error("SSH extension was not registered");
+	}
+	if (typeof Faker !== "function") {
+		throw new Error("Faker extension was not registered");
+	}
 }

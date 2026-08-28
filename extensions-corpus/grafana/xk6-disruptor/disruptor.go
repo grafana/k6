@@ -5,8 +5,8 @@ package disruptor
 import (
 	"fmt"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 
 	"github.com/grafana/sobek"
 
@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	modules.Register("k6/x/disruptor", new(RootModule))
+	extensionapi.Register("k6/x/disruptor", new(RootModule))
 }
 
 // RootModule is the global module object type. It is instantiated once per test
@@ -24,19 +24,19 @@ type RootModule struct{}
 
 // ModuleInstance represents an instance of the JS module.
 type ModuleInstance struct {
-	vu modules.VU
+	vu extensionapi.VU
 	// instance of a Kubernetes helper
 	k8s kubernetes.Kubernetes
 }
 
 // Ensure the interfaces are implemented correctly.
 var (
-	_ modules.Module   = &RootModule{}
-	_ modules.Instance = &ModuleInstance{}
+	_ extensionapi.Module   = &RootModule{}
+	_ extensionapi.Instance = &ModuleInstance{}
 )
 
 // NewModuleInstance returns a new instance of the disruptor module for each VU.
-func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*RootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	k8s, err := kubernetes.New()
 	if err != nil {
 		common.Throw(vu.Runtime(), fmt.Errorf("error creating Kubernetes helper: %w", err))
@@ -50,8 +50,8 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 // Exports implements the modules.Instance interface and returns the exports
 // of the JS module.
-func (m *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{
+func (m *ModuleInstance) Exports() extensionapi.Exports {
+	return extensionapi.Exports{
 		Named: map[string]interface{}{
 			"PodDisruptor":     m.newPodDisruptor,
 			"ServiceDisruptor": m.newServiceDisruptor,

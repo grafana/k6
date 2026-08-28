@@ -3,11 +3,11 @@ package faker
 
 import (
 	"github.com/grafana/xk6-faker/module"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 func register() {
-	modules.Register(module.ImportPath, module.New())
+	extensionapi.Register(module.ImportPath, module.New())
 }
 
 func init() { //nolint:gochecknoinits

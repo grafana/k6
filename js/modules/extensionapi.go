@@ -30,6 +30,15 @@ func (v extensionAPIVU) Runtime() *sobek.Runtime {
 	return v.vu.Runtime()
 }
 
+func (v extensionAPIVU) LookupEnv(key string) (string, bool) {
+	initEnv := v.vu.InitEnv()
+	if initEnv == nil || initEnv.LookupEnv == nil {
+		return "", false
+	}
+
+	return initEnv.LookupEnv(key)
+}
+
 type extensionAPIInstanceAdapter struct {
 	instance extensionapi.Instance
 }

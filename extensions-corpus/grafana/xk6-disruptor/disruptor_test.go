@@ -2,48 +2,33 @@ package disruptor
 
 import (
 	"context"
-	"io/ioutil"
 	"testing"
 
 	"github.com/grafana/sobek"
 	"github.com/grafana/xk6-disruptor/pkg/kubernetes"
 	"github.com/grafana/xk6-disruptor/pkg/testutils/kubernetes/builders"
-	"github.com/sirupsen/logrus"
-
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 
 	"k8s.io/client-go/kubernetes/fake"
 )
 
 // testVU creates a test VU
-func testVU() modules.VU {
+type testVUImpl struct {
+	ctx context.Context
+	rt  *sobek.Runtime
+}
+
+func (v *testVUImpl) Context() context.Context { return v.ctx }
+func (v *testVUImpl) Runtime() *sobek.Runtime  { return v.rt }
+
+func testVU() extensionapi.VU {
 	rt := sobek.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-	testLog := logrus.New()
-	testLog.SetOutput(ioutil.Discard)
-
-	state := &lib.State{
-		Options: lib.Options{
-			SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
-		},
-		Logger: testLog,
-	}
-
-	return &modulestest.VU{
-		RuntimeField: rt,
-		InitEnvField: &common.InitEnvironment{},
-		CtxField:     context.Background(),
-		StateField:   state,
-	}
+	return &testVUImpl{rt: rt, ctx: context.Background()}
 }
 
 // instantiates a module with a fake kubernetes and a test VU
-func setTestModule(k8s *kubernetes.FakeKubernetes, vu modules.VU) error {
+func setTestModule(k8s *kubernetes.FakeKubernetes, vu extensionapi.VU) error {
 	m := ModuleInstance{
 		k8s: k8s,
 		vu:  vu,

@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/grafana/xk6-faker/faker"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // rootModule is k6 JavaScript module.
@@ -15,16 +15,17 @@ type rootModule struct{}
 const ImportPath = "k6/x/faker"
 
 // New creates new root module.
-func New() modules.Module {
+func New() extensionapi.Module {
 	return &rootModule{}
 }
 
-func getseed(vu modules.VU) int64 {
-	if vu == nil || vu.InitEnv() == nil || vu.InitEnv().LookupEnv == nil {
+func getseed(vu extensionapi.VU) int64 {
+	environment, ok := vu.(extensionapi.Environment)
+	if !ok {
 		return 0
 	}
 
-	str, ok := vu.InitEnv().LookupEnv("XK6_FAKER_SEED")
+	str, ok := environment.LookupEnv("XK6_FAKER_SEED")
 	if !ok {
 		return 0
 	}
@@ -38,8 +39,8 @@ func getseed(vu modules.VU) int64 {
 }
 
 // NewModuleInstance creates new module instance.
-func (root *rootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	mod := &module{exports: modules.Exports{
+func (root *rootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
+	mod := &module{exports: extensionapi.Exports{
 		Named:   make(map[string]any),
 		Default: faker.New(getseed(vu), vu.Runtime()),
 	}}
@@ -51,15 +52,15 @@ func (root *rootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 // module is a k6 JavaScript module instance.
 type module struct {
-	exports modules.Exports
+	exports extensionapi.Exports
 }
 
 // Exports is representation of ESM exports of a module.
-func (mod *module) Exports() modules.Exports {
+func (mod *module) Exports() extensionapi.Exports {
 	return mod.exports
 }
 
 var (
-	_ modules.Module   = (*rootModule)(nil)
-	_ modules.Instance = (*module)(nil)
+	_ extensionapi.Module   = (*rootModule)(nil)
+	_ extensionapi.Instance = (*module)(nil)
 )

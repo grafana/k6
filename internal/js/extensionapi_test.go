@@ -31,9 +31,17 @@ type extensionAPITestInstance struct {
 }
 
 func (mi extensionAPITestInstance) Exports() extensionapi.Exports {
+	environment, environmentAvailable := mi.vu.(extensionapi.Environment)
+	environmentValue := ""
+	if environmentAvailable {
+		environmentValue, _ = environment.LookupEnv("K6_EXTENSION_API_TEST_ENV")
+	}
+
 	return extensionapi.Exports{Default: map[string]any{
-		"runtimeAvailable": func() bool { return mi.vu.Runtime() != nil },
-		"contextAvailable": func() bool { return mi.vu.Context() != nil },
+		"runtimeAvailable":     func() bool { return mi.vu.Runtime() != nil },
+		"contextAvailable":     func() bool { return mi.vu.Context() != nil },
+		"environmentAvailable": func() bool { return environmentAvailable },
+		"environmentValue":     func() string { return environmentValue },
 	}}
 }
 
@@ -52,6 +60,9 @@ func TestNewJSRunnerWithExtensionAPI(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Registry:       registry,
 		Usage:          usage.New(),
+		LookupEnv: func(key string) (string, bool) {
+			return "extension-api-test-environment", key == "K6_EXTENSION_API_TEST_ENV"
+		},
 	}
 	moduleResolver := js.NewModuleResolver(&url.URL{}, preInitState, nil)
 	runner, err := js.New(
@@ -61,7 +72,9 @@ func TestNewJSRunnerWithExtensionAPI(t *testing.T) {
 			Data: fmt.Appendf(nil, `
 				import extension from %q;
 				import rawExtension from %q;
-				if (!extension.runtimeAvailable() || !extension.contextAvailable()) {
+				if (!extension.runtimeAvailable() || !extension.contextAvailable() ||
+					!extension.environmentAvailable() ||
+					extension.environmentValue() !== "extension-api-test-environment") {
 					throw new Error("extension API VU was not adapted");
 				}
 				if (rawExtension.value !== 42) {
@@ -69,7 +82,9 @@ func TestNewJSRunnerWithExtensionAPI(t *testing.T) {
 				}
 				export const options = { vus: 1, iterations: 1 };
 				export default function () {
-					if (!extension.runtimeAvailable() || !extension.contextAvailable()) {
+					if (!extension.runtimeAvailable() || !extension.contextAvailable() ||
+						!extension.environmentAvailable() ||
+						extension.environmentValue() !== "extension-api-test-environment") {
 						throw new Error("extension API VU was not adapted");
 					}
 				}

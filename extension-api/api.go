@@ -37,6 +37,13 @@ type VU interface {
 	Runtime() *sobek.Runtime
 }
 
+// Environment is an optional VU capability for looking up environment values
+// supplied by the host. Extensions obtain it with a type assertion from VU so
+// hosts can provide the base API without exposing an environment.
+type Environment interface {
+	LookupEnv(key string) (value string, ok bool)
+}
+
 // Exports represents the ESM exports of an Instance.
 type Exports struct {
 	Default any
