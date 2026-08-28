@@ -280,8 +280,14 @@ func (v *VU) WithSystemTags(tags extensionapi.Tags, systemTags map[extensionapi.
 			continue
 		}
 		if v.MetadataSystemTag[kind] {
+			if metadata == nil {
+				metadata = make(map[string]string)
+			}
 			metadata[string(kind)] = value
 		} else {
+			if values == nil {
+				values = make(map[string]string)
+			}
 			values[string(kind)] = value
 		}
 	}

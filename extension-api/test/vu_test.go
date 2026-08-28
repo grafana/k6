@@ -91,6 +91,19 @@ func TestVUMetrics(t *testing.T) {
 	}
 }
 
+func TestVUWithSystemTagsHandlesEmptyTags(t *testing.T) {
+	t.Parallel()
+	vu := NewVU()
+	vu.EnabledSystemTag[extensionapi.SystemTagURL] = true
+
+	tags := vu.WithSystemTags(NewTags(nil, nil), map[extensionapi.SystemTag]string{
+		extensionapi.SystemTagURL: "https://example.test",
+	})
+	if got := tags.Values()["url"]; got != "https://example.test" {
+		t.Fatalf("URL tag = %q", got)
+	}
+}
+
 func TestVUFileSystem(t *testing.T) {
 	t.Parallel()
 	vu := NewVU()
