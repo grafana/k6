@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 type (
@@ -16,7 +16,7 @@ type (
 
 	// ModuleInstance represents an instance of the JS module.
 	ModuleInstance struct {
-		vu modules.VU
+		vu extensionapi.VU
 
 		*Client
 	}
@@ -24,8 +24,8 @@ type (
 
 // Ensure the interfaces are implemented correctly
 var (
-	_ modules.Instance = &ModuleInstance{}
-	_ modules.Module   = &RootModule{}
+	_ extensionapi.Instance = &ModuleInstance{}
+	_ extensionapi.Module   = &RootModule{}
 )
 
 // New returns a pointer to a new RootModule instance
@@ -35,14 +35,14 @@ func New() *RootModule {
 
 // NewModuleInstance implements the modules.Module interface and returns
 // a new instance for each VU.
-func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*RootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	return &ModuleInstance{vu: vu, Client: &Client{vu: vu}}
 }
 
 // Exports implements the modules.Instance interface and returns
 // the exports of the JS module.
-func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{Named: map[string]any{
+func (mi *ModuleInstance) Exports() extensionapi.Exports {
+	return extensionapi.Exports{Named: map[string]any{
 		"Client": mi.NewClient,
 	}}
 }

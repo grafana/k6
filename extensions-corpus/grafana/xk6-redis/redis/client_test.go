@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -11,11 +12,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/lib/netext"
-	"go.k6.io/k6/v2/lib/types"
-	"go.k6.io/k6/v2/metrics"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 func TestClientConstructor(t *testing.T) {
@@ -2548,10 +2545,10 @@ func TestClientIsSupportedType(t *testing.T) {
 // necessary to test the redis client, in the context
 // of the execution of a k6 script.
 type testSetup struct {
-	runtime *modulestest.Runtime
-	rt      *sobek.Runtime
-	state   *lib.State
-	samples chan metrics.SampleContainer
+	runtime       *extensionapitest.Runtime
+	rt            *sobek.Runtime
+	vu            *extensionapitest.VU
+	hostTLSConfig *tls.Config
 }
 
 // newTestSetup initializes a new test setup.
@@ -2560,28 +2557,22 @@ type testSetup struct {
 // main context of k6.
 func newTestSetup(t testing.TB) testSetup {
 	ts := newInitContextTestSetup(t)
-
-	state := &lib.State{
-		Dialer: netext.NewDialer(
-			net.Dialer{},
-			netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
-		),
-		Options: lib.Options{
-			SystemTags: metrics.NewSystemTagSet(
-				metrics.TagURL,
-				metrics.TagProto,
-				metrics.TagStatus,
-				metrics.TagSubproto,
-			),
-		},
-		Samples:        ts.samples,
-		TLSConfig:      &tls.Config{},
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Tags:           lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
+	hostTLSConfig := &tls.Config{}
+	ts.vu.DialContextFunc = (&net.Dialer{}).DialContext
+	ts.vu.TLSClientFunc = func(ctx context.Context, conn net.Conn, config *tls.Config) (net.Conn, error) {
+		// Simulate the host TLS policy overriding the extension's verification
+		// setting. The production implementation is provided by k6 through the
+		// extension API TLS capability.
+		tlsConfig := config.Clone()
+		tlsConfig.InsecureSkipVerify = hostTLSConfig.InsecureSkipVerify
+		tlsConn := tls.Client(conn, tlsConfig)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = conn.Close()
+			return nil, err
+		}
+		return tlsConn, nil
 	}
-	ts.runtime.MoveToVUContext(state)
-
-	ts.state = state
+	ts.hostTLSConfig = hostTLSConfig
 	return ts
 }
 
@@ -2590,17 +2581,17 @@ func newTestSetup(t testing.TB) testSetup {
 // and event loop, ready to execute scripts as if being executed in the
 // main context of k6.
 func newInitContextTestSetup(t testing.TB) testSetup {
-	runtime := modulestest.NewRuntime(t)
-	samples := make(chan metrics.SampleContainer, 1000)
+	t.Helper()
+	runtime := extensionapitest.NewRuntime()
 
-	rt := runtime.VU.RuntimeField
+	rt := runtime.VU.Runtime()
 	m := new(RootModule).NewModuleInstance(runtime.VU)
 	require.NoError(t, rt.Set("Client", m.Exports().Named["Client"]))
 
 	return testSetup{
 		runtime: runtime,
 		rt:      rt,
-		samples: samples,
+		vu:      runtime.VU,
 	}
 }
 
@@ -2608,7 +2599,7 @@ func TestClientTLS(t *testing.T) {
 	t.Parallel()
 
 	ts := newTestSetup(t)
-	ts.state.TLSConfig.InsecureSkipVerify = true
+	ts.hostTLSConfig.InsecureSkipVerify = true
 	rs := RunTSecure(t, nil)
 
 	err := ts.rt.Set("caCert", string(rs.TLSCertificate()))
@@ -2647,7 +2638,7 @@ func TestClientTLSAuth(t *testing.T) {
 	require.NoError(t, err)
 
 	ts := newTestSetup(t)
-	ts.state.TLSConfig.InsecureSkipVerify = true
+	ts.hostTLSConfig.InsecureSkipVerify = true
 	rs := RunTSecure(t, clientCert)
 
 	err = ts.rt.Set("caCert", string(rs.TLSCertificate()))
@@ -2701,10 +2692,11 @@ func TestClientTLSRespectsNetworkOPtions(t *testing.T) {
 	err = ts.rt.Set("clientPKey", string(clientPKey))
 	require.NoError(t, err)
 
-	// Set the redis server's IP to be blacklisted.
-	net, err := lib.ParseCIDR(rs.Addr().IP.String() + "/32")
-	require.NoError(t, err)
-	ts.state.Dialer.(*netext.Dialer).Blacklist = []*lib.IPNet{net}
+	// Set the redis server's IP to be rejected by the host's network capability.
+	blockedIP := rs.Addr().IP.String()
+	ts.vu.DialContextFunc = func(_ context.Context, _, _ string) (net.Conn, error) {
+		return nil, fmt.Errorf("IP (%s) is in a blacklisted range", blockedIP)
+	}
 
 	gotScriptErr := ts.runtime.EventLoop.Start(func() error {
 		_, err := ts.rt.RunString(fmt.Sprintf(`

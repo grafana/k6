@@ -102,6 +102,25 @@ selection. The capability is unavailable in init context and returns
 `ErrNetworkUnavailable`; extensions must not fall back to Go's default dialer
 or resolver because that would bypass host policy.
 
+### TLS capability
+
+`TLS` is an optional capability for client-side TLS over a connection created
+by `Network`:
+
+```go
+type TLS interface {
+    TLSClient(context.Context, net.Conn, *tls.Config) (net.Conn, error)
+}
+```
+
+k6 clones and retains ownership of its TLS configuration. The extension may
+supply per-connection SNI (`ServerName`) and ALPN (`NextProtos`), custom root
+certificates, and client certificates. Host policy remains authoritative for
+verification, protocol versions, cipher suites, renegotiation, and key
+logging. Custom extension roots replace the host root pool; client certificates
+are additive. `TLSClient()` takes ownership of the raw connection and closes it
+if the handshake fails or the context has already been cancelled.
+
 ### Promise and scheduler capabilities
 
 `Scheduler` reserves one event-loop callback on the JavaScript runtime
@@ -171,13 +190,13 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-sql` | Migrated | Its production code no longer needs k6; legacy tests need standalone test helpers. |
 | `xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | Migrated | Drivers are registration shims; MySQL uses `crypto/tls` constants. |
 | `xk6-faker` | Migrated | Uses the optional `Environment` capability for `XK6_FAKER_SEED`. |
-| `xk6-redis` | Can migrate after TLS policy | Promise/event-loop and network capabilities are available; it still merges k6 TLS settings into Redis TLS options. |
+| `xk6-redis` | Migration in progress | Production code uses `Network`, `TLS`, and `Promises`; its test harness still keeps k6 in the module graph. |
 | `xk6-tls` | Migrated | Uses `Network` and `Promises`; no k6 dependency remains. |
 | `xk6-kafka` | Can migrate after execution-state capability | Metrics/tags and built-in byte metrics are available; it still needs an active-vs-init state capability. |
 | `xk6-dns` | Deferred | Promise/event-loop is available; needs metrics/tags and a DNS-query policy/multi-record lookup capability. |
 | `xk6-icmp` | Deferred | Promise/event-loop, environment, and logger are available; needs ICMP packet sockets and metrics/tags. |
-| `xk6-mqtt` | Deferred | Promise/event-loop and logger are available; needs TLS policy and metrics/tags. |
-| `xk6-tcp` | Deferred | Network, promise/event-loop, and logger are available; needs TLS policy and metrics/tags. |
+| `xk6-mqtt` | Can migrate | Network, TLS, promises, logger, and metrics/tags are available; it needs routine rewiring to the standalone interfaces. |
+| `xk6-tcp` | Can migrate | Network, TLS, promises, logger, and metrics/tags are available; it needs routine rewiring to the standalone interfaces. |
 | `xk6-loki` | Deferred | Logger is available; needs a k6-aware HTTP executor, current tags, VU ID, and metrics. |
 | `xk6-client-prometheus-remote` | Deferred | Needs a k6-aware HTTP executor preserving transport, options, tags, and HTTP metrics. |
 | `xk6-sse` | Deferred | Needs HTTP transport/options/cookies plus HTTP/custom metrics and tags. |
@@ -187,13 +206,10 @@ validate the release tag registered for that k6 catalog version.
 
 The following capabilities are intentionally not in the base API:
 
-1. **TLS configuration**: policy-managed TLS configuration supplied by the
-   host. Resolver and cancellation-aware dialer access are now provided by the
-   optional `Network` capability.
-2. **HTTP execution**: a host executor with portable request/response types,
+1. **HTTP execution**: a host executor with portable request/response types,
    preserving k6 transport settings and built-in HTTP metrics when k6 is the
    host.
-3. **Small metadata services**: VU identity and active-vs-init execution
+2. **Small metadata services**: VU identity and active-vs-init execution
    state. Environment lookup and structured logging are now available.
 
 Each capability should be designed against at least one migrated extension and

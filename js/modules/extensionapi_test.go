@@ -2,8 +2,13 @@ package modules
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"log/slog"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -74,6 +79,70 @@ func TestExtensionAPIVUNetworkUnavailable(t *testing.T) {
 
 	_, err = network.DialContext(context.Background(), "tcp", "example.test:443")
 	require.ErrorIs(t, err, extensionapi.ErrNetworkUnavailable)
+}
+
+func TestExtensionAPIVUTLSClient(t *testing.T) {
+	t.Parallel()
+
+	serverNames := make(chan string, 1)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		serverNames <- request.TLS.ServerName
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	server.StartTLS()
+	defer server.Close()
+
+	hostTLSConfig := server.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
+	hostTLSConfig.NextProtos = nil
+	vu := extensionAPIVU{vu: extensionAPITestVU{state: &lib.State{TLSConfig: hostTLSConfig}}}
+	capability, ok := any(vu).(extensionapi.TLS)
+	require.True(t, ok)
+
+	serverURL, err := url.Parse(server.URL)
+	require.NoError(t, err)
+	dialer := net.Dialer{}
+	rawConnection, err := dialer.DialContext(context.Background(), "tcp", serverURL.Host)
+	require.NoError(t, err)
+	extensionTLSConfig := &tls.Config{
+		ServerName:         "example.com",
+		NextProtos:         []string{"http/1.1"},
+		InsecureSkipVerify: true, // The host policy must not inherit this.
+	}
+	connection, err := capability.TLSClient(context.Background(), rawConnection, extensionTLSConfig)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, connection.Close())
+	})
+
+	_, err = connection.Write([]byte("GET / HTTP/1.1\r\nHost: example.com\r\nConnection: close\r\n\r\n"))
+	require.NoError(t, err)
+	response := make([]byte, 1024)
+	_, err = connection.Read(response)
+	require.NoError(t, err)
+	require.Equal(t, "example.com", <-serverNames)
+	require.Nil(t, hostTLSConfig.NextProtos)
+	require.False(t, hostTLSConfig.InsecureSkipVerify)
+
+	rawConnection, err = dialer.DialContext(context.Background(), "tcp", serverURL.Host)
+	require.NoError(t, err)
+	_, err = capability.TLSClient(context.Background(), rawConnection, &tls.Config{
+		ServerName: "example.com",
+		RootCAs:    x509.NewCertPool(),
+	})
+	require.Error(t, err, "extension roots replace the host roots")
+}
+
+func TestExtensionAPIVUTLSClientUnavailable(t *testing.T) {
+	t.Parallel()
+
+	connection, peer := net.Pipe()
+	t.Cleanup(func() {
+		require.NoError(t, peer.Close())
+	})
+	vu := extensionAPIVU{vu: extensionAPITestVU{}}
+	capability := any(vu).(extensionapi.TLS)
+	_, err := capability.TLSClient(context.Background(), connection, nil)
+	require.ErrorIs(t, err, extensionapi.ErrTLSUnavailable)
 }
 
 func TestExtensionAPISlogHandler(t *testing.T) {

@@ -7,6 +7,7 @@ package extensionapi
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -191,6 +192,21 @@ var ErrNetworkUnavailable = errors.New("extension API network capability is unav
 type Network interface {
 	DialContext(ctx context.Context, network, address string) (net.Conn, error)
 	LookupHost(ctx context.Context, host string) ([]string, error)
+}
+
+// ErrTLSUnavailable is returned when a host cannot apply its TLS policy in
+// the current context, such as k6's init context.
+var ErrTLSUnavailable = errors.New("extension API TLS capability is unavailable")
+
+// TLS is an optional VU capability for client TLS handshakes. The host owns
+// and applies its TLS policy. Extensions may supply a configuration with
+// connection-specific ServerName or NextProtos values and extension-specific
+// roots or client certificates; hosts must not expose their owned TLS config.
+//
+// TLSClient takes ownership of conn. It closes conn when the handshake fails.
+// Extensions obtain it with a type assertion from VU.
+type TLS interface {
+	TLSClient(ctx context.Context, conn net.Conn, config *tls.Config) (net.Conn, error)
 }
 
 // Task is JavaScript-runtime work that a Scheduler executes on the owning

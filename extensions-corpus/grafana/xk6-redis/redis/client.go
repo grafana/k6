@@ -3,24 +3,35 @@ package redis
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/redis/go-redis/v9"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/js/promises"
-	"go.k6.io/k6/v2/lib"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // Client represents the Client constructor (i.e. `new redis.Client()`) and
 // returns a new Redis client object.
 type Client struct {
-	vu           modules.VU
+	vu           extensionapi.VU
 	redisOptions *redis.UniversalOptions
 	redisClient  redis.UniversalClient
+}
+
+var promises extensionAPIPromises
+
+type extensionAPIPromises struct{}
+
+func (extensionAPIPromises) New(vu extensionapi.VU) (*sobek.Promise, func(any), func(any)) {
+	capability, ok := vu.(extensionapi.Promises)
+	if !ok {
+		panic("extension API promise capability is unavailable")
+	}
+	promise, resolver := capability.NewPromise()
+	return promise, resolver.Resolve, resolver.Reject
 }
 
 // Set the given key with the given value.
@@ -1048,9 +1059,9 @@ func (c *Client) connect() error {
 	// As a general convention, k6 should not perform IO in the
 	// init context. Thus, the Connect method will error if
 	// called in the init context.
-	vuState := c.vu.State()
-	if vuState == nil {
-		return common.NewInitContextError("connecting to a redis server in the init context is not supported")
+	network, ok := c.vu.(extensionapi.Network)
+	if !ok {
+		return errors.New("connecting to a redis server in the init context is not supported")
 	}
 
 	// If the redisClient is already instantiated, it is safe
@@ -1060,36 +1071,22 @@ func (c *Client) connect() error {
 	}
 
 	tlsCfg := c.redisOptions.TLSConfig
-	if tlsCfg != nil && vuState.TLSConfig != nil {
-		// Merge k6 TLS configuration with the one we received from the
-		// Client constructor. This will need adjusting depending on which
-		// options we want to expose in the Redis module, and how we want
-		// the override to work.
-		tlsCfg.InsecureSkipVerify = vuState.TLSConfig.InsecureSkipVerify
-		tlsCfg.CipherSuites = vuState.TLSConfig.CipherSuites
-		tlsCfg.MinVersion = vuState.TLSConfig.MinVersion
-		tlsCfg.MaxVersion = vuState.TLSConfig.MaxVersion
-		tlsCfg.Renegotiation = vuState.TLSConfig.Renegotiation
-		tlsCfg.KeyLogWriter = vuState.TLSConfig.KeyLogWriter
-		tlsCfg.Certificates = append(tlsCfg.Certificates, vuState.TLSConfig.Certificates...)
-
-		// TODO: Merge vuState.TLSConfig.RootCAs with
-		// c.redisOptions.TLSConfig. k6 currently doesn't allow setting
-		// this, so it doesn't matter right now, but these should be merged.
-		// I couldn't find a way to do this with the x509.CertPool API
-		// though...
-
-		// In order to preserve the underlying effects of the [netext.Dialer], such
-		// as handling blocked hostnames, or handling hostname resolution, we override
-		// the redis client's dialer with our own function which uses the VU's [netext.Dialer]
-		// and manually upgrades the connection to TLS.
+	if tlsCfg != nil {
+		// In order to preserve host network behavior such as blocked hostnames and
+		// hostname resolution, route the Redis dialer and TLS handshake through the
+		// VU capabilities. TLSClient applies the host TLS policy and merges the
+		// extension's TLS options.
 		//
 		// See Pull Request's #17 [discussion] for more details.
 		//
 		// [discussion]: https://github.com/grafana/xk6-redis/pull/17#discussion_r1369707388
-		c.redisOptions.Dialer = c.upgradeDialerToTLS(vuState.Dialer, tlsCfg)
+		tlsCapability, ok := c.vu.(extensionapi.TLS)
+		if !ok {
+			return extensionapi.ErrTLSUnavailable
+		}
+		c.redisOptions.Dialer = c.upgradeDialerToTLS(network, tlsCapability, tlsCfg)
 	} else {
-		c.redisOptions.Dialer = vuState.Dialer.DialContext
+		c.redisOptions.Dialer = network.DialContext
 	}
 
 	// Replace the internal redis client instance with a new
@@ -1142,28 +1139,27 @@ type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, 
 // the connection and handle network-related options such as blocked hostnames,
 // or hostname resolution, but we also want to use the TLS configuration provided
 // by the user.
-func (c *Client) upgradeDialerToTLS(dialer lib.DialContexter, config *tls.Config) DialContextFunc {
+func (c *Client) upgradeDialerToTLS(networkCapability extensionapi.Network, tlsCapability extensionapi.TLS, config *tls.Config) DialContextFunc {
 	return func(ctx context.Context, network string, addr string) (net.Conn, error) {
 		// Use netext.Dialer to establish the connection
-		rawConn, err := dialer.DialContext(ctx, network, addr)
+		rawConn, err := networkCapability.DialContext(ctx, network, addr)
 		if err != nil {
 			return nil, err
 		}
 
-		// Upgrade the connection to TLS if needed
-		tlsConn := tls.Client(rawConn, config)
-		err = tlsConn.HandshakeContext(ctx)
-		if err != nil {
-			if closeErr := rawConn.Close(); closeErr != nil {
-				return nil, fmt.Errorf("failed to close connection after TLS handshake error: %w", closeErr)
+		// go-redis normally derives the server name from addr. Preserve that behavior
+		// when delegating the TLS handshake to the host capability, without mutating
+		// the configuration shared by pooled connections.
+		tlsConfig := config.Clone()
+		if tlsConfig.ServerName == "" {
+			serverName, _, err := net.SplitHostPort(addr)
+			if err != nil {
+				_ = rawConn.Close()
+				return nil, fmt.Errorf("split Redis TLS address: %w", err)
 			}
-
-			return nil, err
+			tlsConfig.ServerName = serverName
 		}
 
-		// Overwrite rawConn with the TLS connection
-		rawConn = tlsConn
-
-		return rawConn, nil
+		return tlsCapability.TLSClient(ctx, rawConn, tlsConfig)
 	}
 }

@@ -2,6 +2,7 @@ package modules
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net"
@@ -87,6 +88,50 @@ func (v extensionAPIVU) LookupHost(ctx context.Context, host string) ([]string, 
 	}
 
 	return []string{ip.String()}, nil
+}
+
+func (v extensionAPIVU) TLSClient(ctx context.Context, conn net.Conn, config *tls.Config) (net.Conn, error) {
+	if err := ctx.Err(); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+
+	state := v.vu.State()
+	if state == nil {
+		_ = conn.Close()
+		return nil, extensionapi.ErrTLSUnavailable
+	}
+
+	tlsConfig := &tls.Config{}
+	if state.TLSConfig != nil {
+		tlsConfig = state.TLSConfig.Clone()
+	}
+	if config != nil {
+		mergeExtensionAPITLSConfig(tlsConfig, config)
+	}
+
+	tlsConn := tls.Client(conn, tlsConfig)
+	if err := tlsConn.HandshakeContext(ctx); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+
+	return tlsConn, nil
+}
+
+func mergeExtensionAPITLSConfig(host, extension *tls.Config) {
+	if extension.ServerName != "" {
+		host.ServerName = extension.ServerName
+	}
+	if extension.NextProtos != nil {
+		host.NextProtos = append([]string(nil), extension.NextProtos...)
+	}
+	if extension.RootCAs != nil {
+		host.RootCAs = extension.RootCAs
+	}
+	if len(extension.Certificates) > 0 {
+		host.Certificates = append(host.Certificates, extension.Certificates...)
+	}
 }
 
 func (v extensionAPIVU) RegisterCallback() func(extensionapi.Task) {
