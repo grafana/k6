@@ -2,7 +2,9 @@ package extensionapitest
 
 import (
 	"context"
+	"io/fs"
 	"testing"
+	"testing/fstest"
 
 	extensionapi "go.k6.io/k6-extension-api"
 )
@@ -86,6 +88,28 @@ func TestVUMetrics(t *testing.T) {
 	}
 	if got := samples[0].Tags.Values()["url"]; got != "https://example.test" {
 		t.Fatalf("unexpected URL tag %q", got)
+	}
+}
+
+func TestVUFileSystem(t *testing.T) {
+	t.Parallel()
+	vu := NewVU()
+	_, err := vu.FileSystem()
+	if err != extensionapi.ErrFileSystemUnavailable {
+		t.Fatalf("FileSystem error = %v, want %v", err, extensionapi.ErrFileSystemUnavailable)
+	}
+
+	vu.FileSystemValue = fstest.MapFS{"keystore.jks": {Data: []byte("key")}}
+	fileSystem, err := vu.FileSystem()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := fs.ReadFile(fileSystem, "keystore.jks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "key" {
+		t.Fatalf("file contents = %q, want %q", data, "key")
 	}
 }
 

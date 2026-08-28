@@ -5,11 +5,11 @@
 package xk6kafka
 
 import (
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 
 	"github.com/grafana/xk6-kafka/pkg/kafka"
 )
 
 func init() {
-	modules.Register("k6/x/kafka", new(kafka.RootModule))
+	extensionapi.Register("k6/x/kafka", new(kafka.RootModule))
 }

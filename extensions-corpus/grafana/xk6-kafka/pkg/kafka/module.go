@@ -11,8 +11,8 @@ import (
 	"fmt"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 // RootModule is the global module factory; one is created per k6 process.
@@ -20,24 +20,22 @@ type RootModule struct{}
 
 // Module is the per-VU instance of the k6/x/kafka module.
 type Module struct {
-	vu      modules.VU
+	vu      extensionapi.VU
 	exports *sobek.Object
 	metrics *kafkaMetrics
 }
 
 var (
-	_ modules.Module   = (*RootModule)(nil)
-	_ modules.Instance = (*Module)(nil)
+	_ extensionapi.Module   = (*RootModule)(nil)
+	_ extensionapi.Instance = (*Module)(nil)
 )
 
 // NewModuleInstance implements modules.Module. It builds the module's default
 // export object with the flat constants and the public symbols.
-func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*RootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	m := &Module{vu: vu, exports: vu.Runtime().NewObject()}
-	// Register custom metrics from the init environment (present when the module
-	// is imported during VU init). If absent, metrics are simply not emitted.
-	if ie := vu.InitEnv(); ie != nil && ie.Registry != nil {
-		m.metrics = registerMetrics(ie.Registry)
+	if metrics, ok := vu.(extensionapi.Metrics); ok {
+		m.metrics = registerMetrics(metrics)
 	}
 	m.defineConstants()
 	m.defineSymbols()
@@ -62,8 +60,13 @@ func (m *Module) readerCollector() *metricsCollector {
 
 // Exports implements modules.Instance. The module members are exposed as the
 // default export object; named imports resolve to its properties.
-func (m *Module) Exports() modules.Exports {
-	return modules.Exports{Default: m.exports}
+func (m *Module) Exports() extensionapi.Exports {
+	return extensionapi.Exports{Default: m.exports}
+}
+
+func inVUContext(vu extensionapi.VU) bool {
+	execution, ok := vu.(extensionapi.Execution)
+	return !ok || execution.ExecutionPhase() == extensionapi.ExecutionPhaseVU
 }
 
 // defineConstants attaches the flat top-level constants to the export object.

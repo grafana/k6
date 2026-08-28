@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 // TestConnectionExposesClose verifies the Go Close method is reachable from JS
@@ -13,10 +13,10 @@ import (
 func TestConnectionExposesClose(t *testing.T) {
 	t.Parallel()
 
-	rt := modulestest.NewRuntime(t)
-	require.NoError(t, rt.VU.Runtime().Set("conn", &Connection{}))
+	vu := extensionapitest.NewVU()
+	require.NoError(t, vu.Runtime().Set("conn", &Connection{}))
 
-	v, err := rt.VU.Runtime().RunString(`typeof conn.close`)
+	v, err := vu.Runtime().RunString(`typeof conn.close`)
 	require.NoError(t, err)
 	require.Equal(t, "function", v.String())
 }

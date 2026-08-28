@@ -3,19 +3,15 @@ package kafka
 import (
 	"testing"
 
-	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/common"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
-// decodeJS decodes a JS object literal into dst through the exact field-name
-// mapper k6 installs (common.FieldNameMapper), which resolves names via the
-// `js:` struct tag (else snake_case) — NOT the `json:` tag. This pins that the
-// config structs bind from the camelCase names declared in index.d.ts.
+// decodeJS decodes a JS object literal into dst through the standalone test
+// host's field-name mapper, which resolves names through `js:` struct tags.
 func decodeJS(t *testing.T, objectLiteral string, dst any) {
 	t.Helper()
-	rt := sobek.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt := extensionapitest.NewVU().Runtime()
 	v, err := rt.RunString("(" + objectLiteral + ")")
 	require.NoError(t, err)
 	require.NoError(t, rt.ExportTo(v, dst))
@@ -81,8 +77,7 @@ func TestConfigCamelCaseBinding(t *testing.T) {
 
 func TestConsumedMessageOutputIsCamelCase(t *testing.T) {
 	t.Parallel()
-	rt := sobek.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	rt := extensionapitest.NewVU().Runtime()
 	require.NoError(t, rt.Set("m", ConsumedMessage{Topic: "t", HighWaterMark: 42}))
 	v, err := rt.RunString(`m.highWaterMark === 42 && m.topic === "t" && m.high_water_mark === undefined`)
 	require.NoError(t, err)

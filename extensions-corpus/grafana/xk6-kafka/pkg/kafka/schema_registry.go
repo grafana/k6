@@ -20,7 +20,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/hamba/avro/v2"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // schemaRegistryTimeout bounds every Schema Registry HTTP call so a slow or
@@ -74,7 +74,7 @@ type SchemaRegistryConfig struct {
 
 // SchemaRegistry is a client for Schema Registry and serdes operations.
 type SchemaRegistry struct {
-	vu     modules.VU
+	vu     extensionapi.VU
 	config *SchemaRegistryConfig
 	client *http.Client
 
@@ -96,7 +96,7 @@ func (sr *SchemaRegistry) reqContext() context.Context {
 }
 
 // vuContext resolves the usable context for a (possibly nil) VU.
-func vuContext(vu modules.VU) context.Context {
+func vuContext(vu extensionapi.VU) context.Context {
 	if vu != nil {
 		if ctx := vu.Context(); ctx != nil {
 			return ctx
@@ -106,7 +106,7 @@ func vuContext(vu modules.VU) context.Context {
 }
 
 // NewSchemaRegistry creates a new SchemaRegistry client.
-func NewSchemaRegistry(vu modules.VU, config *SchemaRegistryConfig) (*SchemaRegistry, error) {
+func NewSchemaRegistry(vu extensionapi.VU, config *SchemaRegistryConfig) (*SchemaRegistry, error) {
 	if config == nil {
 		// Standalone mode: no registry, so no registry-response caching, but
 		// parsed-Avro reuse still applies to inline schemas.
@@ -119,6 +119,9 @@ func NewSchemaRegistry(vu modules.VU, config *SchemaRegistryConfig) (*SchemaRegi
 
 	if config.URL == "" {
 		return nil, fmt.Errorf("SchemaRegistry: url is required")
+	}
+	if !inVUContext(vu) {
+		return nil, errors.New("SchemaRegistry must be created in the VU context (default/setup/teardown function), not in init")
 	}
 
 	// Build HTTP client with TLS config. Timeout bounds every call so an

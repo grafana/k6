@@ -6,19 +6,18 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/kmsg"
-	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
+	extensionapi "go.k6.io/k6-extension-api"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 // newTestConnection builds a Connection with a lazy client (no dial) in the VU
 // context, for exercising the admin methods' local logic without a broker.
 func newTestConnection(t *testing.T) *Connection {
 	t.Helper()
-	rt := modulestest.NewRuntime(t)
-	rt.MoveToVUContext(&lib.State{})
+	vu := extensionapitest.NewVU()
 	client, err := kgo.NewClient(kgo.SeedBrokers("b:9092"))
 	require.NoError(t, err)
-	conn := &Connection{vu: rt.VU, client: client}
+	conn := &Connection{vu: vu, client: client}
 	t.Cleanup(conn.Close)
 	return conn
 }
@@ -129,10 +128,11 @@ func TestDeleteTopicValidation(t *testing.T) {
 
 func TestAdminRejectsInitContext(t *testing.T) {
 	t.Parallel()
-	rt := modulestest.NewRuntime(t) // init context: State is nil
+	vu := extensionapitest.NewVU()
+	vu.Phase = extensionapi.ExecutionPhaseInit
 	client, err := kgo.NewClient(kgo.SeedBrokers("b:9092"))
 	require.NoError(t, err)
-	conn := &Connection{vu: rt.VU, client: client}
+	conn := &Connection{vu: vu, client: client}
 	t.Cleanup(conn.Close)
 
 	require.Error(t, conn.CreateTopic(TopicConfig{Topic: "t"}))
@@ -154,15 +154,14 @@ func TestAdminAfterCloseErrors(t *testing.T) {
 
 func TestConnectionExposesMethods(t *testing.T) {
 	t.Parallel()
-	rt := modulestest.NewRuntime(t)
-	rt.MoveToVUContext(&lib.State{})
+	vu := extensionapitest.NewVU()
 	client, err := kgo.NewClient(kgo.SeedBrokers("b:9092"))
 	require.NoError(t, err)
-	conn := &Connection{vu: rt.VU, client: client}
+	conn := &Connection{vu: vu, client: client}
 	t.Cleanup(conn.Close)
-	require.NoError(t, rt.VU.Runtime().Set("c", conn))
+	require.NoError(t, vu.Runtime().Set("c", conn))
 
-	v, err := rt.VU.Runtime().RunString(
+	v, err := vu.Runtime().RunString(
 		`typeof c.createTopic === "function" && typeof c.deleteTopic === "function" && ` +
 			`typeof c.listTopics === "function" && typeof c.close === "function"`)
 	require.NoError(t, err)

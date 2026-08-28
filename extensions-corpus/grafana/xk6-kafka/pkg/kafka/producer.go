@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // WriterConfig is the producer configuration (see index.d.ts WriterConfig).
@@ -48,18 +48,18 @@ type ProduceConfig struct {
 
 // Writer produces messages to Kafka.
 type Writer struct {
-	vu           modules.VU
+	vu           extensionapi.VU
 	client       *kgo.Client
 	collector    *metricsCollector
 	defaultTopic string
 }
 
 // openWriter builds a producer client from the config.
-func openWriter(vu modules.VU, cfg WriterConfig, collector *metricsCollector) (*Writer, error) {
+func openWriter(vu extensionapi.VU, cfg WriterConfig, collector *metricsCollector) (*Writer, error) {
 	if len(cfg.Brokers) == 0 {
 		return nil, errors.New("at least one broker is required")
 	}
-	opts, err := writerOptions(cfg, collector)
+	opts, err := writerOptions(vu, cfg, collector)
 	if err != nil {
 		return nil, err
 	}
@@ -71,8 +71,8 @@ func openWriter(vu modules.VU, cfg WriterConfig, collector *metricsCollector) (*
 }
 
 // writerOptions assembles the franz-go options for a producer.
-func writerOptions(cfg WriterConfig, collector *metricsCollector) ([]kgo.Opt, error) {
-	opts, err := clientOptions(cfg.Brokers, cfg.SASL, cfg.TLS)
+func writerOptions(vu extensionapi.VU, cfg WriterConfig, collector *metricsCollector) ([]kgo.Opt, error) {
+	opts, err := clientOptions(vu, cfg.Brokers, cfg.SASL, cfg.TLS)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +178,7 @@ func partitioner(balancer any) kgo.Partitioner {
 // Produce writes the messages to Kafka, blocking until the broker acknowledges
 // the batch. It throws (returns an error) on the first produce failure.
 func (w *Writer) Produce(config ProduceConfig) error {
-	if w.vu.State() == nil {
+	if !inVUContext(w.vu) {
 		return errors.New("produce must be called in the VU context (default/setup/teardown function), not in init")
 	}
 	if w.client == nil {

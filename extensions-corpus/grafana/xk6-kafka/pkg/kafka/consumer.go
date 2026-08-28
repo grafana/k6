@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/twmb/franz-go/pkg/kgo"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // defaultMaxWait is the consume poll deadline / fetch wait when maxWait is unset
@@ -64,7 +64,7 @@ type ConsumedMessage struct {
 
 // Reader reads messages from Kafka.
 type Reader struct {
-	vu        modules.VU
+	vu        extensionapi.VU
 	client    *kgo.Client
 	maxWait   time.Duration
 	collector *metricsCollector
@@ -72,7 +72,7 @@ type Reader struct {
 }
 
 // openReader builds a consumer client (group or direct) from the config.
-func openReader(vu modules.VU, cfg ReaderConfig, collector *metricsCollector) (*Reader, error) {
+func openReader(vu extensionapi.VU, cfg ReaderConfig, collector *metricsCollector) (*Reader, error) {
 	if len(cfg.Brokers) == 0 {
 		return nil, errors.New("at least one broker is required")
 	}
@@ -98,7 +98,7 @@ func openReader(vu modules.VU, cfg ReaderConfig, collector *metricsCollector) (*
 		maxWait = d
 	}
 
-	opts, err := readerOptions(cfg, maxWait, collector)
+	opts, err := readerOptions(vu, cfg, maxWait, collector)
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +110,8 @@ func openReader(vu modules.VU, cfg ReaderConfig, collector *metricsCollector) (*
 }
 
 // readerOptions assembles the franz-go options for a consumer.
-func readerOptions(cfg ReaderConfig, maxWait time.Duration, collector *metricsCollector) ([]kgo.Opt, error) {
-	opts, err := clientOptions(cfg.Brokers, cfg.SASL, cfg.TLS)
+func readerOptions(vu extensionapi.VU, cfg ReaderConfig, maxWait time.Duration, collector *metricsCollector) ([]kgo.Opt, error) {
+	opts, err := clientOptions(vu, cfg.Brokers, cfg.SASL, cfg.TLS)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +240,7 @@ func effectiveGroupBalancers(names []string) []kgo.GroupBalancer {
 // default a timeout before `limit` throws; with expectTimeout it returns the
 // partial batch.
 func (r *Reader) Consume(config ConsumeConfig) ([]ConsumedMessage, error) {
-	if r.vu.State() == nil {
+	if !inVUContext(r.vu) {
 		return nil, errors.New("consume must be called in the VU context (default/setup/teardown function), not in init")
 	}
 	if r.client == nil {

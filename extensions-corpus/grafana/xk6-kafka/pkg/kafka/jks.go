@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 
 	"github.com/grafana/sobek"
 	keystore "github.com/pavlo-v-chernykh/keystore-go/v4"
-	"go.k6.io/k6/v2/js/common"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
 // loadJKS implements the LoadJKS function. It is an init-context operation: it
@@ -18,9 +20,13 @@ import (
 func (m *Module) loadJKS(call sobek.FunctionCall) sobek.Value {
 	rt := m.vu.Runtime()
 
-	initEnv := m.vu.InitEnv()
-	if initEnv == nil {
+	execution, ok := m.vu.(extensionapi.Execution)
+	if !ok || execution.ExecutionPhase() != extensionapi.ExecutionPhaseInit {
 		common.Throw(rt, errors.New("LoadJKS must be called in the init context"))
+	}
+	fileSystem, ok := m.vu.(extensionapi.InitFileSystem)
+	if !ok {
+		common.Throw(rt, extensionapi.ErrFileSystemUnavailable)
 	}
 
 	var cfg JKSConfig
@@ -28,7 +34,11 @@ func (m *Module) loadJKS(call sobek.FunctionCall) sobek.Value {
 		common.Throw(rt, fmt.Errorf("invalid JKS config: %w", err))
 	}
 
-	jks, err := readJKS(initEnv, cfg)
+	fileFS, err := fileSystem.FileSystem()
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	jks, err := readJKS(fileFS, cfg)
 	if err != nil {
 		common.Throw(rt, err)
 	}
@@ -37,16 +47,12 @@ func (m *Module) loadJKS(call sobek.FunctionCall) sobek.Value {
 
 // readJKS loads the keystore via the init-environment filesystem and converts
 // its entries to PEM. Only the JKS format is supported; PKCS#12 fails to decode.
-func readJKS(initEnv *common.InitEnvironment, cfg JKSConfig) (*JKS, error) {
+func readJKS(fileSystem fs.FS, cfg JKSConfig) (*JKS, error) {
 	if cfg.Path == "" {
 		return nil, errors.New("JKS path is required")
 	}
 
-	fs, ok := initEnv.FileSystems["file"]
-	if !ok {
-		return nil, errors.New("no file system available to load the keystore")
-	}
-	f, err := fs.Open(initEnv.GetAbsFilePath(cfg.Path))
+	f, err := fileSystem.Open(cfg.Path)
 	if err != nil {
 		return nil, fmt.Errorf("opening keystore %s: %w", cfg.Path, err)
 	}

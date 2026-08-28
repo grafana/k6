@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"net"
@@ -83,6 +84,17 @@ const (
 
 // Execution is an optional VU capability exposing the current execution phase.
 type Execution interface{ ExecutionPhase() ExecutionPhase }
+
+// ErrFileSystemUnavailable is returned when a host cannot provide its
+// archive-aware init-context filesystem.
+var ErrFileSystemUnavailable = errors.New("extension API init filesystem capability is unavailable")
+
+// InitFileSystem is an optional capability for reading files supplied with a
+// test during init context. The returned filesystem uses io/fs paths and must
+// not expose the host operating-system filesystem directly.
+type InitFileSystem interface {
+	FileSystem() (fs.FS, error)
+}
 
 // VUIdentity is an optional VU capability exposing a stable numeric VU ID.
 type VUIdentity interface{ VUID() uint64 }

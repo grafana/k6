@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 // newTestModule builds a module instance on a test runtime and exposes its
 // default export as the global `kafka`.
-func newTestModule(t *testing.T) *modulestest.Runtime {
+func newTestModule(t *testing.T) *extensionapitest.Runtime {
 	t.Helper()
-	rt := modulestest.NewRuntime(t)
+	rt := extensionapitest.NewRuntime()
 	mi := new(RootModule).NewModuleInstance(rt.VU)
 	require.NoError(t, rt.VU.Runtime().Set("kafka", mi.Exports().Default))
 	return rt

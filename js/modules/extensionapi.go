@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -34,6 +35,12 @@ func (a extensionAPIModuleAdapter) NewModuleInstance(vu VU) Instance {
 type extensionAPIVU struct {
 	vu VU
 }
+
+type extensionAPIFileSystem struct {
+	open func(string) (fs.File, error)
+}
+
+func (f extensionAPIFileSystem) Open(name string) (fs.File, error) { return f.open(name) }
 
 func (v extensionAPIVU) Do(
 	ctx context.Context, request *http.Request, options extensionapi.HTTPOptions,
@@ -76,6 +83,23 @@ func (v extensionAPIVU) ExecutionPhase() extensionapi.ExecutionPhase {
 		return extensionapi.ExecutionPhaseInit
 	}
 	return extensionapi.ExecutionPhaseVU
+}
+
+func (v extensionAPIVU) FileSystem() (fs.FS, error) {
+	if v.vu.State() != nil {
+		return nil, extensionapi.ErrFileSystemUnavailable
+	}
+	initEnv := v.vu.InitEnv()
+	if initEnv == nil {
+		return nil, extensionapi.ErrFileSystemUnavailable
+	}
+	fileSystem, ok := initEnv.FileSystems["file"]
+	if !ok {
+		return nil, extensionapi.ErrFileSystemUnavailable
+	}
+	return extensionAPIFileSystem{open: func(name string) (fs.File, error) {
+		return fileSystem.Open(initEnv.GetAbsFilePath(name))
+	}}, nil
 }
 
 func (v extensionAPIVU) VUID() uint64 {

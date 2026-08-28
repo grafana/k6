@@ -6,8 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 func TestCompressionCodec(t *testing.T) {
@@ -85,32 +84,31 @@ func TestToBytes(t *testing.T) {
 
 func TestOpenWriterRequiresBrokers(t *testing.T) {
 	t.Parallel()
-	rt := modulestest.NewRuntime(t)
-	_, err := openWriter(rt.VU, WriterConfig{Topic: "t"}, nil)
+	vu := extensionapitest.NewVU()
+	_, err := openWriter(vu, WriterConfig{Topic: "t"}, nil)
 	require.Error(t, err)
 }
 
 func TestOpenWriterRejectsInvalidAcks(t *testing.T) {
 	t.Parallel()
-	rt := modulestest.NewRuntime(t)
+	vu := extensionapitest.NewVU()
 	acks := 2
-	_, err := openWriter(rt.VU, WriterConfig{Brokers: []string{"localhost:9092"}, RequiredAcks: &acks}, nil)
+	_, err := openWriter(vu, WriterConfig{Brokers: []string{"localhost:9092"}, RequiredAcks: &acks}, nil)
 	require.Error(t, err)
 }
 
 func TestOpenWriterRejectsNegativeMaxAttempts(t *testing.T) {
 	t.Parallel()
-	rt := modulestest.NewRuntime(t)
+	vu := extensionapitest.NewVU()
 	n := -1
-	_, err := openWriter(rt.VU, WriterConfig{Brokers: []string{"localhost:9092"}, MaxAttempts: &n}, nil)
+	_, err := openWriter(vu, WriterConfig{Brokers: []string{"localhost:9092"}, MaxAttempts: &n}, nil)
 	require.Error(t, err)
 }
 
 func TestProduceAfterCloseErrors(t *testing.T) {
 	t.Parallel()
-	rt := modulestest.NewRuntime(t)
-	rt.MoveToVUContext(&lib.State{}) // non-nil VU state so produce passes the init guard
-	w, err := openWriter(rt.VU, WriterConfig{Brokers: []string{"localhost:9092"}, Topic: "t"}, nil)
+	vu := extensionapitest.NewVU()
+	w, err := openWriter(vu, WriterConfig{Brokers: []string{"localhost:9092"}, Topic: "t"}, nil)
 	require.NoError(t, err)
 	w.Close()
 
@@ -121,14 +119,14 @@ func TestProduceAfterCloseErrors(t *testing.T) {
 
 func TestWriterExposesMethods(t *testing.T) {
 	t.Parallel()
-	rt := modulestest.NewRuntime(t)
+	vu := extensionapitest.NewVU()
 	// NewClient is lazy, so a Writer constructs without a broker.
-	w, err := openWriter(rt.VU, WriterConfig{Brokers: []string{"localhost:9092"}, Topic: "t"}, nil)
+	w, err := openWriter(vu, WriterConfig{Brokers: []string{"localhost:9092"}, Topic: "t"}, nil)
 	require.NoError(t, err)
 	t.Cleanup(w.Close)
-	require.NoError(t, rt.VU.Runtime().Set("w", w))
+	require.NoError(t, vu.Runtime().Set("w", w))
 
-	v, err := rt.VU.Runtime().RunString(`typeof w.produce === "function" && typeof w.close === "function"`)
+	v, err := vu.Runtime().RunString(`typeof w.produce === "function" && typeof w.close === "function"`)
 	require.NoError(t, err)
 	require.True(t, v.ToBoolean())
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"io/fs"
 	"log/slog"
 	"net"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/fsext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -158,6 +160,23 @@ func TestExtensionAPIVUTLSClientUnavailable(t *testing.T) {
 	capability := any(vu).(extensionapi.TLS)
 	_, err := capability.TLSClient(context.Background(), connection, nil)
 	require.ErrorIs(t, err, extensionapi.ErrTLSUnavailable)
+}
+
+func TestExtensionAPIInitFileSystem(t *testing.T) {
+	t.Parallel()
+	memoryFS := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(memoryFS, "/keystore.jks", []byte("key"), 0o600))
+	vu := extensionAPIVU{vu: extensionAPITestVU{initEnv: &common.InitEnvironment{
+		FileSystems: map[string]fsext.Fs{"file": memoryFS},
+		CWD:         &url.URL{Path: "/"},
+	}}}
+	fileSystem, ok := any(vu).(extensionapi.InitFileSystem)
+	require.True(t, ok)
+	provided, err := fileSystem.FileSystem()
+	require.NoError(t, err)
+	data, err := fs.ReadFile(provided, "keystore.jks")
+	require.NoError(t, err)
+	require.Equal(t, []byte("key"), data)
 }
 
 func TestExtensionAPISlogHandler(t *testing.T) {

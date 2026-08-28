@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net"
 	"reflect"
@@ -23,6 +24,7 @@ import (
 type VU struct {
 	RuntimeValue *sobek.Runtime
 	ContextValue context.Context
+	Phase        extensionapi.ExecutionPhase
 
 	LookupEnvFunc     func(string) (string, bool)
 	LoggerValue       *slog.Logger
@@ -30,6 +32,7 @@ type VU struct {
 	LookupHostFunc    func(context.Context, string) ([]string, error)
 	CheckHostFunc     func(context.Context, string) error
 	TLSClientFunc     func(context.Context, net.Conn, *tls.Config) (net.Conn, error)
+	FileSystemValue   fs.FS
 	EnabledSystemTag  map[extensionapi.SystemTag]bool
 	MetadataSystemTag map[extensionapi.SystemTag]bool
 
@@ -72,6 +75,7 @@ func NewVU() *VU {
 	vu := &VU{
 		RuntimeValue: runtime,
 		ContextValue: context.Background(),
+		Phase:        extensionapi.ExecutionPhaseVU,
 		LoggerValue:  slog.New(slog.NewTextHandler(discardWriter{}, nil)),
 		metrics:      make(map[string]extensionapi.MetricSpec),
 		builtins:     make(map[extensionapi.BuiltinMetric]extensionapi.Metric),
@@ -91,6 +95,9 @@ func (v *VU) Context() context.Context { return v.ContextValue }
 
 // Runtime implements extensionapi.VU.
 func (v *VU) Runtime() *sobek.Runtime { return v.RuntimeValue }
+
+// ExecutionPhase implements extensionapi.Execution.
+func (v *VU) ExecutionPhase() extensionapi.ExecutionPhase { return v.Phase }
 
 // LookupEnv implements extensionapi.Environment.
 func (v *VU) LookupEnv(key string) (string, bool) {
@@ -134,6 +141,14 @@ func (v *VU) TLSClient(ctx context.Context, conn net.Conn, config *tls.Config) (
 		return nil, extensionapi.ErrTLSUnavailable
 	}
 	return v.TLSClientFunc(ctx, conn, config)
+}
+
+// FileSystem implements extensionapi.InitFileSystem.
+func (v *VU) FileSystem() (fs.FS, error) {
+	if v.FileSystemValue == nil {
+		return nil, extensionapi.ErrFileSystemUnavailable
+	}
+	return v.FileSystemValue, nil
 }
 
 // RegisterCallback implements extensionapi.Scheduler. Every returned callback
