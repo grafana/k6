@@ -192,15 +192,16 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 // GlobalFlags contains global config values that apply for all k6 sub-commands.
 type GlobalFlags struct {
-	ConfigFilePath   string
-	Quiet            bool
-	NoColor          bool
-	Address          string
-	ProfilingEnabled bool
-	LogOutput        string
-	SecretSource     []string
-	LogFormat        string
-	Verbose          bool
+	ConfigFilePath          string
+	Quiet                   bool
+	NoColor                 bool
+	Address                 string
+	ProfilingEnabled        bool
+	LogOutput               string
+	SecretSource            []string
+	LogFormat               string
+	LogNanosecondTimestamps bool
+	Verbose                 bool
 
 	AutoExtensionResolution bool
 	BuildServiceURL         string
@@ -246,6 +247,9 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	// color output from k6.
 	if _, ok := env["NO_COLOR"]; ok {
 		result.NoColor = true
+	}
+	if _, ok := env["K6_LOG_NS_TIMESTAMPS"]; ok {
+		result.LogNanosecondTimestamps = true
 	}
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true

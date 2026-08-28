@@ -45,6 +45,20 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `access token not configured`)
 	})
 
+	t.Run("TestCloudInvalidToken", func(t *testing.T) {
+		t.Parallel()
+
+		ts := getSimpleCloudTestStateWithError(t, nil, setupCmd, nil, nil, http.StatusUnauthorized)
+		ts.ExpectedExitCode = -1
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `Invalid token`, "the real API error message should still be shown")
+		assert.Contains(t, stdout, "hint=\"Authenticate by running `k6 cloud login` or verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token)\"",
+			"a 401 should come with a recovery hint pointing at `k6 cloud login`")
+	})
+
 	t.Run("TestCloudStackNotConfigured", func(t *testing.T) {
 		t.Parallel()
 
@@ -232,7 +246,21 @@ func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	})
 }
 
-func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandFunc, cliFlags []string, progressCallback func() *cloudapiv6.TestProgress) *GlobalTestState {
+func getSimpleCloudTestState(
+	t *testing.T, script []byte, setupCmd setupCommandFunc, cliFlags []string,
+	progressCallback func() *cloudapiv6.TestProgress,
+) *GlobalTestState {
+	return getSimpleCloudTestStateWithError(t, script, setupCmd, cliFlags, progressCallback, 0)
+}
+
+// getSimpleCloudTestStateWithError is getSimpleCloudTestState plus the
+// ability to make the mock v6 API fail every request with errorStatus (e.g.
+// http.StatusUnauthorized), for testing how the CLI surfaces a failing
+// cloud API call to the user.
+func getSimpleCloudTestStateWithError(
+	t *testing.T, script []byte, setupCmd setupCommandFunc, cliFlags []string,
+	progressCallback func() *cloudapiv6.TestProgress, errorStatus int,
+) *GlobalTestState {
 	if script == nil {
 		script = []byte("export let options = { cloud: { projectID: 1 } };\nexport default function() {}")
 	}
@@ -243,6 +271,7 @@ func getSimpleCloudTestState(t *testing.T, script []byte, setupCmd setupCommandF
 
 	srv := v6test.NewServer(t, v6test.Config{
 		ProgressCallback: progressCallback,
+		ErrorStatus:      errorStatus,
 	})
 
 	ts := NewGlobalTestState(t)

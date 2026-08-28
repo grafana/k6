@@ -58,6 +58,12 @@ type Config struct {
 
 	// LoadZones is the load zone list returned by the load-zones endpoint.
 	LoadZones []cloudapi.LoadZone
+
+	// ErrorStatus, when non-zero, makes every request fail with this HTTP
+	// status and the real k6 Cloud API's error body for it, instead of
+	// the endpoint's normal canned response. Requires the value to be present
+	// in the forcedErrorMessages map or will panic
+	ErrorStatus int
 }
 
 // NewServer creates a test server that serves v6 API endpoints.
@@ -94,11 +100,34 @@ func NewServer(t *testing.T, cfg Config) *Server {
 		s.handleAbortTestRun,
 	)
 
-	srv := httptest.NewServer(mux)
+	var handler http.Handler = mux
+	if cfg.ErrorStatus != 0 {
+		handler = forcedErrorHandler(cfg.ErrorStatus)
+	}
+
+	srv := httptest.NewServer(handler)
 	s.Server = srv
 	t.Cleanup(srv.Close)
 
 	return s
+}
+
+// forcedErrorHandler short-circuits every request with the given status and
+// its real error body, regardless of route.
+func forcedErrorHandler(status int) http.Handler {
+	forcedErrorMessages := map[int]string{
+		http.StatusUnauthorized: "Invalid token",
+	}
+
+	msg, ok := forcedErrorMessages[status]
+	if !ok {
+		panic(fmt.Sprintf("v6test: no error body registered for status %d", status))
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		res := k6cloud.NewErrorResponseApiModel(*k6cloud.NewErrorApiModel(msg, "error"))
+		writeJSON(w, status, res)
+	})
 }
 
 func (s *Server) handleListProjects(w http.ResponseWriter, _ *http.Request) {
