@@ -54,14 +54,33 @@ func (v extensionAPIVU) Do(
 	if values, metadata := options.Tags.Values(), options.Tags.Metadata(); values != nil || metadata != nil {
 		tags = metrics.TagsAndMeta{Tags: initEnv.Registry.RootTagSet().WithTagsFromMap(values), Metadata: metadata}
 	}
-	jar := http.CookieJar(state.CookieJar)
+	var jar http.CookieJar
+	if state.CookieJar != nil {
+		jar = state.CookieJar
+	}
 	if options.Jar != nil {
 		jar = options.Jar
+	}
+	transport := state.Transport
+	if options.ForceHTTP1 {
+		baseTransport, ok := state.Transport.(*http.Transport)
+		if !ok {
+			return nil, fmt.Errorf("extension HTTP transport cannot disable HTTP/2")
+		}
+		forceHTTP1Transport := baseTransport.Clone()
+		forceHTTP1Transport.ForceAttemptHTTP2 = false
+		forceHTTP1Transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+		if forceHTTP1Transport.TLSClientConfig != nil {
+			forceHTTP1Transport.TLSClientConfig = forceHTTP1Transport.TLSClientConfig.Clone()
+			forceHTTP1Transport.TLSClientConfig.NextProtos = []string{"http/1.1"}
+		}
+		transport = forceHTTP1Transport
 	}
 	response, err := httpext.MakeRequestWithLiveResponse(ctx, state, request, httpext.LiveRequestOptions{
 		TagsAndMeta:      tags,
 		Jar:              jar,
 		ResponseCallback: options.ExpectedStatus,
+		Transport:        transport,
 	})
 	if err != nil || response == nil || options.DeferMetrics {
 		return &extensionapi.HTTPResponse{Response: response}, err

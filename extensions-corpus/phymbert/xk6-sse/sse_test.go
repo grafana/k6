@@ -6,7 +6,6 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,9 +15,8 @@ import (
 
 type testVU struct {
 	*extensionapitest.VU
-	client      *http.Client
-	defaultJar  http.CookieJar
-	completions atomic.Int32
+	client     *http.Client
+	defaultJar http.CookieJar
 }
 
 func (v *testVU) Do(
@@ -35,10 +33,7 @@ func (v *testVU) Do(
 	if err != nil {
 		return nil, err
 	}
-	return &extensionapi.HTTPResponse{
-		Response: response,
-		Complete: func() { v.completions.Add(1) },
-	}, nil
+	return &extensionapi.HTTPResponse{Response: response}, nil
 }
 
 func newTestModule(t *testing.T, client *http.Client) (*testVU, *sse) {
@@ -54,7 +49,7 @@ func newTestModule(t *testing.T, client *http.Client) (*testVU, *sse) {
 	return vu, instance
 }
 
-func TestOpenEmitsEventsAndCompletesMetrics(t *testing.T) {
+func TestOpenEmitsEvents(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -73,8 +68,6 @@ func TestOpenEmitsEventsAndCompletesMetrics(t *testing.T) {
 	`)
 	require.NoError(t, err)
 	require.Equal(t, `{"status":200,"received":[{"id":"one","comment":"","name":"","data":"first"},{"id":"","comment":"","name":"update","data":"second"}]}`, vu.Runtime().Get("debug").String())
-	require.Equal(t, int32(1), vu.completions.Load())
-
 	samples := vu.Samples()
 	require.Len(t, samples, 2)
 	for _, sample := range samples {

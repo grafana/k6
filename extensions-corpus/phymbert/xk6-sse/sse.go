@@ -49,7 +49,6 @@ type Client struct {
 	metrics       extensionapi.Metrics
 	sseMetrics    *sseMetrics
 	cancelRequest context.CancelFunc
-	httpResponse  *extensionapi.HTTPResponse
 }
 
 // HTTPResponse is the http response returned by sse.open.
@@ -208,7 +207,6 @@ func (mi *sse) open(
 		DeferMetrics: true,
 	})
 	if response != nil {
-		sseClient.httpResponse = response
 		sseClient.resp = response.Response
 		sseClient.tags = metrics.WithSystemTags(sseClient.tags, map[extensionapi.SystemTag]string{
 			extensionapi.SystemTagURL:    url,
@@ -252,9 +250,6 @@ func (c *Client) closeResponseBody() error {
 	c.shutdownOnce.Do(func() {
 		if c.resp != nil {
 			err = c.resp.Body.Close()
-		}
-		if c.httpResponse != nil && c.httpResponse.Complete != nil {
-			c.httpResponse.Complete()
 		}
 		if err != nil {
 			c.handleEvent("error", c.rt.ToValue(err))

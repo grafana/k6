@@ -179,6 +179,50 @@ func TestExtensionAPIInitFileSystem(t *testing.T) {
 	require.Equal(t, []byte("key"), data)
 }
 
+func TestExtensionAPIHTTPForceHTTP1(t *testing.T) {
+	t.Parallel()
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusNoContent)
+	}))
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+
+	baseTransport := server.Client().Transport.(*http.Transport).Clone()
+	baseTransport.ForceAttemptHTTP2 = true
+	preflight := &http.Client{Transport: baseTransport.Clone()}
+	preflightRequest, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+	preflightResponse, err := preflight.Do(preflightRequest)
+	require.NoError(t, err)
+	require.Equal(t, "HTTP/2.0", preflightResponse.Proto)
+	require.NoError(t, preflightResponse.Body.Close())
+
+	registry := metrics.NewRegistry()
+	builtins := metrics.RegisterBuiltinMetrics(registry)
+	systemTags := metrics.NewSystemTagSet()
+	vu := extensionAPIVU{vu: extensionAPITestVU{
+		state: &lib.State{
+			BuiltinMetrics: builtins,
+			Options:        lib.Options{SystemTags: systemTags},
+			Samples:        make(chan metrics.SampleContainer, 1),
+			Tags:           lib.NewVUStateTags(registry.RootTagSet()),
+			Transport:      baseTransport,
+		},
+		initEnv: &common.InitEnvironment{TestPreInitState: &lib.TestPreInitState{Registry: registry}},
+	}}
+	httpAPI := any(vu).(extensionapi.HTTP)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+	response, err := httpAPI.Do(context.Background(), request, extensionapi.HTTPOptions{
+		ForceHTTP1:   true,
+		DeferMetrics: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "HTTP/1.1", response.Proto)
+	require.NoError(t, response.Body.Close())
+}
+
 func TestExtensionAPISlogHandler(t *testing.T) {
 	t.Parallel()
 
