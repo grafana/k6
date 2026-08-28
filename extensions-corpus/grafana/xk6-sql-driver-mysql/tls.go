@@ -12,24 +12,23 @@ import (
 	"strings"
 
 	"github.com/go-sql-driver/mysql"
-	"go.k6.io/k6/v2/lib/netext"
 )
 
 // supportedTLSVersions is a map of TLS versions to their numeric values.
 var supportedTLSVersions = map[string]uint16{ //nolint: gochecknoglobals
-	netext.TLS_1_0: tls.VersionTLS10,
-	netext.TLS_1_1: tls.VersionTLS11,
-	netext.TLS_1_2: tls.VersionTLS12,
-	netext.TLS_1_3: tls.VersionTLS13,
+	"tls1.0": tls.VersionTLS10,
+	"tls1.1": tls.VersionTLS11,
+	"tls1.2": tls.VersionTLS12,
+	"tls1.3": tls.VersionTLS13,
 }
 
 // tlsExports add TLS related exports to name exports.
 func (mod *module) tlsExports() {
 	// TLS versions
-	mod.exports.Named["TLS_1_0"] = netext.TLS_1_0
-	mod.exports.Named["TLS_1_1"] = netext.TLS_1_1
-	mod.exports.Named["TLS_1_2"] = netext.TLS_1_2
-	mod.exports.Named["TLS_1_3"] = netext.TLS_1_3
+	mod.exports.Named["TLS_1_0"] = "tls1.0"
+	mod.exports.Named["TLS_1_1"] = "tls1.1"
+	mod.exports.Named["TLS_1_2"] = "tls1.2"
+	mod.exports.Named["TLS_1_3"] = "tls1.3"
 
 	// functions
 	mod.exports.Named["loadTLS"] = mod.LoadTLS

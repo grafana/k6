@@ -9,8 +9,12 @@ require (
 	github.com/grafana/sobek v0.0.0-20260429085637-a66d4790012b
 	github.com/grafana/xk6-sql v1.2.1
 	github.com/stretchr/testify v1.11.1
-	go.k6.io/k6/v2 v2.1.0
+	go.k6.io/k6-extension-api v0.0.0
 )
+
+replace go.k6.io/k6-extension-api => ../../../extension-api
+
+replace github.com/grafana/xk6-sql => ../xk6-sql
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect

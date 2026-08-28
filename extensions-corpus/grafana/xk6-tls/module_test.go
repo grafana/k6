@@ -1,6 +1,8 @@
 package tls
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http/httptest"
@@ -10,11 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/lib/netext"
-	"go.k6.io/k6/v2/lib/types"
-	"go.k6.io/k6/v2/metrics"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 func TestGetCertificateOK(t *testing.T) {
@@ -28,7 +26,10 @@ func TestGetCertificateOK(t *testing.T) {
 		JSON.stringify(await tls.getCertificate("%s"));
 	`, strings.TrimPrefix(ts.URL, "https://"))
 
-	_, err := trt.RunOnEventLoop("(async ()=>{globalThis.result = " + testScript + "})()")
+	err := trt.EventLoop.Start(func() error {
+		_, err := trt.VU.Runtime().RunString("(async ()=>{globalThis.result = " + testScript + "})()")
+		return err
+	})
 	require.NoError(t, err)
 	v := trt.VU.Runtime().GlobalObject().Get("result")
 
@@ -45,7 +46,7 @@ func TestGetCertificateNoTLS(t *testing.T) {
 
 	testScript := fmt.Sprintf(`await tls.getCertificate("%s")`, strings.TrimPrefix(ts.URL, "http://"))
 
-	_, err := trt.RunOnEventLoop(wrapInAsyncLambda(testScript))
+	err := runOnEventLoop(trt, wrapInAsyncLambda(testScript))
 	assert.ErrorContains(t, err, "not look like a TLS handshake")
 }
 
@@ -57,7 +58,7 @@ func TestGetCertificateBlockedHostname(t *testing.T) {
 	defer ts.Close()
 
 	testScript := `await tls.getCertificate("blocked.net")`
-	_, err := trt.RunOnEventLoop(wrapInAsyncLambda(testScript))
+	err := runOnEventLoop(trt, wrapInAsyncLambda(testScript))
 	assert.ErrorContains(t, err, "blocked pattern")
 }
 
@@ -94,36 +95,35 @@ func TestParseTargetAddr(t *testing.T) {
 	}
 }
 
-func newTestRuntime(t testing.TB) *modulestest.Runtime {
-	runtime := modulestest.NewRuntime(t)
-	state := &lib.State{
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Dialer:         newTestDialer(),
-		Tags:           lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("tag-vu", "mytag")),
-		Samples:        make(chan metrics.SampleContainer, 8),
-	}
-	runtime.MoveToVUContext(state)
+func newTestRuntime(t testing.TB) *extensionapitest.Runtime {
+	t.Helper()
+	runtime := extensionapitest.NewRuntime()
+	runtime.VU.DialContextFunc = testDialContext
 
 	m, ok := New().NewModuleInstance(runtime.VU).(*ModuleInstance)
 	require.True(t, ok)
-	require.NoError(t, runtime.VU.RuntimeField.Set("tls", m.Exports().Default))
+	require.NoError(t, runtime.VU.Runtime().Set("tls", m.Exports().Default))
 
 	return runtime
 }
 
-func newTestDialer() *netext.Dialer {
-	d := netext.NewDialer(net.Dialer{
-		Timeout:   2 * time.Second,
-		KeepAlive: 10 * time.Second,
-	}, nil)
-
-	trie, err := types.NewHostnameTrie([]string{"blocked.net"})
+func testDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	host, _, err := net.SplitHostPort(address)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	d.BlockedHostnames = trie
+	if host == "blocked.net" {
+		return nil, errors.New("blocked pattern")
+	}
 
-	return d
+	return (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: 10 * time.Second}).DialContext(ctx, network, address)
+}
+
+func runOnEventLoop(runtime *extensionapitest.Runtime, script string) error {
+	return runtime.EventLoop.Start(func() error {
+		_, err := runtime.VU.Runtime().RunString(script)
+		return err
+	})
 }
 
 // wrapInAsyncLambda is a helper function that wraps the provided input in an async lambda.

@@ -9,14 +9,14 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // ImportPath contains module's JavaScript import path.
 const ImportPath = "k6/x/sql"
 
 // New creates a new instance of the extension's JavaScript module.
-func New() modules.Module {
+func New() extensionapi.Module {
 	return new(rootModule)
 }
 
@@ -26,7 +26,7 @@ type rootModule struct{}
 
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
-func (*rootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*rootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	instance := &module{}
 
 	instance.exports.Default = instance
@@ -41,12 +41,12 @@ func (*rootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 // module represents an instance of the JavaScript module for every VU.
 type module struct {
-	exports modules.Exports
-	vu      modules.VU
+	exports extensionapi.Exports
+	vu      extensionapi.VU
 }
 
 // Exports is representation of ESM exports of a module.
-func (mod *module) Exports() modules.Exports {
+func (mod *module) Exports() extensionapi.Exports {
 	return mod.exports
 }
 

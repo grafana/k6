@@ -38,7 +38,7 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
-	go.k6.io/k6/v2 v2.0.0 // indirect
+	go.k6.io/k6-extension-api v0.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0 // indirect
@@ -59,3 +59,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/guregu/null.v3 v3.5.0 // indirect
 )
+
+replace go.k6.io/k6-extension-api => ../../../extension-api
+
+replace github.com/grafana/xk6-sql => ../xk6-sql

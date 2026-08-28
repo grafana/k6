@@ -7,11 +7,11 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 func TestOpen(t *testing.T) { //nolint: paralleltest
-	rt := modulestest.NewRuntime(t)
+	rt := extensionapitest.NewRuntime()
 
 	mod, ok := New().NewModuleInstance(rt.VU).(*module)
 

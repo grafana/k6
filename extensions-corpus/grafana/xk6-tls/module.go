@@ -10,8 +10,7 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/js/promises"
+	"go.k6.io/k6-extension-api"
 )
 
 type (
@@ -21,14 +20,14 @@ type (
 
 	// ModuleInstance represents an instance of the JS module.
 	ModuleInstance struct {
-		vu modules.VU
+		vu extensionapi.VU
 	}
 )
 
 // Ensure the interfaces are implemented correctly
 var (
-	_ modules.Instance = &ModuleInstance{}
-	_ modules.Module   = &RootModule{}
+	_ extensionapi.Instance = &ModuleInstance{}
+	_ extensionapi.Module   = &RootModule{}
 )
 
 // New returns a pointer to a new RootModule instance
@@ -38,7 +37,7 @@ func New() *RootModule {
 
 // NewModuleInstance implements the modules.Module interface and returns
 // a new instance for each VU.
-func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*RootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	return &ModuleInstance{
 		vu: vu,
 	}
@@ -46,37 +45,38 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 // Exports implements the modules.Instance interface and returns
 // the exports of the JS module.
-func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{Default: mi}
+func (mi *ModuleInstance) Exports() extensionapi.Exports {
+	return extensionapi.Exports{Default: mi}
 }
 
 // GetCertificate fetches and exposes the peer certificate's details.
 func (mi *ModuleInstance) GetCertificate(target string) *sobek.Promise {
-	p, resolve, reject := promises.New(mi.vu)
+	promises, ok := mi.vu.(extensionapi.Promises)
+	if !ok {
+		panic("extension API promise capability is unavailable")
+	}
+	promise, resolver := promises.NewPromise()
 
-	state := mi.vu.State()
-	if state == nil {
-		reject(fmt.Errorf("getCertificate is not allowed to run from the Init Context"))
-		return p
+	network, ok := mi.vu.(extensionapi.Network)
+	if !ok {
+		resolver.Reject(fmt.Errorf("getCertificate is not allowed to run from the Init Context"))
+		return promise
 	}
 
 	addr, err := parseTargetAddr(target)
 	if err != nil {
-		reject(err)
-		return p
+		resolver.Reject(err)
+		return promise
 	}
 
 	go func() {
-		netconn, err := state.Dialer.DialContext(mi.vu.Context(), "tcp", addr.uri)
+		netconn, err := network.DialContext(mi.vu.Context(), "tcp", addr.uri)
 		if err != nil {
-			reject(err)
+			resolver.Reject(err)
 			return
 		}
 		defer func() {
-			err := netconn.Close()
-			if err != nil {
-				state.Logger.WithError(err).Debug("Failed to close connection")
-			}
+			_ = netconn.Close()
 		}()
 
 		conn := tls.Client(netconn, &tls.Config{
@@ -86,25 +86,24 @@ func (mi *ModuleInstance) GetCertificate(target string) *sobek.Promise {
 			InsecureSkipVerify: true,
 		})
 		if err := conn.HandshakeContext(mi.vu.Context()); err != nil {
-			reject(err)
+			resolver.Reject(err)
 			return
 		}
 		peerCerts := conn.ConnectionState().PeerCertificates
 		if len(peerCerts) < 1 {
-			reject(fmt.Errorf("no certificate found for %s - the server may not be using TLS or the connection failed", target))
+			resolver.Reject(fmt.Errorf("no certificate found for %s - the server may not be using TLS or the connection failed", target))
 			return
 		}
 		c := peerCerts[0]
-		vc := mi.vu.Runtime().ToValue(certificate{
+		resolver.Resolve(certificate{
 			Subject:     pkixName{CommonName: c.Subject.CommonName},
 			Issuer:      pkixName{CommonName: c.Issuer.CommonName},
 			Issued:      c.NotBefore.UnixMilli(),
 			Expires:     c.NotAfter.UnixMilli(),
 			Fingerprint: fingerprint(c.Raw),
 		})
-		resolve(vc)
 	}()
-	return p
+	return promise
 }
 
 type certificate struct {

@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/common"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 	"k8s.io/client-go/rest"
 
 	"github.com/grafana/xk6-kubernetes/pkg/api"
 
-	"go.k6.io/k6/v2/js/modules"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -24,7 +24,7 @@ import (
 )
 
 func init() {
-	modules.Register("k6/x/kubernetes", new(RootModule))
+	extensionapi.Register("k6/x/kubernetes", new(RootModule))
 }
 
 // RootModule is the global module object type. It is instantiated once per test
@@ -33,7 +33,7 @@ type RootModule struct{}
 
 // ModuleInstance represents an instance of the JS module.
 type ModuleInstance struct {
-	vu modules.VU
+	vu extensionapi.VU
 	// clientset enables injection of a pre-configured Kubernetes environment for unit tests
 	clientset kubernetes.Interface
 	// dynamic enables injection of a fake dynamic client for unit tests
@@ -59,13 +59,13 @@ type KubeConfig struct {
 
 // Ensure the interfaces are implemented correctly.
 var (
-	_ modules.Module   = &RootModule{}
-	_ modules.Instance = &ModuleInstance{}
+	_ extensionapi.Module   = &RootModule{}
+	_ extensionapi.Instance = &ModuleInstance{}
 )
 
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
-func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (*RootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
 	return &ModuleInstance{
 		vu: vu,
 	}
@@ -73,8 +73,8 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 // Exports implements the modules.Instance interface and returns the exports
 // of the JS module.
-func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{
+func (mi *ModuleInstance) Exports() extensionapi.Exports {
+	return extensionapi.Exports{
 		Named: map[string]interface{}{
 			"Kubernetes": mi.newClient,
 		},

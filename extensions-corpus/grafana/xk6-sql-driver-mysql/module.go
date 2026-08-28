@@ -2,7 +2,7 @@ package mysql
 
 import (
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 // rootModule is the global module object type.
@@ -10,13 +10,13 @@ type rootModule struct {
 	driverID *sobek.Symbol
 }
 
-var _ modules.Module = &rootModule{}
+var _ extensionapi.Module = &rootModule{}
 
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
-func (root *rootModule) NewModuleInstance(_ modules.VU) modules.Instance {
+func (root *rootModule) NewModuleInstance(_ extensionapi.VU) extensionapi.Instance {
 	instance := &module{
-		exports: modules.Exports{
+		exports: extensionapi.Exports{
 			Default: root.driverID,
 			Named:   make(map[string]interface{}),
 		},
@@ -29,12 +29,12 @@ func (root *rootModule) NewModuleInstance(_ modules.VU) modules.Instance {
 
 // module represents an instance of the JavaScript module for every VU.
 type module struct {
-	vu        modules.VU
+	vu        extensionapi.VU
 	tlsConfig TLSConfig
-	exports   modules.Exports
+	exports   extensionapi.Exports
 }
 
 // Exports is representation of ESM exports of a module.
-func (mod *module) Exports() modules.Exports {
+func (mod *module) Exports() extensionapi.Exports {
 	return mod.exports
 }

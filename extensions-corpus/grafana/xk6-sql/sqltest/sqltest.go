@@ -7,9 +7,8 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/xk6-sql/sql"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/ext"
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/js/modulestest"
+	extensionapi "go.k6.io/k6-extension-api"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 // RunScript executes JavaScript code in a specially initialized interpreter.
@@ -19,28 +18,27 @@ import (
 func RunScript(t *testing.T, driver string, connection string, script string) sobek.Value {
 	t.Helper()
 
-	runtime := modulestest.NewRuntime(t)
+	runtime := extensionapitest.NewRuntime()
 	vu := runtime.VU
 
-	root := sql.New()
-	m := root.NewModuleInstance(runtime.VU)
+	sqlModule := sql.New().NewModuleInstance(vu)
 
-	require.NoError(t, vu.RuntimeField.Set("sql", m.Exports().Default))
+	require.NoError(t, vu.Runtime().Set("sql", sqlModule.Exports().Default))
 
-	jsext, found := ext.Get(ext.JSExtension)["k6/x/sql/driver/"+driver]
+	jsext, found := extensionapi.Registered()["k6/x/sql/driver/"+driver]
 
 	require.True(t, found, "Driver extension found: "+driver)
 
-	jsmod, ok := jsext.Module.(modules.Module)
+	jsmod, ok := jsext.(extensionapi.Module)
 
 	require.True(t, ok, "Driver extension module is JavaScript module")
 
-	m = jsmod.NewModuleInstance(vu)
+	driverModule := jsmod.NewModuleInstance(vu)
 
-	require.NoError(t, vu.RuntimeField.Set("driver", m.Exports().Default))
-	require.NoError(t, vu.RuntimeField.Set("connection", connection))
+	require.NoError(t, vu.Runtime().Set("driver", driverModule.Exports().Default))
+	require.NoError(t, vu.Runtime().Set("connection", connection))
 
-	value, err := runtime.VU.RuntimeField.RunString(script)
+	value, err := vu.Runtime().RunString(script)
 
 	require.NoError(t, err)
 

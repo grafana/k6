@@ -1,45 +1,23 @@
 package kubernetes
 
 import (
-	"context"
-	"io"
 	"testing"
 
 	"github.com/grafana/sobek"
 	localutils "github.com/grafana/xk6-kubernetes/internal/testutils"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/metrics"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // setupTestEnv should be called from each test to build the execution environment for the test
 func setupTestEnv(t *testing.T, objs ...runtime.Object) *sobek.Runtime {
-	rt := sobek.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-	testLog := logrus.New()
-	testLog.SetOutput(io.Discard)
-
-	state := &lib.State{
-		Options: lib.Options{
-			SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
-		},
-		Logger: testLog,
-		Tags:   lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
-	}
+	vu := extensionapitest.NewVU()
+	rt := vu.Runtime()
 
 	root := &RootModule{}
 	m, ok := root.NewModuleInstance(
-		&modulestest.VU{
-			RuntimeField: rt,
-			InitEnvField: &common.InitEnvironment{},
-			CtxField:     context.Background(),
-			StateField:   state,
-		},
+		vu,
 	).(*ModuleInstance)
 	require.True(t, ok)
 	require.NoError(t, rt.Set("Kubernetes", m.Exports().Named["Kubernetes"]))

@@ -67,7 +67,7 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.k6.io/k6/v2 v2.0.0 // indirect
+	go.k6.io/k6-extension-api v0.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
@@ -90,3 +90,7 @@ require (
 	gopkg.in/guregu/null.v3 v3.5.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace go.k6.io/k6-extension-api => ../../../extension-api
+
+replace github.com/grafana/xk6-sql => ../xk6-sql
