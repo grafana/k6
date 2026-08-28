@@ -2,13 +2,13 @@ package icmp
 
 import (
 	"crypto/rand"
+	"fmt"
 	"net"
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/js/modules"
+	extensionapi "go.k6.io/k6-extension-api"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -19,8 +19,8 @@ const maxUint16 = 1<<16 - 1
 type pinger struct {
 	opts *pingerOptions
 
-	vu      modules.VU
-	log     logrus.FieldLogger
+	vu      extensionapi.VU
+	log     extensionLogger
 	metrics *icmpMetrics
 
 	targetIP      *net.IPAddr
@@ -41,7 +41,7 @@ type pinger struct {
 	mu       sync.RWMutex
 }
 
-func newPinger(opts *pingerOptions, vu modules.VU, log logrus.FieldLogger, metrics *icmpMetrics) *pinger {
+func newPinger(opts *pingerOptions, vu extensionapi.VU, log extensionLogger, metrics *icmpMetrics) *pinger {
 	return &pinger{
 		opts:     opts,
 		vu:       vu,
@@ -78,13 +78,26 @@ func (r *pinger) resolve() error {
 
 	defer func() { r.addDurationMetrics(startedAt, r.metrics.icmpResolve) }()
 
-	ip, _, err := r.vu.State().GetAddrResolver().ResolveAddr(r.opts.target)
+	network, ok := r.vu.(extensionapi.Network)
+	if !ok {
+		return fmt.Errorf("ICMP is not available in the init context")
+	}
+	hosts, err := network.LookupHost(r.vu.Context(), r.opts.target)
 	if err != nil {
 		r.addErrorMetrics()
 
 		return err
 	}
 
+	if len(hosts) == 0 {
+		r.addErrorMetrics()
+		return fmt.Errorf("lookup %s: no addresses returned", r.opts.target)
+	}
+	ip := net.ParseIP(hosts[0])
+	if ip == nil {
+		r.addErrorMetrics()
+		return fmt.Errorf("lookup %s returned invalid address %q", r.opts.target, hosts[0])
+	}
 	r.targetIP = &net.IPAddr{IP: ip}
 	r.ip6 = ip.To4() == nil
 

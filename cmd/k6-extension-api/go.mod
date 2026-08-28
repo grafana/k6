@@ -4,7 +4,9 @@ go 1.26.0
 
 require (
 	github.com/grafana/xk6-disruptor v0.0.0
+	github.com/grafana/xk6-dns v0.0.0
 	github.com/grafana/xk6-faker v0.0.0
+	github.com/grafana/xk6-icmp v0.0.0
 	github.com/grafana/xk6-kubernetes v0.0.0
 	github.com/grafana/xk6-mqtt v0.0.0
 	github.com/grafana/xk6-redis v0.0.0
@@ -92,6 +94,7 @@ require (
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/microsoft/go-mssqldb v1.10.0 // indirect
+	github.com/miekg/dns v1.1.72 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
@@ -140,6 +143,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260811175631-f44d03d253a1 // indirect
+	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
@@ -147,6 +151,7 @@ require (
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
+	golang.org/x/tools v0.48.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260720211330-0afa2a65878a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720211330-0afa2a65878a // indirect
 	google.golang.org/grpc v1.83.1 // indirect
@@ -177,6 +182,10 @@ replace github.com/grafana/xk6-disruptor => ../../extensions-corpus/grafana/xk6-
 replace github.com/grafana/xk6-faker => ../../extensions-corpus/grafana/xk6-faker
 
 replace github.com/grafana/xk6-kubernetes => ../../extensions-corpus/grafana/xk6-kubernetes
+
+replace github.com/grafana/xk6-dns => ../../extensions-corpus/grafana/xk6-dns
+
+replace github.com/grafana/xk6-icmp => ../../extensions-corpus/grafana/xk6-icmp
 
 replace github.com/grafana/xk6-sql => ../../extensions-corpus/grafana/xk6-sql
 

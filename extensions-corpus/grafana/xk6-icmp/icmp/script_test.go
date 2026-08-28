@@ -1,60 +1,86 @@
 package icmp
 
 import (
+	"context"
 	_ "embed"
+	"net"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
+	extensionapi "go.k6.io/k6-extension-api"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 func runScriptTest(t *testing.T, filename string) {
 	t.Helper()
 
-	runtime := newTestRuntime(t)
-	state := newTestVUState(t)
+	runtime := extensionapitest.NewRuntime()
+	vu := runtime.VU
+	vu.LookupEnvFunc = func(key string) (string, bool) {
+		if key == "K6_PING_MINIMUM_INTERVAL" {
+			return "0s", true
+		}
+		return "", false
+	}
+	vu.LookupHostFunc = func(ctx context.Context, host string) ([]string, error) {
+		return net.DefaultResolver.LookupHost(ctx, host)
+	}
+	vu.RegisterBuiltinMetric(extensionapi.BuiltinDataSent, "data_sent")
+	vu.RegisterBuiltinMetric(extensionapi.BuiltinDataReceived, "data_received")
 
-	module := runtime.VU.Runtime().NewObject()
-	exports := runtime.VU.Runtime().NewObject()
+	icmpExports := New().NewModuleInstance(vu).Exports().Named
+	assertExports := newAssertRoot(t).NewModuleInstance(vu).Exports().Named
+
+	module := vu.Runtime().NewObject()
+	exports := vu.Runtime().NewObject()
 
 	require.NoError(t, module.Set("exports", exports))
-	require.NoError(t, runtime.VU.Runtime().Set("module", module))
+	require.NoError(t, vu.Runtime().Set("module", module))
+	require.NoError(t, vu.Runtime().Set("require", func(path string) any {
+		switch path {
+		case ImportPath:
+			return icmpExports
+		case "k6/x/assert":
+			return assertExports
+		default:
+			panic("unexpected module: " + path)
+		}
+	}))
 
-	prog, err := modulestest.CompileFile(filepath.Dir(filename), filepath.Base(filename))
+	source, err := os.ReadFile(filename)
 	require.NoError(t, err)
 
-	_, err = runtime.VU.Runtime().RunProgram(prog)
+	_, err = vu.Runtime().RunString(string(source))
 	require.NoError(t, err)
 
-	runtime.MoveToVUContext(state)
-
-	result, err := runtime.VU.Runtime().RunString("module.exports")
+	result, err := vu.Runtime().RunString("module.exports")
 	require.NoError(t, err)
 
-	get := result.ToObject(runtime.VU.Runtime()).Get
+	get := result.ToObject(vu.Runtime()).Get
 
 	if fn, ok := sobek.AssertFunction(get("setup")); ok {
-		_, err = fn(sobek.Undefined())
-
-		require.NoError(t, err)
-		runtime.EventLoop.WaitOnRegistered()
+		require.NoError(t, runtime.EventLoop.Start(func() error {
+			_, err := fn(sobek.Undefined())
+			return err
+		}))
 	}
 
 	fn, ok := sobek.AssertFunction(result)
 	require.True(t, ok, "module.exports should be a function")
 
-	_, err = fn(sobek.Undefined())
-	require.NoError(t, err)
-
-	runtime.EventLoop.WaitOnRegistered()
+	require.NoError(t, runtime.EventLoop.Start(func() error {
+		_, err := fn(sobek.Undefined())
+		return err
+	}))
 
 	if fn, ok = sobek.AssertFunction(get("teardown")); ok {
-		_, err = fn(sobek.Undefined())
-
-		require.NoError(t, err)
-		runtime.EventLoop.WaitOnRegistered()
+		require.NoError(t, runtime.EventLoop.Start(func() error {
+			_, err := fn(sobek.Undefined())
+			return err
+		}))
 	}
 }
 

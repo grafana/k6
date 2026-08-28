@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/v2/js/promises"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 type pingOptions struct {
@@ -53,17 +53,17 @@ func (m *module) pingAsync(target string, optsOrCb sobek.Value, cbOrNil sobek.Ca
 		return nil, err
 	}
 
-	promise, resolve, reject := promises.New(m.vu)
+	promise, resolver := newPromise(m.vu)
 
 	go func() {
 		result, err := m.pingExecute(opts)
 		if err != nil {
-			reject(err)
+			resolver.Reject(err)
 
 			return
 		}
 
-		resolve(m.vu.Runtime().ToValue(result))
+		resolver.Resolve(m.vu.Runtime().ToValue(result))
 	}()
 
 	return promise, nil
@@ -113,6 +113,14 @@ func (m *module) pingPrepare(target string, optsOrCb sobek.Value, cbOrNil sobek.
 
 func (m *module) pingExecute(opts *pingerOptions) (bool, error) {
 	return newPinger(opts, m.vu, m.log, m.metrics).run()
+}
+
+func newPromise(vu extensionapi.VU) (*sobek.Promise, extensionapi.PromiseResolver) {
+	promises, ok := vu.(extensionapi.Promises)
+	if !ok {
+		panic("extension API promise capability is unavailable")
+	}
+	return promises.NewPromise()
 }
 
 func (m *module) getIntervalMin() time.Duration {

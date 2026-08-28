@@ -3,115 +3,44 @@ package icmp
 import (
 	"time"
 
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
-func (r *pinger) currentTags() *metrics.TagSet {
-	return r.vu.State().Tags.GetCurrentValues().Tags
+func (r *pinger) currentTags() extensionapi.Tags { return r.metrics.host.CurrentTags() }
+
+func (r *pinger) tags() extensionapi.Tags {
+	tags := r.currentTags().With(map[string]string{"proto": "ICMP", "ip": r.targetIP.String()})
+	return tags.With(r.opts.tags)
 }
 
-func (r *pinger) tags() *metrics.TagSet {
-	tags := r.currentTags().With("proto", "ICMP").With("ip", r.targetIP.String())
-
-	return addToTagSet(tags, r.opts.tags)
+func (r *pinger) emit(samples []extensionapi.Sample) {
+	_ = r.metrics.host.Emit(r.vu.Context(), samples)
 }
 
 func (r *pinger) addErrorMetrics() {
-	metrics.PushIfNotDone(r.vu.Context(), r.vu.State().Samples, metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: r.metrics.icmpErrors,
-				Tags:   r.tags(),
-			},
-			Time:  time.Now(),
-			Value: float64(1),
-		},
-	})
+	r.emit([]extensionapi.Sample{{Metric: r.metrics.icmpErrors, Value: 1, Tags: r.tags()}})
 }
 
 func (r *pinger) addSendMetrics(size int) {
-	now := time.Now()
-
-	samples := metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: r.metrics.icmpPacketsSent,
-				Tags:   r.tags(),
-			},
-			Time:  now,
-			Value: float64(1),
-		},
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: r.metrics.dataSent,
-				Tags:   r.currentTags(),
-			},
-			Time:  now,
-			Value: float64(size),
-		},
-	}
-
-	metrics.PushIfNotDone(r.vu.Context(), r.vu.State().Samples, samples)
+	r.emit([]extensionapi.Sample{
+		{Metric: r.metrics.icmpPacketsSent, Value: 1, Tags: r.tags()},
+		{Metric: r.metrics.dataSent, Value: float64(size), Tags: r.currentTags()},
+	})
 }
 
-func (r *pinger) addReceivedMetrics(size int, ttl int, sentAt time.Time) {
-	now := time.Now()
-	rtt := now.Sub(sentAt)
-
-	samples := metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: r.metrics.icmpPacketsReceived,
-				Tags:   r.tags(),
-			},
-			Time:  now,
-			Value: float64(1),
-		},
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: r.metrics.dataReceived,
-				Tags:   r.currentTags(),
-			},
-			Time:  now,
-			Value: float64(size),
-		},
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: r.metrics.icmpRtt,
-				Tags:   r.tags(),
-			},
-			Time:  now,
-			Value: float64(rtt.Milliseconds()),
-		},
+func (r *pinger) addReceivedMetrics(size, ttl int, sentAt time.Time) {
+	rtt := time.Since(sentAt)
+	samples := []extensionapi.Sample{
+		{Metric: r.metrics.icmpPacketsReceived, Value: 1, Tags: r.tags()},
+		{Metric: r.metrics.dataReceived, Value: float64(size), Tags: r.currentTags()},
+		{Metric: r.metrics.icmpRtt, Value: float64(rtt.Milliseconds()), Tags: r.tags()},
 	}
-
 	if ttl > 0 {
-		samples = append(samples, metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: r.metrics.icmpReplyTTL,
-				Tags:   r.currentTags(),
-			},
-			Time:  now,
-			Value: float64(ttl),
-		})
+		samples = append(samples, extensionapi.Sample{Metric: r.metrics.icmpReplyTTL, Value: float64(ttl), Tags: r.currentTags()})
 	}
-
-	metrics.PushIfNotDone(r.vu.Context(), r.vu.State().Samples, samples)
+	r.emit(samples)
 }
 
-func (r *pinger) addDurationMetrics(startedAt time.Time, method *metrics.Metric) {
-	now := time.Now()
-
-	samples := metrics.Samples{
-		metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: method,
-				Tags:   r.tags(),
-			},
-			Time:  now,
-			Value: float64(now.Sub(startedAt).Milliseconds()),
-		},
-	}
-
-	metrics.PushIfNotDone(r.vu.Context(), r.vu.State().Samples, samples)
+func (r *pinger) addDurationMetrics(startedAt time.Time, metric extensionapi.Metric) {
+	r.emit([]extensionapi.Sample{{Metric: metric, Value: float64(time.Since(startedAt).Milliseconds()), Tags: r.tags()}})
 }

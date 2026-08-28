@@ -2,19 +2,18 @@ package dns
 
 import (
 	"context"
+	"errors"
 	"net"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/grafana/sobek"
 	miekgdns "github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/lib/netext"
-	"go.k6.io/k6/v2/lib/types"
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
+	extensionapitest "go.k6.io/k6-extension-api/test"
 )
 
 const (
@@ -785,23 +784,46 @@ const initGlobals = `
 	globalThis.dns = require("k6/x/dns");
 `
 
-func newConfiguredRuntime(t testing.TB) (*modulestest.Runtime, error) {
-	runtime := modulestest.NewRuntime(t)
+type testRuntime struct{ *extensionapitest.Runtime }
 
-	err := runtime.SetupModuleSystem(
-		map[string]any{"k6/x/dns": New()},
-		nil,
-		nil,
-	)
-	if err != nil {
+func newConfiguredRuntime(t testing.TB) (*testRuntime, error) {
+	t.Helper()
+	runtime := &testRuntime{Runtime: extensionapitest.NewRuntime()}
+	dns := New().NewModuleInstance(runtime.VU).Exports().Named
+	if err := runtime.VU.Runtime().Set("require", func(path string) any {
+		if path != ImportPath {
+			panic("unexpected module: " + path)
+		}
+		return dns
+	}); err != nil {
 		return nil, err
 	}
+	if _, err := runtime.VU.Runtime().RunString(initGlobals); err != nil {
+		return nil, err
+	}
+	return runtime, nil
+}
 
-	// Ensure the `fs` module is available in the VU's runtime.
-	_, err = runtime.VU.Runtime().RunString(initGlobals)
-	require.NoError(t, err)
+func (r *testRuntime) MoveToVUContext(state *testVUState) {
+	if state == nil || state.Dialer == nil {
+		r.VU.DialContextFunc = nil
+		r.VU.LookupHostFunc = nil
+		r.VU.CheckHostFunc = nil
+		return
+	}
+	r.VU.DialContextFunc = state.Dialer.DialContext
+	r.VU.LookupHostFunc = state.Dialer.LookupHost
+	r.VU.CheckHostFunc = state.Dialer.CheckHost
+}
 
-	return runtime, err
+func (r *testRuntime) RunOnEventLoop(source string) (sobek.Value, error) {
+	var result sobek.Value
+	err := r.EventLoop.Start(func() error {
+		var err error
+		result, err = r.VU.Runtime().RunString(source)
+		return err
+	})
+	return result, err
 }
 
 // wrapInAsyncLambda is a helper function that wraps the provided input in an async lambda. This
@@ -866,46 +888,51 @@ func startTestDNSServer(t *testing.T) (ipv4Port, ipv6Port string) {
 	return listen("udp4", "127.0.0.1:0"), listen("udp6", "[::1]:0")
 }
 
-func newTestVUState() *lib.State {
-	return &lib.State{
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Dialer:         newTestDialer(),
-		Tags:           lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("tag-vu", "mytag")),
-		Samples:        make(chan metrics.SampleContainer, 8),
+type testVUState struct{ Dialer *testDialer }
+
+type testDialer struct {
+	DialContext func(context.Context, string, string) (net.Conn, error)
+	LookupHost  func(context.Context, string) ([]string, error)
+	CheckHost   func(context.Context, string) error
+}
+
+func newTestVUState() *testVUState {
+	return &testVUState{Dialer: newTestDialer()}
+}
+
+func newTestDialer() *testDialer {
+	dialer := net.Dialer{
+		Timeout:   2 * time.Second,
+		KeepAlive: 10 * time.Second,
+	}
+	return &testDialer{
+		DialContext: dialer.DialContext,
+		LookupHost:  net.DefaultResolver.LookupHost,
+		CheckHost:   func(context.Context, string) error { return nil },
 	}
 }
 
-func newTestDialer() *netext.Dialer {
-	return netext.NewDialer(net.Dialer{
-		Timeout:   2 * time.Second,
-		KeepAlive: 10 * time.Second,
-	}, nil)
-}
-
-func newTestBlacklistIPsDialer(ip string, m net.IPMask) *netext.Dialer {
-	// Prepare an IP blacklist
-	blacklist := []*lib.IPNet{{
-		IPNet: net.IPNet{
-			IP:   net.ParseIP(ip),
-			Mask: m,
-		},
-	}}
-
-	// prepare a k6 dialer with our blacklist.
-	// We explicitly disable the resolver to ensure we do not bypass our own.
+func newTestBlacklistIPsDialer(ip string, m net.IPMask) *testDialer {
 	dialer := newTestDialer()
-	dialer.Blacklist = blacklist
+	blocked := &net.IPNet{IP: net.ParseIP(ip), Mask: m}
+	dial := dialer.DialContext
+	dialer.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(address)
+		if err == nil && blocked.Contains(net.ParseIP(host)) {
+			return nil, &net.OpError{Op: "dial", Net: network, Err: errors.New("IP is blacklisted")}
+		}
+		return dial(ctx, network, address)
+	}
 	return dialer
 }
 
-func newTestBlockedHostnameDialer(hostname string) *netext.Dialer {
-	// prepare a k6 dialer with blocked hostnames.
-	// We explicitly disable the resolver to ensure we do not bypass our own.
+func newTestBlockedHostnameDialer(hostname string) *testDialer {
 	dialer := newTestDialer()
-
-	// Set blocked hostnames for tests expecting hostname-based blocking
-	trie, _ := types.NewHostnameTrie([]string{hostname})
-	dialer.BlockedHostnames = trie
-
+	dialer.CheckHost = func(_ context.Context, host string) error {
+		if strings.EqualFold(strings.TrimSuffix(host, "."), hostname) {
+			return extensionapi.ErrNetworkPolicyUnavailable
+		}
+		return nil
+	}
 	return dialer
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+	extensionapi "go.k6.io/k6-extension-api"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -12,7 +13,14 @@ import (
 
 func (r *pinger) loop() {
 	ctx := r.vu.Context()
-	tq := taskqueue.New(r.vu.RegisterCallback)
+	scheduler, ok := r.vu.(extensionapi.Scheduler)
+	if !ok {
+		panic("extension API scheduler capability is unavailable")
+	}
+	tq := taskqueue.New(func() func(func() error) {
+		callback := scheduler.RegisterCallback()
+		return func(task func() error) { callback(extensionapi.Task(task)) }
+	})
 
 	defer tq.Close()
 

@@ -15,7 +15,8 @@ The current custom binary composition is in `cmd/k6-extension-api`. It declares
 all migrated clones and is intentionally a nested module, so it does not alter
 the root k6 module's vendored dependency set. It is built and run with an
 isolated empty configuration. Its smoke test links every migrated extension and
-directly exercises msgpack, SSH, Faker, TLS, Redis, and MQTT/TCP construction.
+directly exercises msgpack, SSH, Faker, TLS, DNS/ICMP registration, Redis, and
+MQTT/TCP construction.
 
 ## Implemented v1 surface
 
@@ -169,10 +170,12 @@ as a supported built-in metric.
 | `github.com/grafana/xk6-sql-driver-{azuresql,clickhouse,mysql,postgres,sqlserver}` | SQL driver registration modules | Migrated. Each repository builds. MySQL now uses `crypto/tls` version constants. |
 | `github.com/grafana/xk6-mqtt` | Per-VU MQTT client using network, TLS, promises, logging, and metrics | Migrated for native MQTT/TLS brokers. Its complete Go test suite passes. MQTT over WebSocket remains deferred pending a host-aware WebSocket capability. |
 | `github.com/grafana/xk6-tcp` | Per-VU TCP socket using network, TLS, promises, logging, and metrics | Migrated. Its complete Go test suite, including local integration tests, passes. |
+| `github.com/grafana/xk6-dns` | Per-VU DNS client using policy checks, direct UDP packets, promises, and metrics | Migrated. Its complete Go test suite passes. |
+| `github.com/grafana/xk6-icmp` | Per-VU ICMP client using policy-aware address lookup, direct packet sockets, promises, logging, environment, and metrics | Migrated. Its complete Go test suite passes. |
 
 The custom binary test script imports every migrated module except disruptor
-and directly exercises msgpack, SSH, Faker, TLS, Redis, and MQTT/TCP module
-construction. Disruptor initializes its Kubernetes
+and directly exercises msgpack, SSH, Faker, TLS, DNS/ICMP registration, Redis,
+and MQTT/TCP module construction. Disruptor initializes its Kubernetes
 client at module-instantiation time and therefore requires a reachable cluster;
 the binary links it but the no-external-service smoke test deliberately avoids
 instantiating it. The script uses an isolated empty config file so it does not
@@ -196,8 +199,8 @@ validate the release tag registered for that k6 catalog version.
 | `xk6-redis` | Migrated | Uses `Network`, `TLS`, and `Promises`; its tests use the standalone API test host. |
 | `xk6-tls` | Migrated | Uses `Network` and `Promises`; no k6 dependency remains. |
 | `xk6-kafka` | Can migrate after execution-state capability | Metrics/tags and built-in byte metrics are available; it still needs an active-vs-init state capability. |
-| `xk6-dns` | Can migrate | Use `NetworkPolicy.CheckHost()` for the queried logical name and own its DNS packets, nameserver choice, and response parsing. |
-| `xk6-icmp` | Can migrate | Use policy-aware `Network.LookupHost()` to resolve the target, then own ICMP packet-socket selection, privileges, and echo handling. |
+| `xk6-dns` | Migrated | Uses `NetworkPolicy.CheckHost()` for the queried logical name and owns its DNS packets, nameserver choice, and response parsing. |
+| `xk6-icmp` | Migrated | Uses policy-aware `Network.LookupHost()` to resolve the target and owns ICMP packet-socket selection, privileges, and echo handling. |
 | `xk6-mqtt` | Migrated for native MQTT/TLS | Uses network, TLS, promises, logger, and metrics/tags. MQTT-over-WebSocket awaits a host-aware WebSocket capability. |
 | `xk6-tcp` | Migrated | Uses network, TLS, promises, logger, and metrics/tags. |
 | `xk6-loki` | Deferred | Logger is available; needs a k6-aware HTTP executor, current tags, VU ID, and metrics. |

@@ -2,6 +2,8 @@ import msgpack from "k6/x/msgpack";
 import ssh from "k6/x/ssh";
 import tls from "k6/x/tls";
 import { Faker } from "k6/x/faker";
+import * as dns from "k6/x/dns";
+import * as icmp from "k6/x/icmp";
 import { Client as RedisClient } from "k6/x/redis";
 import { Client as MQTTClient } from "k6/x/mqtt";
 import { Socket as TCPSocket } from "k6/x/tcp";
@@ -28,6 +30,12 @@ export default function () {
 	}
 	if (typeof tls.getCertificate !== "function") {
 		throw new Error("TLS extension was not registered");
+	}
+	if (typeof dns.resolve !== "function" || typeof dns.lookup !== "function") {
+		throw new Error("DNS extension was not registered");
+	}
+	if (typeof icmp.ping !== "function" || typeof icmp.pingAsync !== "function") {
+		throw new Error("ICMP extension was not registered");
 	}
 	if (typeof RedisClient !== "function") {
 		throw new Error("Redis extension was not registered");

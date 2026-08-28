@@ -7,72 +7,56 @@ import (
 	"fmt"
 	"time"
 
-	"go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/js/promises"
-	"go.k6.io/k6/v2/metrics"
-
 	"github.com/grafana/sobek"
+	extensionapi "go.k6.io/k6-extension-api"
+	"go.k6.io/k6-extension-api/common"
 )
 
-type (
-	// RootModule is the module that will be registered with the runtime.
-	RootModule struct{}
+// ImportPath is the JavaScript import path for the DNS module.
+const ImportPath = "k6/x/dns"
 
-	// ModuleInstance is the module instance that will be created for each VU.
-	ModuleInstance struct {
-		vu        modules.VU
-		dnsClient *Client
-		metrics   *moduleInstanceMetrics
-	}
-)
+// RootModule is the module that creates a DNS module instance for each VU.
+type RootModule struct{}
 
-// Ensure the interfaces are implemented correctly
-var (
-	_ modules.Instance = &ModuleInstance{}
-	_ modules.Module   = &RootModule{}
-)
-
-// New creates a new RootModule instance.
-func New() *RootModule {
-	return &RootModule{}
+// ModuleInstance is a DNS module instance for one VU.
+type ModuleInstance struct {
+	vu        extensionapi.VU
+	dnsClient *Client
+	metrics   *moduleInstanceMetrics
 }
 
-// NewModuleInstance creates a new instance of the module for a specific VU.
-func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	instanceMetrics, err := registerMetrics(metrics.NewRegistry())
-	if err != nil {
-		common.Throw(vu.Runtime(), fmt.Errorf("failed to register dns module instance's metrics; reason: %w", err))
-	}
+var _ extensionapi.Module = (*RootModule)(nil)
+var _ extensionapi.Instance = (*ModuleInstance)(nil)
 
-	dnsClient, err := NewDNSClient(vu)
+// New creates a new DNS module.
+func New() extensionapi.Module { return new(RootModule) }
+
+// NewModuleInstance creates a DNS module instance for vu.
+func (*RootModule) NewModuleInstance(vu extensionapi.VU) extensionapi.Instance {
+	instanceMetrics, err := registerMetrics(vu)
 	if err != nil {
-		common.Throw(vu.Runtime(), fmt.Errorf("failed to create DNS client; reason: %w", err))
+		common.Throw(vu.Runtime(), fmt.Errorf("register DNS metrics: %w", err))
 	}
 
 	return &ModuleInstance{
 		vu:        vu,
-		dnsClient: dnsClient,
+		dnsClient: NewDNSClient(vu),
 		metrics:   instanceMetrics,
 	}
 }
 
-// Exports returns the module exports, that will be available in the runtime.
-func (mi *ModuleInstance) Exports() modules.Exports {
-	return modules.Exports{Named: map[string]any{
+// Exports returns the module exports available in JavaScript.
+func (mi *ModuleInstance) Exports() extensionapi.Exports {
+	return extensionapi.Exports{Named: map[string]any{
 		"resolve": mi.Resolve,
 		"lookup":  mi.Lookup,
 	}}
 }
 
-// Resolve resolves a domain name to an IP address.
+// Resolve resolves a domain name using the supplied nameserver.
 func (mi *ModuleInstance) Resolve(query, recordType, nameserverAddr sobek.Value) *sobek.Promise {
-	promise, resolve, reject := promises.New(mi.vu)
-
-	if mi.vu.State() == nil {
-		reject(errors.New("resolve can not be used in the init context"))
-		return promise
-	}
+	promise, resolver := newPromise(mi.vu)
+	resolve, reject := resolver.Resolve, resolver.Reject
 
 	if nameserverAddr == nil {
 		reject(errors.New("nameserver argument must be provided"))
@@ -104,45 +88,23 @@ func (mi *ModuleInstance) Resolve(query, recordType, nameserverAddr sobek.Value)
 	}
 
 	go func() {
-		// Start timer for resolution
-		resolutionStartTime := time.Now()
-
-		// Resolve the query
+		startedAt := time.Now()
 		results, resolveErr := mi.dnsClient.Resolve(mi.vu.Context(), queryStr, recordTypeStr, nameserver)
-
-		// Stop the timer for resolution
-		sinceResolutionStart := time.Since(resolutionStartTime).Milliseconds()
-
-		// Emit the metrics, regardless of the result
-		mi.emitResolutionMetrics(
-			mi.vu.Context(),
-			sinceResolutionStart,
-			queryStr,
-			recordTypeStr,
-			nameserver,
-			resolveErr,
-		)
-
-		// Handle the resolution failure only now that we have emitted the metrics
+		mi.emitResolutionMetrics(mi.vu.Context(), time.Since(startedAt), queryStr, recordTypeStr, nameserver, resolveErr)
 		if resolveErr != nil {
 			reject(resolveErr)
 			return
 		}
-
 		resolve(results)
 	}()
 
 	return promise
 }
 
-// Lookup resolves a domain name to an IP address using the default system nameservers.
+// Lookup resolves a domain name using the host resolver.
 func (mi *ModuleInstance) Lookup(hostname sobek.Value) *sobek.Promise {
-	promise, resolve, reject := promises.New(mi.vu)
-
-	if mi.vu.State() == nil {
-		reject(fmt.Errorf("lookup can not be used in the init context"))
-		return promise
-	}
+	promise, resolver := newPromise(mi.vu)
+	resolve, reject := resolver.Resolve, resolver.Reject
 
 	var hostnameStr string
 	if err := mi.vu.Runtime().ExportTo(hostname, &hostnameStr); err != nil {
@@ -151,200 +113,95 @@ func (mi *ModuleInstance) Lookup(hostname sobek.Value) *sobek.Promise {
 	}
 
 	go func() {
-		// Start the timer for the lookup
-		lookupStartTime := time.Now()
-
-		// Perform the lookup
+		startedAt := time.Now()
 		ips, lookupErr := mi.dnsClient.Lookup(mi.vu.Context(), hostnameStr)
-
-		// Stop the timer for the lookup
-		sinceLookupStart := time.Since(lookupStartTime).Milliseconds()
-
-		// Emit the metrics, regardless of the result
-		mi.emitLookupMetrics(
-			mi.vu.Context(),
-			sinceLookupStart,
-			hostnameStr,
-			lookupErr,
-		)
-
-		// Handle the lookup failure only now that we have emitted the metrics
+		mi.emitLookupMetrics(mi.vu.Context(), time.Since(startedAt), hostnameStr, lookupErr)
 		if lookupErr != nil {
 			reject(lookupErr)
 			return
 		}
-
 		resolve(ips)
 	}()
 
 	return promise
 }
 
-// registerMetrics registers the metrics for the module instance.
-func registerMetrics(registry *metrics.Registry) (*moduleInstanceMetrics, error) {
+func newPromise(vu extensionapi.VU) (*sobek.Promise, extensionapi.PromiseResolver) {
+	promises, ok := vu.(extensionapi.Promises)
+	if !ok {
+		panic("extension API promise capability is unavailable")
+	}
+	return promises.NewPromise()
+}
+
+// registerMetrics registers DNS metrics for one module instance.
+func registerMetrics(vu extensionapi.VU) (*moduleInstanceMetrics, error) {
+	host, ok := vu.(extensionapi.Metrics)
+	if !ok {
+		return nil, extensionapi.ErrMetricsUnavailable
+	}
+	register := func(name string, kind extensionapi.MetricKind, unit extensionapi.MetricUnit) (extensionapi.Metric, error) {
+		return host.RegisterMetric(extensionapi.MetricSpec{Name: name, Kind: kind, Unit: unit})
+	}
+	m := &moduleInstanceMetrics{host: host}
 	var err error
-	m := &moduleInstanceMetrics{}
-
-	m.DNSResolutions, err = registry.NewMetric("dns_resolutions", metrics.Counter)
-	if err != nil {
-		return nil, fmt.Errorf("failed registering dns_resolutions metric: %w", err)
+	if m.DNSResolutions, err = register("dns_resolutions", extensionapi.MetricCounter, extensionapi.MetricUnitDefault); err != nil {
+		return nil, err
 	}
-
-	m.DNSResolutionDuration, err = registry.NewMetric("dns_resolution_duration", metrics.Trend, metrics.Time)
-	if err != nil {
-		return nil, fmt.Errorf("failed registering dns_resolution_duration metric: %w", err)
+	if m.DNSResolutionDuration, err = register("dns_resolution_duration", extensionapi.MetricTrend, extensionapi.MetricUnitTime); err != nil {
+		return nil, err
 	}
-
-	m.DNSResolutionFailed, err = registry.NewMetric("dns_resolution_failed", metrics.Rate)
-	if err != nil {
-		return nil, fmt.Errorf("failed registering dns_resolution_failed metric: %w", err)
+	if m.DNSResolutionFailed, err = register("dns_resolution_failed", extensionapi.MetricRate, extensionapi.MetricUnitDefault); err != nil {
+		return nil, err
 	}
-
-	m.DNSLookups, err = registry.NewMetric("dns_lookups", metrics.Counter)
-	if err != nil {
-		return nil, fmt.Errorf("failed registering dns_lookups metric: %w", err)
+	if m.DNSLookups, err = register("dns_lookups", extensionapi.MetricCounter, extensionapi.MetricUnitDefault); err != nil {
+		return nil, err
 	}
-
-	m.DNSLookupDuration, err = registry.NewMetric("dns_lookup_duration", metrics.Trend, metrics.Time)
-	if err != nil {
-		return nil, fmt.Errorf("failed registering dns_lookup_duration metric: %w", err)
+	if m.DNSLookupDuration, err = register("dns_lookup_duration", extensionapi.MetricTrend, extensionapi.MetricUnitTime); err != nil {
+		return nil, err
 	}
-
-	m.DNSLookupFailed, err = registry.NewMetric("dns_lookup_failed", metrics.Rate)
-	if err != nil {
-		return nil, fmt.Errorf("failed registering dns_lookup_failed metric: %w", err)
+	if m.DNSLookupFailed, err = register("dns_lookup_failed", extensionapi.MetricRate, extensionapi.MetricUnitDefault); err != nil {
+		return nil, err
 	}
-
 	return m, nil
 }
 
-// emitResolutionMetrics emits the metrics specific to DNS resolution operations.
 func (mi *ModuleInstance) emitResolutionMetrics(
-	ctx context.Context,
-	duration int64,
-	query,
-	recordType string,
-	nameserver Nameserver,
-	resolutionErr error,
+	ctx context.Context, duration time.Duration, query, recordType string, nameserver Nameserver, resolutionErr error,
 ) {
-	state := mi.vu.State()
-
-	tags := state.Tags.GetCurrentValues().Tags
-	tags = tags.With("query", query)
-	tags = tags.With("recordType", recordType)
-	tags = tags.With("nameserver", nameserver.Addr())
-
-	now := time.Now()
-
-	// Increment the DNS lookups counter
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: mi.metrics.DNSResolutions,
-			Tags:   tags,
-		},
-		Time:     now,
-		Metadata: nil,
-		Value:    float64(1),
+	tags := mi.metrics.host.CurrentTags().With(map[string]string{
+		"query": query, "recordType": recordType, "nameserver": nameserver.Addr(),
 	})
-
-	// Emit the DNS lookup duration
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: mi.metrics.DNSResolutionDuration,
-			Tags:   tags,
-		},
-		Time:     now,
-		Value:    float64(duration),
-		Metadata: nil,
-	})
-
-	var failed float64
+	failed := 0.0
 	if resolutionErr != nil {
 		failed = 1
 	}
-
-	// Emit the DNS resolution failed rate
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: mi.metrics.DNSResolutionFailed,
-			Tags:   tags,
-		},
-		Time:     now,
-		Value:    failed,
-		Metadata: nil,
+	_ = mi.metrics.host.Emit(ctx, []extensionapi.Sample{
+		{Metric: mi.metrics.DNSResolutions, Value: 1, Tags: tags},
+		{Metric: mi.metrics.DNSResolutionDuration, Value: float64(duration.Milliseconds()), Tags: tags},
+		{Metric: mi.metrics.DNSResolutionFailed, Value: failed, Tags: tags},
 	})
 }
 
-// emitLookupMetrics emits the metrics specific to DNS lookup operations.
-func (mi *ModuleInstance) emitLookupMetrics(
-	ctx context.Context,
-	duration int64,
-	host string,
-	lookupErr error,
-) {
-	state := mi.vu.State()
-
-	tags := state.Tags.GetCurrentValues().Tags
-	tags = tags.With("host", host)
-
-	now := time.Now()
-
-	// Increment the DNS lookups counter
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: mi.metrics.DNSLookups,
-			Tags:   tags,
-		},
-		Time:     now,
-		Metadata: nil,
-		Value:    float64(1),
-	})
-
-	// Emit the DNS lookup duration
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: mi.metrics.DNSLookupDuration,
-			Tags:   tags,
-		},
-		Time:     now,
-		Value:    float64(duration),
-		Metadata: nil,
-	})
-
-	var failed float64
+func (mi *ModuleInstance) emitLookupMetrics(ctx context.Context, duration time.Duration, host string, lookupErr error) {
+	tags := mi.metrics.host.CurrentTags().With(map[string]string{"host": host})
+	failed := 0.0
 	if lookupErr != nil {
 		failed = 1
 	}
-
-	// Emit the DNS lookup failed rate
-	metrics.PushIfNotDone(ctx, state.Samples, metrics.Sample{
-		TimeSeries: metrics.TimeSeries{
-			Metric: mi.metrics.DNSLookupFailed,
-			Tags:   tags,
-		},
-		Time:     now,
-		Value:    failed,
-		Metadata: nil,
+	_ = mi.metrics.host.Emit(ctx, []extensionapi.Sample{
+		{Metric: mi.metrics.DNSLookups, Value: 1, Tags: tags},
+		{Metric: mi.metrics.DNSLookupDuration, Value: float64(duration.Milliseconds()), Tags: tags},
+		{Metric: mi.metrics.DNSLookupFailed, Value: failed, Tags: tags},
 	})
 }
 
-// moduleInstanceMetrics holds the metrics for the module instance.
 type moduleInstanceMetrics struct {
-	// DNSResolutions is a counter metric tracking the total number of DNS resolutions.
-	DNSResolutions *metrics.Metric
-
-	// DNSResolutionDuration is a trend metric tracking the duration of DNS resolutions.
-	DNSResolutionDuration *metrics.Metric
-
-	// DNSResolutionFailed is a Rate metric tracking the rate of failed DNS resolutions.
-	DNSResolutionFailed *metrics.Metric
-
-	// DNSLookups is a counter metric tracking the total number of DNS lookups.
-	DNSLookups *metrics.Metric
-
-	// DNSLookupDuration is a trend metric tracking the duration of DNS lookups.
-	DNSLookupDuration *metrics.Metric
-
-	// DNSLookupFailed is a Rate metric tracking the rate of failed DNS lookups.
-	DNSLookupFailed *metrics.Metric
+	host                  extensionapi.Metrics
+	DNSResolutions        extensionapi.Metric
+	DNSResolutionDuration extensionapi.Metric
+	DNSResolutionFailed   extensionapi.Metric
+	DNSLookups            extensionapi.Metric
+	DNSLookupDuration     extensionapi.Metric
+	DNSLookupFailed       extensionapi.Metric
 }

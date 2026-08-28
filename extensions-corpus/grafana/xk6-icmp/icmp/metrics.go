@@ -1,10 +1,9 @@
 package icmp
 
 import (
-	"sort"
+	"fmt"
 
-	"go.k6.io/k6/v2/js/modules"
-	"go.k6.io/k6/v2/metrics"
+	extensionapi "go.k6.io/k6-extension-api"
 )
 
 const (
@@ -18,47 +17,48 @@ const (
 )
 
 type icmpMetrics struct {
-	dataSent            *metrics.Metric
-	dataReceived        *metrics.Metric
-	icmpPacketsSent     *metrics.Metric
-	icmpPacketsReceived *metrics.Metric
-	icmpReplyTTL        *metrics.Metric
-	icmpRtt             *metrics.Metric
-	icmpResolve         *metrics.Metric
-	icmpSetup           *metrics.Metric
-	icmpErrors          *metrics.Metric
+	host                extensionapi.Metrics
+	dataSent            extensionapi.Metric
+	dataReceived        extensionapi.Metric
+	icmpPacketsSent     extensionapi.Metric
+	icmpPacketsReceived extensionapi.Metric
+	icmpReplyTTL        extensionapi.Metric
+	icmpRtt             extensionapi.Metric
+	icmpResolve         extensionapi.Metric
+	icmpSetup           extensionapi.Metric
+	icmpErrors          extensionapi.Metric
 }
 
-func newIcmpMetrics(vu modules.VU) *icmpMetrics {
+func newICMPMetrics(vu extensionapi.VU) *icmpMetrics {
+	host, ok := vu.(extensionapi.Metrics)
+	if !ok {
+		panic("extension API metrics capability is unavailable")
+	}
+	register := func(name string, kind extensionapi.MetricKind, unit extensionapi.MetricUnit) extensionapi.Metric {
+		metric, err := host.RegisterMetric(extensionapi.MetricSpec{Name: name, Kind: kind, Unit: unit})
+		if err != nil {
+			panic(fmt.Errorf("register ICMP metric %q: %w", name, err))
+		}
+		return metric
+	}
+	dataSent, ok := host.BuiltinMetric(extensionapi.BuiltinDataSent)
+	if !ok {
+		panic("extension API data_sent metric is unavailable")
+	}
+	dataReceived, ok := host.BuiltinMetric(extensionapi.BuiltinDataReceived)
+	if !ok {
+		panic("extension API data_received metric is unavailable")
+	}
 	return &icmpMetrics{
-		dataSent:            vu.InitEnv().BuiltinMetrics.DataSent,
-		dataReceived:        vu.InitEnv().BuiltinMetrics.DataReceived,
-		icmpPacketsSent:     vu.InitEnv().Registry.MustNewMetric(icmpPacketsSent, metrics.Counter),
-		icmpPacketsReceived: vu.InitEnv().Registry.MustNewMetric(icmpPacketsReceived, metrics.Counter),
-		icmpReplyTTL:        vu.InitEnv().Registry.MustNewMetric(icmpReplyTTL, metrics.Gauge),
-		icmpRtt:             vu.InitEnv().Registry.MustNewMetric(icmpRtt, metrics.Trend, metrics.Time),
-		icmpResolve:         vu.InitEnv().Registry.MustNewMetric(icmpResolve, metrics.Trend, metrics.Time),
-		icmpSetup:           vu.InitEnv().Registry.MustNewMetric(icmpSetup, metrics.Trend, metrics.Time),
-		icmpErrors:          vu.InitEnv().Registry.MustNewMetric(icmpErrors, metrics.Counter),
+		host:                host,
+		dataSent:            dataSent,
+		dataReceived:        dataReceived,
+		icmpPacketsSent:     register(icmpPacketsSent, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
+		icmpPacketsReceived: register(icmpPacketsReceived, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
+		icmpReplyTTL:        register(icmpReplyTTL, extensionapi.MetricGauge, extensionapi.MetricUnitDefault),
+		icmpRtt:             register(icmpRtt, extensionapi.MetricTrend, extensionapi.MetricUnitTime),
+		icmpResolve:         register(icmpResolve, extensionapi.MetricTrend, extensionapi.MetricUnitTime),
+		icmpSetup:           register(icmpSetup, extensionapi.MetricTrend, extensionapi.MetricUnitTime),
+		icmpErrors:          register(icmpErrors, extensionapi.MetricCounter, extensionapi.MetricUnitDefault),
 	}
-}
-
-func addToTagSet(ts *metrics.TagSet, tags map[string]string) *metrics.TagSet {
-	if tags == nil {
-		return ts
-	}
-
-	keys := make([]string, 0, len(tags))
-
-	for k := range tags {
-		keys = append(keys, k)
-	}
-
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		ts = ts.With(k, tags[k])
-	}
-
-	return ts
 }
