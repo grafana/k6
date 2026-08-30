@@ -230,6 +230,11 @@ func getConsolidatedConfig(
 		return Config{}, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
+	// Lower layers drop their shortcuts before the merge.
+	if cliConf.once {
+		dropOnceShortcuts(&fileConf.Options, &runnerOpts, &envConf.Options)
+	}
+
 	conf := cliConf.Apply(fileConf)
 
 	warnOnShortHandOverride(conf.Options, runnerOpts, "script", gs.Logger)
