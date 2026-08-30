@@ -67,6 +67,7 @@ func onceScenario(name string, src lib.ExecutorConfig) (lib.ExecutorConfig, erro
 		return nil, fmt.Errorf("reading the exec of the %q scenario: %w", src.GetName(), err)
 	}
 	once.Exec = raw.Exec
+	once.Env = src.GetEnv()
 
 	return once, nil
 }

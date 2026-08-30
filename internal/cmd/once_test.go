@@ -67,3 +67,36 @@ func TestApplyOncePreservesScenarioExec(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyOncePreservesScenarioFields(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct {
+		name  string
+		setup func(*executor.SharedIterationsConfig)
+		check func(*testing.T, executor.SharedIterationsConfig)
+	}{
+		{
+			name:  "env",
+			setup: func(s *executor.SharedIterationsConfig) { s.Env = map[string]string{"GREETING": "hi"} },
+			check: func(t *testing.T, s executor.SharedIterationsConfig) {
+				t.Helper()
+				assert.Equal(t, map[string]string{"GREETING": "hi"}, s.Env)
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			src := executor.NewSharedIterationsConfig("ui")
+			tt.setup(&src)
+			opts := lib.Options{Scenarios: lib.ScenarioConfigs{"ui": src}}
+
+			res, err := applyOnce(opts)
+			require.NoError(t, err)
+
+			sc := mustExtractSingleSharedIterScenario(t, res)
+			tt.check(t, sc)
+		})
+	}
+}
