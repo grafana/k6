@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 func TestRunOnce(t *testing.T) {
@@ -111,4 +113,63 @@ func TestCloudRunOnceUploadsRewrittenArchive(t *testing.T) {
 	sc := mustExtractSingleSharedIterScenario(t, arc.Options)
 	assert.Equal(t, null.IntFrom(1), sc.VUs)
 	assert.Equal(t, null.IntFrom(1), sc.Iterations)
+}
+
+func buildArchive(t *testing.T, script string, flags ...string) []byte {
+	t.Helper()
+
+	ts := NewGlobalTestState(t)
+	tarPath := filepath.Join(ts.Cwd, "archive.tar")
+	require.NoError(t, fsext.WriteFile(
+		ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
+	ts.CmdArgs = append(append([]string{"k6", "archive"}, flags...), "-O", tarPath, "test.js")
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	tarData, err := fsext.ReadFile(ts.FS, tarPath)
+	require.NoError(t, err)
+
+	return tarData
+}
+
+func TestArchiveOnceWritesRewrittenOptions(t *testing.T) {
+	t.Parallel()
+
+	script := `
+		export const options = { scenarios: {
+			ui: { executor: 'constant-vus', vus: 3, duration: '2s' }
+		}};
+		export default function() {}
+	`
+
+	arc, err := lib.ReadArchive(bytes.NewReader(buildArchive(t, script, "--once")))
+	require.NoError(t, err)
+
+	sc := mustExtractSingleSharedIterScenario(t, arc.Options)
+	assert.Equal(t, null.IntFrom(1), sc.VUs)
+	assert.Equal(t, null.IntFrom(1), sc.Iterations)
+}
+
+func TestRunOnceRewritesPlainArchive(t *testing.T) {
+	t.Parallel()
+
+	script := `
+		export const options = { scenarios: {
+			ui: { executor: 'shared-iterations', vus: 3, iterations: 9 }
+		}};
+		export default function() { console.log('once ran'); }
+	`
+
+	tarData := buildArchive(t, script)
+
+	ts := NewGlobalTestState(t)
+	tarPath := filepath.Join(ts.Cwd, "archive.tar")
+	require.NoError(t, fsext.WriteFile(ts.FS, tarPath, tarData, 0o644))
+	ts.CmdArgs = []string{"k6", "run", "--log-output=stdout", "--once", tarPath}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	assert.Contains(t, stdout, "1 iterations shared among 1 VUs")
+	assert.Equal(t, 1, strings.Count(stdout, "once ran"))
 }
