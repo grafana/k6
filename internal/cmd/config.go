@@ -232,7 +232,13 @@ func getConsolidatedConfig(
 
 	// Lower layers drop their shortcuts before the merge.
 	if cliConf.once {
-		dropOnceShortcuts(&fileConf.Options, &runnerOpts, &envConf.Options)
+		if err := dropOnceShortcuts(gs.Logger, map[string]*lib.Options{
+			"config":      &fileConf.Options,
+			"script":      &runnerOpts,
+			"environment": &envConf.Options,
+		}); err != nil {
+			return Config{}, err
+		}
 	}
 
 	conf := cliConf.Apply(fileConf)
