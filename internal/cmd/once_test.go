@@ -5,11 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/internal/cmd/tests"
+	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/executor"
 	"go.k6.io/k6/v2/lib/fsext"
@@ -178,4 +180,36 @@ func TestOncePreservesScenarioAcrossLayers(t *testing.T) {
 	assert.Equal(t, map[string]string{"GREETING": "hi"}, sc.Env)
 	assert.Equal(t, map[string]string{"team": "core"}, sc.Tags)
 	assert.Equal(t, &lib.ScenarioOptions{Browser: map[string]any{"type": "chromium"}}, sc.Options)
+}
+
+func TestDropOnceShortcutsWarnsOnlyWhenItDropsShortcuts(t *testing.T) {
+	t.Parallel()
+
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+
+	require.NoError(t, dropOnceShortcuts(logger, map[string]*lib.Options{
+		"config":      {},
+		"script":      {},
+		"environment": {},
+	}))
+	assert.Empty(t, hook.Drain())
+
+	segment, err := lib.NewExecutionSegmentFromString("0:1/2")
+	require.NoError(t, err)
+	require.NoError(t, dropOnceShortcuts(logger, map[string]*lib.Options{
+		"config": {VUs: null.IntFrom(1), Stages: []lib.Stage{
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(1)},
+		}},
+		"script": {
+			VUs: null.IntFrom(1), Duration: types.NullDurationFrom(time.Second),
+			ExecutionSegment: segment,
+		},
+		"environment": {Iterations: null.IntFrom(1)},
+	}))
+
+	entries := hook.Drain()
+	require.Len(t, entries, 3)
+	assert.Equal(t, `--once overrode vus, stages in "config" configuration`, entries[0].Message)
+	assert.Equal(t, `--once overrode vus, duration, executionSegment in "script" configuration`, entries[1].Message)
+	assert.Equal(t, `--once overrode iterations in "environment" configuration`, entries[2].Message)
 }

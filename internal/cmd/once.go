@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/errext"
@@ -16,17 +17,43 @@ import (
 )
 
 // A shortcut left in a lower layer drops or rewrites the scenario applyOnce writes.
-func dropOnceShortcuts(layers ...*lib.Options) {
+func dropOnceShortcuts(logger logrus.FieldLogger, layers map[string]*lib.Options) error {
 	var unset lib.Options
 
-	for _, o := range layers {
+	// k6 merges the layers in this order, and the warning follows it.
+	for _, name := range []string{"config", "script", "environment"} {
+		o, ok := layers[name]
+		if !ok {
+			return fmt.Errorf("missing %q layer", name)
+		}
+
+		var dropped []string
+		drop := func(opt string, set bool) {
+			if set {
+				dropped = append(dropped, opt)
+			}
+		}
+		drop("vus", o.VUs.Valid)
+		drop("duration", o.Duration.Valid)
+		drop("iterations", o.Iterations.Valid)
+		drop("stages", o.Stages != nil)
+		drop("executionSegment", o.ExecutionSegment != nil)
+		drop("executionSegmentSequence", o.ExecutionSegmentSequence != nil)
+
+		// Clearing an unset shortcut changes nothing, so only the naming above needs a check.
 		o.VUs = unset.VUs
 		o.Duration = unset.Duration
 		o.Iterations = unset.Iterations
 		o.Stages = unset.Stages
 		o.ExecutionSegment = unset.ExecutionSegment
 		o.ExecutionSegmentSequence = unset.ExecutionSegmentSequence
+
+		if len(dropped) > 0 {
+			logger.Warnf("--once overrode %s in %q configuration", strings.Join(dropped, ", "), name)
+		}
 	}
+
+	return nil
 }
 
 // Bare --once never guesses which scenario runs, so several scenarios are ambiguous.
