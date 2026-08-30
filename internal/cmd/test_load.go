@@ -552,6 +552,10 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		return nil, err
 	}
 
+	if cliConfig.once {
+		consolidatedConfig.Options = applyOnce(consolidatedConfig.Options)
+	}
+
 	gs.Logger.Debug("Parsing thresholds and validating config...")
 	// Parse the thresholds, only if the --no-threshold flag is not set.
 	// If parsing the threshold expressions failed, consider it as an
