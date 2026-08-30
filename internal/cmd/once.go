@@ -15,6 +15,20 @@ import (
 	"go.k6.io/k6/v2/lib/executor"
 )
 
+// A shortcut left in a lower layer drops or rewrites the scenario applyOnce writes.
+func dropOnceShortcuts(layers ...*lib.Options) {
+	var unset lib.Options
+
+	for _, o := range layers {
+		o.VUs = unset.VUs
+		o.Duration = unset.Duration
+		o.Iterations = unset.Iterations
+		o.Stages = unset.Stages
+		o.ExecutionSegment = unset.ExecutionSegment
+		o.ExecutionSegmentSequence = unset.ExecutionSegmentSequence
+	}
+}
+
 // Bare --once never guesses which scenario runs, so several scenarios are ambiguous.
 func rejectAmbiguousOnce(scenarios lib.ScenarioConfigs) error {
 	if len(scenarios) <= 1 {

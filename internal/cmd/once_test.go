@@ -1,14 +1,19 @@
 package cmd
 
 import (
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/cmd/tests"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 func TestApplyOncePreservesScenarioName(t *testing.T) {
@@ -119,3 +124,58 @@ func TestApplyOncePreservesScenarioFields(t *testing.T) {
 	}
 }
 
+func TestGetConsolidatedConfigOnceDropsLowerLayerShortcuts(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, ts.FS.MkdirAll(filepath.Dir(ts.Flags.ConfigFilePath), 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, ts.Flags.ConfigFilePath,
+		[]byte(`{"vus": 7, "stages": [{"duration": "10s", "target": 5}]}`), 0o644))
+	ts.Env["K6_ITERATIONS"] = "5"
+
+	segment, err := lib.NewExecutionSegmentFromString("0:1/2")
+	require.NoError(t, err)
+	runnerOpts := lib.Options{
+		Duration:         types.NullDurationFrom(time.Second),
+		ExecutionSegment: segment,
+	}
+
+	conf, err := getConsolidatedConfig(ts.GlobalState, Config{once: true}, runnerOpts, nil)
+	require.NoError(t, err)
+
+	assert.False(t, conf.VUs.Valid)
+	assert.False(t, conf.Duration.Valid)
+	assert.False(t, conf.Iterations.Valid)
+	assert.Nil(t, conf.Stages)
+	assert.Nil(t, conf.ExecutionSegment)
+}
+
+func TestOncePreservesScenarioAcrossLayers(t *testing.T) {
+	t.Parallel()
+
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, ts.FS.MkdirAll(filepath.Dir(ts.Flags.ConfigFilePath), 0o755))
+	require.NoError(t, fsext.WriteFile(ts.FS, ts.Flags.ConfigFilePath, []byte(`{"scenarios": {
+		"fromfile": { "executor": "constant-vus", "vus": 3, "duration": "2s", "exec": "api",
+			"env": { "GREETING": "hi" }, "tags": { "team": "core" },
+			"options": { "browser": { "type": "chromium" } } }
+	}}`), 0o644))
+	ts.Env["K6_ITERATIONS"] = "5"
+
+	runnerOpts := lib.Options{Duration: types.NullDurationFrom(time.Second)}
+
+	conf, err := getConsolidatedConfig(ts.GlobalState, Config{once: true}, runnerOpts, nil)
+	require.NoError(t, err)
+
+	opts, err := applyOnce(conf.Options)
+	require.NoError(t, err)
+
+	sc := mustExtractSingleSharedIterScenario(t, opts)
+	assert.Equal(t, "fromfile", sc.GetName())
+	assert.Equal(t, null.IntFrom(1), sc.VUs)
+	assert.Equal(t, null.IntFrom(1), sc.Iterations)
+	assert.Equal(t, null.StringFrom("api"), sc.Exec)
+	assert.Equal(t, map[string]string{"GREETING": "hi"}, sc.Env)
+	assert.Equal(t, map[string]string{"team": "core"}, sc.Tags)
+	assert.Equal(t, &lib.ScenarioOptions{Browser: map[string]any{"type": "chromium"}}, sc.Options)
+}
