@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/cmd/tests"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
@@ -212,4 +214,30 @@ func TestDropOnceShortcutsWarnsOnlyWhenItDropsShortcuts(t *testing.T) {
 	assert.Equal(t, `--once overrode vus, stages in "config" configuration`, entries[0].Message)
 	assert.Equal(t, `--once overrode vus, duration, executionSegment in "script" configuration`, entries[1].Message)
 	assert.Equal(t, `--once overrode iterations in "environment" configuration`, entries[2].Message)
+}
+
+func TestGetOptionsRejectsOnceWithShortcut(t *testing.T) {
+	t.Parallel()
+
+	for _, tt := range []struct{ flag, value string }{
+		{"vus", "1"},
+		{"duration", "10s"},
+		{"iterations", "5"},
+		{"stage", "10s:5"},
+		{"execution-segment", "1/2:1"},
+	} {
+		t.Run(tt.flag, func(t *testing.T) {
+			t.Parallel()
+
+			flags := optionFlagSet()
+			require.NoError(t, flags.Parse([]string{"--once", "--" + tt.flag, tt.value}))
+
+			_, err := getOptions(flags)
+			require.EqualError(t, err, "--once cannot be combined with --"+tt.flag)
+
+			var ec errext.HasExitCode
+			require.ErrorAs(t, err, &ec)
+			assert.Equal(t, exitcodes.InvalidConfig, ec.ExitCode())
+		})
+	}
 }

@@ -80,6 +80,10 @@ func optionFlagSet() *pflag.FlagSet {
 
 //nolint:funlen,gocognit,cyclop // this needs breaking up but probably should wait for croconf
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
+	if err := checkOnceConflicts(flags); err != nil {
+		return lib.Options{}, err
+	}
+
 	opts := lib.Options{
 		VUs:                     getNullInt64(flags, "vus"),
 		Duration:                getNullDuration(flags, "duration"),
