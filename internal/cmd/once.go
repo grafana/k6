@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/errext"
@@ -15,6 +16,23 @@ import (
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/executor"
 )
+
+// --once writes the load itself, so a CLI shortcut would fight the scenario it writes.
+func checkOnceConflicts(flags *pflag.FlagSet) error {
+	if !getNullBool(flags, "once").Bool {
+		return nil
+	}
+	for _, name := range []string{
+		"vus", "duration", "iterations", "stage",
+		"execution-segment", "execution-segment-sequence",
+	} {
+		if flags.Changed(name) {
+			return errext.WithExitCodeIfNone(
+				fmt.Errorf("--once cannot be combined with --%s", name), exitcodes.InvalidConfig)
+		}
+	}
+	return nil
+}
 
 // A shortcut left in a lower layer drops or rewrites the scenario applyOnce writes.
 func dropOnceShortcuts(logger logrus.FieldLogger, layers map[string]*lib.Options) error {
