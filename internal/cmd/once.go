@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
@@ -26,24 +27,46 @@ func rejectAmbiguousOnce(scenarios lib.ScenarioConfigs) error {
 }
 
 // Runs before DeriveScenariosFromShortcuts, so the archive gets the same scenarios.
-func applyOnce(opts lib.Options) lib.Options {
+func applyOnce(opts lib.Options) (lib.Options, error) {
 	scenarios := opts.Scenarios
 	if len(scenarios) == 0 {
 		scenarios = lib.ScenarioConfigs{lib.DefaultScenarioName: nil}
 	}
 
 	rewritten := make(lib.ScenarioConfigs, len(scenarios))
-	for name := range scenarios {
-		rewritten[name] = onceScenario(name)
+	for name, src := range scenarios {
+		sc, err := onceScenario(name, src)
+		if err != nil {
+			return opts, err
+		}
+		rewritten[name] = sc
 	}
 	opts.Scenarios = rewritten
 
-	return opts
+	return opts, nil
 }
 
-func onceScenario(name string) lib.ExecutorConfig {
+func onceScenario(name string, src lib.ExecutorConfig) (lib.ExecutorConfig, error) {
 	once := executor.NewSharedIterationsConfig(name)
 	once.VUs = null.IntFrom(1)
 	once.Iterations = null.IntFrom(1)
-	return once
+	if src == nil {
+		return once, nil
+	}
+
+	// GetExec collapses an unset exec and an explicit "default" to the same "default",
+	// and the interface exposes no raw getter, so read the null.String through JSON.
+	data, err := json.Marshal(src)
+	if err != nil {
+		return nil, fmt.Errorf("reading the %q scenario: %w", src.GetName(), err)
+	}
+	var raw struct {
+		Exec null.String `json:"exec"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("reading the exec of the %q scenario: %w", src.GetName(), err)
+	}
+	once.Exec = raw.Exec
+
+	return once, nil
 }

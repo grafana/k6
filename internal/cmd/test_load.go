@@ -556,7 +556,9 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		if err = rejectAmbiguousOnce(consolidatedConfig.Scenarios); err != nil {
 			return nil, err
 		}
-		consolidatedConfig.Options = applyOnce(consolidatedConfig.Options)
+		if consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options); err != nil {
+			return nil, err
+		}
 	}
 
 	gs.Logger.Debug("Parsing thresholds and validating config...")
