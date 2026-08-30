@@ -68,6 +68,7 @@ func onceScenario(name string, src lib.ExecutorConfig) (lib.ExecutorConfig, erro
 	}
 	once.Exec = raw.Exec
 	once.Env = src.GetEnv()
+	once.Tags = src.GetTags()
 
 	return once, nil
 }
