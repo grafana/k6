@@ -92,6 +92,16 @@ func TestApplyOncePreservesScenarioFields(t *testing.T) {
 				assert.Equal(t, map[string]string{"team": "core"}, s.Tags)
 			},
 		},
+		{
+			name: "options",
+			setup: func(s *executor.SharedIterationsConfig) {
+				s.Options = &lib.ScenarioOptions{Browser: map[string]any{"type": "chromium"}}
+			},
+			check: func(t *testing.T, s executor.SharedIterationsConfig) {
+				t.Helper()
+				assert.Equal(t, &lib.ScenarioOptions{Browser: map[string]any{"type": "chromium"}}, s.Options)
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
