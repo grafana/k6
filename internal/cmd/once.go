@@ -25,15 +25,25 @@ func rejectAmbiguousOnce(scenarios lib.ScenarioConfigs) error {
 			strings.Join(names, ", ")), exitcodes.InvalidConfig)
 }
 
-// Runs before DeriveScenariosFromShortcuts, so the archive gets the same scenario.
+// Runs before DeriveScenariosFromShortcuts, so the archive gets the same scenarios.
 func applyOnce(opts lib.Options) lib.Options {
-	name := lib.DefaultScenarioName
+	scenarios := opts.Scenarios
+	if len(scenarios) == 0 {
+		scenarios = lib.ScenarioConfigs{lib.DefaultScenarioName: nil}
+	}
 
+	rewritten := make(lib.ScenarioConfigs, len(scenarios))
+	for name := range scenarios {
+		rewritten[name] = onceScenario(name)
+	}
+	opts.Scenarios = rewritten
+
+	return opts
+}
+
+func onceScenario(name string) lib.ExecutorConfig {
 	once := executor.NewSharedIterationsConfig(name)
 	once.VUs = null.IntFrom(1)
 	once.Iterations = null.IntFrom(1)
-
-	opts.Scenarios = lib.ScenarioConfigs{name: once}
-
-	return opts
+	return once
 }
