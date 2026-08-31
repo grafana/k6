@@ -48,7 +48,7 @@ func (s relativePseudoClassSelector) Match(n *html.Node) bool {
 }
 
 // hasChildMatch returns whether n has any child that matches a.
-func hasChildMatch(n *html.Node, a Matcher) bool {
+func hasChildMatch(n *html.Node, a SelectorGroup) bool {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		if a.Match(c) {
 			return true
@@ -60,7 +60,7 @@ func hasChildMatch(n *html.Node, a Matcher) bool {
 // hasDescendantMatch performs a depth-first search of n's descendants,
 // testing whether any of them match a. It returns true as soon as a match is
 // found, or false if no match is found.
-func hasDescendantMatch(n *html.Node, a Matcher) bool {
+func hasDescendantMatch(n *html.Node, a SelectorGroup) bool {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		if a.Match(c) || (c.Type == html.ElementNode && hasDescendantMatch(c, a)) {
 			return true
@@ -327,7 +327,7 @@ func (s emptyElementPseudoClassSelector) Match(n *html.Node) bool {
 		case html.ElementNode:
 			return false
 		case html.TextNode:
-			if strings.TrimSpace(nodeText(c)) == "" {
+			if strings.TrimSpace(c.Data) == "" {
 				continue
 			} else {
 				return false
