@@ -544,12 +544,32 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		// --once is CLI-only, so it rides on the CLI configuration layer.
 		cliConfig.once = getNullBool(cmd.Flags(), "once").Bool
 	}
+	var scenarioNames []string
+	if cmd.Flags().Changed("scenario") {
+		var err error
+		scenarioNames, err = cmd.Flags().GetStringSlice("scenario")
+		if err != nil {
+			return nil, err
+		}
+		if len(scenarioNames) == 0 {
+			return nil, errext.WithExitCodeIfNone(
+				errors.New("--scenario requires at least one scenario name"),
+				exitcodes.InvalidConfig)
+		}
+	}
 
 	gs.Logger.Debug("Consolidating config layers...")
 	consolidatedConfig, err := getConsolidatedConfig(
 		gs, cliConfig, lt.initRunner.GetOptions(), lt.preInitState.FeatureFlags)
 	if err != nil {
 		return nil, err
+	}
+
+	if scenarioNames != nil {
+		consolidatedConfig.Options, err = selectScenarios(consolidatedConfig.Options, scenarioNames)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if cliConfig.once {
