@@ -572,11 +572,15 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		}
 	}
 
-	if cliConfig.once {
-		if err = rejectAmbiguousOnce(consolidatedConfig.Scenarios); err != nil {
+	if cliConfig.once && scenarioNames == nil {
+		if err := rejectAmbiguousOnce(consolidatedConfig.Scenarios); err != nil {
 			return nil, err
 		}
-		if consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options); err != nil {
+	}
+
+	if cliConfig.once {
+		consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options)
+		if err != nil {
 			return nil, err
 		}
 	}
