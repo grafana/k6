@@ -276,11 +276,11 @@ func TestReadyState(t *testing.T) {
 	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
 		var ws = new WebSocket("WSBIN_URL/ws-echo")
 		ws.addEventListener("open", () => {
-			if (ws.readyState != 1){
+			if (ws.readyState != WebSocket.OPEN){
 				throw new Error("Expected ready state 1 got "+ ws.readyState)
 			}
 			ws.addEventListener("close", () => {
-				if (ws.readyState != 3){
+				if (ws.readyState != WebSocket.CLOSED){
 					throw new Error("Expected ready state 3 got "+ ws.readyState)
 				}
 
@@ -288,7 +288,7 @@ func TestReadyState(t *testing.T) {
 			ws.send("something")
 			ws.close()
 		})
-		if (ws.readyState != 0){
+		if (ws.readyState != WebSocket.CONNECTING){
 			throw new Error("Expected ready state 0 got "+ ws.readyState)
 		}
 	`))
@@ -1590,7 +1590,7 @@ func TestReadyStateSwitch(t *testing.T) {
 		var ws = new WebSocket("WSBIN_URL/ws-echo")
 		try {
 			switch (ws.readyState) {
-				case 0:
+				case WebSocket.CONNECTING:
 					break;
 				default:
 					throw "ws.readyState doesn't get correct value in switch"
