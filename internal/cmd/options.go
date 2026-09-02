@@ -25,6 +25,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 
 	flags.Bool("once", false, "run the test with 1 VU and 1 iteration")
+	flags.StringSlice("scenario", nil, "run scenarios by name (comma-separated)")
 	flags.Int64P("vus", "u", 1, "number of virtual users")
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
