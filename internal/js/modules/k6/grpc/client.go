@@ -41,6 +41,11 @@ type Client struct {
 
 	types    *protoregistry.Types
 	typesMtx sync.Mutex
+
+	connPool *connectionPool
+	// sharedKey is set while this client uses a connection from connPool, and
+	// identifies the entry to give back when the client is closed.
+	sharedKey *connectionKey
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
@@ -265,7 +270,7 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	}
 
 	c.addr = addr
-	c.conn, err = grpcext.Dial(ctx, addr, c.types, opts...)
+	c.conn, err = c.dial(ctx, addr, p, opts...)
 	if err != nil {
 		return false, err
 	}
@@ -286,6 +291,33 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	}
 
 	return true, err
+}
+
+// dial establishes a gRPC connection, either shared with the other clients
+// connected to the same server with the same parameters, or as a new dedicated
+// connection.
+func (c *Client) dial(
+	ctx context.Context, addr string, p *connectParams, opts ...grpc.DialOption,
+) (*grpcext.Conn, error) {
+	if !p.ConnectionSharing {
+		return grpcext.Dial(ctx, addr, c.types, opts...)
+	}
+
+	key, err := newConnectionKey(addr, p)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := c.connPool.getOrDial(ctx, key, addr, c.types, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Only track the connection once it is ours to give back, so that a failed
+	// dial doesn't make a later Close() release somebody else's connection.
+	c.sharedKey = &key
+
+	return conn, nil
 }
 
 // HealthCheck checks if the server side is up and ready to serve responses
@@ -477,7 +509,14 @@ func (c *Client) Close() error {
 	if c.conn == nil {
 		return nil
 	}
-	err := c.conn.Close()
+
+	var err error
+	if c.sharedKey != nil {
+		err = c.connPool.release(*c.sharedKey)
+		c.sharedKey = nil
+	} else {
+		err = c.conn.Close()
+	}
 	c.conn = nil
 
 	return err
