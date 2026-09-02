@@ -255,7 +255,8 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 					common.Throw(rt, fmt.Errorf("a value for '%s' should be callable", property))
 				}
 
-				el.setOn(func(v sobek.Value) (sobek.Value, error) { return fn(sobek.Undefined(), v) })
+				el.setOn(w.wrapUnderCurrentMetricContext(
+					func(v sobek.Value) (sobek.Value, error) { return fn(sobek.Undefined(), v) }))
 
 				return nil
 			}), sobek.FLAG_FALSE, sobek.FLAG_TRUE))
@@ -951,8 +952,23 @@ func (w *webSocket) addEventListener(event string, handler func(sobek.Value) (so
 		common.Throw(w.vu.Runtime(), fmt.Errorf("handler for event type %q isn't a callable function", event))
 	}
 
-	if err := w.eventListeners.add(event, handler); err != nil {
+	if err := w.eventListeners.add(event, w.wrapUnderCurrentMetricContext(handler)); err != nil {
 		w.vu.State().Logger.Warnf("can't add event handler: %s", err)
+	}
+}
+
+// WebSocket listeners run outside Sobek's promise machinery.
+func (w *webSocket) wrapUnderCurrentMetricContext(
+	fn func(sobek.Value) (sobek.Value, error),
+) func(sobek.Value) (sobek.Value, error) {
+	if !common.AsyncMetricContextEnabled(w.vu.State()) {
+		return fn
+	}
+	captured := common.CaptureMetricContext(w.vu.State())
+	return func(v sobek.Value) (sobek.Value, error) {
+		return common.RunWithMetricContext(captured, func() (sobek.Value, error) {
+			return fn(v)
+		})
 	}
 }
 
