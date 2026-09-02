@@ -541,6 +541,8 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		if err != nil {
 			return nil, err
 		}
+		// --once is CLI-only, so it rides on the CLI configuration layer.
+		cliConfig.once = getNullBool(cmd.Flags(), "once").Bool
 	}
 
 	gs.Logger.Debug("Consolidating config layers...")
@@ -548,6 +550,15 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		gs, cliConfig, lt.initRunner.GetOptions(), lt.preInitState.FeatureFlags)
 	if err != nil {
 		return nil, err
+	}
+
+	if cliConfig.once {
+		if err = rejectAmbiguousOnce(consolidatedConfig.Scenarios); err != nil {
+			return nil, err
+		}
+		if consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options); err != nil {
+			return nil, err
+		}
 	}
 
 	gs.Logger.Debug("Parsing thresholds and validating config...")
