@@ -515,7 +515,11 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	defer cancel()
 
 	// buffer of one is for sending the target ID whether an event handler
-	// exists or not.
+	// exists or not. The page event can arrive during CreateTarget, before
+	// the ID is known, so the predicate waits on this channel. It must put
+	// the ID back after reading: a non-matching event (another newPage in
+	// the same context, or a popup) would otherwise consume it and leave
+	// later matching events blocked until the timeout.
 	targetID := make(chan target.ID, 1)
 
 	waitForPage, removeEventHandler := createWaitForEventHandler(
@@ -523,7 +527,13 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		bc, // browser context will emit the following event:
 		[]string{EventBrowserContextPage},
 		func(e any) bool {
-			tid := <-targetID
+			var tid target.ID
+			select {
+			case tid = <-targetID:
+				targetID <- tid
+			case <-ctx.Done():
+				return false
+			}
 
 			b.logger.Debugf("Browser:newPageInContext:createWaitForEventHandler",
 				"tid:%v ptid:%v bctxid:%v", tid, e.(*Page).targetID, id) //nolint:forcetypeassert
