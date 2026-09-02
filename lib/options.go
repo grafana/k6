@@ -547,6 +547,14 @@ func (o Options) Validate() []error {
 	if o.SetupTimeout.Valid && o.SetupTimeout.Duration <= 0 {
 		validationErrors = append(validationErrors, errors.New("setupTimeout must be positive"))
 	}
+	// metricSamplesBufferSize < 1 makes run.go's make(chan SampleContainer, n) panic
+	// with "makechan: size out of range" (negative) or use an unbuffered channel (0)
+	// that is never intentional for this option.
+	if o.MetricSamplesBufferSize.Valid && o.MetricSamplesBufferSize.Int64 < 1 {
+		validationErrors = append(validationErrors,
+			fmt.Errorf("metricSamplesBufferSize must be a positive number but is %d",
+				o.MetricSamplesBufferSize.Int64))
+	}
 	return validationErrors
 }
 
