@@ -56,8 +56,11 @@ func NewSelector(selector string) (*Selector, error) {
 		Parts:    make([]*SelectorPart, 0, 1),
 		Capture:  nil,
 	}
-	err := s.parse()
-	return &s, err
+	if err := s.parse(); err != nil {
+		return nil, err
+	}
+
+	return &s, nil
 }
 
 func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
