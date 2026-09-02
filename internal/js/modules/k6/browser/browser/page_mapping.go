@@ -28,8 +28,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameCheckOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameCheckOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing new frame check options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -37,7 +37,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"click": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameClickOptions(vu.Context(), opts, p.MainFrame().Timeout())
+			popts, err := parseFrameClickOptions(rt, opts, p.MainFrame().Timeout())
 			if err != nil {
 				return nil, err
 			}
@@ -70,8 +70,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return mapBrowserContext(vu, p.Context())
 		},
 		"dblclick": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameDblClickOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameDblclickOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing double click options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -79,8 +79,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"dispatchEvent": func(selector, typ string, eventInit, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameDispatchEventOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameDispatchEventOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing page dispatch event options: %w", err)
 			}
 			earg := exportArg(eventInit)
@@ -127,8 +127,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"fill": func(selector string, value string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameFillOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameFillOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing fill options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -137,7 +137,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"focus": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			if err := parseFrameBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing focus options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -154,7 +154,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"getAttribute": func(selector string, name string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameBaseOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			if err := parseFrameBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing getAttribute options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -232,11 +232,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(ml).ToObject(rt), nil
 		},
 		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
-			gopts := common.NewFrameGotoOptions(
+			gopts, err := parseFrameGotoOptions(
+				rt, opts,
 				p.Referrer(),
 				p.NavigationTimeout(),
 			)
-			if err := gopts.Parse(vu.Context(), opts); err != nil {
+			if err != nil {
 				return nil, fmt.Errorf("parsing page navigation options to %q: %w", url, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -249,8 +250,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"hover": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameHoverOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameHoverOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing hover options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -258,8 +259,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"innerHTML": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameInnerHTMLOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing inner HTML options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -267,8 +268,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"innerText": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameInnerTextOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameInnerTextOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing inner text options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -276,8 +277,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"inputValue": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameInputValueOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameInputValueOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing input value options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -285,8 +286,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"isChecked": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsCheckedOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsCheckedOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parse isChecked options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -295,8 +296,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"isClosed": p.IsClosed,
 		"isDisabled": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsDisabledOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsDisabledOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parse isDisabled options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -304,8 +305,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"isEditable": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsEditableOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsEditableOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parse isEditabled options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -313,8 +314,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"isEnabled": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsEnabledOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsEnabledOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parse isEnabled options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -322,8 +323,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"isHidden": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsHiddenOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsHiddenOptions(rt, opts)
+			if err != nil {
 				return nil, fmt.Errorf("parse isHidden options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -331,8 +332,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"isVisible": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameIsVisibleOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameIsVisibleOptions(rt, opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing isVisible options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -360,8 +361,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"press": func(selector string, key string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFramePressOptions(p.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFramePressOptions(rt, opts, p.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing press options of selector %q: %w", selector, err)
 			}
 			return promise(vu, func() (any, error) {
@@ -442,8 +443,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return promise, nil
 		},
 		"selectOption": func(selector string, values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameSelectOptionOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameSelectOptionOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 
@@ -456,8 +457,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"setChecked": func(selector string, checked bool, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameCheckOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameCheckOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing frame set check options: %w", err)
 			}
 
@@ -466,8 +467,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"setContent": func(html string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameSetContentOptions(p.MainFrame().NavigationTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameSetContentOptions(rt, opts, p.MainFrame().NavigationTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing setContent options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -482,8 +483,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"setInputFiles": func(selector string, files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameSetInputFilesOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameSetInputFilesOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
 			}
 
@@ -506,8 +507,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"tap": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameTapOptions(p.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameTapOptions(rt, opts, p.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing page tap options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -515,8 +516,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"textContent": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameTextContentOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameTextContentOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing text content options: %w", err)
 			}
 
@@ -548,8 +549,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"touchscreen": mapTouchscreen(vu, p.GetTouchscreen()),
 		"type": func(selector string, text string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameTypeOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameTypeOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing type options: %w", err)
 			}
 
@@ -558,8 +559,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"uncheck": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameUncheckOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameUncheckOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
 			}
 
@@ -581,7 +582,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"viewportSize": p.ViewportSize,
 		"waitForFunction": func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
-				vu.Context(), p.Timeout(), pageFunc, opts, args...,
+				rt, p.Timeout(), pageFunc, opts, args...,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("page waitForFunction: %w", err)
@@ -592,8 +593,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"waitForLoadState": func(state string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForLoadStateOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameWaitForLoadStateOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
 			}
 
@@ -602,11 +603,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
-			return mapWaitForNavigation(vu, p, opts)
+			return mapWaitForNavigation(rt, vu, p, opts)
 		},
 		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameWaitForSelectorOptions(rt, opts, p.MainFrame().Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
 			}
 
@@ -625,7 +626,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			})
 		},
 		"waitForURL": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			return mapWaitForURL(vu, p, url, opts)
+			return mapWaitForURL(rt, vu, p, url, opts)
 		},
 		"waitForResponse": func(url sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parsePageWaitForResponseOptions(vu.Context(), opts, p.Timeout())
@@ -814,10 +815,9 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 }
 
 func parseWaitForFunctionArgs(
-	ctx context.Context, timeout time.Duration, pageFunc, opts sobek.Value, gargs ...sobek.Value,
+	rt *sobek.Runtime, timeout time.Duration, pageFunc, opts sobek.Value, gargs ...sobek.Value,
 ) (string, *common.FrameWaitForFunctionOptions, []any, error) {
-	popts := common.NewFrameWaitForFunctionOptions(timeout)
-	err := popts.Parse(ctx, opts)
+	popts, err := parseFrameWaitForFunctionOptions(rt, opts, timeout)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("parsing waitForFunction options: %w", err)
 	}
@@ -829,6 +829,40 @@ func parseWaitForFunctionArgs(
 	}
 
 	return js, popts, exportArgs(gargs), nil
+}
+
+// parseFrameWaitForFunctionOptions parses the frame waitForFunction options from a Sobek value.
+func parseFrameWaitForFunctionOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameWaitForFunctionOptions, error) {
+	wfopts := common.NewFrameWaitForFunctionOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wfopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		v := obj.Get(k)
+		switch k {
+		case "timeout":
+			wfopts.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
+		case "polling":
+			switch v.ExportType().Kind() {
+			case reflect.Int64:
+				wfopts.Polling = common.PollingInterval
+				wfopts.Interval = v.ToInteger()
+			case reflect.String:
+				if p, ok := common.PollingIDFromString(v.ToString().String()); ok {
+					wfopts.Polling = p
+					break
+				}
+				fallthrough
+			default:
+				return wfopts, fmt.Errorf("wrong polling option value: %q; "+
+					`possible values: "raf", "mutation" or number`, v)
+			}
+		}
+	}
+	return wfopts, nil
 }
 
 // parseStringOrRegex parses a sobek.Value to return either a quoted string if it was a string,
@@ -960,7 +994,7 @@ func mapPageRoute(vu moduleVU, p *common.Page) func(sobek.Value, sobek.Callable)
 	}
 }
 
-func mapWaitForURL(vu moduleVU, target interface {
+func mapWaitForURL(rt *sobek.Runtime, vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForURL(urlPattern string, opts *common.FrameWaitForURLOptions, rm common.RegExMatcher) error
 }, url sobek.Value, opts sobek.Value,
@@ -968,8 +1002,8 @@ func mapWaitForURL(vu moduleVU, target interface {
 	if k6common.IsNullish(url) {
 		return nil, errors.New("missing required argument 'url'")
 	}
-	popts := common.NewFrameWaitForURLOptions(target.Timeout())
-	if err := popts.Parse(vu.Context(), opts); err != nil {
+	popts, err := parseFrameWaitForURLOptions(rt, opts, target.Timeout())
+	if err != nil {
 		return nil, fmt.Errorf("parsing waitForURL options: %w", err)
 	}
 
@@ -982,13 +1016,36 @@ func mapWaitForURL(vu moduleVU, target interface {
 	}), nil
 }
 
-func mapWaitForNavigation(vu moduleVU, target interface {
+// parseFrameWaitForURLOptions parses the frame waitForURL options from a Sobek value.
+func parseFrameWaitForURLOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameWaitForURLOptions, error) {
+	wuopts := common.NewFrameWaitForURLOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wuopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "timeout":
+			wuopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if err := wuopts.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+				return wuopts, fmt.Errorf("parsing waitForURL options: %w", err)
+			}
+		}
+	}
+	return wuopts, nil
+}
+
+func mapWaitForNavigation(rt *sobek.Runtime, vu moduleVU, target interface {
 	Timeout() time.Duration
 	WaitForNavigation(*common.FrameWaitForNavigationOptions, common.RegExMatcher) (*common.Response, error)
 }, opts sobek.Value,
 ) (*sobek.Promise, error) {
-	popts := common.NewFrameWaitForNavigationOptions(target.Timeout())
-	if err := popts.Parse(vu.Context(), opts); err != nil {
+	popts, err := parseFrameWaitForNavigationOptions(rt, opts, target.Timeout())
+	if err != nil {
 		return nil, fmt.Errorf("parsing frame wait for navigation options: %w", err)
 	}
 
@@ -1010,6 +1067,39 @@ func mapWaitForNavigation(vu moduleVU, target interface {
 		}
 		return mapResponse(vu, resp), nil
 	}), nil
+}
+
+// parseFrameWaitForNavigationOptions parses the frame waitForNavigation options from a Sobek value.
+func parseFrameWaitForNavigationOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameWaitForNavigationOptions, error) {
+	wnopts := common.NewFrameWaitForNavigationOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return wnopts, nil
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "url":
+			var val string
+			switch obj.Get(k).ExportType() {
+			case reflect.TypeFor[string]():
+				val = fmt.Sprintf("'%s'", obj.Get(k).String()) // Strings require quotes
+			default: // JS Regex, CSS, numbers or booleans
+				val = obj.Get(k).String() // No quotes
+			}
+
+			wnopts.URL = val
+		case "timeout":
+			wnopts.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
+		case "waitUntil":
+			lifeCycle := obj.Get(k).String()
+			if err := wnopts.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
+				return wnopts, fmt.Errorf("parsing waitForNavigation options: %w", err)
+			}
+		}
+	}
+	return wnopts, nil
 }
 
 func parsePageWaitForResponseOptions(
