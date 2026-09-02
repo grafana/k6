@@ -1710,6 +1710,58 @@ func TestRemoteCloseWithCodeAndReason(t *testing.T) {
 	assert.Equal(t, []string{"remote closed"}, ts.callRecorder.Recorded())
 }
 
+// TestWriteFailureDuringSendLoopDoesNotHang verifies that a failed write while
+// the event loop is mid-send-loop does not deadlock the VU. Without the fix,
+// writePump's outer loop blocks forever forwarding to a writeChannel whose
+// consumer already exited, so the next ws.send() blocks on writeQueueCh and
+// the queued connectionClosedWithError callback never runs.
+func TestWriteFailureDuringSendLoopDoesNotHang(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+
+	ts.tb.Mux.HandleFunc("/ws-write-fail-loop", func(w http.ResponseWriter, req *http.Request) {
+		conn, upgErr := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if !assert.NoError(t, upgErr) {
+			return
+		}
+
+		// Accept one message so the client sees an open, writable socket, then
+		// kill the TCP connection so subsequent client writes fail.
+		_, _, _ = conn.ReadMessage()
+		assert.NoError(t, conn.UnderlyingConn().Close())
+	})
+
+	sr := ts.tb.Replacer.Replace
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, err := ts.runtime.RunOnEventLoop(sr(`
+			var ws = new WebSocket("WSBIN_URL/ws-write-fail-loop")
+			ws.onerror = () => { call("error") }
+			ws.onclose = () => { call("close") }
+			ws.onopen = () => {
+				// Flood sends so several are queued when the TCP drop makes
+				// WriteMessage fail. A hang here never reaches "finished".
+				for (let i = 0; i < 200; i++) {
+					ws.send("payload-" + i + "-" + "x".repeat(256))
+				}
+				call("finished")
+			}
+		`))
+		assert.NoError(t, err)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("event loop hung: ws.send blocked after writePump write failure")
+	}
+
+	recorded := ts.callRecorder.Recorded()
+	assert.Contains(t, recorded, "finished")
+	assert.Contains(t, recorded, "error")
+}
+
 // TestPingHandlerDeadlock verifies that server pings arriving during connection
 // teardown don't deadlock the readPump goroutine. The server sends aggressive
 // pings then abruptly kills the TCP connection. Without the fix, the ping

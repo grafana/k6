@@ -574,6 +574,13 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 	samplesOutput := w.vu.State().Samples
 	ctx := w.vu.Context()
 	writeChannel := make(chan message)
+	// writeFailed is closed when the writer goroutine gives up after a send
+	// error. The outer pump must then stop forwarding to writeChannel (which
+	// nobody reads anymore) and instead keep draining writeQueueCh until done
+	// closes. Otherwise a later ws.send()/ping()/close() from the event loop
+	// blocks forever on the unbuffered writeQueueCh and prevents the queued
+	// connectionClosedWithError callback from running — hanging the VU.
+	writeFailed := make(chan struct{})
 	go func() {
 		defer wg.Done()
 		for {
@@ -593,6 +600,7 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 					return w.conn.WriteControl(msg.mtype, msg.data, msg.t.Add(writeWait))
 				}()
 				if err != nil {
+					close(writeFailed)
 					w.tq.Queue(func() error {
 						_ = w.conn.Close() // TODO fix
 						closeErr := w.connectionClosedWithError(err)
@@ -637,6 +645,16 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 				queue = append(queue, msg)
 			case wch <- msg:
 				queue = queue[:copy(queue, queue[1:])]
+			case <-writeFailed:
+				for {
+					select {
+					case <-w.writeQueueCh:
+						// Discard: connection is already failing; keep send()
+						// from blocking the event loop until done is closed.
+					case <-w.done:
+						return
+					}
+				}
 			case <-w.done:
 				return
 			}
