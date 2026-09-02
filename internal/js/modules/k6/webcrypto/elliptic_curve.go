@@ -535,6 +535,13 @@ func newECDHKeyDeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobe
 
 // DeriveBits represents the EC function that derives the key as bits from EC params
 func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length int) ([]byte, error) {
+	// Guard before b[:length/8]: a non-positive multiple of 8 (e.g. -8) would
+	// panic with "slice bounds out of range". SubtleCrypto.DeriveBits also
+	// rejects this; keep the check here for direct callers / defense in depth.
+	if length <= 0 {
+		return nil, NewError(OperationError, "length must be a positive number")
+	}
+
 	if err := privateKey.Validate(); err != nil {
 		return nil, NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey: "+err.Error())
 	}
