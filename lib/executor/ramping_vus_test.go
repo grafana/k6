@@ -6,17 +6,21 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func TestRampingVUsConfigValidation(t *testing.T) {
@@ -1209,4 +1213,127 @@ func TestSumRandomSegmentSequenceMatchesNoSegment(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestRampingVUsVUStartError checks that a VU-start failure is returned by
+// Run() instead of being swallowed, and that the executor doesn't log it
+// itself, leaving that to the scheduler that receives the error.
+func TestRampingVUsVUStartError(t *testing.T) {
+	t.Parallel()
+
+	// The executor needs to start VUs immediately, which exercises the
+	// VU-start failure path once the planned VU buffer is exhausted.
+	config := RampingVUsConfig{
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+		StartVUs:   null.IntFrom(2),
+		Stages: []Stage{
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(2)},
+		},
+	}
+
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error { return nil })
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
+	// getVU() no longer logs the failure itself: it's returned from Run()
+	// instead, and it's the scheduler's job to log it once it receives that
+	// result. Attach a dedicated error hook to prove the executor stays quiet.
+	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
+	test.executor.GetLogger().Logger.AddHook(errorHook)
+
+	// Reproduce a "system overload" condition: drain every planned VU so the
+	// executor cannot fetch one when it tries to start VUs.
+	maxVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(test.state.ExecutionTuple))
+	for range maxVUs {
+		_, err := test.state.GetPlannedVU(test.executor.GetLogger(), false)
+		require.NoError(t, err)
+	}
+
+	engineOut := make(chan metrics.SampleContainer, 1000)
+	errCh := make(chan error, 1)
+	go func() { errCh <- test.executor.Run(test.ctx, engineOut) }()
+
+	// Run must surface the VU-start failure to its caller instead of
+	// swallowing it.
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get a VU from the buffer in")
+	case <-time.After(2 * lib.MaxRetriesGetPlannedVU * lib.MaxTimeToWaitForPlannedVU):
+		t.Fatal("executor did not stop after a VU-start failure")
+	}
+
+	// Running the executor on its own must not log the failure: it's returned
+	// from Run() and the scheduler is the one that reports it.
+	require.Empty(t, errorHook.Drain())
+}
+
+// TestRampingVUsVUStartErrorMultiStage checks that, with a multi-stage ramp,
+// the executor stops after the first VU-start failure instead of carrying on
+// into later stages and hitting the same failure again for every later stage.
+func TestRampingVUsVUStartErrorMultiStage(t *testing.T) {
+	t.Parallel()
+
+	// A multi-stage ramp tries to schedule VUs across several stages; the
+	// executor must abort at the first VU-start failure, not at every stage.
+	config := RampingVUsConfig{
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+		StartVUs:   null.IntFrom(1),
+		Stages: []Stage{
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(2)},
+			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(3)},
+		},
+	}
+
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error { return nil })
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
+	// The executor itself no longer logs VU-start failures (that's now the
+	// scheduler's job once Run() returns the error), so this hook is here to
+	// prove it stays quiet.
+	errorHook := testutils.NewLogHook(logrus.ErrorLevel)
+	test.executor.GetLogger().Logger.AddHook(errorHook)
+
+	// Drain every planned VU so the executor cannot fetch one when it starts VUs.
+	maxVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(test.state.ExecutionTuple))
+	for range maxVUs {
+		_, err := test.state.GetPlannedVU(test.executor.GetLogger(), false)
+		require.NoError(t, err)
+	}
+
+	engineOut := make(chan metrics.SampleContainer, 1000)
+	errCh := make(chan error, 1)
+	go func() { errCh <- test.executor.Run(test.ctx, engineOut) }()
+
+	select {
+	case err := <-errCh:
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "could not get a VU from the buffer in")
+	case <-time.After(2 * lib.MaxRetriesGetPlannedVU * lib.MaxTimeToWaitForPlannedVU):
+		t.Fatal("executor did not stop after a VU-start failure")
+	}
+
+	// GetPlannedVU() itself still warns once per retry while it waits for a VU
+	// to free up, up to lib.MaxRetriesGetPlannedVU times, before it gives up
+	// and returns the error above (see lib.ExecutionState.GetPlannedVU()). The
+	// drain above returns immediately without warning, so the only warnings
+	// come from the executor: if iterateSteps() aborts on the first VU-start
+	// failure like it should, the executor only tries (and fails) to fetch a
+	// VU once, so we see exactly lib.MaxRetriesGetPlannedVU such warnings. If
+	// the early-abort regressed and the executor kept going into later stages
+	// instead, it would retry (and warn) again for every later stage,
+	// inflating the count past lib.MaxRetriesGetPlannedVU.
+	const wantWarnMsg = "Could not get a VU from the buffer for"
+	var gotVUBufferWarns int
+	for _, entry := range test.logHook.Drain() {
+		if strings.Contains(entry.Message, wantWarnMsg) {
+			gotVUBufferWarns++
+		}
+	}
+	require.Equal(t, lib.MaxRetriesGetPlannedVU, gotVUBufferWarns)
+
+	// No error should be logged by the executor at all: it's returned from
+	// Run() and it's the scheduler's job to log it, not the executor's.
+	require.Empty(t, errorHook.Drain())
 }

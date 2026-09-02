@@ -943,6 +943,60 @@ func TestSchedulerEndErrors(t *testing.T) {
 	assert.Empty(t, hook.Entries)
 }
 
+// TestSchedulerRampingVUsStartErrorLoggedOnce checks that, when a VU-start
+// failure occurs during a real scheduler run, the failure is logged exactly
+// once. The ramping VUs executor used to log the failure itself and then
+// return it to the scheduler, which logs every non-nil executor result,
+// producing two error-level entries for a single failure.
+func TestSchedulerRampingVUsStartErrorLoggedOnce(t *testing.T) {
+	t.Parallel()
+
+	config := executor.NewRampingVUsConfig("myscenario")
+	config.GracefulStop = types.NullDurationFrom(0)
+	config.StartVUs = null.IntFrom(2)
+	config.Stages = []executor.Stage{
+		{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(2)},
+	}
+
+	runner := &minirunner.MiniRunner{
+		Fn: func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
+			return nil
+		},
+		Options: lib.Options{
+			Scenarios: lib.ScenarioConfigs{config.GetName(): config},
+		},
+	}
+
+	logger, hook := logtest.NewNullLogger()
+	ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, lib.Options{})
+	defer cancel()
+
+	// Drain every planned VU so the executor cannot fetch one when it tries
+	// to start VUs, reproducing a "system overload" VU-start failure.
+	state := execScheduler.GetState()
+	maxVUs := lib.GetMaxPlannedVUs(config.GetExecutionRequirements(state.ExecutionTuple))
+	entry := logrus.NewEntry(logger)
+	for range maxVUs {
+		_, err := state.GetPlannedVU(entry, false)
+		require.NoError(t, err)
+	}
+
+	// Run through the real scheduler, not executor.Run() directly, since
+	// that's the path that determines how many times the failure is logged.
+	runErr := execScheduler.Run(ctx, ctx, samples)
+	require.Error(t, runErr)
+	require.Contains(t, runErr.Error(), "could not get a VU from the buffer in")
+
+	var errorEntries []*logrus.Entry
+	for _, e := range hook.AllEntries() {
+		if e.Level == logrus.ErrorLevel {
+			errorEntries = append(errorEntries, e)
+		}
+	}
+	require.Len(t, errorEntries, 1,
+		"the VU-start failure must be logged exactly once, by the scheduler that receives it from Run()")
+}
+
 func TestSchedulerEndIterations(t *testing.T) {
 	t.Parallel()
 	registry := metrics.NewRegistry()

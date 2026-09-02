@@ -527,6 +527,7 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		activeVUsCount: new(int64),
 		started:        startTime,
 		runIteration:   getIterationRunner(vlv.executionState, vlv.logger),
+		cancel:         cancel,
 	}
 
 	progressFn := runState.makeProgressFn(regularDuration)
@@ -551,16 +552,16 @@ func (vlv *RampingVUs) Run(ctx context.Context, _ chan<- metrics.SampleContainer
 		handleNewScheduledVUs  = runState.scheduledVUsHandlerStrategy()
 	)
 	handledGracefulSteps := runState.iterateSteps(
-		ctx,
+		maxDurationCtx,
 		handleNewMaxAllowedVUs,
 		handleNewScheduledVUs,
 	)
 	go runState.runRemainingGracefulSteps(
-		ctx,
+		maxDurationCtx,
 		handleNewMaxAllowedVUs,
 		handledGracefulSteps,
 	)
-	return nil
+	return runState.startErr
 }
 
 // rampingVUsRunState is created and initialized by the Run() method
@@ -575,6 +576,13 @@ type rampingVUsRunState struct {
 	wg             sync.WaitGroup
 
 	runIteration func(context.Context, lib.ActiveVU) bool // a helper closure function that runs a single iteration
+	cancel       func()
+
+	// startErr holds a VU-start failure so Run() can return it to its caller.
+	// It's only written and read from the Run() goroutine: the
+	// scheduledVUsHandlerStrategy() closure that sets it is invoked exclusively
+	// from iterateSteps(), which Run() calls synchronously (not in a goroutine).
+	startErr error
 }
 
 func (rs *rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn func() (float64, []string)) {
@@ -597,7 +605,6 @@ func (rs *rampingVUsRunState) runLoopsIfPossible(ctx context.Context, cancel fun
 	getVU := func() (lib.InitializedVU, error) {
 		pvu, err := rs.executor.executionState.GetPlannedVU(rs.executor.logger, false)
 		if err != nil {
-			rs.executor.logger.WithError(err).Error("Cannot get a VU from the buffer")
 			cancel()
 			return pvu, err
 		}
@@ -642,6 +649,9 @@ func (rs *rampingVUsRunState) iterateSteps(
 				break
 			}
 			handleNewScheduledVUs(r)
+			if rs.startErr != nil {
+				break
+			}
 			i++
 		}
 	}
@@ -685,7 +695,13 @@ func (rs *rampingVUsRunState) scheduledVUsHandlerStrategy() func(lib.ExecutionSt
 	return func(raw lib.ExecutionStep) {
 		pv := raw.PlannedVUs
 		for ; cur < pv; cur++ {
-			_ = rs.vuHandles[cur].start() // TODO: handle the error
+			if err := rs.vuHandles[cur].start(); err != nil {
+				// Record the error so Run() can return it; the scheduler logs
+				// it once the executor returns.
+				rs.startErr = err
+				rs.cancel()
+				return
+			}
 		}
 		for ; pv < cur; cur-- {
 			rs.vuHandles[cur-1].gracefulStop()
@@ -711,7 +727,14 @@ func waiter(ctx context.Context, start time.Time) func(offset time.Duration) boo
 				// now we do a step
 			}
 		}
-		return false
+		// honor cancellation even for past-due steps, where diff <= 0 and the
+		// select above is skipped
+		select {
+		case <-ctx.Done():
+			return true
+		default:
+			return false
+		}
 	}
 }
 
