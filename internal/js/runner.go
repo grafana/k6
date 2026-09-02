@@ -247,6 +247,7 @@ func (r *Runner) newVU(
 		Samples:        vu.Samples,
 		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
+		FeatureFlags:   r.preInitState.FeatureFlags,
 		TracerProvider: r.preInitState.TracerProvider,
 		Usage:          r.preInitState.Usage,
 		TestStatus:     r.preInitState.TestStatus,
