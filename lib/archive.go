@@ -181,6 +181,12 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			return nil, fmt.Errorf("unknown file prefix `%s` for file `%s`", pfx, normPath)
 		}
 	}
+	// A well-formed k6 archive always has metadata.json, which is what populates FilenameURL.
+	// Without it (corrupt bundle, or any tar that detectTestType() treats as an archive),
+	// getURLPathOnFs would dereference a nil *url.URL and crash the process.
+	if arc.FilenameURL == nil {
+		return nil, errors.New("incomplete archive: missing metadata.json")
+	}
 	scheme, pathOnFs := getURLPathOnFs(arc.FilenameURL)
 	var err error
 	pathOnFs, err = url.PathUnescape(pathOnFs)
