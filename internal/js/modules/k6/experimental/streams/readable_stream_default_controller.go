@@ -433,6 +433,16 @@ func (controller *ReadableStreamDefaultController) callPullIfNeeded() {
 	}
 }
 
+// hasBackpressure implements the [specification]'s ReadableStreamDefaultControllerHasBackpressure
+// abstract operation.
+//
+// [specification]: https://streams.spec.whatwg.org/#readable-stream-default-controller-has-backpressure
+func (controller *ReadableStreamDefaultController) hasBackpressure() bool {
+	// 1. If ! ReadableStreamDefaultControllerShouldCallPull(controller) is true, return false.
+	// 2. Otherwise, return true.
+	return !controller.shouldCallPull()
+}
+
 // shouldCallPull implements the [specification]'s ReadableStreamDefaultControllerShouldCallPull algorithm
 //
 // [specification]: https://streams.spec.whatwg.org/#readable-stream-default-controller-should-call-pull
