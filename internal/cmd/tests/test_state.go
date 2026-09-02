@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/cmd/state"
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/ui/console"
 	"go.k6.io/k6/v2/internal/usage"
@@ -101,7 +101,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 			// when tests don't explicitly point it at an httptest server.
 			state.ProvisionCatalogURL: "http://127.0.0.1:1/unreachable",
 		},
-		Events:       event.NewEventSystem(100, logger),
+		Events:       eventdispatcher.NewEventSystem(100, logger),
 		DefaultFlags: defaultFlags,
 		Flags:        defaultFlags,
 		OutMutex:     outMutex,
