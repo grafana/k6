@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
@@ -314,6 +315,146 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 				assert.Equalf(t, tt.wantRes.wt, s.Time, "timing skew in %s", s.Metric.Name)
 			})
 			assert.Equalf(t, 3, n, "should emit 8 response metrics")
+		})
+	}
+}
+
+func TestNetworkManagerMetricsRetainRequestTagsAndMetadata(t *testing.T) {
+	t.Parallel()
+
+	registry := k6metrics.NewRegistry()
+	k6m := k6ext.RegisterCustomMetrics(registry)
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+
+	state := vu.State()
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag(k6metrics.TagGroup.String(), "::request")
+		tagsAndMeta.SetTag("phase", "request")
+		tagsAndMeta.SetMetadata("trace", "request")
+	})
+
+	now := time.Now()
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event: &network.EventRequestWillBeSent{
+			Request:   &network.Request{URL: "https://example.test/"},
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+		},
+		tagsAndMeta: state.Tags.GetCurrentValues(),
+	})
+	require.NoError(t, err)
+
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag(k6metrics.TagGroup.String(), "")
+		tagsAndMeta.SetTag("phase", "after")
+		tagsAndMeta.SetMetadata("trace", "after")
+	})
+
+	nm := &NetworkManager{
+		ctx:              vu.Context(),
+		vu:               vu,
+		customMetrics:    k6m,
+		eventInterceptor: &EventInterceptorMock{},
+	}
+	nm.emitRequestMetrics(req)
+	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
+		URL:    req.URL(),
+		Timing: &network.ResourceTiming{},
+	}, (*cdp.MonotonicTime)(&now))
+	nm.emitResponseMetrics(resp, req)
+
+	n := vu.AssertSamples(func(sample k6metrics.Sample) {
+		group, ok := sample.Tags.Get(k6metrics.TagGroup.String())
+		require.True(t, ok)
+		assert.Equal(t, "::request", group)
+		phase, ok := sample.Tags.Get("phase")
+		require.True(t, ok)
+		assert.Equal(t, "request", phase)
+		assert.Equal(t, "request", sample.Metadata["trace"])
+	})
+	assert.Equal(t, 4, n)
+}
+
+func TestNetworkManagerRedirectKeepsLoaderOperation(t *testing.T) {
+	t.Parallel()
+
+	nm, _ := newTestNetworkManager(t, k6lib.Options{})
+	state := nm.vu.State()
+	state.FeatureFlags = &features.Flags{AsyncMetricContext: true}
+	page := &Page{}
+	nm.frameManager.page = page
+
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag("operation", "navigation")
+	})
+	navigationComplete, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
+	navigationTags, navigationOperation := nm.networkTagsAndMeta(state, &network.EventRequestWillBeSent{
+		FrameID:  cdp.FrameID("frame"),
+		LoaderID: cdp.LoaderID("initial-loader"),
+		Type:     network.ResourceTypeDocument,
+	}, nil)
+	require.NotNil(t, navigationOperation)
+	navigationComplete()
+
+	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
+		tagsAndMeta.SetTag("operation", "unrelated")
+	})
+	unrelatedComplete, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
+	defer unrelatedComplete()
+
+	redirectTags, redirectOperation := nm.networkTagsAndMeta(state, &network.EventRequestWillBeSent{
+		FrameID:  cdp.FrameID("frame"),
+		LoaderID: cdp.LoaderID("redirect-loader"),
+		Type:     network.ResourceTypeDocument,
+	}, []*Request{{
+		tagsAndMeta:      navigationTags,
+		networkOperation: navigationOperation,
+	}})
+	assert.Same(t, navigationOperation, redirectOperation)
+	operation, _ := redirectTags.Tags.Get("operation")
+	assert.Equal(t, "navigation", operation)
+
+	loaderTags, loaderOperation, ok := page.getNetworkTagsAndMetaForRequest(
+		cdp.FrameID("frame"), cdp.LoaderID("redirect-loader"), true, false,
+	)
+	require.True(t, ok)
+	assert.Same(t, navigationOperation, loaderOperation)
+	operation, _ = loaderTags.Tags.Get("operation")
+	assert.Equal(t, "navigation", operation)
+}
+
+func TestRequestLoaderContext(t *testing.T) {
+	t.Parallel()
+
+	for _, testCase := range []struct {
+		name      string
+		typ       network.ResourceType
+		initiator *network.Initiator
+		prefer    bool
+		bind      bool
+	}{
+		{name: "document", typ: network.ResourceTypeDocument, prefer: true, bind: true},
+		{name: "parser", initiator: &network.Initiator{Type: network.InitiatorTypeParser}, prefer: true},
+		{name: "preload", initiator: &network.Initiator{Type: network.InitiatorTypePreload}, prefer: true},
+		{
+			name:      "signed exchange",
+			initiator: &network.Initiator{Type: network.InitiatorTypeSignedExchange},
+			prefer:    true,
+		},
+		{name: "script", initiator: &network.Initiator{Type: network.InitiatorTypeScript}},
+		{name: "preflight", initiator: &network.Initiator{Type: network.InitiatorTypePreflight}},
+		{name: "unknown initiator"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			prefer, bind := requestLoaderContext(&network.EventRequestWillBeSent{
+				Type:      testCase.typ,
+				Initiator: testCase.initiator,
+			})
+			assert.Equal(t, testCase.prefer, prefer)
+			assert.Equal(t, testCase.bind, bind)
 		})
 	}
 }

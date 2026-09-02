@@ -50,6 +50,14 @@ type ElementHandle struct {
 	frame *Frame
 }
 
+// Page returns the page that owns the element handle.
+func (h *ElementHandle) Page() *Page {
+	if h == nil || h.frame == nil {
+		return nil
+	}
+	return h.frame.Page()
+}
+
 // String returns a string representation of ElementHandle.
 // It exists mostly for debugging where we don't want fmt.Sprintf to just
 // go through a complex object and try to stringify it.

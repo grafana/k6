@@ -456,6 +456,9 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) error {
 	if err := frame.detach(); err != nil {
 		return fmt.Errorf("removing frames recursively: detaching frame: %w", err)
 	}
+	if m.page != nil {
+		m.page.clearNetworkLoaderContext(cdp.FrameID(frame.ID()))
+	}
 
 	m.framesMu.Lock()
 	m.logger.Debugf("FrameManager:removeFramesRecursively:delParentFrame",

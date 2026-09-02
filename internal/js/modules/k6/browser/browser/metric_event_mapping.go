@@ -11,8 +11,8 @@ func mapMetricEvent(vu moduleVU, event common.PageEvent) mapping {
 	rt := vu.Runtime()
 	em := event.Metric
 
-	return mapping{
-		"tag": func(urls common.TagMatches) error {
+	return finishMapping(mapping{
+		"tag": passiveCall(func(urls common.TagMatches) error {
 			callback := func(pattern, url string) (bool, error) {
 				matched, err := rt.RunString(pattern + `.test('` + url + `')`)
 				if err != nil {
@@ -22,6 +22,6 @@ func mapMetricEvent(vu moduleVU, event common.PageEvent) mapping {
 			}
 
 			return em.Tag(callback, urls) //nolint:wrapcheck
-		},
-	}
+		}),
+	})
 }
