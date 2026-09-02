@@ -690,6 +690,32 @@ func TestRequest(t *testing.T) {
 				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/cookies"), 200, "")
 			})
 
+			t.Run("doubleQuotes", func(t *testing.T) {
+				// The endpoint echoes back the raw Cookie header, since go-httpbin
+				// parses cookies with net/http and would drop the double quotes
+				// before we get a chance to see them.
+				tb.Mux.HandleFunc("/echo-cookie-header", http.HandlerFunc(
+					func(w http.ResponseWriter, r *http.Request) {
+						_, _ = w.Write([]byte(r.Header.Get("Cookie")))
+					}))
+
+				cookieJar, err := cookiejar.New(nil)
+				assert.NoError(t, err)
+				state.CookieJar = cookieJar
+				_, err = rt.RunString(sr(`
+				var jar = http.cookieJar();
+				jar.set("HTTPBIN_URL/echo-cookie-header", "fromJar", '{"a":1}');
+				var jarCookies = jar.cookiesForURL("HTTPBIN_URL/echo-cookie-header");
+				if (jarCookies.fromJar[0] != '{"a":1}') { throw new Error("wrong cookie value in jar: " + jarCookies.fromJar[0]); }
+
+				var res = http.request("GET", "HTTPBIN_URL/echo-cookie-header", null, { cookies: { fromParams: '"' } });
+				if (res.body.indexOf('fromJar={"a":1}') == -1) { throw new Error("wrong jar cookie sent: " + res.body); }
+				if (res.body.indexOf('fromParams="') == -1) { throw new Error("wrong param cookie sent: " + res.body); }
+				`))
+				assert.NoError(t, err)
+				assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/echo-cookie-header"), 200, "")
+			})
+
 			t.Run("redirect", func(t *testing.T) {
 				t.Run("set cookie after redirect", func(t *testing.T) {
 					// TODO figure out a way to remove this ?
