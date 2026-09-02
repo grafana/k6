@@ -36,6 +36,9 @@ type Config struct {
 	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers"`
 
+	// Labels contains additional labels that should be included in the remote write time series.
+	Labels map[string]string `json:"labels"`
+
 	// InsecureSkipTLSVerify skips TLS client side checks.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"`
 
@@ -224,6 +227,13 @@ func (conf Config) Apply(applied Config) Config {
 		maps.Copy(conf.Headers, applied.Headers)
 	}
 
+	if len(applied.Labels) > 0 {
+		if conf.Labels == nil {
+			conf.Labels = make(map[string]string)
+		}
+		maps.Copy(conf.Labels, applied.Labels)
+	}
+
 	if len(applied.TrendStats) > 0 {
 		conf.TrendStats = make([]string, len(applied.TrendStats))
 		copy(conf.TrendStats, applied.TrendStats)
@@ -291,6 +301,7 @@ func envMap(env map[string]string, prefix string) map[string]string {
 func parseEnvs(env map[string]string) (Config, error) {
 	c := Config{
 		Headers: make(map[string]string),
+		Labels:  make(map[string]string),
 	}
 
 	err := envconfig.Process("", &c, func(key string) (string, bool) {
@@ -313,6 +324,16 @@ func parseEnvs(env map[string]string) (Config, error) {
 				return c, fmt.Errorf("the provided header (%s) does not respect the expected format <header key>:<value>", kvPair)
 			}
 			c.Headers[header[0]] = header[1]
+		}
+	}
+
+	if labels, labelsDefined := env["K6_PROMETHEUS_RW_LABELS"]; labelsDefined {
+		for kvPair := range strings.SplitSeq(labels, ",") {
+			key, value, ok := strings.Cut(kvPair, "=")
+			if !ok {
+				return c, fmt.Errorf("the provided label (%s) does not respect the expected format <label key>=<value>", kvPair)
+			}
+			c.Labels[key] = value
 		}
 	}
 
