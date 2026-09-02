@@ -210,6 +210,17 @@ func TestMappings(t *testing.T) {
 				})
 			},
 		},
+		"dialog": {
+			apiInterface: (*dialogAPI)(nil),
+			mapp: func() mapping {
+				// &common.Dialog{} is a zero-value dialog (nil ctx/session).
+				// testMapping only checks that the mapping keys exist; it does not
+				// invoke the functions, so nil fields are safe here.
+				return mapDialog(moduleVU{VU: vu}, common.PageEvent{
+					Dialog: &common.Dialog{},
+				})
+			},
+		},
 		"mapTouchscreen": {
 			apiInterface: (*touchscreenAPI)(nil),
 			mapp: func() mapping {
@@ -637,4 +648,13 @@ type mouseAPI interface {
 // workerAPI is the interface of a web worker.
 type workerAPI interface {
 	URL() string
+}
+
+type dialogAPI interface {
+	Accept(promptText ...string) *sobek.Promise
+	Dismiss() *sobek.Promise
+	Type() string
+	Message() string
+	DefaultValue() string
+	Page() mapping
 }
