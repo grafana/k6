@@ -64,6 +64,10 @@ lint: check-linter-version
 tests:
 	go test -race -timeout 210s ./...
 
+## grpc-e2e-tests: Runs the gRPC end-to-end tests (k6 and the gRPC server as separate processes).
+grpc-e2e-tests:
+	go test -tags grpc_e2e -race -count=1 -timeout 600s ./internal/e2e/grpc/...
+
 ## check: Runs the linters and tests.
 check: lint tests
 
@@ -82,4 +86,4 @@ clean:
 	@echo "cleaning"
 	rm -f ./k6
 
-.PHONY: build format lint tests check check-linter-version help
+.PHONY: build format lint tests grpc-e2e-tests check check-linter-version help
