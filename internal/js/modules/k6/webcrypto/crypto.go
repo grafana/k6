@@ -36,6 +36,13 @@ type Crypto struct {
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
 func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
+	// The typedArray parameter is not optional in the specification's WebIDL
+	// definition, so reject a missing or nullish one before IsInstanceOf gets
+	// to dereference it.
+	if common.IsNullish(typedArray) {
+		common.Throw(c.vu.Runtime(), NewError(TypeError, "typedArray parameter is required"))
+	}
+
 	acceptedTypes := []JSType{
 		Int8ArrayConstructor,
 		Uint8ArrayConstructor,
@@ -59,6 +66,12 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	objLength, ok := obj.Get("length").ToNumber().Export().(int64)
 	if !ok {
 		common.Throw(c.vu.Runtime(), NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
+	}
+
+	// The length property is script-controlled and can be overridden with a
+	// negative value, which would make the make() call below panic.
+	if objLength < 0 {
+		common.Throw(c.vu.Runtime(), NewError(TypeError, "typedArray parameter's length is negative"))
 	}
 
 	if objLength > maxRandomValuesLength {
