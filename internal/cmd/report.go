@@ -4,16 +4,22 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"net/http"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
+
+	"github.com/google/uuid"
 
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/execution"
 	"go.k6.io/k6/v2/internal/usage"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 // extensionEntry identifies a used extension in the usage report by its Go
@@ -139,11 +145,50 @@ func reportUsage(ctx context.Context, gs *state.GlobalState, create func(ctx con
 	defer cancel()
 
 	gs.Logger.Debug("Sending usage report...")
-	if err := postUsageReport(reportCtx, envLookup(gs.Env), create(reportCtx)); err != nil {
+
+	m := create(reportCtx)
+	if id, err := installationID(gs); err != nil {
+		gs.Logger.WithError(err).Debug("Omitting the installation ID from the usage report")
+	} else {
+		m["installation_id"] = id
+	}
+
+	if err := postUsageReport(reportCtx, envLookup(gs.Env), m); err != nil {
 		gs.Logger.WithError(err).Debug("Error sending usage report")
 	} else {
 		gs.Logger.Debug("Usage report sent successfully")
 	}
+}
+
+func installationID(gs *state.GlobalState) (string, error) {
+	path := filepath.Join(gs.UserOSConfigDir, "k6", "installation-id")
+
+	stored, err := fsext.ReadFile(gs.FS, path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+	if id, err := uuid.ParseBytes(stored); err == nil {
+		return id.String(), nil
+	}
+
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Dir(path)
+	if err := gs.FS.MkdirAll(dir, configDirMode); err != nil {
+		return "", err
+	}
+	if err := gs.FS.Chmod(dir, configDirMode); err != nil {
+		return "", err
+	}
+	if err := fsext.WriteFile(gs.FS, path, []byte(id.String()), configFileMode); err != nil {
+		return "", err
+	}
+	if err := gs.FS.Chmod(path, configFileMode); err != nil {
+		return "", err
+	}
+	return id.String(), nil
 }
 
 // defaultUsageReportURL is the production endpoint the anonymous usage report
