@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/execution"
 	"go.k6.io/k6/v2/internal/execution/local"
@@ -13,6 +16,7 @@ import (
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/executor"
+	"go.k6.io/k6/v2/lib/fsext"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -106,4 +110,45 @@ func TestCreateReport(t *testing.T) {
 		assert.Equal(t, "0s", m["duration"])
 		assert.EqualValues(t, true, m["is_ci"])
 	})
+}
+
+func TestInstallationID(t *testing.T) {
+	t.Parallel()
+
+	const storedID = "123e4567-e89b-42d3-a456-426614174000"
+
+	tests := []struct {
+		name   string
+		stored string
+		want   string
+	}{
+		{name: "creates a UUID when none is stored"},
+		{name: "reuses the stored UUID", stored: storedID, want: storedID},
+		{name: "replaces an invalid stored value", stored: "not-a-uuid"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			configDir := t.TempDir()
+			path := filepath.Join(configDir, "k6", "installation-id")
+			gs := &state.GlobalState{FS: fsext.NewOsFs(), UserOSConfigDir: configDir}
+			if tt.stored != "" {
+				require.NoError(t, gs.FS.MkdirAll(filepath.Dir(path), configDirMode))
+				require.NoError(t, fsext.WriteFile(gs.FS, path, []byte(tt.stored), configFileMode))
+			}
+
+			got, err := installationID(gs)
+
+			require.NoError(t, err)
+			require.NoError(t, uuid.Validate(got))
+			if tt.want != "" {
+				require.Equal(t, tt.want, got)
+			}
+			saved, err := fsext.ReadFile(gs.FS, path)
+			require.NoError(t, err)
+			require.Equal(t, got, string(saved))
+		})
+	}
 }
