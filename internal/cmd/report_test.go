@@ -152,3 +152,20 @@ func TestInstallationID(t *testing.T) {
 		})
 	}
 }
+
+func TestInstallationIDCreatesANewUUIDAfterDeletion(t *testing.T) {
+	t.Parallel()
+
+	configDir := t.TempDir()
+	gs := &state.GlobalState{FS: fsext.NewOsFs(), UserOSConfigDir: configDir}
+
+	first, err := installationID(gs)
+	require.NoError(t, err)
+	require.NoError(t, gs.FS.Remove(filepath.Join(configDir, "k6", "installation-id")))
+
+	second, err := installationID(gs)
+
+	require.NoError(t, err)
+	require.NoError(t, uuid.Validate(second))
+	require.NotEqual(t, first, second)
+}
