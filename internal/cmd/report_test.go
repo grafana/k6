@@ -212,3 +212,40 @@ func TestInstallationIDStorageErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestInstallationIDUsesSecurePermissions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		dirMode  fs.FileMode
+		fileMode fs.FileMode
+	}{
+		{name: "creates them with owner-only access"},
+		{name: "tightens pre-existing loose access", dirMode: 0o755, fileMode: 0o644},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gs := &state.GlobalState{FS: fsext.NewMemMapFs(), UserOSConfigDir: ".config"}
+			path := filepath.Join(".config", "k6", "installation-id")
+			if tt.dirMode != 0 {
+				require.NoError(t, gs.FS.MkdirAll(filepath.Dir(path), tt.dirMode))
+				require.NoError(t, fsext.WriteFile(gs.FS, path, []byte("not-a-uuid"), tt.fileMode))
+			}
+
+			_, err := installationID(gs)
+			require.NoError(t, err)
+
+			finfo, err := gs.FS.Stat(path)
+			require.NoError(t, err)
+			assert.Equal(t, configFileMode, finfo.Mode().Perm())
+
+			dinfo, err := gs.FS.Stat(filepath.Dir(path))
+			require.NoError(t, err)
+			assert.Equal(t, configDirMode, dinfo.Mode().Perm())
+		})
+	}
+}
