@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io/fs"
 	"path/filepath"
 	"testing"
 	"time"
@@ -168,4 +169,46 @@ func TestInstallationIDCreatesANewUUIDAfterDeletion(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, uuid.Validate(second))
 	require.NotEqual(t, first, second)
+}
+
+func TestInstallationIDStorageErrors(t *testing.T) {
+	t.Parallel()
+
+	idPath := filepath.Join(".config", "k6", "installation-id")
+
+	tests := []struct {
+		name   string
+		denied string
+		access int
+	}{
+		{name: "the stored UUID cannot be read", denied: idPath, access: 1},
+		{name: "the directory cannot be created", denied: filepath.Dir(idPath), access: 1},
+		{name: "the new UUID cannot be saved", denied: idPath, access: 2},
+		{name: "the directory permissions cannot be tightened", denied: filepath.Dir(idPath), access: 2},
+		{name: "the file permissions cannot be tightened", denied: idPath, access: 3},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			accesses := 0
+			denyingFS := fsext.NewChangePathFs(fsext.NewMemMapFs(), func(name string) (string, error) {
+				if name != tt.denied {
+					return name, nil
+				}
+				accesses++
+				if accesses == tt.access {
+					return "", fs.ErrPermission
+				}
+				return name, nil
+			})
+			gs := &state.GlobalState{FS: denyingFS, UserOSConfigDir: ".config"}
+
+			got, err := installationID(gs)
+
+			require.ErrorIs(t, err, fs.ErrPermission)
+			require.Empty(t, got)
+		})
+	}
 }
