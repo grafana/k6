@@ -30,7 +30,8 @@ func newMappingTestVU() moduleVU {
 func TestJSHandleAsElementNonElementReturnsNil(t *testing.T) {
 	t.Parallel()
 
-	m := mapJSHandle(newMappingTestVU(), &common.BaseJSHandle{})
+	vu := newMappingTestVU()
+	m := mapJSHandle(vu, &common.BaseJSHandle{})
 	asElement, ok := m["asElement"].(func() any)
 	require.True(t, ok, "asElement should be mapped as func() any")
 
@@ -38,6 +39,17 @@ func TestJSHandleAsElementNonElementReturnsNil(t *testing.T) {
 	// matching Playwright. Returning a mapped object here used to panic
 	// on the first method call (e.g. click / boundingBox).
 	require.Nil(t, asElement())
+
+	// Same check through Sobek: Playwright-style `if (handle.asElement())`
+	// must be falsy so callers do not invoke methods on a dummy object.
+	rt := vu.Runtime()
+	require.NoError(t, rt.Set("handle", mapToSobek(vu, m)))
+	v, err := rt.RunString(`handle.asElement()`)
+	require.NoError(t, err)
+	require.True(t, sobek.IsNull(v) || sobek.IsUndefined(v), "got %v", v)
+	truth, err := rt.RunString(`handle.asElement() ? 'truthy' : 'falsy'`)
+	require.NoError(t, err)
+	require.Equal(t, "falsy", truth.String())
 }
 
 func TestJSHandleAsElementOnElementHandle(t *testing.T) {
