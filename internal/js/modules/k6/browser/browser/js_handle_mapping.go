@@ -11,8 +11,16 @@ import (
 // mapJSHandle to the JS module.
 func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 	return mapping{
-		"asElement": func() mapping {
-			return mapElementHandle(vu, jsh.AsElement())
+		"asElement": func() any {
+			// BaseJSHandle.AsElement() is nil when the remote object is not a
+			// DOM node. Mapping that as an ElementHandle produces closures that
+			// nil-deref on first use (click, boundingBox, …) and crash the process.
+			// Playwright returns null here; $ / $$ already follow the same rule.
+			eh := jsh.AsElement()
+			if eh == nil {
+				return nil
+			}
+			return mapElementHandle(vu, eh)
 		},
 		"dispose": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
