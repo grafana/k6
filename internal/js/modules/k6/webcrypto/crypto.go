@@ -38,9 +38,11 @@ type Crypto struct {
 func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	// The typedArray parameter is not optional in the specification's WebIDL
 	// definition, so reject a missing or nullish one before IsInstanceOf gets
-	// to dereference it.
+	// to dereference it. This is an ECMAScript TypeError rather than one of the
+	// WebCrypto error names, which is what browsers and Node throw here, and
+	// what a nullish argument already produced before this check existed.
 	if common.IsNullish(typedArray) {
-		common.Throw(c.vu.Runtime(), NewError(TypeError, "typedArray parameter is required"))
+		panic(c.vu.Runtime().NewTypeError("typedArray parameter is required"))
 	}
 
 	acceptedTypes := []JSType{
@@ -71,7 +73,7 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	// The length property is script-controlled and can be overridden with a
 	// negative value, which would make the make() call below panic.
 	if objLength < 0 {
-		common.Throw(c.vu.Runtime(), NewError(TypeError, "typedArray parameter's length is negative"))
+		panic(c.vu.Runtime().NewTypeError("typedArray parameter's length is negative"))
 	}
 
 	if objLength > maxRandomValuesLength {
