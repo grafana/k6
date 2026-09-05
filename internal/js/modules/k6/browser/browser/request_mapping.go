@@ -22,9 +22,8 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return r.AllHeaders(), nil
 			})
 		},
-		"frame": func() *sobek.Object {
-			mf := mapFrame(vu, r.Frame())
-			return rt.ToValue(mf).ToObject(rt)
+		"frame": func() any {
+			return mapFrame(vu, r.Frame())
 		},
 		"headerValue": func(name string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
