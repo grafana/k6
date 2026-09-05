@@ -232,8 +232,8 @@ github.com/jhump/protoreflect/v2/internal/reparse
 github.com/jhump/protoreflect/v2/internal/sort
 github.com/jhump/protoreflect/v2/protoresolve
 github.com/jhump/protoreflect/v2/sourceinfo
-# github.com/klauspost/compress v1.19.1
-## explicit; go 1.24
+# github.com/klauspost/compress v1.20.0
+## explicit; go 1.25
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
 github.com/klauspost/compress/fse
@@ -242,6 +242,7 @@ github.com/klauspost/compress/huff0
 github.com/klauspost/compress/internal/cpuinfo
 github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/race
+github.com/klauspost/compress/internal/regmask
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/s2
 github.com/klauspost/compress/snappy
