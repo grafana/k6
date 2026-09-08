@@ -364,6 +364,10 @@ func (ctx *_builtinJSON_stringifyContext) str(key Value, holder *Object) bool {
 	case *valueBigInt:
 		ctx.r.typeErrorResult(true, "Do not know how to serialize a BigInt")
 	case *Object:
+		if value1.self.className() == classRawJSON {
+			ctx.buf.WriteString(value1.self.getStr("rawJSON", nil).String())
+			return true
+		}
 		for _, object := range ctx.stack {
 			if value1.SameAs(object) {
 				ctx.r.typeErrorResult(true, "Converting circular structure to JSON")
@@ -528,6 +532,50 @@ func (ctx *_builtinJSON_stringifyContext) quote(str String) {
 	ctx.buf.WriteByte('"')
 }
 
+func (r *Runtime) builtinJSON_rawJSON(call FunctionCall) Value {
+	arg := call.Argument(0)
+
+	var jsonString String
+	switch dd := arg.(type) {
+	case String:
+		jsonString = dd
+		if jsonString.Length() == 0 {
+			panic(r.newSyntaxError("\"\" is unacceptable as raw JSON"))
+		}
+		first := jsonString.CharAt(0)
+		last := jsonString.CharAt(jsonString.Length() - 1)
+		if first == '{' || first == '[' ||
+			first == ' ' || first == '\n' || first == '\r' || first == '\t' ||
+			last == ' ' || last == '\n' || last == '\r' || last == '\t' {
+			panic(r.newSyntaxError("\"" + arg.String() + "\" is unacceptable as raw JSON"))
+		}
+		if !json.Valid([]byte(jsonString.String())) {
+			panic(r.newSyntaxError("\"" + arg.String() + "\" is not a valid JSON"))
+		}
+	case valueBool, valueInt, *valueBigInt, valueFloat, valueNull:
+		jsonString = dd.toString()
+	case *Symbol:
+		panic(r.NewTypeError("Cannot convert a Symbol value to a string"))
+	default:
+		panic(r.newSyntaxError(arg.String() + " is not a valid JSON"))
+	}
+
+	o := r.newBaseObject(nil, classRawJSON)
+	o._putProp("rawJSON", jsonString, false, true, false)
+	o.preventExtensions(true)
+	return o.val
+}
+
+func (r *Runtime) builtinJSON_isRawJSON(call FunctionCall) Value {
+	arg := call.Argument(0)
+	if o, ok := arg.(*Object); ok {
+		if o.self.className() == classRawJSON {
+			return valueTrue
+		}
+	}
+	return valueFalse
+}
+
 func (r *Runtime) getJSON() *Object {
 	ret := r.global.JSON
 	if ret == nil {
@@ -536,6 +584,8 @@ func (r *Runtime) getJSON() *Object {
 		r.global.JSON = ret
 		JSON._putProp("parse", r.newNativeFunc(r.builtinJSON_parse, "parse", 2), true, false, true)
 		JSON._putProp("stringify", r.newNativeFunc(r.builtinJSON_stringify, "stringify", 3), true, false, true)
+		JSON._putProp("rawJSON", r.newNativeFunc(r.builtinJSON_rawJSON, "rawJSON", 1), true, false, true)
+		JSON._putProp("isRawJSON", r.newNativeFunc(r.builtinJSON_isRawJSON, "isRawJSON", 1), true, false, true)
 		JSON._putSym(SymToStringTag, valueProp(asciiString(classJSON), false, false, true))
 	}
 	return ret
