@@ -1,6 +1,14 @@
 MAKEFLAGS += --silent
-GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
 PROTOC_VERSION := 21.12
+
+LINT_WORKFLOW ?= .github/workflows/lint.yml
+K6_CI_REF     := $(shell grep -oE 'grafana/k6-ci/[^@[:space:]]+@[A-Za-z0-9._/-]+' $(LINT_WORKFLOW) | head -n1 | cut -d@ -f2)
+LINT_BASE_URL := https://raw.githubusercontent.com/grafana/k6-ci/$(K6_CI_REF)/.golangci.yml
+LINT_DIR      ?= build/lint
+LINT_BASE     := $(LINT_DIR)/.golangci-base.yml
+LINT_FINAL    := $(LINT_DIR)/.golangci.yml
+LINT_PATCH    ?= .golangci.patch
+GOLANGCI_LINT_VERSION = $(shell head -n 1 $(LINT_BASE) 2>/dev/null | tr -d '\# ')
 
 ifeq ($(OS),Windows_NT)
     DETECTED_OS := Windows
@@ -51,14 +59,36 @@ format:
 grpc-server-run:
 	go run -mod=mod examples/grpc_server/*.go
 
-## check-linter-version: Checks if the linter version is the same as the one specified in the linter config.
-check-linter-version:
-	(golangci-lint version | grep -E "version v?$(shell head -n 1 .golangci.yml | tr -d '\# v')") || echo "Your installation of golangci-lint is different from the one that is specified in k6's linter config (there it's $(shell head -n 1 .golangci.yml | tr -d '\# ')). Results could be different in the CI."
+$(LINT_DIR):
+	mkdir -p $@
 
-## lint: Runs the linters.
-lint: check-linter-version
+$(LINT_BASE): $(LINT_WORKFLOW) | $(LINT_DIR)
+	curl -fsSL $(LINT_BASE_URL) -o $@
+
+$(LINT_FINAL): $(LINT_BASE) $(wildcard $(LINT_PATCH))
+	cp $(LINT_BASE) $@
+	@if [ -f $(LINT_PATCH) ]; then \
+	  echo "Applying $(LINT_PATCH)"; \
+	  git apply --directory=$(LINT_DIR) $(LINT_PATCH); \
+	fi
+
+## lint: Run golangci-lint with the k6-ci config + $(LINT_PATCH).
+lint: $(LINT_FINAL)
 	echo "Running linters..."
-	golangci-lint run ./...
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) \
+	  run --config=$(LINT_FINAL) ./...
+
+## update-lint-patch: Regenerate $(LINT_PATCH) from the locally edited $(LINT_FINAL).
+update-lint-patch: $(LINT_BASE)
+	@if [ ! -f $(LINT_FINAL) ]; then \
+	  echo "Run 'make lint' first to materialize $(LINT_FINAL), edit it, then re-run."; \
+	  exit 1; \
+	fi
+	-diff -u --label a/.golangci.yml --label b/.golangci.yml $(LINT_BASE) $(LINT_FINAL) > $(LINT_PATCH)
+
+## clean-lint: Remove $(LINT_DIR).
+clean-lint:
+	rm -rf $(LINT_DIR)
 
 ## tests: Executes any unit tests.
 tests:
@@ -82,4 +112,4 @@ clean:
 	@echo "cleaning"
 	rm -f ./k6
 
-.PHONY: build format lint tests check check-linter-version help
+.PHONY: build format lint tests check help update-lint-patch clean-lint
