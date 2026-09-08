@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/Azure/go-ntlmssp"
-	"github.com/icholy/digest"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -224,11 +223,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		// header for basic auth
 		preq.URL.GetURL().User = nil
 
-		transport = &digest.Transport{
-			Username:  username,
-			Password:  password,
-			Transport: transport,
-		}
+		transport = newDigestTransport(transport, username, password, state.Logger)
 	case "ntlm":
 		// The first response of NTLM auth may be a 401 error.
 		if tracerTransport.responseCallback != nil {
