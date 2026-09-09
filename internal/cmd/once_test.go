@@ -144,7 +144,14 @@ func TestGetConsolidatedConfigOnceDropsLowerLayerShortcuts(t *testing.T) {
 		ExecutionSegment: segment,
 	}
 
-	conf, err := getConsolidatedConfig(ts.GlobalState, Config{once: true}, runnerOpts, nil)
+	fileConf, envConf, err := readConfigLayers(ts.GlobalState)
+	require.NoError(t, err)
+	require.NoError(t, dropOnceShortcuts(ts.Logger, map[string]*lib.Options{
+		"config":      &fileConf.Options,
+		"script":      &runnerOpts,
+		"environment": &envConf.Options,
+	}))
+	conf, err := getConsolidatedConfig(ts.GlobalState, Config{}, fileConf, envConf, runnerOpts, nil)
 	require.NoError(t, err)
 
 	assert.False(t, conf.VUs.Valid)
@@ -168,7 +175,14 @@ func TestOncePreservesScenarioAcrossLayers(t *testing.T) {
 
 	runnerOpts := lib.Options{Duration: types.NullDurationFrom(time.Second)}
 
-	conf, err := getConsolidatedConfig(ts.GlobalState, Config{once: true}, runnerOpts, nil)
+	fileConf, envConf, err := readConfigLayers(ts.GlobalState)
+	require.NoError(t, err)
+	require.NoError(t, dropOnceShortcuts(ts.Logger, map[string]*lib.Options{
+		"config":      &fileConf.Options,
+		"script":      &runnerOpts,
+		"environment": &envConf.Options,
+	}))
+	conf, err := getConsolidatedConfig(ts.GlobalState, Config{}, fileConf, envConf, runnerOpts, nil)
 	require.NoError(t, err)
 
 	opts, err := applyOnce(conf.Options)

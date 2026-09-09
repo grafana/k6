@@ -546,8 +546,23 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	}
 
 	gs.Logger.Debug("Consolidating config layers...")
+	fileConf, envConf, err := readConfigLayers(gs)
+	if err != nil {
+		return nil, err
+	}
+	runnerOpts := lt.initRunner.GetOptions()
+	// Lower layers drop their shortcuts before the merge; getOptions rejects the CLI ones.
+	if cliConfig.once {
+		if err := dropOnceShortcuts(gs.Logger, map[string]*lib.Options{
+			"config":      &fileConf.Options,
+			"script":      &runnerOpts,
+			"environment": &envConf.Options,
+		}); err != nil {
+			return nil, err
+		}
+	}
 	consolidatedConfig, err := getConsolidatedConfig(
-		gs, cliConfig, lt.initRunner.GetOptions(), lt.preInitState.FeatureFlags)
+		gs, cliConfig, fileConf, envConf, runnerOpts, lt.preInitState.FeatureFlags)
 	if err != nil {
 		return nil, err
 	}
