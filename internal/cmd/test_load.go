@@ -585,6 +585,7 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		return nil, err
 	}
 
+	configuredScenarios := consolidatedConfig.Scenarios
 	if scenarioNames != nil {
 		consolidatedConfig.Options, err = selectScenarios(consolidatedConfig.Options, scenarioNames)
 		if err != nil {
@@ -619,6 +620,10 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 			}
 		}
+	}
+
+	if scenarioNames != nil {
+		dropScenarioThresholds(gs.Logger, &consolidatedConfig.Options, configuredScenarios)
 	}
 
 	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.Logger)

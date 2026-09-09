@@ -22,7 +22,11 @@ const scenariosScript = `
 	export const options = {
 		cloud: { name: 'pick', projectID: 123456 },
 		vus: 1, duration: '1ms', iterations: 1, stages: [],
-		thresholds: { 'iterations{scenario:db}': ['count==0'] },
+		thresholds: {
+			iterations: ['count>0'],
+			'iterations{scenario:api}': ['count>0'],
+			'iterations{scenario:db}': ['count>0']
+		},
 		scenarios: {
 			ui:  { executor: 'per-vu-iterations', vus: 2, iterations: 1 },
 			api: { executor: 'shared-iterations', vus: 1, iterations: 2 },
@@ -68,7 +72,9 @@ func TestScenariosFilterArchive(t *testing.T) {
 			require.True(t, ok)
 			assert.Equal(t, null.IntFrom(2), ui.VUs)
 			assert.Equal(t, null.IntFrom(1), ui.Iterations)
-			assert.Contains(t, arc.Options.Thresholds, "iterations{scenario:db}")
+			assert.NotContains(t, arc.Options.Thresholds, "iterations{scenario:db}")
+			assert.Contains(t, arc.Options.Thresholds, "iterations")
+			assert.Contains(t, arc.Options.Thresholds, "iterations{scenario:api}")
 			assert.False(t, arc.Options.VUs.Valid)
 			assert.False(t, arc.Options.Duration.Valid)
 			assert.False(t, arc.Options.Iterations.Valid)
@@ -85,6 +91,7 @@ func TestScenariosFilterArchive(t *testing.T) {
 			assert.Equal(t, 2, strings.Count(stdout, "ran api"))
 			assert.NotContains(t, stdout, "ran db")
 			assert.NotContains(t, stdout, "ran default")
+			assert.NotContains(t, stdout, "--scenario skipped thresholds")
 		})
 	}
 }
@@ -104,6 +111,30 @@ func TestRunScenarios(t *testing.T) {
 	assert.NotContains(t, stdout, "ran default")
 	assert.Contains(t, stdout, `--scenario overrode vus, duration, iterations, stages in "script" configuration`)
 	assert.Contains(t, stdout, `--scenario overrode iterations in "environment" configuration`)
+	assert.Contains(t, stdout, "--scenario skipped thresholds for excluded scenarios: iterations{scenario:db}; "+
+		"these thresholds remain skipped even if another scenario emits matching tags")
+	assert.Equal(t, 1, strings.Count(stdout, "--scenario skipped thresholds"))
+}
+
+func TestScenarioThresholdValidation(t *testing.T) {
+	t.Parallel()
+
+	script := strings.Replace(scenariosScript,
+		"'iterations{scenario:db}': ['count>0']", "'iterations{scenario:db}': ['invalid']", 1)
+	for _, tt := range []struct {
+		noThresholds string
+		exitCode     exitcodes.ExitCode
+	}{
+		{"false", exitcodes.InvalidConfig},
+		{"true", 0},
+	} {
+		t.Run(tt.noThresholds, func(t *testing.T) {
+			t.Parallel()
+			ts := getSingleFileTestState(t, script,
+				[]string{"--scenario", "api", "--no-thresholds=" + tt.noThresholds}, tt.exitCode)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+		})
+	}
 }
 
 func TestRunScenariosOnce(t *testing.T) {

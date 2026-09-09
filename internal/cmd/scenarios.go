@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/metrics"
 )
 
 func checkScenarioConflicts(flags *pflag.FlagSet) error {
@@ -80,4 +81,36 @@ func selectScenarios(opts lib.Options, names []string) (lib.Options, error) {
 	})
 
 	return opts, nil
+}
+
+func dropScenarioThresholds(logger logrus.FieldLogger, opts *lib.Options, configured lib.ScenarioConfigs) {
+	opts.Thresholds = maps.Clone(opts.Thresholds)
+	var dropped []string
+	for metricName := range opts.Thresholds {
+		_, tags, err := metrics.ParseMetricName(metricName)
+		if err != nil {
+			// Only --no-thresholds permits malformed filters past threshold validation.
+			continue
+		}
+		// Match AddSubmetric's normalization and last-value-wins handling of repeated tags.
+		for _, tag := range slices.Backward(tags) {
+			key, value, _ := strings.Cut(tag, ":")
+			if strings.Trim(strings.TrimSpace(key), `"'`) != "scenario" {
+				continue
+			}
+			name := strings.Trim(strings.TrimSpace(value), `"'`)
+			_, exists := configured[name]
+			_, selected := opts.Scenarios[name]
+			if exists && !selected {
+				delete(opts.Thresholds, metricName)
+				dropped = append(dropped, metricName)
+			}
+			break
+		}
+	}
+	if len(dropped) > 0 {
+		slices.Sort(dropped)
+		logger.Warnf("--scenario skipped thresholds for excluded scenarios: %s; "+
+			"these thresholds remain skipped even if another scenario emits matching tags", strings.Join(dropped, "; "))
+	}
 }
