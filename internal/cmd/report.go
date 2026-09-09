@@ -49,6 +49,9 @@ func addEnvironmentInfo(m map[string]any, lookupEnv func(string) (string, bool))
 	m["goos"] = runtime.GOOS
 	m["goarch"] = runtime.GOARCH
 	m["is_ci"] = isCI(lookupEnv)
+	if build.BuildOrigin != "" {
+		m["build_origin"] = build.BuildOrigin
+	}
 }
 
 // createReport assembles the anonymous usage report for a run from its
