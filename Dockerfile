@@ -8,6 +8,8 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /usr/b
 # Runtime stage
 FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b as release
 
+LABEL org.opencontainers.image.source=https://github.com/grafana/k6
+
 RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
 
