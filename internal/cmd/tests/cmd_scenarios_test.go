@@ -106,6 +106,19 @@ func TestRunScenarios(t *testing.T) {
 	assert.Contains(t, stdout, `--scenario overrode iterations in "environment" configuration`)
 }
 
+func TestRunScenariosOnce(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(t, scenariosScript,
+		[]string{"--log-output=stdout", "--scenario", "ui,api", "--once"}, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	assert.Equal(t, 1, strings.Count(stdout, "ran ui"))
+	assert.Equal(t, 1, strings.Count(stdout, "ran api"))
+	assert.NotContains(t, stdout, "ran db")
+}
+
 func TestRunRejectsEmptyScenarios(t *testing.T) {
 	t.Parallel()
 
