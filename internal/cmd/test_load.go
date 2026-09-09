@@ -545,6 +545,20 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		cliConfig.once = getNullBool(cmd.Flags(), "once").Bool
 	}
 
+	var scenarioNames []string
+	if cmd.Flags().Changed("scenario") {
+		var err error
+		scenarioNames, err = cmd.Flags().GetStringSlice("scenario")
+		if err != nil {
+			return nil, err
+		}
+		if len(scenarioNames) == 0 {
+			return nil, errext.WithExitCodeIfNone(
+				errors.New("--scenario requires at least one scenario name"),
+				exitcodes.InvalidConfig)
+		}
+	}
+
 	gs.Logger.Debug("Consolidating config layers...")
 	fileConf, envConf, err := readConfigLayers(gs)
 	if err != nil {
@@ -552,14 +566,18 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	}
 	runnerOpts := lt.initRunner.GetOptions()
 	// Lower layers drop their shortcuts before the merge; getOptions rejects the CLI ones.
+	layers := map[string]*lib.Options{
+		"config":      &fileConf.Options,
+		"script":      &runnerOpts,
+		"environment": &envConf.Options,
+	}
 	if cliConfig.once {
-		if err := dropOnceShortcuts(gs.Logger, map[string]*lib.Options{
-			"config":      &fileConf.Options,
-			"script":      &runnerOpts,
-			"environment": &envConf.Options,
-		}); err != nil {
-			return nil, err
-		}
+		err = dropOnceShortcuts(gs.Logger, layers)
+	} else if scenarioNames != nil {
+		err = dropScenarioShortcuts(gs.Logger, layers)
+	}
+	if err != nil {
+		return nil, err
 	}
 	consolidatedConfig, err := getConsolidatedConfig(
 		gs, cliConfig, fileConf, envConf, runnerOpts, lt.preInitState.FeatureFlags)
@@ -572,6 +590,13 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 			return nil, err
 		}
 		if consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options); err != nil {
+			return nil, err
+		}
+	}
+
+	if scenarioNames != nil {
+		consolidatedConfig.Options, err = selectScenarios(consolidatedConfig.Options, scenarioNames)
+		if err != nil {
 			return nil, err
 		}
 	}
