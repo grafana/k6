@@ -529,6 +529,7 @@ func detectTestType(data []byte) string {
 	return testTypeJS
 }
 
+//nolint:funlen // Keep CLI feature ordering together.
 func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	gs *state.GlobalState, cmd *cobra.Command,
 	cliConfGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
@@ -586,17 +587,14 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	}
 
 	configuredScenarios := consolidatedConfig.Scenarios
-	if scenarioNames != nil {
+	switch {
+	case scenarioNames != nil:
 		consolidatedConfig.Options, err = selectScenarios(consolidatedConfig.Options, scenarioNames)
-		if err != nil {
-			return nil, err
-		}
+	case cliConfig.once:
+		err = rejectAmbiguousOnce(consolidatedConfig.Scenarios)
 	}
-
-	if cliConfig.once && scenarioNames == nil {
-		if err = rejectAmbiguousOnce(consolidatedConfig.Scenarios); err != nil {
-			return nil, err
-		}
+	if err != nil {
+		return nil, err
 	}
 	if cliConfig.once {
 		if consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options); err != nil {

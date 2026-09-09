@@ -36,41 +36,18 @@ func TestSelectScenarios(t *testing.T) {
 
 	all := lib.ScenarioConfigs{"ui": ui, "api": api, "db": executor.NewConstantVUsConfig("db")}
 
-	for _, tt := range []struct {
-		name    string
-		names   []string
-		want    lib.ScenarioConfigs
-		wantErr string
-	}{
-		{
-			name:  "selects and preserves",
-			names: []string{"ui", "api"},
-			want:  lib.ScenarioConfigs{"ui": ui, "api": api},
-		},
-		{
-			name:    "unknown name lists available",
-			names:   []string{"ui", "gone"},
-			wantErr: `scenario "gone" not found; available scenarios: api, db, ui`,
-		},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	res, err := selectScenarios(lib.Options{Scenarios: all}, []string{"ui", "api"})
+	require.NoError(t, err)
+	assert.Equal(t, lib.ScenarioConfigs{"ui": ui, "api": api}, res.Scenarios)
+	assert.Len(t, all, 3)
 
-			res, err := selectScenarios(lib.Options{Scenarios: all}, tt.names)
-			if tt.wantErr != "" {
-				require.EqualError(t, err, tt.wantErr)
-				var ec errext.HasExitCode
-				require.ErrorAs(t, err, &ec)
-				assert.Equal(t, exitcodes.InvalidConfig, ec.ExitCode())
-				return
-			}
+	_, err = selectScenarios(lib.Options{Scenarios: all}, []string{"ui", "gone"})
+	require.EqualError(t, err, `scenario "gone" not found; available scenarios: api, db, ui`)
+	var ec errext.HasExitCode
+	require.ErrorAs(t, err, &ec)
+	assert.Equal(t, exitcodes.InvalidConfig, ec.ExitCode())
 
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, res.Scenarios)
-		})
-	}
-
-	_, err := selectScenarios(lib.Options{}, []string{"default"})
+	_, err = selectScenarios(lib.Options{}, []string{"default"})
 	require.EqualError(t, err, `scenario "default" not found; the script does not have any named scenario`)
 }
 

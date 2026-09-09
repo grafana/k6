@@ -39,29 +39,20 @@ const scenariosScript = `
 func TestScenariosFilterArchive(t *testing.T) {
 	t.Parallel()
 
-	for _, tt := range []struct {
-		name string
-		tar  func(t *testing.T) []byte
-	}{
-		{
-			name: "local archive",
-			tar: func(t *testing.T) []byte {
-				return buildArchive(t, scenariosScript, "--scenario", "ui,api")
-			},
+	for name, build := range map[string]func(*testing.T) []byte{
+		"local archive": func(t *testing.T) []byte {
+			return buildArchive(t, scenariosScript, "--scenario", "ui,api")
 		},
-		{
-			name: "cloud run",
-			tar: func(t *testing.T) []byte {
-				_, data := uploadAndCaptureArchive(t,
-					[]string{"k6", "cloud", "run", "--scenario", "ui,api", "test.js"}, nil, scenariosScript)
-				return data
-			},
+		"cloud run": func(t *testing.T) []byte {
+			_, data := uploadAndCaptureArchive(t,
+				[]string{"k6", "cloud", "run", "--scenario", "ui,api", "test.js"}, nil, scenariosScript)
+			return data
 		},
 	} {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			tarData := tt.tar(t)
+			tarData := build(t)
 			arc, err := lib.ReadArchive(bytes.NewReader(tarData))
 			require.NoError(t, err)
 
@@ -121,17 +112,14 @@ func TestScenarioThresholdValidation(t *testing.T) {
 
 	script := strings.Replace(scenariosScript,
 		"'iterations{scenario:db}': ['count>0']", "'iterations{scenario:db}': ['invalid']", 1)
-	for _, tt := range []struct {
-		noThresholds string
-		exitCode     exitcodes.ExitCode
-	}{
-		{"false", exitcodes.InvalidConfig},
-		{"true", 0},
+	for noThresholds, exitCode := range map[string]exitcodes.ExitCode{
+		"false": exitcodes.InvalidConfig,
+		"true":  0,
 	} {
-		t.Run(tt.noThresholds, func(t *testing.T) {
+		t.Run(noThresholds, func(t *testing.T) {
 			t.Parallel()
 			ts := getSingleFileTestState(t, script,
-				[]string{"--scenario", "api", "--no-thresholds=" + tt.noThresholds}, tt.exitCode)
+				[]string{"--scenario", "api", "--no-thresholds=" + noThresholds}, exitCode)
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 		})
 	}

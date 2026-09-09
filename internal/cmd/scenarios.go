@@ -61,8 +61,10 @@ func dropScenarioShortcuts(logger logrus.FieldLogger, layers map[string]*lib.Opt
 }
 
 func selectScenarios(opts lib.Options, names []string) (lib.Options, error) {
+	selected := make(lib.ScenarioConfigs, len(names))
 	for _, name := range names {
-		if _, ok := opts.Scenarios[name]; ok {
+		if sc, ok := opts.Scenarios[name]; ok {
+			selected[name] = sc
 			continue
 		}
 
@@ -75,10 +77,7 @@ func selectScenarios(opts lib.Options, names []string) (lib.Options, error) {
 		return opts, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
-	opts.Scenarios = maps.Clone(opts.Scenarios)
-	maps.DeleteFunc(opts.Scenarios, func(name string, _ lib.ExecutorConfig) bool {
-		return !slices.Contains(names, name)
-	})
+	opts.Scenarios = selected
 
 	return opts, nil
 }
