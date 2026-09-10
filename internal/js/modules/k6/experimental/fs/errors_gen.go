@@ -4,14 +4,11 @@ package fs
 
 import (
 	"fmt"
-	"strings"
 )
 
 const _errorKindName = "NotFoundErrorInvalidResourceErrorForbiddenErrorTypeErrorEOFError"
 
 var _errorKindIndex = [...]uint8{0, 13, 33, 47, 56, 64}
-
-const _errorKindLowerName = "notfounderrorinvalidresourceerrorforbiddenerrortypeerroreoferror"
 
 func (i errorKind) String() string {
 	i -= 1
@@ -21,38 +18,14 @@ func (i errorKind) String() string {
 	return _errorKindName[_errorKindIndex[i]:_errorKindIndex[i+1]]
 }
 
-// An "invalid array index" compiler error signifies that the constant values have changed.
-// Re-run the stringer command to generate them again.
-func _errorKindNoOp() {
-	var x [1]struct{}
-	_ = x[NotFoundError-(1)]
-	_ = x[InvalidResourceError-(2)]
-	_ = x[ForbiddenError-(3)]
-	_ = x[TypeError-(4)]
-	_ = x[EOFError-(5)]
-}
-
-var _errorKindValues = []errorKind{NotFoundError, InvalidResourceError, ForbiddenError, TypeError, EOFError}
+var _errorKindValues = []errorKind{1, 2, 3, 4, 5}
 
 var _errorKindNameToValueMap = map[string]errorKind{
-	_errorKindName[0:13]:       NotFoundError,
-	_errorKindLowerName[0:13]:  NotFoundError,
-	_errorKindName[13:33]:      InvalidResourceError,
-	_errorKindLowerName[13:33]: InvalidResourceError,
-	_errorKindName[33:47]:      ForbiddenError,
-	_errorKindLowerName[33:47]: ForbiddenError,
-	_errorKindName[47:56]:      TypeError,
-	_errorKindLowerName[47:56]: TypeError,
-	_errorKindName[56:64]:      EOFError,
-	_errorKindLowerName[56:64]: EOFError,
-}
-
-var _errorKindNames = []string{
-	_errorKindName[0:13],
-	_errorKindName[13:33],
-	_errorKindName[33:47],
-	_errorKindName[47:56],
-	_errorKindName[56:64],
+	_errorKindName[0:13]:  1,
+	_errorKindName[13:33]: 2,
+	_errorKindName[33:47]: 3,
+	_errorKindName[47:56]: 4,
+	_errorKindName[56:64]: 5,
 }
 
 // errorKindString retrieves an enum value from the enum constants string name.
@@ -61,23 +34,12 @@ func errorKindString(s string) (errorKind, error) {
 	if val, ok := _errorKindNameToValueMap[s]; ok {
 		return val, nil
 	}
-
-	if val, ok := _errorKindNameToValueMap[strings.ToLower(s)]; ok {
-		return val, nil
-	}
 	return 0, fmt.Errorf("%s does not belong to errorKind values", s)
 }
 
 // errorKindValues returns all values of the enum
 func errorKindValues() []errorKind {
 	return _errorKindValues
-}
-
-// errorKindStrings returns a slice of all String values of the enum
-func errorKindStrings() []string {
-	strs := make([]string, len(_errorKindNames))
-	copy(strs, _errorKindNames)
-	return strs
 }
 
 // IsAerrorKind returns "true" if the value is listed in the enum definition. "false" otherwise
