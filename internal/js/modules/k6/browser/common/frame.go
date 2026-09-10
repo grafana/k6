@@ -56,6 +56,11 @@ var domElementStateToID = map[string]DOMElementState{ //nolint:gochecknoglobals
 	"hidden":   DOMElementStateHidden,
 }
 
+func DOMElementStateIDFromString(format string) (DOMElementState, bool) {
+	id, exists := domElementStateToID[format]
+	return id, exists
+}
+
 // MarshalJSON marshals the enum as a quoted JSON string.
 func (s DOMElementState) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
