@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -18,6 +19,197 @@ import (
 // It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
 type mapping = map[string]any
+
+type mappingCallKind uint8
+
+const (
+	mappingCallPassive mappingCallKind = iota + 1
+	mappingCallNetwork
+)
+
+type mappingCall struct {
+	fn   any
+	kind mappingCallKind
+}
+
+// Browser requests can arrive after the mapped call that initiated them settles. Requiring every
+// callable to choose a kind prevents a passive waiter from silently becoming a competing operation.
+func passiveCall(fn any) mappingCall {
+	return mappingCall{fn: fn, kind: mappingCallPassive}
+}
+
+func networkCall(fn any) mappingCall {
+	return mappingCall{fn: fn, kind: mappingCallNetwork}
+}
+
+func finishMapping(m mapping) mapping {
+	return finishMappingCalls(moduleVU{}, m, nil, "")
+}
+
+func withPageNetworkCalls(vu moduleVU, page *common.Page, m mapping) mapping {
+	var begin func() (complete, cancel func())
+	if page != nil && k6common.AsyncMetricContextEnabled(vu.State()) {
+		begin = func() (complete, cancel func()) {
+			state := vu.State()
+			if state == nil || state.Tags == nil {
+				return func() {}, func() {}
+			}
+			return page.BeginNetworkOperation(state.Tags.GetCurrentValues())
+		}
+	}
+	return finishMappingCalls(vu, m, begin, "")
+}
+
+func finishMappingCalls(
+	vu moduleVU,
+	m mapping,
+	begin func() (complete, cancel func()),
+	path string,
+) mapping {
+	for name, value := range m {
+		callPath := name
+		if path != "" {
+			callPath = path + "." + name
+		}
+		switch value := value.(type) {
+		case mapping:
+			m[name] = finishMappingCalls(vu, value, begin, callPath)
+		case mappingCall:
+			fn := reflect.ValueOf(value.fn)
+			if !fn.IsValid() || fn.Kind() != reflect.Func {
+				panic(fmt.Sprintf("browser mapping %q classifies non-callable %T", callPath, value.fn))
+			}
+			switch value.kind {
+			case mappingCallPassive:
+				m[name] = value.fn
+			case mappingCallNetwork:
+				if begin == nil {
+					m[name] = value.fn
+					break
+				}
+				m[name], _ = aroundMappingCall(vu, value.fn, begin)
+			default:
+				panic(fmt.Sprintf("browser mapping call %q has invalid classification", callPath))
+			}
+		default:
+			valueType := reflect.TypeOf(value)
+			if valueType != nil && valueType.Kind() == reflect.Func {
+				panic(fmt.Sprintf("browser mapping call %q must be classified", callPath))
+			}
+			m[name] = value
+		}
+	}
+	return m
+}
+
+func aroundMappingCalls(
+	vu moduleVU,
+	m mapping,
+	begin func() (complete, cancel func()),
+) mapping {
+	return finishMappingCalls(vu, m, begin, "")
+}
+
+func aroundMappingCall(
+	vu moduleVU,
+	value any,
+	begin func() (complete, cancel func()),
+) (any, bool) {
+	original := reflect.ValueOf(value)
+	if original.Kind() != reflect.Func {
+		return nil, false
+	}
+	wrapped := reflect.MakeFunc(original.Type(), func(args []reflect.Value) []reflect.Value {
+		complete, cancel := begin()
+		operationStarted := false
+		defer func() {
+			if !operationStarted {
+				cancel()
+			}
+		}()
+
+		results := callMapping(original, args)
+		if mappingCallFailed(results) {
+			return results
+		}
+		operationStarted = wrapMappingPromise(vu, results, complete)
+		if !operationStarted {
+			complete()
+			operationStarted = true
+		}
+		return results
+	})
+	return wrapped.Interface(), true
+}
+
+func callMapping(fn reflect.Value, args []reflect.Value) []reflect.Value {
+	if fn.Type().IsVariadic() {
+		return fn.CallSlice(args)
+	}
+	return fn.Call(args)
+}
+
+func mappingCallFailed(results []reflect.Value) bool {
+	for _, result := range results {
+		if err, ok := result.Interface().(error); ok && err != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func wrapMappingPromise(vu moduleVU, results []reflect.Value, complete func()) bool {
+	for i, result := range results {
+		promise, ok := result.Interface().(*sobek.Promise)
+		if !ok || promise == nil {
+			continue
+		}
+		results[i] = reflect.ValueOf(endOperationOnPromiseSettlement(vu, promise, complete))
+		return true
+	}
+	return false
+}
+
+func endOperationOnPromiseSettlement(
+	vu moduleVU,
+	promise *sobek.Promise,
+	end func(),
+) *sobek.Promise {
+	rt := vu.Runtime()
+	wrapped, resolve, reject := rt.NewPromise()
+	end = sync.OnceFunc(end)
+
+	onFulfilled := func(call sobek.FunctionCall) sobek.Value {
+		end()
+		if err := resolve(call.Argument(0)); err != nil {
+			k6common.Throw(rt, err)
+		}
+		return sobek.Undefined()
+	}
+	onRejected := func(call sobek.FunctionCall) sobek.Value {
+		end()
+		if err := reject(call.Argument(0)); err != nil {
+			k6common.Throw(rt, err)
+		}
+		return sobek.Undefined()
+	}
+
+	then, ok := sobek.AssertFunction(rt.ToValue(promise).ToObject(rt).Get("then"))
+	if !ok {
+		panic("browser promise has no callable then method")
+	}
+	if _, err := then(
+		rt.ToValue(promise),
+		rt.ToValue(onFulfilled),
+		rt.ToValue(onRejected),
+	); err != nil {
+		end()
+		if rejectErr := reject(err); rejectErr != nil {
+			k6common.Throw(rt, rejectErr)
+		}
+	}
+	return wrapped
+}
 
 // mapToSobek maps a browser-module mapping to a Sobek object.
 // The motivation of this mapping was to support $ and $$ wildcard

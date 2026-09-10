@@ -16,17 +16,17 @@ func mapRequestEvent(vu moduleVU, event common.PageEvent) mapping {
 func mapRequest(vu moduleVU, r *common.Request) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
-		"allHeaders": func() *sobek.Promise {
+		"allHeaders": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				r.WaitForRawHeaders()
 				return r.AllHeaders(), nil
 			})
-		},
-		"frame": func() *sobek.Object {
+		}),
+		"frame": passiveCall(func() *sobek.Object {
 			mf := mapFrame(vu, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)
-		},
-		"headerValue": func(name string) *sobek.Promise {
+		}),
+		"headerValue": passiveCall(func(name string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				r.WaitForRawHeaders()
 				v, ok := r.HeaderValue(name)
@@ -36,32 +36,32 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 
 				return v, nil
 			})
-		},
-		"headers": r.Headers,
-		"headersArray": func() *sobek.Promise {
+		}),
+		"headers": passiveCall(r.Headers),
+		"headersArray": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				r.WaitForRawHeaders()
 				return r.HeadersArray(), nil
 			})
-		},
-		"isNavigationRequest": r.IsNavigationRequest,
-		"method":              r.Method,
-		"postData": func() any {
+		}),
+		"isNavigationRequest": passiveCall(r.IsNavigationRequest),
+		"method":              passiveCall(r.Method),
+		"postData": passiveCall(func() any {
 			p := r.PostData()
 			if p == "" {
 				return nil
 			}
 			return p
-		},
-		"postDataBuffer": func() any {
+		}),
+		"postDataBuffer": passiveCall(func() any {
 			p := r.PostDataBuffer()
 			if len(p) == 0 {
 				return nil
 			}
 			return rt.NewArrayBuffer(p)
-		},
-		"resourceType": r.ResourceType,
-		"response": func() *sobek.Promise {
+		}),
+		"resourceType": passiveCall(r.ResourceType),
+		"response": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				resp := r.Response()
 				if resp == nil {
@@ -69,12 +69,12 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				}
 				return mapResponse(vu, resp), nil
 			})
-		},
-		"size":    r.Size,
-		"timing":  r.Timing,
-		"url":     r.URL,
-		"failure": r.Failure,
+		}),
+		"size":    passiveCall(r.Size),
+		"timing":  passiveCall(r.Timing),
+		"url":     passiveCall(r.URL),
+		"failure": passiveCall(r.Failure),
 	}
 
-	return maps
+	return finishMapping(maps)
 }

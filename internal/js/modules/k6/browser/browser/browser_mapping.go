@@ -6,6 +6,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // browserProvider is a function that provides a browser instance.
@@ -18,14 +19,14 @@ type browserProvider func() (*common.Browser, error)
 //nolint:gocognit,funlen
 func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 	m := mapping{
-		"context": func() (mapping, error) {
+		"context": passiveCall(func() (mapping, error) {
 			b, err := browser()
 			if err != nil {
 				return nil, err
 			}
 			return mapBrowserContext(vu, b.Context()), nil
-		},
-		"closeContext": func() *sobek.Promise {
+		}),
+		"closeContext": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				b, err := browser()
 				if err != nil {
@@ -33,15 +34,15 @@ func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 				}
 				return nil, b.CloseContext() //nolint:wrapcheck
 			})
-		},
-		"isConnected": func() (bool, error) {
+		}),
+		"isConnected": passiveCall(func() (bool, error) {
 			b, err := browser()
 			if err != nil {
 				return false, err
 			}
 			return b.IsConnected(), nil
-		},
-		"newContext": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"newContext": passiveCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
@@ -61,25 +62,30 @@ func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 
 				return mapBrowserContext(vu, bctx), nil
 			}), nil
-		},
-		"userAgent": func() (string, error) {
+		}),
+		"userAgent": passiveCall(func() (string, error) {
 			b, err := browser()
 			if err != nil {
 				return "", err
 			}
 			return b.UserAgent(), nil
-		},
-		"version": func() (string, error) {
+		}),
+		"version": passiveCall(func() (string, error) {
 			b, err := browser()
 			if err != nil {
 				return "", err
 			}
 			return b.Version(), nil
-		},
-		"newPage": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"newPage": passiveCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
+			}
+			var setNetworkTags func(*common.Page)
+			if k6common.AsyncMetricContextEnabled(vu.State()) {
+				tagsAndMeta := vu.State().Tags.GetCurrentValues()
+				setNetworkTags = func(page *common.Page) { page.SetNetworkFallbackTagsAndMeta(tagsAndMeta) }
 			}
 			return promise(vu, func() (any, error) {
 				b, err := browser()
@@ -90,18 +96,21 @@ func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
+				if setNetworkTags != nil {
+					setNetworkTags(page)
+				}
 				if err := initBrowserContext(b.Context(), vu.testRunID); err != nil {
 					return nil, err
 				}
 
 				return mapPage(vu, page), nil
 			}), nil
-		},
+		}),
 	}
 
 	addUserManagedClose(vu, m, browser)
 
-	return m
+	return finishMapping(m)
 }
 
 // addUserManagedClose adds a close() method to the browser mapping when the
@@ -124,13 +133,13 @@ func addUserManagedClose(vu moduleVU, m mapping, browser browserProvider) {
 	if !ok {
 		return
 	}
-	m["close"] = func() *sobek.Promise {
+	m["close"] = passiveCall(func() *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			vu.untrackUserManagedBrowser(iter, b)
 			b.Close()
 			return nil, nil
 		})
-	}
+	})
 }
 
 func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {

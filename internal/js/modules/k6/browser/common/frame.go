@@ -1660,6 +1660,15 @@ func (f *Frame) QueryAll(selector string) ([]*ElementHandle, error) {
 
 // Page returns page that owns frame.
 func (f *Frame) Page() *Page {
+	if f == nil {
+		return nil
+	}
+	if f.page != nil {
+		return f.page
+	}
+	if f.manager == nil {
+		return nil
+	}
 	return f.manager.page
 }
 

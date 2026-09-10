@@ -5,8 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/v2/metrics"
 )
 
 // TestPageLocator can be removed later on when we add integration
@@ -165,4 +168,95 @@ func TestPageOn(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, p.eventHandlers[("metric")], 1)
 	})
+}
+
+func TestPageNetworkOperationContext(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	metricContext := func(name string) metrics.TagsAndMeta {
+		return metrics.TagsAndMeta{
+			Tags:     registry.RootTagSet().With("context", name),
+			Metadata: map[string]string{"context": name},
+		}
+	}
+	contextName := func(tagsAndMeta metrics.TagsAndMeta) string {
+		name, _ := tagsAndMeta.Tags.Get("context")
+		assert.Equal(t, name, tagsAndMeta.Metadata["context"])
+		return name
+	}
+
+	p := &Page{}
+	p.SetNetworkFallbackTagsAndMeta(metricContext("fallback"))
+	tagsAndMeta, ok := p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "fallback", contextName(tagsAndMeta))
+
+	firstComplete, _ := p.BeginNetworkOperation(metricContext("first"))
+	secondComplete, _ := p.BeginNetworkOperation(metricContext("second"))
+
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
+
+	firstComplete()
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
+
+	secondComplete()
+	secondComplete()
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
+
+	_, failedCancel := p.BeginNetworkOperation(metricContext("failed"))
+	failedCancel()
+	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
+	require.True(t, ok)
+	assert.Equal(t, "second", contextName(tagsAndMeta))
+}
+
+func TestPageNetworkLoaderContextOutlivesUnrelatedCalls(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	metricContext := func(name string) metrics.TagsAndMeta {
+		return metrics.TagsAndMeta{Tags: registry.RootTagSet().With("context", name)}
+	}
+	contextName := func(tagsAndMeta metrics.TagsAndMeta) string {
+		name, _ := tagsAndMeta.Tags.Get("context")
+		return name
+	}
+
+	p := &Page{}
+	navigationComplete, _ := p.BeginNetworkOperation(metricContext("navigation"))
+	tagsAndMeta, _, ok := p.getNetworkTagsAndMetaForRequest(
+		cdp.FrameID("frame"), cdp.LoaderID("loader"), true, true,
+	)
+	require.True(t, ok)
+	assert.Equal(t, "navigation", contextName(tagsAndMeta))
+	navigationComplete()
+
+	inspectionComplete, _ := p.BeginNetworkOperation(metricContext("inspection"))
+	inspectionComplete()
+
+	tagsAndMeta, _, ok = p.getNetworkTagsAndMetaForRequest(
+		cdp.FrameID("frame"), cdp.LoaderID("loader"), true, false,
+	)
+	require.True(t, ok)
+	assert.Equal(t, "navigation", contextName(tagsAndMeta))
+
+	tagsAndMeta, _, ok = p.getNetworkTagsAndMetaForRequest(
+		cdp.FrameID("frame"), cdp.LoaderID("loader"), false, false,
+	)
+	require.True(t, ok)
+	assert.Equal(t, "inspection", contextName(tagsAndMeta))
+
+	p.clearNetworkLoaderContext(cdp.FrameID("frame"))
+	tagsAndMeta, _, ok = p.getNetworkTagsAndMetaForRequest(
+		cdp.FrameID("frame"), cdp.LoaderID("loader"), true, false,
+	)
+	require.True(t, ok)
+	assert.Equal(t, "inspection", contextName(tagsAndMeta))
 }
