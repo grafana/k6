@@ -222,6 +222,7 @@ func (b *Browser) initEvents() error {
 	}, chHandler)
 
 	go func() {
+		defer recoverGoroutinePanic(b.logger, "Browser:initEvents:go")
 		defer func() {
 			b.browserProc.didLoseConnection()
 			// Closing the vuCtx incase it hasn't already been closed. Very likely

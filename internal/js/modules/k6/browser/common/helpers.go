@@ -305,6 +305,20 @@ func hasSourceURL(js string) bool {
 	return sourceURLRegex.MatchString(js[lastNewLineBeforeLastLineIndex:])
 }
 
+// recoverGoroutinePanic recovers from a panic on the goroutine it's deferred
+// on and logs it instead of letting it propagate. It must be deferred
+// directly by long-running background goroutines that process CDP events
+// (e.g. FrameSession's and Browser's event loops), which don't run within a
+// sobek call stack and so can't rely on the JS runtime to catch a panic
+// raised by k6ext.Panicf/k6ext.Abortf when a CDP event handler fails.
+// Without this, such a panic is unrecovered anywhere and crashes the whole
+// k6 process, aborting every VU rather than just the affected iteration.
+func recoverGoroutinePanic(logger *log.Logger, category string) {
+	if r := recover(); r != nil {
+		logger.Errorf(category, "recovered from a panic on a background goroutine: %v", r)
+	}
+}
+
 // pushIfNotDone preserves PushIfNotDone semantics and logs when
 // a metric drop is observed because the provided context is done.
 func pushIfNotDone(
