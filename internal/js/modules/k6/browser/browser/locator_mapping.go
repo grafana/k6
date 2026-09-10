@@ -3,6 +3,7 @@ package browser
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/grafana/sobek"
 
@@ -32,7 +33,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		},
 		"boundingBox": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameBaseOptions(lo.Timeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			if err := parseFrameBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing locator bounding box options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -46,8 +47,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"clear": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameFillOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameFillOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing clear options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -55,7 +56,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"click": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseFrameClickOptions(vu.Context(), opts, lo.Timeout())
+			popts, err := parseFrameClickOptions(rt, opts, lo.Timeout())
 			if err != nil {
 				return nil, err
 			}
@@ -74,8 +75,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			})
 		},
 		"dblclick": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameDblClickOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameDblclickOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing double click options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -107,8 +108,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"setChecked": func(checked bool, opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameCheckOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameCheckOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing set checked options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -116,8 +117,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"check": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameCheckOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameCheckOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing check options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -125,8 +126,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"uncheck": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameUncheckOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameUncheckOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing uncheck options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -134,8 +135,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"isChecked": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameIsCheckedOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameIsCheckedOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing is checked options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -143,8 +144,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"isEditable": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameIsEditableOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameIsEditableOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing is editable options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -152,8 +153,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"isEnabled": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameIsEnabledOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameIsEnabledOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing is enabled options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -161,8 +162,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"isDisabled": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameIsDisabledOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameIsDisabledOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing is disabled options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -170,8 +171,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"isInViewport": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameIsInViewportOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameIsInViewportOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing is in viewport options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -189,8 +190,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			})
 		},
 		"fill": func(value string, opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameFillOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameFillOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing fill options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -208,7 +209,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		},
 		"focus": func(opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameBaseOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			if err := parseFrameBaseOptions(copts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing focus options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -217,7 +218,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		},
 		"getAttribute": func(name string, opts sobek.Value) (*sobek.Promise, error) {
 			copts := common.NewFrameBaseOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			if err := parseFrameBaseOptions(copts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing get attribute options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -302,8 +303,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			return rt.ToValue(mfl).ToObject(rt)
 		},
 		"innerHTML": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameInnerHTMLOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameInnerHTMLOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing inner HTML options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -311,8 +312,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"innerText": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameInnerTextOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameInnerTextOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing inner text options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -328,8 +329,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			return rt.ToValue(ml).ToObject(rt)
 		},
 		"textContent": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameTextContentOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameTextContentOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing text content options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -344,8 +345,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"inputValue": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameInputValueOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameInputValueOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing input value options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -353,8 +354,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"selectOption": func(values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameSelectOptionOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameSelectOptionOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing select option options: %w", err)
 			}
 			convValues, err := ConvertSelectOptionValues(vu.Runtime(), values)
@@ -366,8 +367,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"press": func(key string, opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFramePressOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFramePressOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing press options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -376,8 +377,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		},
 
 		"pressSequentially": func(text string, opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameTypeOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameTypeOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing locator press sequentially options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -386,8 +387,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		},
 
 		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameTypeOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameTypeOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing type options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -395,8 +396,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"hover": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameHoverOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameHoverOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing hover options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -404,8 +405,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"tap": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameTapOptions(lo.DefaultTimeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameTapOptions(rt, opts, lo.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing locator tap options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -413,8 +414,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"dispatchEvent": func(typ string, eventInit, opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewFrameDispatchEventOptions(lo.DefaultTimeout())
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseFrameDispatchEventOptions(rt, opts, lo.DefaultTimeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing locator dispatch event options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -422,8 +423,8 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			}), nil
 		},
 		"waitFor": func(opts sobek.Value) (*sobek.Promise, error) {
-			copts := common.NewFrameWaitForSelectorOptions(lo.Timeout())
-			if err := copts.Parse(vu.Context(), opts); err != nil {
+			copts, err := parseFrameWaitForSelectorOptions(rt, opts, lo.Timeout())
+			if err != nil {
 				return nil, fmt.Errorf("parsing wait for options: %w", err)
 			}
 			return promise(vu, func() (any, error) {
@@ -451,4 +452,27 @@ func parseLocatorOptions(rt *sobek.Runtime, opts sobek.Value) *common.LocatorOpt
 	}
 
 	return &popts
+}
+
+// parseFrameIsInViewportOptions parses the frame isInViewport options from a Sobek value.
+func parseFrameIsInViewportOptions(
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
+) (*common.FrameIsInViewportOptions, error) {
+	vopts := common.NewFrameIsInViewportOptions(defaultTimeout)
+	if k6common.IsNullish(opts) {
+		return vopts, nil
+	}
+
+	err := parseFrameBaseOptions(&vopts.FrameBaseOptions, rt, opts)
+	if err != nil {
+		return vopts, err
+	}
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		if k == "ratio" {
+			vopts.Ratio = obj.Get(k).ToFloat()
+		}
+	}
+
+	return vopts, nil
 }
