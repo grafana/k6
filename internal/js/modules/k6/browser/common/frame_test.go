@@ -112,8 +112,10 @@ func (e *executionContextTestStub) eval( // this needs to be a pointer as otherw
 }
 
 // toPtr is a helper function to convert a value to a pointer.
+//
+//go:fix inline
 func toPtr[T any](v T) *T {
-	return &v
+	return new(v)
 }
 
 func TestBuildAttributeSelector(t *testing.T) {
@@ -153,28 +155,28 @@ func TestBuildAttributeSelector(t *testing.T) {
 			name:      "quoted_single_exact_false",
 			attrName:  "data-test",
 			attrValue: "'Foo Bar'",
-			opts:      &GetByBaseOptions{Exact: toPtr(false)},
+			opts:      &GetByBaseOptions{Exact: new(false)},
 			want:      "internal:attr=[data-test='Foo Bar'i]",
 		},
 		{
 			name:      "quoted_single_exact_true",
 			attrName:  "data-test",
 			attrValue: "'Foo Bar'",
-			opts:      &GetByBaseOptions{Exact: toPtr(true)},
+			opts:      &GetByBaseOptions{Exact: new(true)},
 			want:      "internal:attr=[data-test='Foo Bar's]",
 		},
 		{
 			name:      "quoted_double_exact_true",
 			attrName:  "data-test",
 			attrValue: "\"Foo Bar\"",
-			opts:      &GetByBaseOptions{Exact: toPtr(true)},
+			opts:      &GetByBaseOptions{Exact: new(true)},
 			want:      "internal:attr=[data-test=\"Foo Bar\"s]",
 		},
 		{
 			name:      "quoted_double_exact_false",
 			attrName:  "data-test",
 			attrValue: "\"Foo Bar\"",
-			opts:      &GetByBaseOptions{Exact: toPtr(false)},
+			opts:      &GetByBaseOptions{Exact: new(false)},
 			want:      "internal:attr=[data-test=\"Foo Bar\"i]",
 		},
 		{

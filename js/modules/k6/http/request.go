@@ -75,8 +75,7 @@ func (c *Client) handleParseRequestError(err error) (*Response, error) {
 	state.Logger.WithField("error", err).Warn("Request Failed")
 	r := httpext.NewResponse()
 	r.Error = err.Error()
-	var k6e httpext.K6Error
-	if errors.As(err, &k6e) {
+	if k6e, ok := errors.AsType[httpext.K6Error](err); ok {
 		r.ErrorCode = int(k6e.Code)
 	}
 	return &Response{Response: r, client: c}, nil
@@ -442,8 +441,7 @@ func (c *Client) prepareBatchArray(requests []any) (
 		parsedReq, err := c.parseBatchRequest(i, req)
 		if err != nil {
 			resp.Error = err.Error()
-			var k6e httpext.K6Error
-			if errors.As(err, &k6e) {
+			if k6e, ok := errors.AsType[httpext.K6Error](err); ok {
 				resp.ErrorCode = int(k6e.Code)
 			}
 			results[i] = c.responseFromHTTPext(resp)
@@ -472,8 +470,7 @@ func (c *Client) prepareBatchObject(requests map[string]any) (
 		parsedReq, err := c.parseBatchRequest(key, req)
 		if err != nil {
 			resp.Error = err.Error()
-			var k6e httpext.K6Error
-			if errors.As(err, &k6e) {
+			if k6e, ok := errors.AsType[httpext.K6Error](err); ok {
 				resp.ErrorCode = int(k6e.Code)
 			}
 			results[key] = c.responseFromHTTPext(resp)

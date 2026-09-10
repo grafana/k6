@@ -479,6 +479,8 @@ func asString(tb testing.TB, v any) string {
 }
 
 // toPtr is a helper function to convert a value to a pointer.
+//
+//go:fix inline
 func toPtr[T any](v T) *T {
-	return &v
+	return new(v)
 }

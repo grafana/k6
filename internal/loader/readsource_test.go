@@ -17,7 +17,7 @@ import (
 type errorReader string
 
 func (e errorReader) Read(_ []byte) (int, error) {
-	return 0, errors.New((string)(e))
+	return 0, errors.New(string(e))
 }
 
 var _ io.Reader = errorReader("")

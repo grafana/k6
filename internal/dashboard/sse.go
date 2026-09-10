@@ -60,9 +60,7 @@ func (emitter *eventEmitter) onStart() error {
 }
 
 func (emitter *eventEmitter) onStop(reason error) error {
-	var err errext.HasAbortReason
-
-	if !errors.As(reason, &err) {
+	if _, ok := errors.AsType[errext.HasAbortReason](reason); !ok {
 		emitter.wait.Wait()
 	}
 
