@@ -58,6 +58,9 @@ type Runner struct {
 	RPSLimit       *rate.Limiter
 	RunTags        *metrics.TagSet
 
+	// aiaFetcher owns the AIA cache + HTTP client when tlsAIAFetch is enabled.
+	aiaFetcher *netext.AIAFetcher
+
 	console    *console
 	setupData  []byte
 	BufferPool *lib.BufferPool
@@ -193,6 +196,9 @@ func (r *Runner) newVU(
 			)
 		})
 		tlsConfig.NameToCertificate = nameToCert //nolint:staticcheck
+	}
+	if r.Bundle.Options.TLSAIAFetch.Bool {
+		tlsConfig = r.aiaFetcher.Wrap(tlsConfig, r.preInitState.Logger) //nolint:contextcheck
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
@@ -578,6 +584,17 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	if err := r.setResolver(opts.DNS); err != nil {
 		return err
 	}
+
+	// Rebuild the AIA fetcher against the new options — Blacklist / BlockedHostnames /
+	// Hosts / Resolver may have changed and the fetcher's dialer captures them.
+	runnerDialer := &netext.Dialer{
+		Dialer:           r.BaseDialer,
+		Resolver:         r.Resolver,
+		Blacklist:        opts.BlacklistIPs,
+		BlockedHostnames: opts.BlockedHostnames.Trie,
+		Hosts:            opts.Hosts.Trie,
+	}
+	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
 
 	// FIXME: add tests
 	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)

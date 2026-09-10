@@ -1,0 +1,26 @@
+diff --git a/.golangci.yml b/.golangci.yml
+--- a/.golangci.yml
++++ b/.golangci.yml
+@@ -101,6 +101,22 @@ linters:
+           - gosec
+         path: _(test|gen)\.go
+       - linters:
++          - contextcheck
++          - revive
++        path: js\/modules\/k6\/browser\/.*\.go
++      - linters:
++          - revive
++        path: js\/modules\/k6\/html\/.*\.go
++        text: 'exported: exported '
++      - linters:
++          - paralleltest
++          - tparallel
++        path: js\/modules\/k6\/html\/.*\.go
++      - linters:
++          - paralleltest
++          - tparallel
++        path: js\/modules\/k6\/http\/.*_test\.go
++      - linters:
+           - forbidigo
+         text: use of `os\.(SyscallError|Signal|Interrupt)` forbidden
+       - linters:

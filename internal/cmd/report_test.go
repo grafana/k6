@@ -107,3 +107,48 @@ func TestCreateReport(t *testing.T) {
 		assert.EqualValues(t, true, m["is_ci"])
 	})
 }
+
+//nolint:paralleltest // swaps the package-global build.BuildOrigin, so the subtests must run serially.
+func TestCreateReportBuildOrigin(t *testing.T) {
+	logger := testutils.NewLogger(t)
+	opts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
+		VUs:        null.IntFrom(1),
+		Iterations: null.IntFrom(1),
+	}, logger)
+	require.NoError(t, err)
+
+	newScheduler := func() *execution.Scheduler {
+		s, err := execution.NewScheduler(&lib.TestRunState{
+			TestPreInitState: &lib.TestPreInitState{
+				Logger:    logger,
+				LookupEnv: func(string) (string, bool) { return "", false },
+			},
+			Options: opts,
+		}, local.NewController())
+		require.NoError(t, err)
+		return s
+	}
+
+	noCatalog := func() map[string]struct{} { return nil }
+
+	t.Run("empty origin omits the field", func(t *testing.T) {
+		original := build.BuildOrigin
+		build.BuildOrigin = ""
+		t.Cleanup(func() { build.BuildOrigin = original })
+
+		m := createReport(usage.New(), newScheduler(), noCatalog)
+
+		_, ok := m["build_origin"]
+		assert.False(t, ok)
+	})
+
+	t.Run("recorded origin appears in the report", func(t *testing.T) {
+		original := build.BuildOrigin
+		build.BuildOrigin = "release"
+		t.Cleanup(func() { build.BuildOrigin = original })
+
+		m := createReport(usage.New(), newScheduler(), noCatalog)
+
+		assert.Equal(t, "release", m["build_origin"])
+	})
+}
