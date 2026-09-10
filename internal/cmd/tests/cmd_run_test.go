@@ -1187,6 +1187,40 @@ func runTestWithLinger(t *testing.T, ts *GlobalTestState) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
+func TestExecutionResultWithLinger(t *testing.T) {
+	t.Parallel()
+
+	addr := getFreeBindAddr(t)
+	script := `
+		import exec from 'k6/execution';
+		export default function () { exec.test.abort('foo'); }
+	`
+	ts := getSingleFileTestState(t, script,
+		[]string{"-v", "--log-output=stdout", "--linger", "--address", addr}, exitcodes.ScriptAborted)
+	ts.Flags.Address = addr
+
+	sendSignal := injectMockSignalNotifier(ts)
+	asyncWaitForStdoutAndRun(t, ts, 15, time.Second, "waiting for Ctrl+C to continue", func() {
+		defer func() {
+			sendSignal <- syscall.SIGINT
+			<-sendSignal
+		}()
+
+		req, err := http.NewRequestWithContext(ts.Ctx, http.MethodGet, fmt.Sprintf("http://%s/v1/status", addr), nil)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer func() { assert.NoError(t, resp.Body.Close()) }()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, int64(exitcodes.ScriptAborted),
+			gjson.GetBytes(body, "data.attributes.execution_result.exit_code").Int())
+	})
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+}
+
 func TestAbortedByScriptSetupError(t *testing.T) {
 	t.Parallel()
 	script := `
