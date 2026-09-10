@@ -2,7 +2,7 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, v1.x ]
 
 permissions:
   contents: read

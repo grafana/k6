@@ -9,12 +9,12 @@ type cmdCloudLoadZone struct {
 	globalState *state.GlobalState
 }
 
-func getCmdCloudLoadZone(cloudCmd *cmdCloud) *cobra.Command {
+func getCmdCloudLoadZone(gs *state.GlobalState) *cobra.Command {
 	c := &cmdCloudLoadZone{
-		globalState: cloudCmd.gs,
+		globalState: gs,
 	}
 
-	exampleText := getExampleText(cloudCmd.gs, `
+	exampleText := getExampleText(gs, `
   # List all load zones in the configured stack
   $ {{.}} cloud load-zone list
 

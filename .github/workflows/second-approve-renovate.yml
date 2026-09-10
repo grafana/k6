@@ -1,0 +1,22 @@
+name: Second approval for Renovate
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions: {}
+
+jobs:
+  approve:
+    if: >
+      github.event.review.state == 'approved' &&
+      github.event.review.user.login == 'k6-core-bot[bot]' &&
+      github.event.pull_request.user.login == 'renovate-sh-app[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Approve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr review "$PR" --repo "$GITHUB_REPOSITORY" --approve

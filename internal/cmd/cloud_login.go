@@ -271,7 +271,6 @@ func authenticateUserToken(
 			"Authentication failed as provided token or stack might not be valid."+
 				" Learn more: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication."+
 				" Server error for details: %w",
-
 			err)
 	}
 	config.StackURL = null.StringFrom(stackURL)

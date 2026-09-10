@@ -33,6 +33,21 @@ func TestK6CloudUpload(t *testing.T) {
 		assert.Contains(t, stdout, `access token not configured`)
 	})
 
+	t.Run("TestCloudUploadInvalidEnv", func(t *testing.T) {
+		t.Parallel()
+
+		// The upload command doesn't define the --exit-on-running flag, but it
+		// still validates the corresponding env variable for wrong values.
+		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil)
+		ts.Env["K6_EXIT_ON_RUNNING"] = "invalid"
+		ts.ExpectedExitCode = -1
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `parsing K6_EXIT_ON_RUNNING returned an error`)
+	})
+
 	t.Run("TestCloudUploadWithScript", func(t *testing.T) {
 		t.Parallel()
 

@@ -169,7 +169,7 @@ func buildPresignedRequestBody(basePath, path string) ([]byte, error) {
 			Name string `json:"name"`
 		}{
 			{
-				Name: filepath.Join(basePath, path),
+				Name: filepath.ToSlash(filepath.Join(basePath, path)),
 			},
 		},
 	}

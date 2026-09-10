@@ -90,11 +90,12 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	defaultFlags := state.GetDefaultFlags(".config", ".cache")
 
 	ts.GlobalState = &state.GlobalState{
-		Ctx:        ctx,
-		FS:         fs,
-		Getwd:      func() (string, error) { return ts.Cwd, nil },
-		BinaryName: "k6",
-		CmdArgs:    []string{},
+		Ctx:             ctx,
+		FS:              fs,
+		Getwd:           func() (string, error) { return ts.Cwd, nil },
+		UserOSConfigDir: ".config",
+		BinaryName:      "k6",
+		CmdArgs:         []string{},
 		Env: map[string]string{
 			"K6_NO_USAGE_REPORT": "true",
 			// Keep `k6 x` command-tree construction off the real registry.k6.io

@@ -73,6 +73,18 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
 
+	// shutdownTracerProvider is set once the tracer provider is created below.
+	// It must run after the Exit event has been emitted and handled (e.g. by
+	// the browser module ending any open spans), but before globalCtx is
+	// cancelled by globalCancel above, since it derives its own timeout from
+	// globalCtx.
+	var shutdownTracerProvider func()
+	defer func() {
+		if shutdownTracerProvider != nil {
+			shutdownTracerProvider()
+		}
+	}()
+
 	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
 	// k6 was started with the --linger option.
 	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
@@ -119,7 +131,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err = c.setupTracerProvider(globalCtx, test); err != nil {
 		return err
 	}
-	waitTracesFlushed := func() {
+	shutdownTracerProvider = func() {
 		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
 		defer cancel()
 		if tpErr := test.preInitState.TracerProvider.Shutdown(ctx); tpErr != nil {
@@ -377,24 +389,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	defer func() {
-		logger.Debug("Waiting for metrics and traces processing to finish...")
+		logger.Debug("Waiting for metrics processing to finish...")
 		close(samples)
-
-		ww := [...]func(){
-			waitOutputsFlushed,
-			waitTracesFlushed,
-		}
-		var wg sync.WaitGroup
-		wg.Add(len(ww))
-		for _, w := range ww {
-			go func() {
-				w()
-				wg.Done()
-			}()
-		}
-		wg.Wait()
-
-		logger.Debug("Metrics and traces processing finished!")
+		waitOutputsFlushed()
+		logger.Debug("Metrics processing finished!")
 	}()
 
 	printExecutionDescription(
