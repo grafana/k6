@@ -14,6 +14,14 @@ import (
 //
 //nolint:funlen,gocognit,cyclop
 func mapFrame(vu moduleVU, f *common.Frame) mapping {
+	// Main frames have no parent; some requests (service workers, missing
+	// FrameID) also have a nil frame. Mapping that as a Frame produces
+	// closures that nil-deref on first use (name, evaluate, click, …)
+	// and crash the process. Playwright returns null here.
+	if f == nil {
+		return nil
+	}
+
 	rt := vu.Runtime()
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
