@@ -41,11 +41,12 @@ func (l Lifecycle) String() string {
 
 // Flags declares every feature flag as a tagged bool field.
 type Flags struct {
-	NativeHistograms bool `lifecycle:"experimental" help:"Use native histograms for trend metrics"`
-	MergeRunTags     bool `lifecycle:"experimental" help:"Merge run tags across config layers instead of replacing"`
-	FreezeEnv        bool `lifecycle:"experimental" help:"Freeze __ENV object to prevent modifications from JS code"`
-	_                noCopy
-	activated        []string
+	NativeHistograms   bool `lifecycle:"experimental" help:"Use native histograms for trend metrics"`
+	MergeRunTags       bool `lifecycle:"experimental" help:"Merge run tags across config layers instead of replacing"`
+	FreezeEnv          bool `lifecycle:"experimental" help:"Freeze __ENV object to prevent modifications from JS code"`
+	AsyncMetricContext bool `lifecycle:"experimental" help:"Propagate metric context through asynchronous operations"`
+	_                  noCopy
+	activated          []string
 }
 
 // Activated returns a copy of the sorted canonical names of active features.
