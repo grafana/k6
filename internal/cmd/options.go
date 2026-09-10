@@ -24,6 +24,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
 
+	flags.Bool("once", false, "run the test with 1 VU and 1 iteration")
 	flags.Int64P("vus", "u", 1, "number of virtual users")
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
@@ -79,6 +80,10 @@ func optionFlagSet() *pflag.FlagSet {
 
 //nolint:funlen,gocognit,cyclop // this needs breaking up but probably should wait for croconf
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
+	if err := checkOnceConflicts(flags); err != nil {
+		return lib.Options{}, err
+	}
+
 	opts := lib.Options{
 		VUs:                     getNullInt64(flags, "vus"),
 		Duration:                getNullDuration(flags, "duration"),

@@ -51,6 +51,9 @@ type Config struct {
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
+	// once carries --once between the layers. Unexported keeps json and envconfig out.
+	once bool
+
 	// NoArchiveUpload is an option that is only used when running in local-execution mode with the cloud run
 	// command.
 	//
@@ -225,6 +228,17 @@ func getConsolidatedConfig(
 	envConf, err := readEnvConfig(gs.Env)
 	if err != nil {
 		return Config{}, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+	}
+
+	// Lower layers drop their shortcuts before the merge; getOptions rejects the CLI ones.
+	if cliConf.once {
+		if err := dropOnceShortcuts(gs.Logger, map[string]*lib.Options{
+			"config":      &fileConf.Options,
+			"script":      &runnerOpts,
+			"environment": &envConf.Options,
+		}); err != nil {
+			return Config{}, err
+		}
 	}
 
 	conf := cliConf.Apply(fileConf)
