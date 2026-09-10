@@ -57,6 +57,72 @@ func nodeName(node *html.Node) string {
 	}
 }
 
+// TextOptions controls the behaviour of the Text function.
+type TextOptions struct {
+	// Separator is inserted between the contents of the text nodes that are
+	// included in the result. It defaults to the empty string, which
+	// concatenates the text nodes without any separator.
+	Separator string
+
+	// Trim, when true, removes leading and trailing whitespace from the
+	// content of each text node and omits text nodes that are empty once
+	// trimmed. This is useful to discard the insignificant whitespace that
+	// comes from the indentation of the source HTML.
+	Trim bool
+
+	// Keep, when non-nil, is called for each text node encountered while
+	// traversing the selection. The content of the text node is included in
+	// the result only if Keep returns true. It can be used, for example, to
+	// drop the text of <script> and <style> elements by inspecting the node's
+	// parent. When Keep is nil, every text node is included (subject to Trim).
+	Keep func(node *html.Node) bool
+}
+
+// Text returns the combined text contents of the nodes in the selection,
+// including their descendants, in document order. It is a package-level
+// function - and not a method on the Selection, because it is not part of the
+// jQuery API - that offers control over how the text of distinct text nodes is
+// joined and which text nodes are included, in the same spirit as Python's
+// BeautifulSoup get_text.
+//
+// With a nil opts (or a zero-value TextOptions), Text behaves like calling the
+// Selection.Text method on the selection. Setting TextOptions.Separator inserts
+// a separator between the text nodes, Trim strips the surrounding whitespace of
+// each text node (dropping the ones that become empty), and Keep filters which
+// text nodes contribute to the result.
+func Text(s *Selection, opts *TextOptions) string {
+	if opts == nil {
+		opts = &TextOptions{}
+	}
+
+	var parts []string
+	var collect func(*html.Node)
+	collect = func(n *html.Node) {
+		if n.Type == html.TextNode {
+			if opts.Keep != nil && !opts.Keep(n) {
+				return
+			}
+			text := n.Data
+			if opts.Trim {
+				text = strings.TrimSpace(text)
+				if text == "" {
+					return
+				}
+			}
+			parts = append(parts, text)
+			return
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			collect(c)
+		}
+	}
+	for _, n := range s.Nodes {
+		collect(n)
+	}
+
+	return strings.Join(parts, opts.Separator)
+}
+
 // Render renders the HTML of the first item in the selection and writes it to
 // the writer. It behaves the same as OuterHtml but writes to w instead of
 // returning the string.
@@ -143,7 +209,7 @@ func appendWithoutDuplicates(target []*html.Node, nodes []*html.Node, targetSet 
 	// if a targetSet is passed, then assume it is reliable, otherwise create one
 	// and initialize it with the current target contents.
 	if targetSet == nil {
-		targetSet = make(map[*html.Node]bool, len(target))
+		targetSet = make(map[*html.Node]bool, len(target)+len(nodes))
 		for _, n := range target {
 			targetSet[n] = true
 		}
