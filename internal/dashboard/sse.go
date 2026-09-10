@@ -80,7 +80,7 @@ func (emitter *eventEmitter) onEvent(name string, data any) {
 	var retry []byte
 
 	if name == stopEvent {
-		retry = []byte(strconv.Itoa(maxSafeInteger))
+		retry = []byte(strconv.FormatInt(int64(maxSafeInteger), 10))
 	}
 
 	id := strconv.FormatInt(emitter.id.Add(1), 10)
