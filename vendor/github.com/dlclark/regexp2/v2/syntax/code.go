@@ -91,6 +91,11 @@ const (
 	Setloopatomic InstOp = 45
 	// Updates the bumpalong position to the current position.
 	UpdateBumpalong InstOp = 46
+	// Matches one Unicode extended grapheme cluster (\X).
+	Grapheme InstOp = 47
+	// Selects and consumes the next character using a disjoint branch table.
+	// Operand 0 is an index into Code.Dispatches.
+	Dispatch InstOp = 48
 
 	// Modifiers for alternate modes
 
@@ -105,6 +110,7 @@ type Code struct {
 	Codes             []int              // the code
 	Strings           [][]rune           // string table
 	Sets              []*CharSet         //character set table
+	Dispatches        []DispatchTable    // shared match tables for deterministic alternations
 	TrackCount        int                // how many instructions use backtracking
 	Caps              map[int]int        // mapping of user group numbers -> impl group slots
 	Capsize           int                // number of impl group slots
@@ -114,7 +120,23 @@ type Code struct {
 	RightToLeft       bool               // true if right to left
 	FindOptimizations *FindOptimizations // analyzed candidate search strategy
 	QuickCodes        []int              // bool-only code with unobservable captures removed
+	QuickDispatches   []DispatchTable    // lightweight tables targeting QuickCodes
 	CaptureSlotInUse  []bool             // capture slots observable by the pattern itself during quick matches
+	// LeftContextRunes is how many runes before a candidate start matching may
+	// inspect. 0 means none, 1 means a single previous rune (or slack so ^/\A
+	// do not see the candidate as the origin), and -1 means do not slice
+	// (lookbehind or \G).
+	LeftContextRunes int
+}
+
+// DispatchTable maps disjoint character sets to branch indices. Larger tables
+// use a direct ASCII lookup, small tables use compact masks, and non-ASCII
+// runes inspect the full sets.
+type DispatchTable struct {
+	Sets       []int
+	Branches   []int
+	ASCII      *[128]uint16 // entry index + 1; zero means no branch
+	ASCIIMasks []uint64     // two membership words per branch when ASCII is nil
 }
 
 // captureSlotsInUse returns the capture slots whose values can affect matching.
@@ -190,11 +212,11 @@ func opcodeSize(op InstOp) int {
 
 	switch op {
 	case Nothing, Bol, Eol, Boundary, Nonboundary, ECMABoundary, NonECMABoundary, Beginning, Start, EndZ,
-		End, Nullmark, Setmark, Getmark, Setjump, Backjump, Forejump, Stop, UpdateBumpalong:
+		End, Nullmark, Setmark, Getmark, Setjump, Backjump, Forejump, Stop, UpdateBumpalong, Grapheme:
 		return 1
 
 	case One, Notone, Multi, Ref, Testref, Goto, Nullcount, Setcount, Lazybranch, Branchmark, Lazybranchmark,
-		Prune, Set:
+		Prune, Set, Dispatch:
 		return 2
 
 	case Capturemark, Branchcount, Lazybranchcount, Onerep, Notonerep, Oneloop, Notoneloop, Onelazy, Notonelazy,
@@ -221,7 +243,7 @@ var codeStr = []string{
 	"Prune", "Stop",
 	"ECMABoundary", "NonECMABoundary",
 	"Oneloopatomic", "Notoneloopatomic", "Setloopatomic",
-	"Bumpalong",
+	"Bumpalong", "Grapheme", "Dispatch",
 }
 
 func operatorDescription(op InstOp) string {
@@ -267,6 +289,16 @@ func (c *Code) OpcodeDescription(offset int) string {
 	case Set, Setrep, Setloop, Setlazy, Setloopatomic:
 		buf.WriteString("Set = ")
 		buf.WriteString(c.Sets[c.Codes[offset+1]].String())
+
+	case Dispatch:
+		tableIndex := c.Codes[offset+1]
+		fmt.Fprintf(buf, "Table = %d", tableIndex)
+		if tableIndex >= 0 && tableIndex < len(c.Dispatches) {
+			table := &c.Dispatches[tableIndex]
+			for i, setIndex := range table.Sets {
+				fmt.Fprintf(buf, ", %s -> %d", c.Sets[setIndex].String(), table.Branches[i])
+			}
+		}
 
 	case Multi:
 		fmt.Fprintf(buf, "String = %s", string(c.Strings[c.Codes[offset+1]]))

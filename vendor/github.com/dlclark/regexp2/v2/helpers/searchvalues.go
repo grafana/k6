@@ -64,14 +64,30 @@ func (s AsciiSearchValues) IndexOfAnyExcept(chars []rune) int {
 
 // return the last index of our original vals values within the slice given
 func (s AsciiSearchValues) LastIndexOfAny(chars []rune) int {
-	panic("not implemented")
-	//TODO: this
+	for i := len(chars) - 1; i >= 0; i-- {
+		c := chars[i]
+		if c > unicode.MaxASCII {
+			continue
+		}
+		if s.set[c/64]&(1<<(c%64)) != 0 {
+			return i
+		}
+	}
+	return -1
 }
 
 // return the last index of our original vals values within the slice given
 func (s AsciiSearchValues) LastIndexOfAnyExcept(chars []rune) int {
-	panic("not implemented")
-	//TODO: this
+	for i := len(chars) - 1; i >= 0; i-- {
+		c := chars[i]
+		if c > unicode.MaxASCII {
+			return i
+		}
+		if s.set[c/64]&(1<<(c%64)) == 0 {
+			return i
+		}
+	}
+	return -1
 }
 
 type RuneSearchValues struct {
@@ -79,37 +95,40 @@ type RuneSearchValues struct {
 }
 
 func newRuneSearchValues(vals []rune) RuneSearchValues {
-	//TODO: pre-calc the stuff we need to make each IndexOf go faster
 	return RuneSearchValues{vals: vals}
-
 }
 
 func NewRuneSearchValues(vals string) RuneSearchValues {
 	return newRuneSearchValues([]rune(vals))
 }
 
-// return the first index of our original vals values within the slice given
 func (s RuneSearchValues) IndexOfAny(chars []rune) int {
-	//naive implementation
-	//TODO: this
 	return IndexOfAny(chars, s.vals)
 }
 
-// return the first index of our original vals values within the slice given
 func (s RuneSearchValues) IndexOfAnyExcept(chars []rune) int {
-	//TODO: this
 	return IndexOfAnyExcept(chars, s.vals)
 }
 
-// return the last index of our original vals values within the slice given
 func (s RuneSearchValues) LastIndexOfAny(chars []rune) int {
-	panic("not implemented")
+	if len(s.vals) == 1 {
+		return LastIndexOfAny1(chars, s.vals[0])
+	}
+	for i := len(chars) - 1; i >= 0; i-- {
+		if slices.Contains(s.vals, chars[i]) {
+			return i
+		}
+	}
+	return -1
 }
 
-// return the last index of our original vals values within the slice given
 func (s RuneSearchValues) LastIndexOfAnyExcept(chars []rune) int {
-	panic("not implemented")
-	//TODO: this
+	for i := len(chars) - 1; i >= 0; i-- {
+		if !slices.Contains(s.vals, chars[i]) {
+			return i
+		}
+	}
+	return -1
 }
 
 type StringSearchValues struct {
@@ -145,11 +164,21 @@ func NewStringSearchValues(vals [][]rune, ignoreCase bool) StringSearchValues {
 }
 
 func (s StringSearchValues) StartsWith(chars []rune) int {
-	panic("not implemented")
+	for _, val := range s.vals {
+		if StartsWith(chars, val) {
+			return 0
+		}
+	}
+	return -1
 }
 
 func (s StringSearchValues) StartsWithIgnoreCase(chars []rune) int {
-	panic("not implemented")
+	for _, val := range s.vals {
+		if StartsWithIgnoreCase(chars, val) {
+			return 0
+		}
+	}
+	return -1
 }
 
 func (s StringSearchValues) IndexOfAny(in []rune) int {
