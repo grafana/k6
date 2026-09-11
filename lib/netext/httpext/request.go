@@ -349,14 +349,16 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
 	replacedCookies := make(map[string]struct{})
 	for key, reqCookie := range reqCookies {
-		req.AddCookie(&http.Cookie{Name: key, Value: reqCookie.Value}) //nolint:gosec // this cookie is for an outgoing request, not a Set-Cookie response
+		//nolint:gosec // outgoing request cookie, not a Set-Cookie response
+		req.AddCookie(&http.Cookie{Name: key, Value: reqCookie.Value})
 		if reqCookie.Replace {
 			replacedCookies[key] = struct{}{}
 		}
 	}
 	for _, c := range jar.Cookies(req.URL) {
 		if _, ok := replacedCookies[c.Name]; !ok {
-			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value}) //nolint:gosec // this cookie is for an outgoing request, not a Set-Cookie response
+			//nolint:gosec // outgoing request cookie, not a Set-Cookie response
+			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}
 }

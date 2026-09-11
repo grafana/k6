@@ -110,7 +110,7 @@ func (j CookieJar) Delete(url, name string) error {
 		return err
 	}
 
-	c := http.Cookie{Name: name, MaxAge: -1} //nolint:gosec // this cookie is for an outgoing request, not a Set-Cookie response
+	c := http.Cookie{Name: name, MaxAge: -1} //nolint:gosec // outgoing request cookie, not a Set-Cookie response
 	j.Jar.SetCookies(u, []*http.Cookie{&c})
 
 	return nil
