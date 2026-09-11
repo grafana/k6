@@ -81,11 +81,11 @@ func DefaultStartLocalExecutionResponse() *k6cloud.StartLocalExecutionTestRespon
 	metrics := k6cloud.NewMetricsRuntimeConfig(
 		"https://ingest.k6.io/v1/metrics",
 		*k6cloud.NewNullableString(new("2s")),
-		*k6cloud.NewNullableInt32(int32Ptr(5)),
+		*k6cloud.NewNullableInt32(new(int32(5))),
 		*k6cloud.NewNullableString(new("3s")),
 		*k6cloud.NewNullableString(new("1s")),
-		*k6cloud.NewNullableInt32(int32Ptr(50)),
-		*k6cloud.NewNullableInt32(int32Ptr(2000)),
+		*k6cloud.NewNullableInt32(new(int32(50))),
+		*k6cloud.NewNullableInt32(new(int32(2000))),
 	)
 
 	secrets := k6cloud.NewSecretsRuntimeConfig(
@@ -211,6 +211,3 @@ func (s *Server) HandleNotify(testRunID int64, handler http.HandlerFunc) {
 		handler,
 	)
 }
-
-//go:fix inline
-func int32Ptr(i int32) *int32 { return new(i) }
