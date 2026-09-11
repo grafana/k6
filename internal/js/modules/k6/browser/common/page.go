@@ -97,7 +97,7 @@ var reducedMotionToString = map[ReducedMotion]string{
 	ReducedMotionNoPreference: "no-preference",
 }
 
-//nolint:goconst,gochecknoglobals
+//nolint:gochecknoglobals
 var reducedMotionToID = map[string]ReducedMotion{
 	"reduce":        ReducedMotionReduce,
 	"no-preference": ReducedMotionNoPreference,
