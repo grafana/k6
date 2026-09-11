@@ -2362,17 +2362,35 @@ func TestDigestAuthNonDigestChallenge(t *testing.T) {
 		_, _ = w.Write([]byte("no digest here"))
 	}))
 
+	// A malformed Digest challenge must behave the same way as a missing one:
+	// the 401 response is surfaced instead of a transport error (with a warning
+	// logged by the transport).
+	tb.Mux.HandleFunc("/malformed-challenge", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Digest realm="unclosed, qop="auth"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+
+	for _, path := range []string{"/negotiate-only", "/malformed-challenge"} {
+		urlWithCreds := tb.Replacer.Replace(
+			"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT" + path)
+
+		_, err := rt.RunString(fmt.Sprintf(`
+			var res = http.get(%q, { auth: "digest" });
+			if (res.status !== 401) { throw new Error("wrong status: " + res.status); }
+			if (res.error_code !== 1401) { throw new Error("wrong error code: " + res.error_code); }
+			if (res.body !== "") { throw new Error("expected empty body, got: " + res.body); }
+		`, urlWithCreds))
+		require.NoError(t, err, "path: %s", path)
+	}
+
+	// The non-digest challenge response must keep its WWW-Authenticate header.
 	urlWithCreds := tb.Replacer.Replace(
 		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/negotiate-only")
-
 	_, err := rt.RunString(fmt.Sprintf(`
 		var res = http.get(%q, { auth: "digest" });
-		if (res.status !== 401) { throw new Error("wrong status: " + res.status); }
-		if (res.error_code !== 1401) { throw new Error("wrong error code: " + res.error_code); }
 		if (res.headers["Www-Authenticate"] !== "Negotiate, NTLM") {
 			throw new Error("missing WWW-Authenticate header: " + JSON.stringify(res.headers));
 		}
-		if (res.body !== "") { throw new Error("expected empty body, got: " + res.body); }
 	`, urlWithCreds))
 	require.NoError(t, err)
 
