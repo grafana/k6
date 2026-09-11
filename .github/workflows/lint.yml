@@ -29,7 +29,8 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: ${{ steps.go_versions.outputs.current }}
+          # Use Go 1.26 until https://github.com/grafana/k6/issues/6399 is resolved.
+          go-version: ${{ steps.go_versions.outputs.prev }}
           check-latest: true
       - name: Check code generation
         run: |
