@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 
+	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/metrics"
 )
@@ -49,6 +50,7 @@ type State struct {
 	// TestPreInitState. The Samples channel might also benefit from that...
 	Options        Options
 	BuiltinMetrics *metrics.BuiltinMetrics
+	FeatureFlags   *features.Flags
 
 	// Logger instance for every VU.
 	Logger logrus.FieldLogger
