@@ -124,6 +124,7 @@ func TestDigestTransportClosesChallengeBodyOnReadError(t *testing.T) {
 	)
 
 	res, err := rt.RoundTrip(req)
+	t.Cleanup(func() { _ = res.Body.Close() })
 
 	// The challenge-less 401 is surfaced (not the read error), and the failed
 	// body was still closed underneath.
