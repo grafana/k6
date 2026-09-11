@@ -220,7 +220,7 @@ func TestConstructorInInitContext(t *testing.T) {
 	// No MoveToVUContext call, so VU.State() is nil, i.e. we are in the init context.
 	_, err := runtime.VU.Runtime().RunString(`new WebSocket("ws://localhost/")`)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "using websockets in the init context is not supported")
+	assert.Contains(t, err.Error(), errWSInInitContext.Error())
 }
 
 func TestBasic(t *testing.T) {
