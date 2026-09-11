@@ -488,9 +488,7 @@ func extractUnknownModules(err error) (dependencies, error) {
 		return deps, nil
 	}
 
-	var u modules.UnknownModulesError
-
-	if errors.As(err, &u) {
+	if u, ok := errors.AsType[modules.UnknownModulesError](err); ok {
 		for _, name := range u.List() {
 			deps[name] = nil
 		}
@@ -529,6 +527,7 @@ func detectTestType(data []byte) string {
 	return testTypeJS
 }
 
+//nolint:funlen // Keep CLI feature ordering together.
 func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	gs *state.GlobalState, cmd *cobra.Command,
 	cliConfGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
@@ -541,13 +540,64 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		if err != nil {
 			return nil, err
 		}
+		// --once is CLI-only, so it rides on the CLI configuration layer.
+		cliConfig.once = getNullBool(cmd.Flags(), "once").Bool
+	}
+
+	var scenarioNames []string
+	if cmd.Flags().Changed("scenario") {
+		var err error
+		scenarioNames, err = cmd.Flags().GetStringSlice("scenario")
+		if err != nil {
+			return nil, err
+		}
+		if len(scenarioNames) == 0 {
+			return nil, errext.WithExitCodeIfNone(
+				errors.New("--scenario requires at least one scenario name"),
+				exitcodes.InvalidConfig)
+		}
 	}
 
 	gs.Logger.Debug("Consolidating config layers...")
-	consolidatedConfig, err := getConsolidatedConfig(
-		gs, cliConfig, lt.initRunner.GetOptions(), lt.preInitState.FeatureFlags)
+	fileConf, envConf, err := readConfigLayers(gs)
 	if err != nil {
 		return nil, err
+	}
+	runnerOpts := lt.initRunner.GetOptions()
+	// Lower layers drop their shortcuts before the merge; getOptions rejects the CLI ones.
+	layers := map[string]*lib.Options{
+		"config":      &fileConf.Options,
+		"script":      &runnerOpts,
+		"environment": &envConf.Options,
+	}
+	if cliConfig.once {
+		err = dropOnceShortcuts(gs.Logger, layers)
+	} else if scenarioNames != nil {
+		err = dropScenarioShortcuts(gs.Logger, layers)
+	}
+	if err != nil {
+		return nil, err
+	}
+	consolidatedConfig, err := getConsolidatedConfig(
+		gs, cliConfig, fileConf, envConf, runnerOpts, lt.preInitState.FeatureFlags)
+	if err != nil {
+		return nil, err
+	}
+
+	configuredScenarios := consolidatedConfig.Scenarios
+	switch {
+	case scenarioNames != nil:
+		consolidatedConfig.Options, err = selectScenarios(consolidatedConfig.Options, scenarioNames)
+	case cliConfig.once:
+		err = rejectAmbiguousOnce(consolidatedConfig.Scenarios)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cliConfig.once {
+		if consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options); err != nil {
+			return nil, err
+		}
 	}
 
 	gs.Logger.Debug("Parsing thresholds and validating config...")
@@ -566,6 +616,10 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 			}
 		}
+	}
+
+	if scenarioNames != nil {
+		dropScenarioThresholds(gs.Logger, &consolidatedConfig.Options, configuredScenarios)
 	}
 
 	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.Logger)

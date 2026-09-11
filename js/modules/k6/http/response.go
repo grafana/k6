@@ -98,8 +98,7 @@ func (res *Response) JSON(selector ...string) sobek.Value {
 		}
 
 		if err := json.Unmarshal(body, &v); err != nil {
-			var syntaxError *json.SyntaxError
-			if errors.As(err, &syntaxError) {
+			if syntaxError, ok := errors.AsType[*json.SyntaxError](err); ok {
 				err = checkErrorInJSON(body, int(syntaxError.Offset), err)
 			}
 			common.Throw(rt, err)

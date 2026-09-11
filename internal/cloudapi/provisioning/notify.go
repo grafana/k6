@@ -27,8 +27,7 @@ func mapTestErrorToNotifyCode(testErr error) *notifyError {
 		return nil
 	}
 
-	var hasAbortReason errext.HasAbortReason
-	if errors.As(testErr, &hasAbortReason) {
+	if hasAbortReason, ok := errors.AsType[errext.HasAbortReason](testErr); ok {
 		switch hasAbortReason.AbortReason() {
 		case errext.AbortedByUser, errext.AbortedByScriptAbort:
 			return &notifyError{Code: 8036, Reason: testErr.Error()}

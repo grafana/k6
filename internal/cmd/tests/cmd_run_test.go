@@ -522,7 +522,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 	loglines := ts.LoggerHook.Drain()
 	require.Len(t, loglines, 1)
 
-	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"handleSummaryTimeout":null,"features":null}`
+	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"tlsAIAFetch":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"handleSummaryTimeout":null,"features":null}`
 	assert.JSONEq(t, expected, loglines[0].Message)
 }
 
@@ -2177,7 +2177,7 @@ func TestBadLogOutput(t *testing.T) {
 }
 
 // HACK: We need this so multiple tests can register differently named modules.
-var uniqueModuleNumber uint64 //nolint:gochecknoglobals
+var uniqueModuleNumber atomic.Uint64 //nolint:gochecknoglobals
 
 // Tests that the appropriate events are emitted in the correct order.
 func TestEventSystemOK(t *testing.T) {
@@ -2185,7 +2185,7 @@ func TestEventSystemOK(t *testing.T) {
 
 	ts := NewGlobalTestState(t)
 
-	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+	moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 	mod := events.New(event.GlobalEvents, event.VUEvents)
 	modules.Register(moduleName, mod)
 
@@ -2311,7 +2311,7 @@ func TestEventSystemError(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
 
-			moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+			moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 			mod := events.New(event.GlobalEvents, event.VUEvents)
 			modules.Register(moduleName, mod)
 
@@ -2368,7 +2368,7 @@ func BenchmarkRunEvents(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ts := NewGlobalTestState(b)
 
-		moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+		moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 		mod := events.New(event.GlobalEvents, event.VUEvents)
 		modules.Register(moduleName, mod)
 
