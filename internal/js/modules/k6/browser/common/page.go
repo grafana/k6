@@ -91,12 +91,14 @@ func (r ReducedMotion) String() string {
 	return reducedMotionToString[r]
 }
 
-var reducedMotionToString = map[ReducedMotion]string{ //nolint:gochecknoglobals
+//nolint:goconst,gochecknoglobals
+var reducedMotionToString = map[ReducedMotion]string{
 	ReducedMotionReduce:       "reduce",
 	ReducedMotionNoPreference: "no-preference",
 }
 
-var reducedMotionToID = map[string]ReducedMotion{ //nolint:gochecknoglobals
+//nolint:goconst,gochecknoglobals
+var reducedMotionToID = map[string]ReducedMotion{
 	"reduce":        ReducedMotionReduce,
 	"no-preference": ReducedMotionNoPreference,
 }

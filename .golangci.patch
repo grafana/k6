@@ -1,13 +1,18 @@
-diff --git a/.golangci.yml b/.golangci.yml
 --- a/.golangci.yml
 +++ b/.golangci.yml
-@@ -101,6 +101,22 @@ linters:
+@@ -99,8 +99,28 @@
+           - gocognit
+           - lll
            - gosec
++          - goconst
          path: _(test|gen)\.go
        - linters:
 +          - contextcheck
 +          - revive
 +        path: js\/modules\/k6\/browser\/.*\.go
++      - linters:
++          - goconst
++        path: js\/modules\/k6\/browser\/.*mapping\.go
 +      - linters:
 +          - revive
 +        path: js\/modules\/k6\/html\/.*\.go
