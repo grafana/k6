@@ -70,18 +70,22 @@ type RequestFailure struct {
 
 // Request represents a browser HTTP request.
 type Request struct {
-	ctx            context.Context
-	frame          *Frame
-	responseMu     sync.RWMutex
-	response       *Response
-	redirectChain  []*Request
-	requestID      network.RequestID
-	documentID     string
-	url            *url.URL
-	method         string
-	headers        map[string][]string
-	extraHeaders   map[string][]string
-	extraHeadersMu sync.RWMutex
+	ctx           context.Context
+	frame         *Frame
+	responseMu    sync.RWMutex
+	response      *Response
+	redirectChain []*Request
+	requestID     network.RequestID
+	documentID    string
+	url           *url.URL
+	method        string
+	headers       map[string][]string
+	extraHeaders  map[string][]string
+	// mu guards headers, extraHeaders, method, postDataEntries and url: an
+	// ExtraInfo CDP event can set the raw headers, and route.continue can
+	// override any of these fields, potentially from a different goroutine
+	// than the one reading them.
+	mu sync.RWMutex
 	// rawHeadersCh is closed once the raw (ExtraInfo) headers have been
 	// resolved: either applied, or known not to arrive. Readers that need the
 	// raw headers wait on it; see waitForRawHeaders.
@@ -223,10 +227,38 @@ func validateResourceType(logger *log.Logger, t string) string {
 }
 
 func (r *Request) addExtraHeaders(extra map[string][]string) {
-	r.extraHeadersMu.Lock()
+	r.mu.Lock()
 	r.extraHeaders = extra
-	r.extraHeadersMu.Unlock()
+	r.mu.Unlock()
 	r.resolveRawHeaders()
+}
+
+// applyContinueOverrides updates the request's in-memory representation with
+// the values overridden through route.continue, so that later reads (e.g.
+// from a "response" event handler) reflect what was actually sent to the
+// server instead of the request's original, unmodified values.
+func (r *Request) applyContinueOverrides(opts ContinueOptions) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if len(opts.Headers) > 0 {
+		headers := make(map[string][]string, len(opts.Headers))
+		for _, h := range opts.Headers {
+			headers[h.Name] = append(headers[h.Name], h.Value)
+		}
+		r.headers = headers
+	}
+	if opts.Method != "" {
+		r.method = opts.Method
+	}
+	if len(opts.PostData) > 0 {
+		r.postDataEntries = []string{string(opts.PostData)}
+	}
+	if opts.URL != "" {
+		if u, err := url.Parse(opts.URL); err == nil {
+			r.url = u
+		}
+	}
 }
 
 // resolveRawHeaders unblocks readers waiting for the raw (ExtraInfo) headers.
@@ -257,12 +289,13 @@ func (r *Request) getDocumentID() string {
 	return r.documentID
 }
 
-func (r *Request) headersSize() int64 {
+// headersSizeLocked computes the header size and requires the caller to
+// already hold r.mu (for reading).
+func (r *Request) headersSizeLocked() int64 {
 	size := 4 // 4 = 2 spaces + 2 line breaks (GET /path \r\n)
 	size += len(r.method)
 	size += len(r.url.Path)
 	size += 8 // httpVersion
-	r.extraHeadersMu.RLock()
 	if len(r.extraHeaders) != 0 {
 		for name, values := range r.extraHeaders {
 			for _, value := range values {
@@ -276,7 +309,6 @@ func (r *Request) headersSize() int64 {
 			}
 		}
 	}
-	r.extraHeadersMu.RUnlock()
 	return int64(size)
 }
 
@@ -299,7 +331,7 @@ func (r *Request) setLoadedFromCache(fromMemoryCache bool) {
 // AllHeaders returns all the request headers.
 func (r *Request) AllHeaders() map[string]string {
 	headers := make(map[string]string)
-	r.extraHeadersMu.RLock()
+	r.mu.RLock()
 	if len(r.extraHeaders) != 0 {
 		for name, values := range r.extraHeaders {
 			headers[strings.ToLower(name)] = strings.Join(values, "\n")
@@ -309,7 +341,7 @@ func (r *Request) AllHeaders() map[string]string {
 			headers[strings.ToLower(name)] = strings.Join(values, "\n")
 		}
 	}
-	r.extraHeadersMu.RUnlock()
+	r.mu.RUnlock()
 	return headers
 }
 
@@ -327,6 +359,9 @@ func (r *Request) HeaderValue(name string) (string, bool) {
 
 // Headers returns the request headers.
 func (r *Request) Headers() map[string]string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	headers := make(map[string]string)
 	for n, v := range r.headers {
 		headers[n] = strings.Join(v, ",")
@@ -337,7 +372,7 @@ func (r *Request) Headers() map[string]string {
 // HeadersArray returns the request headers as an array of objects.
 func (r *Request) HeadersArray() []HTTPHeader {
 	headers := make([]HTTPHeader, 0)
-	r.extraHeadersMu.RLock()
+	r.mu.RLock()
 	source := r.headers
 	if len(r.extraHeaders) != 0 {
 		source = r.extraHeaders
@@ -347,7 +382,7 @@ func (r *Request) HeadersArray() []HTTPHeader {
 			headers = append(headers, HTTPHeader{Name: name, Value: v})
 		}
 	}
-	r.extraHeadersMu.RUnlock()
+	r.mu.RUnlock()
 	return headers
 }
 
@@ -358,6 +393,8 @@ func (r *Request) IsNavigationRequest() bool {
 
 // Method returns the request method.
 func (r *Request) Method() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.method
 }
 
@@ -370,6 +407,9 @@ func (r *Request) Method() string {
 // TODO: Create a PostDataEntries API when we have a better idea of when that
 // is needed.
 func (r *Request) PostData() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	if len(r.postDataEntries) > 0 {
 		return r.postDataEntries[0]
 	}
@@ -386,6 +426,9 @@ func (r *Request) PostData() string {
 // TODO: Create a PostDataEntries API when we have a better idea of when that
 // is needed.
 func (r *Request) PostDataBuffer() []byte {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	if len(r.postDataEntries) > 0 {
 		return []byte(r.postDataEntries[0])
 	}
@@ -405,13 +448,16 @@ func (r *Request) Response() *Response {
 
 // Size returns the size of the request.
 func (r *Request) Size() HTTPMessageSize {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	var b int64
 	for _, p := range r.postDataEntries {
 		b += int64(len(p))
 	}
 	return HTTPMessageSize{
 		Body:    b,
-		Headers: r.headersSize(),
+		Headers: r.headersSizeLocked(),
 	}
 }
 
@@ -451,7 +497,17 @@ func (r *Request) Timing() *resourceTiming {
 
 // URL returns the request URL.
 func (r *Request) URL() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	return r.url.String()
+}
+
+// parsedURL returns the request's URL, guarded by the same lock that
+// protects it against a concurrent route.continue override.
+func (r *Request) parsedURL() *url.URL {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.url
 }
 
 // RemoteAddress contains informationa about a remote target.
@@ -681,7 +737,7 @@ func (r *Response) bodySize() int64 {
 
 	if err := r.fetchBody(); err != nil {
 		r.logger.Debugf("Response:bodySize:fetchBody",
-			"url:%s method:%s err:%s", r.url, r.request.method, err)
+			"url:%s method:%s err:%s", r.url, r.request.Method(), err)
 	}
 
 	r.bodyMu.RLock()
@@ -891,7 +947,13 @@ func (r *Route) Continue(opts ContinueOptions) error {
 		return err
 	}
 
-	return r.networkManager.ContinueRequest(r.request.interceptionID, opts, r.request.HeadersArray())
+	if err := r.networkManager.ContinueRequest(r.request.interceptionID, opts, r.request.HeadersArray()); err != nil {
+		return err
+	}
+
+	r.request.applyContinueOverrides(opts)
+
+	return nil
 }
 
 // Fulfill fulfills the request with the given options for the response.
