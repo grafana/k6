@@ -29,13 +29,13 @@ func TestDigestTransportNonDigestChallenge(t *testing.T) {
 
 	res, err := rt.RoundTrip(req)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = res.Body.Close() })
 	require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	require.Equal(t, "Negotiate, NTLM", res.Header.Get("WWW-Authenticate"))
 
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err, "body must be readable even without a digest challenge")
 	require.Empty(t, body)
-	require.NoError(t, res.Body.Close())
 }
 
 // A malformed digest challenge must not fail the whole request either: the
@@ -53,6 +53,7 @@ func TestDigestTransportMalformedChallenge(t *testing.T) {
 
 	res, err := rt.RoundTrip(req)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = res.Body.Close() })
 	require.Equal(t, http.StatusUnauthorized, res.StatusCode)
 	require.Contains(t, res.Header.Get("WWW-Authenticate"), "Digest")
 }
@@ -77,6 +78,7 @@ func TestDigestTransportSuccess(t *testing.T) {
 		rt := newDigestTransport(srv.Client().Transport, "testuser", "testpwd", nil)
 		res, err := rt.RoundTrip(newReq(srv.URL + "/digest-auth/auth/testuser/testpwd"))
 		require.NoError(t, err)
+		t.Cleanup(func() { _ = res.Body.Close() })
 		require.Equal(t, http.StatusOK, res.StatusCode)
 	})
 
@@ -85,6 +87,7 @@ func TestDigestTransportSuccess(t *testing.T) {
 		rt := newDigestTransport(srv.Client().Transport, "testuser", "testpwd", nil)
 		res, err := rt.RoundTrip(newReq(srv.URL + "/digest-auth/auth/testuser/testpwd/SHA-256"))
 		require.NoError(t, err)
+		t.Cleanup(func() { _ = res.Body.Close() })
 		require.Equal(t, http.StatusOK, res.StatusCode)
 	})
 
@@ -93,6 +96,7 @@ func TestDigestTransportSuccess(t *testing.T) {
 		rt := newDigestTransport(srv.Client().Transport, "testuser", "testpwd", nil)
 		res, err := rt.RoundTrip(newReq(srv.URL + "/get"))
 		require.NoError(t, err)
+		t.Cleanup(func() { _ = res.Body.Close() })
 		require.Equal(t, http.StatusOK, res.StatusCode)
 	})
 }
