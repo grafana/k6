@@ -209,7 +209,7 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 		"url", rt.ToValue(w.url.String()), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty( // this needs to be with an accessor as we change the value
 		"readyState", rt.ToValue(func() sobek.Value {
-			return rt.ToValue((uint)(w.readyState))
+			return rt.ToValue(uint(w.readyState))
 		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
 		"bufferedAmount", rt.ToValue(func() sobek.Value { return rt.ToValue(w.bufferedAmount) }), nil,
@@ -543,10 +543,9 @@ func (w *webSocket) readPump(wg *sync.WaitGroup) {
 			continue
 		}
 
-		var closeErr *websocket.CloseError
 		var code int
 		var reason string
-		if errors.As(err, &closeErr) {
+		if closeErr, ok := errors.AsType[*websocket.CloseError](err); ok {
 			code = closeErr.Code
 			reason = closeErr.Text
 		}

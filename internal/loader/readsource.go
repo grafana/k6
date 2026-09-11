@@ -47,9 +47,8 @@ func ReadSource(
 
 	srcURL, err := Resolve(pwdURL, filepath.ToSlash(src))
 	if err != nil {
-		var unresolvedError unresolvableURLError
-		if errors.As(err, &unresolvedError) {
-			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, (string)(unresolvedError)) //nolint:staticcheck
+		if unresolvedError, ok := errors.AsType[unresolvableURLError](err); ok {
+			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, string(unresolvedError)) //nolint:staticcheck
 		}
 		return nil, err
 	}

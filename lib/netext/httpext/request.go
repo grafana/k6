@@ -276,7 +276,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	reqCtx, cancelFunc := context.WithTimeout(ctx, preq.Timeout)
 	defer cancelFunc()
 	mreq := preq.Req.WithContext(reqCtx)
-	res, resErr := client.Do(mreq) //nolint:gosec
+	res, resErr := client.Do(mreq)
 
 	// TODO(imiric): It would be safer to check for a writeable
 	// response body here instead of status code, but those are
@@ -357,6 +357,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[string]*HTTPRequestCookie) {
 	replacedCookies := make(map[string]struct{})
 	for key, reqCookie := range reqCookies {
+		//nolint:gosec // outgoing request cookie, not a Set-Cookie response
 		req.AddCookie(&http.Cookie{Name: key, Value: reqCookie.Value})
 		if reqCookie.Replace {
 			replacedCookies[key] = struct{}{}
@@ -364,6 +365,7 @@ func SetRequestCookies(req *http.Request, jar *cookiejar.Jar, reqCookies map[str
 	}
 	for _, c := range jar.Cookies(req.URL) {
 		if _, ok := replacedCookies[c.Name]; !ok {
+			//nolint:gosec // outgoing request cookie, not a Set-Cookie response
 			req.AddCookie(&http.Cookie{Name: c.Name, Value: c.Value})
 		}
 	}

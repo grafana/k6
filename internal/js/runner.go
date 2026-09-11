@@ -894,8 +894,7 @@ func (u *ActiveVU) RunOnce() error {
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
 	if err != nil {
-		var x *sobek.InterruptedError
-		if errors.As(err, &x) {
+		if x, ok := errors.AsType[*sobek.InterruptedError](err); ok {
 			if v, ok := x.Value().(*errext.InterruptError); ok {
 				v.Reason = x.Error()
 				err = v
@@ -976,8 +975,7 @@ func (u *VU) runFn(
 		u.moduleVUImpl.eventLoop.WaitOnRegistered()
 	}
 	endTime := time.Now()
-	var exception *sobek.Exception
-	if errors.As(err, &exception) {
+	if exception, ok := errors.AsType[*sobek.Exception](err); ok {
 		err = &scriptExceptionError{inner: exception}
 	}
 
