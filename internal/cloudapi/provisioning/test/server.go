@@ -213,7 +213,4 @@ func (s *Server) HandleNotify(testRunID int64, handler http.HandlerFunc) {
 }
 
 //go:fix inline
-func strPtr(s string) *string { return new(s) }
-
-//go:fix inline
 func int32Ptr(i int32) *int32 { return new(i) }

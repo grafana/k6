@@ -111,13 +111,6 @@ func (e *executionContextTestStub) eval( // this needs to be a pointer as otherw
 	return e.evalFn(apiCtx, opts, js, args...)
 }
 
-// toPtr is a helper function to convert a value to a pointer.
-//
-//go:fix inline
-func toPtr[T any](v T) *T {
-	return new(v)
-}
-
 func TestBuildAttributeSelector(t *testing.T) {
 	t.Parallel()
 
