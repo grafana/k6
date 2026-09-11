@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -521,7 +522,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 	loglines := ts.LoggerHook.Drain()
 	require.Len(t, loglines, 1)
 
-	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"features":null}`
+	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"tlsAIAFetch":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"handleSummaryTimeout":null,"features":null}`
 	assert.JSONEq(t, expected, loglines[0].Message)
 }
 
@@ -712,7 +713,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Running thresholds on 4 metrics..."))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Finalizing thresholds..."))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics emission of VUs and VUsMax metrics stopped"))
-	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics and traces processing finished!"))
+	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics processing finished!"))
 }
 
 func TestThresholdsFailed(t *testing.T) {
@@ -796,7 +797,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	assert.Contains(t, stdOut, "iterations\n    ✗ 'count == 1'")
 	assert.Contains(t, stdOut, `teardown() called`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdOut, `level=debug msg="Metrics and traces processing finished!"`)
+	assert.Contains(t, stdOut, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=8 tainted=true`)
 }
 
@@ -858,7 +859,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
       ✓ 'count == 1' count=1`)
 	assert.Contains(t, stdout, `Stopping k6 in response to signal`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
+	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 }
 
@@ -982,7 +983,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdout, `PATCH /v1/status`)
 	assert.Contains(t, stdout, `level=error msg="test run stopped from REST API`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
+	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 	assert.NotContains(t, stdout, `Running thresholds`)
 	assert.NotContains(t, stdout, `Finalizing thresholds`)
@@ -1272,7 +1273,7 @@ func testAbortedByScriptError(t *testing.T, script string, runTest func(*testing
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
+	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Everything has finished, exiting k6 with an error!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 	return ts
@@ -1417,7 +1418,7 @@ func testAbortedByScriptTestAbort(t *testing.T, script string, runTest func(*tes
 	assert.Contains(t, stdout, "test aborted: foo")
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	assert.Contains(t, stdout, `level=debug msg="Metrics and traces processing finished!"`)
+	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, "bogus summary")
 }
 
@@ -2176,7 +2177,7 @@ func TestBadLogOutput(t *testing.T) {
 }
 
 // HACK: We need this so multiple tests can register differently named modules.
-var uniqueModuleNumber uint64 //nolint:gochecknoglobals
+var uniqueModuleNumber atomic.Uint64 //nolint:gochecknoglobals
 
 // Tests that the appropriate events are emitted in the correct order.
 func TestEventSystemOK(t *testing.T) {
@@ -2184,7 +2185,7 @@ func TestEventSystemOK(t *testing.T) {
 
 	ts := NewGlobalTestState(t)
 
-	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+	moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 	mod := events.New(event.GlobalEvents, event.VUEvents)
 	modules.Register(moduleName, mod)
 
@@ -2310,7 +2311,7 @@ func TestEventSystemError(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
 
-			moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+			moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 			mod := events.New(event.GlobalEvents, event.VUEvents)
 			modules.Register(moduleName, mod)
 
@@ -2367,7 +2368,7 @@ func BenchmarkRunEvents(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ts := NewGlobalTestState(b)
 
-		moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+		moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 		mod := events.New(event.GlobalEvents, event.VUEvents)
 		modules.Register(moduleName, mod)
 
@@ -2535,6 +2536,69 @@ func TestSetupTimeout(t *testing.T) {
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
 	assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
+}
+
+func TestHandleSummaryTimeout(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name   string
+		env    map[string]string
+		script string
+	}{
+		{
+			name: "script option",
+			script: `
+				import { sleep } from 'k6';
+
+				export const options = {
+					handleSummaryTimeout: '1s',
+				};
+
+				export function handleSummary(data) {
+					sleep(100000);
+				}
+
+				export default function() {}
+			`,
+		},
+		{
+			name: "environment variable",
+			env: map[string]string{
+				"K6_HANDLE_SUMMARY_TIMEOUT": "1s",
+			},
+			script: `
+				import { sleep } from 'k6';
+
+				export function handleSummary(data) {
+					sleep(100000);
+				}
+
+				export default function() {}
+			`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = []string{"k6", "run", "-"}
+			maps.Copy(ts.Env, tc.env)
+			ts.Stdin = bytes.NewBufferString(tc.script)
+
+			start := time.Now()
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			elapsed := time.Since(start)
+			assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of handleSummaryTimeout")
+			assert.Less(
+				t, elapsed, 5*time.Second,
+				"expected less time to have passed because of handleSummaryTimeout",
+			)
+
+			stderr := ts.Stderr.String()
+			t.Log(stderr)
+			assert.Contains(t, stderr, "handleSummary() execution timed out after 1 seconds")
+		})
+	}
 }
 
 func TestTypeScriptSupport(t *testing.T) {
@@ -3468,4 +3532,79 @@ func TestPLZCloudSecretsEnvVars(t *testing.T) {
 	assert.NotContains(t, stderr, "level=error")
 	assert.Contains(t, stderr, `level=info msg="***SECRET_REDACTED***" source=console`)
 	assert.NotContains(t, stderr, "plz-secret-value")
+}
+
+func TestLogNanosecondTimestampsFlag(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name          string
+		additionalArg string
+		assertFunc    func(log string, t *testing.T)
+	}{
+		{
+			name:          "json format with cli switch",
+			additionalArg: "--log-format=json",
+			assertFunc: func(log string, t *testing.T) {
+				parsed := &struct {
+					Msg  string
+					Time time.Time
+				}{}
+
+				require.NoError(t, json.Unmarshal([]byte(log), parsed))
+				assert.NotZero(t, parsed.Time.Nanosecond(), "Logged timestamp should have nanoseconds")
+			},
+		},
+		{
+			name:          "default format with color disabled with cli switch",
+			additionalArg: "--no-color",
+			assertFunc: func(log string, t *testing.T) {
+				pairs := strings.Split(log, " ")
+				require.NotZero(t, len(pairs))
+
+				keyValue := strings.Split(pairs[0], "=")
+				require.Len(t, keyValue, 2)
+				require.Equal(t, "time", keyValue[0])
+				timestamp, err := time.Parse(time.RFC3339Nano, strings.Trim(keyValue[1], "\""))
+				require.NoError(t, err)
+
+				assert.NotZero(t, timestamp.Nanosecond(), "Logged timestamp should have nanoseconds")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mainScript := `
+				export default function () {
+					console.log("test 1 xdgf");
+				};
+			`
+
+			ts := NewGlobalTestState(t)
+			ts.Flags.LogNanosecondTimestamps = true
+
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "script.js"), []byte(mainScript), 0o644))
+
+			ts.CmdArgs = []string{"k6", "run", "script.js", tc.additionalArg}
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			logs := strings.Trim(ts.Stderr.String(), "\n")
+			lines := strings.Split(logs, "\n")
+			require.NotZero(t, len(lines))
+
+			found := false
+			for _, line := range lines {
+				if strings.Contains(line, "test 1 xdgf") {
+					tc.assertFunc(line, t)
+					found = true
+					break
+				}
+			}
+
+			require.True(t, found, "expected log line containing marker not found")
+		})
+	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/grafana/sobek"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
@@ -41,6 +42,7 @@ type (
 	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
 		Browser         *sobek.Object
+		Chromium        *sobek.Object
 		Devices         map[string]common.Device
 		NetworkProfiles map[string]common.NetworkProfile `js:"networkProfiles"`
 	}
@@ -76,22 +78,25 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 		m.initialize(vu)
 	})
 
+	mvu := moduleVU{
+		VU:          vu,
+		pidRegistry: m.PidRegistry,
+		browserRegistry: newBrowserRegistry(
+			context.Background(),
+			vu,
+			m.remoteRegistry,
+			m.PidRegistry,
+			m.tracesMetadata,
+		),
+		taskQueueRegistry: newTaskQueueRegistry(vu),
+		filePersister:     m.filePersister,
+		testRunID:         m.testRunID,
+	}
+
 	return &ModuleInstance{
 		mod: &JSModule{
-			Browser: mapBrowserToSobek(moduleVU{
-				VU:          vu,
-				pidRegistry: m.PidRegistry,
-				browserRegistry: newBrowserRegistry(
-					context.Background(),
-					vu,
-					m.remoteRegistry,
-					m.PidRegistry,
-					m.tracesMetadata,
-				),
-				taskQueueRegistry: newTaskQueueRegistry(vu),
-				filePersister:     m.filePersister,
-				testRunID:         m.testRunID,
-			}),
+			Browser:         mapToSobek(mvu, mapBrowser(mvu, mvu.browser)),
+			Chromium:        mapToSobek(mvu, mapChromium(mvu, chromium.NewBrowserType(vu))),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),
 		},

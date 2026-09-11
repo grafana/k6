@@ -39,6 +39,15 @@ func newStringPrefixFilter(code *syntax.Code) StringPrefixFilter {
 		return stringIndexPrefixesFilter(opts.LeadingPrefixes, false, minRequiredLength)
 	case syntax.LeadingStrings_OrdinalIgnoreCase_LeftToRight:
 		return stringIndexPrefixesFilter(opts.LeadingPrefixes, true, minRequiredLength)
+	case syntax.LeadingSet_LeftToRight:
+		if len(opts.FixedDistanceSets) == 0 {
+			return nil
+		}
+		set := opts.FixedDistanceSets[0]
+		if set.Range == nil && (len(set.Chars) == 0 || len(set.Chars) > 5) {
+			return nil
+		}
+		return stringFixedDistanceSetFilter(set, minRequiredLength)
 	case syntax.FixedDistanceChar_LeftToRight:
 		return stringFixedDistanceCharFilter(opts.FixedDistanceLiteral.C, opts.FixedDistanceLiteral.Distance, minRequiredLength)
 	case syntax.FixedDistanceString_LeftToRight:
@@ -50,6 +59,107 @@ func newStringPrefixFilter(code *syntax.Code) StringPrefixFilter {
 	}
 }
 
+type asciiSetStringScanner struct {
+	chars    string
+	first    byte
+	last     byte
+	useRange bool
+	distance int
+}
+
+func newASCIISetStringScanner(set syntax.FixedDistanceSet) (asciiSetStringScanner, bool) {
+	if set.Negated || set.Distance < 0 {
+		return asciiSetStringScanner{}, false
+	}
+	if set.Range != nil {
+		if set.Range.First < 0 || set.Range.Last > utf8.RuneSelf-1 {
+			return asciiSetStringScanner{}, false
+		}
+		return asciiSetStringScanner{
+			first:    byte(set.Range.First),
+			last:     byte(set.Range.Last),
+			useRange: true,
+			distance: set.Distance,
+		}, true
+	}
+	if len(set.Chars) == 0 {
+		return asciiSetStringScanner{}, false
+	}
+	chars := make([]byte, len(set.Chars))
+	for i, ch := range set.Chars {
+		if ch < 0 || ch > utf8.RuneSelf-1 {
+			return asciiSetStringScanner{}, false
+		}
+		chars[i] = byte(ch)
+	}
+	return asciiSetStringScanner{chars: string(chars), distance: set.Distance}, true
+}
+
+func stringFixedDistanceSetFilter(set syntax.FixedDistanceSet, minRequiredLength int) StringPrefixFilter {
+	scanner, ok := newASCIISetStringScanner(set)
+	if !ok {
+		return nil
+	}
+
+	return func(input string, startAt int) (candidateByteIndex int, ok bool) {
+		if !hasMinRequiredBytes(input, startAt, minRequiredLength) {
+			return 0, false
+		}
+
+		for searchAt := startAt; searchAt < len(input); {
+			offset := scanner.index(input[searchAt:])
+			if offset < 0 {
+				return 0, false
+			}
+			setByteIndex := searchAt + offset
+			candidateByteIndex, valid := stringFixedDistanceCandidateStart(input, startAt, setByteIndex, scanner.distance)
+			if valid && hasMinRequiredBytes(input, candidateByteIndex, minRequiredLength) {
+				return candidateByteIndex, true
+			}
+			if valid {
+				return 0, false
+			}
+			searchAt = setByteIndex + 1
+		}
+		return 0, false
+	}
+}
+
+func (s asciiSetStringScanner) index(input string) int {
+	if !s.useRange {
+		if len(s.chars) == 1 {
+			return strings.IndexByte(input, s.chars[0])
+		}
+		return strings.IndexAny(input, s.chars)
+	}
+	for i := 0; i < len(input); i++ {
+		if input[i] >= s.first && input[i] <= s.last {
+			return i
+		}
+	}
+	return -1
+}
+
+// A literal U+FFFD also matches invalid UTF-8 bytes once decoded. Keep the
+// byte filter for valid strings, and let the rune engine handle invalid input.
+// Ordinary literals return the original filter without a per-search check.
+func withRuneErrorFallback(filter StringPrefixFilter, literals ...string) StringPrefixFilter {
+	for _, literal := range literals {
+		if strings.ContainsRune(literal, utf8.RuneError) {
+			return func(input string, startAt int) (int, bool) {
+				if startAt < 0 || startAt > len(input) {
+					return 0, false
+				}
+				if !utf8.ValidString(input[startAt:]) {
+					return startAt, true
+				}
+				return filter(input, startAt)
+			}
+		}
+	}
+	return filter
+}
+
 func stringIndexPrefixFilter(prefix string, ignoreCase bool, minRequiredLength int) StringPrefixFilter {
 	if prefix == "" {
 		return nil
@@ -58,7 +168,7 @@ func stringIndexPrefixFilter(prefix string, ignoreCase bool, minRequiredLength i
 		return nil
 	}
 
-	return func(input string, startAt int) (candidateByteIndex int, ok bool) {
+	return withRuneErrorFallback(func(input string, startAt int) (candidateByteIndex int, ok bool) {
 		if !hasMinRequiredBytes(input, startAt, minRequiredLength) {
 			return 0, false
 		}
@@ -73,7 +183,7 @@ func stringIndexPrefixFilter(prefix string, ignoreCase bool, minRequiredLength i
 			return 0, false
 		}
 		return startAt + offset, true
-	}
+	}, prefix)
 }
 
 func stringIndexPrefixesFilter(prefixes []string, ignoreCase bool, minRequiredLength int) StringPrefixFilter {
@@ -92,9 +202,9 @@ func stringIndexPrefixesFilter(prefixes []string, ignoreCase bool, minRequiredLe
 		return filter.index
 	}
 
-	return func(input string, startAt int) (candidateByteIndex int, ok bool) {
+	return withRuneErrorFallback(func(input string, startAt int) (candidateByteIndex int, ok bool) {
 		return indexAnyPrefixFallback(input, startAt, prefixes, ignoreCase, minRequiredLength)
-	}
+	}, prefixes...)
 }
 
 func indexAnyPrefixFallback(input string, startAt int, prefixes []string, ignoreCase bool, minRequiredLength int) (candidateByteIndex int, ok bool) {
@@ -232,7 +342,7 @@ func stringFixedDistanceStringFilter(literal string, distance, minRequiredLength
 		return nil
 	}
 
-	return func(input string, startAt int) (candidateByteIndex int, ok bool) {
+	return withRuneErrorFallback(func(input string, startAt int) (candidateByteIndex int, ok bool) {
 		if !hasMinRequiredBytes(input, startAt, minRequiredLength) {
 			return 0, false
 		}
@@ -254,7 +364,7 @@ func stringFixedDistanceStringFilter(literal string, distance, minRequiredLength
 			searchAt = literalIndex + 1
 		}
 		return 0, false
-	}
+	}, literal)
 }
 
 func stringLiteralAfterLoopFilter(literal *syntax.LiteralAfterLoop, minRequiredLength int) StringPrefixFilter {
@@ -265,7 +375,7 @@ func stringLiteralAfterLoopFilter(literal *syntax.LiteralAfterLoop, minRequiredL
 		return nil
 	}
 
-	return func(input string, startAt int) (candidateByteIndex int, ok bool) {
+	return withRuneErrorFallback(func(input string, startAt int) (candidateByteIndex int, ok bool) {
 		if !hasMinRequiredBytes(input, startAt, minRequiredLength) {
 			return 0, false
 		}
@@ -273,7 +383,7 @@ func stringLiteralAfterLoopFilter(literal *syntax.LiteralAfterLoop, minRequiredL
 			return 0, false
 		}
 		return startAt, true
-	}
+	}, literal.String)
 }
 
 func stringHasLiteralAfterLoop(input string, searchAt int, literal *syntax.LiteralAfterLoop) bool {

@@ -101,7 +101,7 @@ func newRequestBody(data *pbcloud.MetricSet) ([]byte, error) {
 	// https://pkg.go.dev/github.com/klauspost/compress/snappy#NewBufferedWriter
 	if snappy.MaxEncodedLen(len(b)) < 0 {
 		return nil, fmt.Errorf("the Protobuf message is too large to be handled by Snappy encoder; "+
-			"size: %d, limit: %d", len(b), 0xffffffff)
+			"size: %d, limit: %d", len(b), uint64(0xffffffff))
 	}
 	return snappy.Encode(nil, b), nil
 }

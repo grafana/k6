@@ -1,5 +1,7 @@
 package sobek
 
+import "weak"
+
 type weakSetObject struct {
 	baseObject
 	s weakMap
@@ -7,7 +9,9 @@ type weakSetObject struct {
 
 func (ws *weakSetObject) init() {
 	ws.baseObject.init()
-	ws.s = weakMap(ws.val.runtime.genId())
+	ws.s = weakMap{
+		m: make(map[weak.Pointer[Object]]Value),
+	}
 }
 
 func (r *Runtime) weakSetProto_add(call FunctionCall) Value {

@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -25,6 +26,8 @@ export default async function() {
     await page.screenshot({ path: 'screenshot.png' });
     // TODO: Assert this somehow. Upload as CI artifact or just an external `ls`?
     // Maybe even do a fuzzy image comparison against a preset known good screenshot?
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

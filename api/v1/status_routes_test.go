@@ -19,7 +19,7 @@ func TestGetStatus(t *testing.T) {
 	cs := getControlSurface(t, testState)
 
 	rw := httptest.NewRecorder()
-	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/status", nil))
 	res := rw.Result()
 	t.Cleanup(func() {
 		assert.NoError(t, res.Body.Close())

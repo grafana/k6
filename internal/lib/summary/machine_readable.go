@@ -70,9 +70,8 @@ func machineReadableSummaryResultsMetricsBuilder(metrics Metrics) []cog.Builder[
 	val := reflect.ValueOf(metrics)
 
 	metricBuilders := make([]cog.Builder[machinereadable.Metric], 0)
-	for i := 0; i < val.NumField(); i++ {
-		value := val.Field(i)
-		metricsMap, isMetricsMap := value.Interface().(map[string]Metric)
+	for _, value := range val.Fields() {
+		metricsMap, isMetricsMap := reflect.TypeAssert[map[string]Metric](value)
 		if !isMetricsMap {
 			continue // Theoretically, this should never happen as all the struct fields satisfy the type.
 		}

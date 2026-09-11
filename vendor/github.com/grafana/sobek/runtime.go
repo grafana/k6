@@ -143,6 +143,8 @@ type global struct {
 	weakMapAdder  *Object
 	mapAdder      *Object
 	setAdder      *Object
+	setHas        *Object
+	setValues     *Object
 	arrayValues   *Object
 	arrayToString *Object
 
@@ -193,9 +195,8 @@ type Runtime struct {
 
 	fieldNameMapper FieldNameMapper
 
-	vm    *vm
-	hash  *maphash.Hash
-	idSeq uint64
+	vm   *vm
+	hash *maphash.Hash
 
 	modules          map[ModuleRecord]ModuleInstance
 	moduleNamespaces map[ModuleRecord]*namespaceObject
@@ -490,7 +491,7 @@ func (r *Runtime) newReferenceError(name unistring.String) Value {
 	return r.newErrorf(r.getReferenceError(), "%s is not defined", name)
 }
 
-func (r *Runtime) newSyntaxError(msg string, offset int) Value {
+func (r *Runtime) newSyntaxError(msg string) Value {
 	return r.builtin_new(r.getSyntaxError(), []Value{newStringValue(msg)})
 }
 
@@ -2803,7 +2804,11 @@ func (ir *iteratorRecord) close() {
 // When using outside of Runtime.Run (i.e. when calling directly from Go code, not from a JS function implemented
 // in Go) it must be enclosed in Try. See the example.
 func (r *Runtime) ForOf(iterable Value, step func(curValue Value) (continueIteration bool)) {
-	iter := r.getIterator(iterable, nil)
+	r.forOfMethod(iterable, nil, step)
+}
+
+func (r *Runtime) forOfMethod(iterable Value, method func(FunctionCall) Value, step func(curValue Value) (continueIteration bool)) {
+	iter := r.getIterator(iterable, method)
 	for {
 		value, ex := iter.step()
 		if ex != nil {
@@ -2936,19 +2941,6 @@ func growCap(newSize, oldSize, oldCap int) int {
 			return cap
 		}
 	}
-}
-
-func (r *Runtime) genId() (ret uint64) {
-	if r.hash == nil {
-		h := r.getHash()
-		r.idSeq = h.Sum64()
-	}
-	if r.idSeq == 0 {
-		r.idSeq = 1
-	}
-	ret = r.idSeq
-	r.idSeq++
-	return
 }
 
 func (r *Runtime) setGlobal(name unistring.String, v Value, strict bool) {

@@ -123,6 +123,11 @@ func tryFindFirstCharClass(node *RegexNode, ccIn **CharSet) int {
 		}
 		return 0
 
+	case NtGrapheme:
+		// Every rune can begin a grapheme, so there is no useful candidate
+		// restriction to derive.
+		return 0
+
 	// Zero-width elements.  These don't contribute to the starting set, so return null to indicate a caller
 	// should keep looking past them.
 	case NtEmpty, NtNothing, NtBol, NtEol, NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary,
@@ -532,6 +537,9 @@ func findPrefixesCore(node *RegexNode, res *[]*bytes.Buffer, ignoreCase bool) bo
 		// that comprise the set. For case-insensitive, we need the set to be two ASCII letters that case fold to the same thing.
 		// As with One and loops, set loops are handled the same as sets up to the min iteration limit.
 		case NtSet, NtSetloop, NtSetlazy, NtSetloopatomic:
+			if node.Set == nil || node.Set.IsNegated() {
+				return false
+			}
 
 			setChars := node.Set.GetSetChars(maxPrefixes)
 
@@ -895,10 +903,11 @@ func tryFindRawFixedSets(node *RegexNode, res *[]FixedDistanceSet, distance *int
 							combined[fixedSet.Distance] = v
 						}
 					} else {
+						setCopy := fixedSet.Set.Copy()
 						combined[fixedSet.Distance] = struct {
 							Set   *CharSet
 							Count int
-						}{Set: fixedSet.Set, Count: 1}
+						}{Set: &setCopy, Count: 1}
 					}
 				}
 			}
@@ -1032,50 +1041,6 @@ func sumFrequencies(chars []rune) float32 {
 		}
 	}
 	return sum
-}
-
-func hasHighFrequencyChars(set FixedDistanceSet) bool {
-	if set.Negated {
-		return true
-	}
-
-	// Sets without extracted chars can't be frequency-analyzed.
-	// Single-char sets use IndexOf, which is a strong filter regardless of frequency.
-	if len(set.Chars) <= 1 {
-		return false
-	}
-
-	totalFrequency := sumFrequencies(set.Chars)
-
-	// If the average frequency of the set's chars exceeds this threshold, the
-	// characters are common enough that a multi-string search may be a better filter.
-	const highFrequencyThreshold = 0.6
-	return totalFrequency >= highFrequencyThreshold*float32(len(set.Chars))
-}
-
-func mayContainCaseInsensitiveMatching(node *RegexNode) bool {
-	if node.Options&IgnoreCase != 0 {
-		return true
-	}
-
-	if node.Set != nil {
-		chars := node.Set.GetSetChars(maxPrefixes)
-		for _, ch := range chars {
-			if participatesInCaseConversion(ch) &&
-				slices.Contains(chars, unicode.ToLower(ch)) &&
-				slices.Contains(chars, unicode.ToUpper(ch)) {
-				return true
-			}
-		}
-	}
-
-	for _, child := range node.Children {
-		if mayContainCaseInsensitiveMatching(child) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // Percent occurrences in source text (100 * char count / total count)

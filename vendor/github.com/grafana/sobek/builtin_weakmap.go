@@ -1,6 +1,61 @@
 package sobek
 
-type weakMap uint64
+import (
+	"runtime"
+	"sync"
+	"weak"
+)
+
+type weakMap struct {
+	m map[weak.Pointer[Object]]Value
+	sync.Mutex
+}
+
+func (wm *weakMap) set(key *Object, value Value) {
+	p := weak.Make(key)
+	wm.Lock()
+	_, exists := wm.m[p]
+	wm.m[p] = value
+	wm.Unlock()
+	if !exists {
+		wmPtr := weak.Make(wm) // do not hold strong reference to wm so that it could be collected by GC
+		runtime.AddCleanup(key, func(p weak.Pointer[Object]) {
+			wm := wmPtr.Value()
+			if wm == nil {
+				return
+			}
+			wm.Lock()
+			delete(wm.m, p)
+			wm.Unlock()
+		}, p)
+	}
+}
+
+func (wm *weakMap) get(key *Object) (res Value) {
+	p := weak.Make(key)
+	wm.Lock()
+	res = wm.m[p]
+	wm.Unlock()
+	return
+}
+
+func (wm *weakMap) remove(key *Object) (removed bool) {
+	p := weak.Make(key)
+	wm.Lock()
+	if _, removed = wm.m[p]; removed {
+		delete(wm.m, p)
+	}
+	wm.Unlock()
+	return
+}
+
+func (wm *weakMap) has(key *Object) bool {
+	p := weak.Make(key)
+	wm.Lock()
+	_, exists := wm.m[p]
+	wm.Unlock()
+	return exists
+}
 
 type weakMapObject struct {
 	baseObject
@@ -9,28 +64,9 @@ type weakMapObject struct {
 
 func (wmo *weakMapObject) init() {
 	wmo.baseObject.init()
-	wmo.m = weakMap(wmo.val.runtime.genId())
-}
-
-func (wm weakMap) set(key *Object, value Value) {
-	key.getWeakRefs()[wm] = value
-}
-
-func (wm weakMap) get(key *Object) Value {
-	return key.weakRefs[wm]
-}
-
-func (wm weakMap) remove(key *Object) bool {
-	if _, exists := key.weakRefs[wm]; exists {
-		delete(key.weakRefs, wm)
-		return true
+	wmo.m = weakMap{
+		m: make(map[weak.Pointer[Object]]Value),
 	}
-	return false
-}
-
-func (wm weakMap) has(key *Object) bool {
-	_, exists := key.weakRefs[wm]
-	return exists
 }
 
 func (r *Runtime) weakMapProto_delete(call FunctionCall) Value {

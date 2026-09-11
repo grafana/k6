@@ -9,7 +9,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 
@@ -317,6 +319,66 @@ func TestBrowserRegistry(t *testing.T) {
 		// Verify there are no browsers left
 		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
+
+	// IterEnd must be a no-op for a non-browser iteration that never called
+	// chromium.connectOverCDP: nothing was built (IterStart is skipped), nothing
+	// is tracked in userManaged, and the traces registry was never initialized.
+	// This locks in the `if r.tr != nil` guard and the unconditional
+	// closeUserManaged sweep on IterEnd — without them, IterEnd would panic here.
+	t.Run("iterend_noop_on_bare_non_browser_iter", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			vu              = k6test.NewVU(t)
+			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+		)
+
+		vu.ActivateVU()
+
+		// Unset the browser type option so this represents a non-browser VU.
+		delete(vu.StateField.Options.Scenarios["default"].GetScenarioOptions().Browser, "type")
+
+		vu.StartIteration(t, k6test.WithIteration(0))
+
+		// Nothing built and no traces registry: IterStart is skipped entirely for
+		// a non-browser iter, and connectOverCDP (which would init the registry)
+		// was never called.
+		require.Equal(t, 0, browserRegistry.browserCount())
+		require.Nil(t, browserRegistry.tr, "traces registry must not be initialized for a bare non-browser iter")
+
+		// The regression under test: IterEnd reaches closeUserManaged (nothing
+		// tracked) and the trace guard (r.tr is nil). Neither may panic.
+		require.NotPanics(t, func() {
+			vu.EndIteration(t, k6test.WithIteration(0))
+		})
+
+		require.Equal(t, 0, browserRegistry.browserCount())
+		require.Nil(t, browserRegistry.tr, "traces registry must remain uninitialized after IterEnd")
+	})
+}
+
+func TestStartConnectTraceAttributes(t *testing.T) {
+	t.Parallel()
+
+	rec := k6test.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
+
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+	vu.ActivateVU()
+	vu.StartIteration(t)
+	vu.State().VUID = 42 // non-zero so the test.vu assertion is meaningful
+
+	r := &browserRegistry{
+		vu:          vu,
+		m:           make(map[int64]*common.Browser),
+		userManaged: make(map[int64][]*common.Browser),
+	}
+	r.startConnectTrace(vu.Context(), vu.State().Iteration)
+
+	span, ok := rec.Find("iteration")
+	require.True(t, ok, "expected an 'iteration' root span")
+	require.Equal(t, int64(42), span.AttrInt64(t, "test.vu"))
+	require.Equal(t, "default", span.AttrString(t, "test.scenario"))
 }
 
 func TestParseTracesMetadata(t *testing.T) {

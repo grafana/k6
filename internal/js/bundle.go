@@ -246,7 +246,7 @@ func beautifyOptionsJSONUnmarshalError(data []byte, err error) error {
 	if errors.As(err, &unmarshalTypError) {
 		e := unmarshalTypError
 		previousNewLineIndex := max(bytes.LastIndexByte(data[:e.Offset], '\n'), 0)
-		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), (int)(e.Offset))
+		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), int(e.Offset))
 
 		info := strings.TrimSpace(string(data[previousNewLineIndex:nextNewLineIndex]))
 		err = fmt.Errorf("parsing options from script got error while parsing %q: %w", info, e)
@@ -374,8 +374,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	}
 
 	if err != nil {
-		var exception *sobek.Exception
-		if errors.As(err, &exception) {
+		if exception, ok := errors.AsType[*sobek.Exception](err); ok {
 			err = &scriptExceptionError{inner: exception}
 		}
 		return nil, err
@@ -412,12 +411,11 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.Fi
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
-	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
-	err := rt.Set("__ENV", env)
-	if err != nil {
+	if err := setupEnvObject(rt, b.preInitState.RuntimeOptions.Env, b.preInitState.FeatureFlags); err != nil {
 		return err
 	}
+
+	var err error
 	err = rt.Set("__VU", vuID)
 	if err != nil {
 		return err

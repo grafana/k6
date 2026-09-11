@@ -11,13 +11,23 @@ type RuntimeEngineData struct {
 	CapSize            int                // size of the capture array
 	FindFirstChar      func(*Runner) bool // generated candidate search
 	Execute            func(*Runner) error
-	StringPrefixFilter StringPrefixFilter // optional pre-decode candidate search for string input
+	ExecuteQuick       func(*Runner) error // optional bool-only execution with unobservable captures removed
+	StringPrefixFilter StringPrefixFilter  // optional pre-decode candidate search for string input
+	// LeftContextKnown reports that LeftContextRunes was computed by the
+	// code generator. If it is false, decoded string input is never sliced;
+	// older generated engines omit the field and must keep the full string.
+	LeftContextKnown bool
+	// LeftContextRunes is how many runes before a candidate start matching
+	// may inspect. 0 means none, 1 means a single previous rune, and -1
+	// means do not slice (lookbehind or \G). Ignored unless LeftContextKnown.
+	LeftContextRunes int
 }
 
 type cacheKey struct {
-	pattern              string
-	opt                  RegexOptions
-	maintainCaptureOrder bool
+	pattern                  string
+	opt                      RegexOptions
+	maintainCaptureOrder     bool
+	maxBacktrackingStackSize int
 }
 
 func RegisterEngine(pattern string, engine RuntimeEngineData, options ...CompileOption) {
@@ -28,6 +38,10 @@ func RegisterEngine(pattern string, engine RuntimeEngineData, options ...Compile
 }
 
 func newEngineRegexp(pattern string, c compileConfig, engine RuntimeEngineData) *Regexp {
+	leftContext := -1
+	if engine.LeftContextKnown {
+		leftContext = engine.LeftContextRunes
+	}
 	re := &Regexp{
 		pattern:            pattern,
 		options:            c.regexOptions,
@@ -40,7 +54,9 @@ func newEngineRegexp(pattern string, c compileConfig, engine RuntimeEngineData) 
 		optimizations:      c.optimizations,
 		findFirstChar:      engine.FindFirstChar,
 		execute:            engine.Execute,
+		executeQuick:       engine.ExecuteQuick,
 		stringPrefixFilter: engine.StringPrefixFilter,
+		leftContextRunes:   leftContext,
 	}
 	re.initCaches()
 	return re
@@ -58,9 +74,10 @@ func getEngineRegexp(pattern string, c compileConfig) *Regexp {
 
 func cacheKeyFromConfig(pattern string, c compileConfig) cacheKey {
 	return cacheKey{
-		pattern:              pattern,
-		opt:                  c.regexOptions,
-		maintainCaptureOrder: c.maintainCaptureOrder,
+		pattern:                  pattern,
+		opt:                      c.regexOptions,
+		maintainCaptureOrder:     c.maintainCaptureOrder,
+		maxBacktrackingStackSize: c.optimizations.MaxBacktrackingStackSize,
 	}
 }
 

@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - master
+      - v1.x
     tags:
       - v*
   pull_request:
@@ -45,7 +46,7 @@ jobs:
       is_latest_in_major: ${{ steps.classify_release.outputs.is_latest_in_major }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -154,7 +155,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -220,7 +221,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -236,13 +237,23 @@ jobs:
             -t $DOCKER_IMAGE_ID .
       - name: Check
         run: |
-          docker buildx build --load -t $DOCKER_IMAGE_ID .
+          set -x
+          CHECK_IMAGE_TAG="k6:check"
+          docker buildx build --target with-browser --load -t $CHECK_IMAGE_TAG .
           # Assert that simple cases works for the new built image
-          docker run $DOCKER_IMAGE_ID version
-          docker run $DOCKER_IMAGE_ID --help
-          docker run $DOCKER_IMAGE_ID help
-          docker run $DOCKER_IMAGE_ID run --help
-          docker run $DOCKER_IMAGE_ID inspect --help
+          docker run --rm --pull never $CHECK_IMAGE_TAG version
+          docker run --rm --pull never $CHECK_IMAGE_TAG --help
+          docker run --rm --pull never $CHECK_IMAGE_TAG help
+          docker run --rm --pull never $CHECK_IMAGE_TAG run --help
+          docker run --rm --pull never $CHECK_IMAGE_TAG inspect --help
+
+          # Run a browser script to smoke test the browser image
+          # Using framelocator.js because it does not depend on an external website
+          docker run --rm \
+            --pull never \
+            --env K6_NO_USAGE_REPORT=true \
+            -v "$PWD/examples/browser:/tests:ro" \
+            $CHECK_IMAGE_TAG run -q "/tests/framelocator.js"
       - name: Login to GAR (Docker Hub mirror)
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         uses: grafana/shared-workflows/actions/login-to-gar@c7ad5f57693ac858c698d95783685a9cbfd91223 # login-to-gar/v1.0.1
@@ -434,7 +445,7 @@ jobs:
       VERSION: ${{ needs.configure.outputs.k6_version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Install pandoc
@@ -541,7 +552,7 @@ jobs:
        contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Download binaries
@@ -635,7 +646,7 @@ jobs:
       id-token: write # Required for Vault
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Download binaries

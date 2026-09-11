@@ -152,6 +152,15 @@ func createOutputs(
 			}
 		}
 
+		// An output is an extension by membership in the output registry, not by
+		// its name, so built-in outputs stay out of the "extensions" bucket that
+		// the usage report filters against the catalog.
+		if e, isExt := ext.Get(ext.OutputExtension)[outputType]; isExt {
+			if err := test.preInitState.Usage.Values("extensions", e); err != nil {
+				gs.Logger.WithError(err).Warnf("Couldn't report usage for output extension %q", outputType)
+			}
+		}
+
 		params := baseParams
 		params.OutputType = outputType
 		params.ConfigArgument = outputArg
@@ -178,8 +187,20 @@ func createOutputs(
 			}
 		}
 
+		attachCloudLogDrainer(out, gs)
+
 		result = append(result, out)
 	}
 
 	return result, nil
+}
+
+// attachCloudLogDrainer gives the cloud output the local-execution log pusher
+// so it flushes buffered logs before the run is notified complete. The
+// concrete-nil guard avoids handing the output a typed-nil drainer once it is
+// wrapped in an interface.
+func attachCloudLogDrainer(out output.Output, gs *state.GlobalState) {
+	if co, ok := out.(*cloud.Output); ok && gs.CloudLogPusher != nil {
+		co.SetLogDrainer(gs.CloudLogPusher)
+	}
 }

@@ -82,6 +82,14 @@ func (s asciiString) utf16Runes() []rune {
 	return runes
 }
 
+func (s asciiString) utf16() []uint16 {
+	u := make([]uint16, len(s))
+	for i := 0; i < len(s); i++ {
+		u[i] = uint16(s[i])
+	}
+	return u
+}
+
 // ss must be trimmed
 func stringToInt(ss string) (int64, error) {
 	if ss == "" {
@@ -335,16 +343,11 @@ func (s asciiString) Substring(start, end int) String {
 }
 
 func (s asciiString) CompareTo(other String) int {
-	switch other := other.(type) {
-	case asciiString:
-		return strings.Compare(string(s), string(other))
-	case unicodeString:
-		return strings.Compare(string(s), other.String())
-	case *importedString:
-		return strings.Compare(string(s), other.s)
-	default:
-		panic(newTypeError("Internal bug: unknown string type: %T", other))
+	a, u := devirtualizeString(other)
+	if u != nil {
+		return -u.compareToAscii(s)
 	}
+	return strings.Compare(string(s), string(a))
 }
 
 func (s asciiString) index(substr String, start int) int {

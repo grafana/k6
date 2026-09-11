@@ -21,10 +21,11 @@ type FindOptimizations struct {
 	LeadingPrefixesRunes [][]rune
 	//LeadingStrings    *helpers.StringSearchValues
 
-	FixedDistanceLiteral FixedDistanceLiteral
-	FixedDistanceSets    []FixedDistanceSet
-	LiteralAfterLoop     *LiteralAfterLoop
-	LandmarkChain        *RequiredLandmarkChain
+	FixedDistanceLiteral    FixedDistanceLiteral
+	FixedDistanceSets       []FixedDistanceSet
+	LiteralAfterLoop        *LiteralAfterLoop
+	LandmarkChain           *RequiredLandmarkChain
+	LeadingPrefixFirstRunes []rune
 }
 
 type LiteralAfterLoop struct {
@@ -460,19 +461,23 @@ func newFindOptimizationsForNode(root *RegexNode, opt ParseOptions, isLeadingPar
 
 	// We're now left-to-right only and looking for multiple prefixes and/or sets.
 
-	// If there are multiple leading strings, we can search for any of them.
-	// this works in the interpreter, but we avoid it due to additional cost during construction
-
+	// Multiple leading strings let the finder jump between candidate prefixes.
+	// Case-sensitive prefixes are cheap to collect and help the interpreter.
+	// Case-insensitive prefix explosion is still limited to code generation.
+	if prefixes := findPrefixes(root, false); len(prefixes) > 1 {
+		f.LeadingPrefixes = prefixes
+		f.LeadingPrefixesRunes = toRunePrefixes(prefixes)
+		f.LeadingPrefixFirstRunes = leadingPrefixFirstRunes(f.LeadingPrefixesRunes)
+		f.FindMode = LeadingStrings_LeftToRight
+		return f
+	}
 	if !interpreter {
 		ciPrefixes := findPrefixes(root, true)
 		if len(ciPrefixes) > 1 {
 			f.LeadingPrefixes = ciPrefixes
 			f.LeadingPrefixesRunes = toRunePrefixes(ciPrefixes)
+			f.LeadingPrefixFirstRunes = leadingPrefixFirstRunes(f.LeadingPrefixesRunes)
 			f.FindMode = LeadingStrings_OrdinalIgnoreCase_LeftToRight
-			/*SYSTEM_TEXT_REGULAREXPRESSIONS
-			if usesRfoTryFind {
-						f.LeadingStrings = helpers.NewSearchValues(f.LeadingPrefixes, true)
-			}*/
 			return f
 		}
 	}
@@ -514,19 +519,6 @@ func newFindOptimizationsForNode(root *RegexNode, opt ParseOptions, isLeadingPar
 		// Sort the sets by "quality", such that whatever set is first is the one deemed most efficient to use.
 		// In some searches, we may use multiple sets, so we want the subsequent ones to also be the efficiency runners-up.
 		slices.SortFunc(fixedDistanceSets, compareFixedDistanceSetsByQuality)
-
-		// If the best fixed-distance set is composed of high-frequency characters, IndexOfAny on
-		// those characters is likely to match too many positions. Prefer a case-sensitive
-		// multi-prefix search when one is available.
-		if !interpreter && !mayContainCaseInsensitiveMatching(root) && hasHighFrequencyChars(fixedDistanceSets[0]) {
-			caseSensitivePrefixes := findPrefixes(root, false)
-			if len(caseSensitivePrefixes) > 1 {
-				f.LeadingPrefixes = caseSensitivePrefixes
-				f.LeadingPrefixesRunes = toRunePrefixes(caseSensitivePrefixes)
-				f.FindMode = LeadingStrings_LeftToRight
-				return f
-			}
-		}
 
 		// If there is no literal after the loop, use whatever set we got.
 		// If there is a literal after the loop, consider it to be better than a negated set and better than a set with many characters.
@@ -585,6 +577,16 @@ func toRunePrefixes(prefixes []string) [][]rune {
 		runes[i] = []rune(prefix)
 	}
 	return runes
+}
+
+func leadingPrefixFirstRunes(prefixes [][]rune) []rune {
+	first := make([]rune, 0, len(prefixes))
+	for _, prefix := range prefixes {
+		if len(prefix) > 0 && !slices.Contains(first, prefix[0]) {
+			first = append(first, prefix[0])
+		}
+	}
+	return first
 }
 
 func getFindMode(rtl bool, t NodeType) FindNextStartingPositionMode {

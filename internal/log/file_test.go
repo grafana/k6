@@ -24,6 +24,18 @@ func (nc *nopCloser) Close() error {
 	return nil
 }
 
+type signalWriter struct {
+	wrote chan struct{}
+}
+
+func (sw signalWriter) Write(p []byte) (int, error) {
+	select {
+	case sw.wrote <- struct{}{}:
+	default:
+	}
+	return len(p), nil
+}
+
 func TestFileHookFromConfigLine(t *testing.T) {
 	t.Parallel()
 
@@ -144,4 +156,39 @@ func TestFileHookFire(t *testing.T) {
 	<-nc.closed
 
 	assert.Contains(t, buffer.String(), "example log line")
+}
+
+func TestFileHookPeriodicallyFlushes(t *testing.T) {
+	t.Parallel()
+
+	wrote := make(chan struct{}, 1)
+	nc := &nopCloser{
+		Writer: signalWriter{wrote: wrote},
+		closed: make(chan struct{}),
+	}
+
+	hook := &fileHook{
+		loglines: make(chan []byte, fileHookBufferSize),
+		w:        nc,
+		bw:       bufio.NewWriter(nc),
+		levels:   logrus.AllLevels,
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		<-nc.closed
+	}()
+
+	go hook.Listen(ctx)
+	hook.loglines <- []byte("example log line\n")
+
+	require.Eventually(t, func() bool {
+		select {
+		case <-wrote:
+			return true
+		default:
+			return false
+		}
+	}, 2*fileHookFlushInterval, 10*time.Millisecond)
 }

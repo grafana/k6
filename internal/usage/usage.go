@@ -45,6 +45,30 @@ func (u *Usage) Strings(originalKey, value string) error {
 	return nil
 }
 
+// Values appends the provided value to a slice of values that is the value,
+// like Strings but for arbitrary values, so callers can record structured usage
+// without Usage knowing their types. It also works out level of keys.
+func (u *Usage) Values(originalKey string, value any) error {
+	u.l.Lock()
+	defer u.l.Unlock()
+	m, newKey, err := u.createLevel(originalKey)
+	if err != nil {
+		return err
+	}
+	oldV, ok := m[newKey]
+	if !ok {
+		m[newKey] = []any{value}
+		return nil
+	}
+	switch oldValue := oldV.(type) {
+	case []any:
+		m[newKey] = append(oldValue, value)
+	default:
+		return fmt.Errorf("value of key %s is not []any as expected but %T", originalKey, oldValue)
+	}
+	return nil
+}
+
 // Uint64 adds the provided value to a given key. Creating the key if needed and working out levels of keys
 func (u *Usage) Uint64(originalKey string, value uint64) error {
 	u.l.Lock()

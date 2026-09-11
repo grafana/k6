@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { fail } from 'k6';
 import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
@@ -33,6 +34,8 @@ export default async function() {
         return text == 'Contact us';
       }
     });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

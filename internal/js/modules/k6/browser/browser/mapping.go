@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -19,18 +18,17 @@ import (
 // and customization over our API.
 type mapping = map[string]any
 
-// mapBrowserToSobek maps the browser API to the JS module.
+// mapToSobek maps a browser-module mapping to a Sobek object.
 // The motivation of this mapping was to support $ and $$ wildcard
 // methods.
 // See issue #661 for more details.
-func mapBrowserToSobek(vu moduleVU) *sobek.Object {
+func mapToSobek(vu moduleVU, m mapping) *sobek.Object {
 	var (
 		rt  = vu.Runtime()
 		obj = rt.NewObject()
 	)
-	for k, v := range mapBrowser(vu) {
-		err := obj.Set(k, rt.ToValue(v))
-		if err != nil {
+	for k, v := range m {
+		if err := obj.Set(k, rt.ToValue(v)); err != nil {
 			k6common.Throw(rt, k6ext.BrowserError(fmt.Errorf("mapping: %w", err)))
 		}
 	}
@@ -39,12 +37,21 @@ func mapBrowserToSobek(vu moduleVU) *sobek.Object {
 }
 
 func parseFrameClickOptions(
-	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
 ) (*common.FrameClickOptions, error) {
 	copts := common.NewFrameClickOptions(defaultTimeout)
-	if err := copts.Parse(ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing click options: %w", err)
+	if k6common.IsNullish(opts) {
+		return copts, nil
 	}
+
+	ehcopts, err := parseElementHandleClickOptions(rt, opts, defaultTimeout)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.ElementHandleClickOptions = *ehcopts
+	copts.Strict = parseStrict(rt, opts)
+
 	return copts, nil
 }
 

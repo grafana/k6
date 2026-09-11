@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -102,9 +103,8 @@ LOOP:
 		default:
 			mt, message, err := in.ReadMessage()
 			if err != nil {
-				var cerr *websocket.CloseError
-				if errors.As(err, &cerr) {
-					// If WS conn is closed, just return
+				if isConnShuttingDown(err) {
+					// If either WS conn is closing, just return.
 					return
 				}
 				p.t.Fatalf("error reading message: %v", err)
@@ -112,13 +112,25 @@ LOOP:
 
 			err = out.WriteMessage(mt, message)
 			if err != nil {
-				var cerr *websocket.CloseError
-				if errors.As(err, &cerr) {
-					// If WS conn is closed, just return
+				if isConnShuttingDown(err) {
+					// If either WS conn is closing, just return.
 					return
 				}
 				p.t.Fatalf("error writing message: %v", err)
 			}
 		}
 	}
+}
+
+// isConnShuttingDown reports whether err indicates one of the proxied WS
+// connections is closing, so forwarding should stop cleanly instead of failing
+// the test. This covers the peer sending a close frame (*websocket.CloseError),
+// this side having already sent its own close frame (websocket.ErrCloseSent,
+// e.g. when a client closes its connection while the browser is still emitting
+// unsolicited events), and the underlying socket being closed (net.ErrClosed).
+func isConnShuttingDown(err error) bool {
+	var cerr *websocket.CloseError
+	return errors.As(err, &cerr) ||
+		errors.Is(err, websocket.ErrCloseSent) ||
+		errors.Is(err, net.ErrClosed)
 }

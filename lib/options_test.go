@@ -119,7 +119,7 @@ func TestOptions(t *testing.T) {
 				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
 
 				assert.NotNil(t, opts.TLSCipherSuites)
-				assert.Len(t, *(opts.TLSCipherSuites), 1)
+				assert.Len(t, *opts.TLSCipherSuites, 1)
 				assert.Equal(t, suiteID, (*opts.TLSCipherSuites)[0])
 			})
 		}
@@ -658,6 +658,12 @@ func TestOptionsEnv(t *testing.T) {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
 			"false": null.BoolFrom(false),
+		},
+		{"HandleSummaryTimeout", "K6_HANDLE_SUMMARY_TIMEOUT"}: {
+			"":     types.NullDuration{},
+			"10s":  types.NullDurationFrom(10 * time.Second),
+			"3m":   types.NullDurationFrom(3 * time.Minute),
+			"300s": types.NullDurationFrom(300 * time.Second),
 		},
 		// Thresholds
 		// External

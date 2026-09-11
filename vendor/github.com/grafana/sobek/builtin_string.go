@@ -841,24 +841,88 @@ func (r *Runtime) stringproto_split(call FunctionCall) Value {
 		return r.newArrayValues([]Value{s})
 	}
 
-	separator := separatorValue.String()
+	var valueArray []Value
+	sa, su := devirtualizeString(s)
+	sepa, sepu := devirtualizeString(separatorValue.toString())
+	if su == nil { // ASCII string
+		if sepu == nil {
+			// Both are ASCII
+			splitLimit := limit
+			if limit > 0 {
+				splitLimit = limit + 1
+			}
 
-	str := s.String()
-	splitLimit := limit
-	if limit > 0 {
-		splitLimit = limit + 1
-	}
+			split := strings.SplitN(string(sa), string(sepa), splitLimit)
 
-	// TODO handle invalid UTF-16
-	split := strings.SplitN(str, separator, splitLimit)
-
-	if limit > 0 && len(split) > limit {
-		split = split[:limit]
-	}
-
-	valueArray := make([]Value, len(split))
-	for index, value := range split {
-		valueArray[index] = newStringValue(value)
+			if limit > 0 && len(split) > limit {
+				split = split[:limit]
+			}
+			valueArray = make([]Value, len(split))
+			for index, value := range split {
+				valueArray[index] = asciiString(value)
+			}
+		} else {
+			// Unicode separator will never match an ASCII string
+			return r.newArrayValues([]Value{s})
+		}
+	} else {
+		var ss []uint16
+		if sepu != nil {
+			ss = sepu[1:]
+		} else {
+			ss = sepa.utf16()
+		}
+		su = su[1:]
+		if len(ss) > 0 {
+			idx := utf16Index(su, ss)
+			if idx == -1 {
+				// Shortcut to avoid creating a copy of s
+				return r.newArrayValues([]Value{s})
+			}
+			if limit < 0 {
+				limit = min(math.MaxInt, math.MaxUint32)
+			}
+			for ; limit > 0; limit-- {
+				var sb strings.Builder
+				for i := range idx {
+					if su[i] >= utf8.RuneSelf {
+						chunk := make(unicodeString, idx+1)
+						chunk[0] = unistring.BOM
+						copy(chunk[1:], su[:idx])
+						valueArray = append(valueArray, chunk)
+						goto next
+					}
+				}
+				sb.Grow(idx)
+				for i := range idx {
+					sb.WriteByte((byte)(su[i]))
+				}
+				valueArray = append(valueArray, asciiString(sb.String()))
+			next:
+				if idx == len(su) {
+					break
+				}
+				su = su[idx+len(ss):]
+				idx = utf16Index(su, ss)
+				if idx == -1 {
+					idx = len(su)
+				}
+			}
+		} else {
+			if limit > 0 && len(su) > limit {
+				su = su[:limit]
+			}
+			for len(su) > 0 {
+				c := su[0]
+				if c >= utf8.RuneSelf {
+					chunk := unicodeString{unistring.BOM, c}
+					valueArray = append(valueArray, chunk)
+				} else {
+					valueArray = append(valueArray, asciiString(rune(c)))
+				}
+				su = su[1:]
+			}
+		}
 	}
 
 	return r.newArrayValues(valueArray)

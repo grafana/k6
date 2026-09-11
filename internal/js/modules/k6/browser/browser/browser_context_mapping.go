@@ -56,8 +56,9 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			})
 		},
 		"browser": func() mapping {
-			// the browser is grabbed from VU.
-			return mapBrowser(vu)
+			return mapBrowser(vu, func() (*common.Browser, error) {
+				return bc.Browser(), nil
+			})
 		},
 		"clearCookies": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {

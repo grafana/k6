@@ -820,10 +820,22 @@ func (a *typedArrayObject) setOwnIdx(p valueInt, v Value, throw bool) bool {
 }
 
 func (a *typedArrayObject) setForeignStr(p unistring.String, v, receiver Value, throw bool) (res bool, handled bool) {
+	idx, ok := strToIntNum(p)
+	if ok {
+		if !a.isValidIntegerIndex(idx) {
+			return true, true
+		}
+	} else if idx == 0 {
+		return true, true
+	}
+
 	return a._setForeignStr(p, a.getOwnPropStr(p), v, receiver, throw)
 }
 
 func (a *typedArrayObject) setForeignIdx(p valueInt, v, receiver Value, throw bool) (res bool, handled bool) {
+	if !a.isValidIntegerIndex(toIntClamp(int64(p))) {
+		return true, true
+	}
 	return a._setForeignIdx(p, trueValIfPresent(a.hasOwnPropertyIdx(p)), v, receiver, throw)
 }
 

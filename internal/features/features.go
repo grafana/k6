@@ -43,6 +43,7 @@ func (l Lifecycle) String() string {
 type Flags struct {
 	NativeHistograms bool `lifecycle:"experimental" help:"Use native histograms for trend metrics"`
 	MergeRunTags     bool `lifecycle:"experimental" help:"Merge run tags across config layers instead of replacing"`
+	FreezeEnv        bool `lifecycle:"experimental" help:"Freeze __ENV object to prevent modifications from JS code"`
 	_                noCopy
 	activated        []string
 }
@@ -167,8 +168,7 @@ func parseDefinitions(t reflect.Type) (*definitions, error) {
 		byName: make(map[string]int),
 	}
 
-	for i := range t.NumField() {
-		f := t.Field(i)
+	for f := range t.Fields() {
 		if !f.IsExported() {
 			continue
 		}

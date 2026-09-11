@@ -57,6 +57,7 @@ type RuntimeConfig struct {
 	Metrics      MetricsConfig
 	TestRunToken string
 	Secrets      SecretsConfig
+	Logs         LogsConfig
 }
 
 // MetricsConfig holds the metrics push configuration from the
@@ -76,6 +77,18 @@ type MetricsConfig struct {
 type SecretsConfig struct {
 	Endpoint     string
 	ResponsePath string
+}
+
+// LogsConfig holds the log-push configuration from the provisioning
+// API's runtime_config.logs object. tail_url is intentionally omitted:
+// --local-execution pushes logs, it doesn't tail them.
+type LogsConfig struct {
+	PushURL           string
+	Level             string
+	Limit             int32
+	PushPeriodSeconds string
+	MessageMaxSize    int32
+	AllowedLabels     []string
 }
 
 // UploadArchive PUTs pre-serialised archive bytes to the given
@@ -115,13 +128,12 @@ func (c *Client) UploadArchive(ctx context.Context, uploadURL string, body []byt
 // backend status becomes "initializing" (signalling that k6 can begin
 // local execution). Returns an error if the test run reaches "aborted"
 // or "completed" first. Cancellable via context. Logs status transitions
-// at Info level once per change.
+// at Debug level once per change.
 //
 // If pollInterval is <= 0 the defaultWaitPollInterval is used.
 func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int64, pollInterval time.Duration) error {
 	if pollInterval <= 0 {
 		pollInterval = defaultWaitPollInterval
-		c.logger.WithField("interval", pollInterval).Info("using default poll interval")
 	}
 
 	var lastStatus string
@@ -157,7 +169,7 @@ func (c *Client) WaitForTestRunReady(ctx context.Context, testRunID int64, pollI
 		default:
 			// created, queued, or any unrecognised state — keep polling.
 			if status != lastStatus {
-				c.logger.WithField("status", progress.FormatStatus()).Info("test status")
+				c.logger.WithField("status", progress.FormatStatus()).Debug("test status")
 				lastStatus = status
 			}
 		}
@@ -241,6 +253,7 @@ func mapStartLocalExecutionResponse(res *k6cloud.StartLocalExecutionTestResponse
 	rc := res.GetRuntimeConfig()
 	m := rc.GetMetrics()
 	s := rc.GetSecrets()
+	l := rc.GetLogs()
 
 	resp := &StartLocalExecutionResponse{
 		TestRunID:             res.GetTestRunId(),
@@ -259,6 +272,14 @@ func mapStartLocalExecutionResponse(res *k6cloud.StartLocalExecutionTestResponse
 			Secrets: SecretsConfig{
 				Endpoint:     s.GetEndpoint(),
 				ResponsePath: s.GetResponsePath(),
+			},
+			Logs: LogsConfig{
+				PushURL:           l.GetPushUrl(),
+				Level:             l.GetLevel(),
+				Limit:             l.GetLimit(),
+				PushPeriodSeconds: l.GetPushPeriodSeconds(),
+				MessageMaxSize:    l.GetMessageMaxSize(),
+				AllowedLabels:     l.GetAllowedLabels(),
 			},
 		},
 	}

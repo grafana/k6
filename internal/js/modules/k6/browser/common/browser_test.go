@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/stretchr/testify/require"
@@ -187,6 +188,102 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		require.Nil(t, page)
 	})
+}
+
+func TestConnectionOnAttachedToTarget(t *testing.T) {
+	t.Parallel()
+
+	const (
+		ownContextID     cdp.BrowserContextID = "own"
+		foreignContextID cdp.BrowserContextID = "foreign"
+	)
+
+	newTestBrowser := func(t *testing.T, withOwnContext bool) *Browser {
+		t.Helper()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		t.Cleanup(cancel)
+		b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+
+		var err error
+		b.defaultContext, err = NewBrowserContext(k6ext.WithVU(ctx, k6test.NewVU(t)), b, "", nil, nil)
+		require.NoError(t, err)
+		if withOwnContext {
+			b.context, err = NewBrowserContext(k6ext.WithVU(ctx, k6test.NewVU(t)), b, ownContextID, nil, nil)
+			require.NoError(t, err)
+		}
+
+		return b
+	}
+
+	tests := []struct {
+		name            string
+		withOwnContext  bool
+		targetContextID cdp.BrowserContextID
+		want            bool
+	}{
+		{"own_context_target", true, ownContextID, true},
+		{"foreign_target", true, foreignContextID, false},
+		{"foreign_target_without_own_context", false, foreignContextID, false},
+		{"default_context_target", false, "", true},
+		{"default_context_target_with_own_context", true, "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			b := newTestBrowser(t, tt.withOwnContext)
+			ev := &target.EventAttachedToTarget{
+				TargetInfo: &target.Info{BrowserContextID: tt.targetContextID},
+			}
+			require.Equal(t, tt.want, b.connectionOnAttachedToTarget(ev))
+		})
+	}
+}
+
+// TestBrowserRejectedTarget ensures a target the connection accepts but the
+// browser rejects (isAttachedPageValid) is resumed and then detached from,
+// like the connection-level rejection in TestConnectionRejectedTarget.
+func TestBrowserRejectedTarget(t *testing.T) {
+	t.Parallel()
+
+	const rejectedSessionID = target.SessionID("session_id_0123456789")
+
+	wsURL, received := newAttachedToTargetServer(t,
+		attachedToTargetEvent(rejectedSessionID, "service_worker", ""),
+		300*time.Millisecond)
+
+	vuCtx, vuCancel := context.WithCancel(context.Background())
+	t.Cleanup(vuCancel)
+	b := newBrowser(context.Background(), vuCtx, vuCancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	var err error
+	b.defaultContext, err = NewBrowserContext(k6ext.WithVU(vuCtx, k6test.NewVU(t)), b, "", nil, nil)
+	require.NoError(t, err)
+
+	conn, err := NewConnection(
+		b.browserCtx, wsURL, log.NewNullLogger(), b.connectionOnAttachedToTarget,
+	)
+	require.NoError(t, err)
+	t.Cleanup(conn.Close)
+	b.conn = conn
+
+	evCh := make(chan Event)
+	conn.on(b.browserCtx, []string{cdproto.EventTargetAttachedToTarget}, evCh)
+
+	action := target.SetDiscoverTargets(true)
+	require.NoError(t, action.Do(cdp.WithExecutor(b.browserCtx, conn)))
+
+	select {
+	case event := <-evCh:
+		ev, ok := event.data.(*target.EventAttachedToTarget)
+		require.True(t, ok)
+		require.NoError(t, b.onAttachedToTarget(ev))
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for the attached target event")
+	}
+
+	requireResumeThenDetach(t, received, rejectedSessionID)
 }
 
 type fakeConn struct {

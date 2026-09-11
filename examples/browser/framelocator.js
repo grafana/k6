@@ -1,5 +1,6 @@
 import { browser } from 'k6/browser';
 import { check } from 'k6';
+import exec from 'k6/execution';
 
 export const options = {
   scenarios: {
@@ -18,9 +19,11 @@ export const options = {
 }
 
 export default async function () {
-  const page = await browser.newPage();
+  let page;
 
   try {
+    page = await browser.newPage();
+
     // create a page with an iframe
     await page.setContent(`
       <html>
@@ -65,7 +68,16 @@ export default async function () {
       'found heading inside iframe': (text) => text === 'Inside iframe',
     });
 
+  } catch (error) {
+    // This script is run as a smoke test in the build workflow to verify the
+    // browser Docker image. exec.test.fail() is used here (instead of fail())
+    // to produce a non-zero exit code on exception, failing that CI check.
+    // error.message is empty for rejected promises, so fall back to error.toString()
+    const message = error.message || error.toString();
+    exec.test.fail(`Browser iteration failed: ${message}`);
   } finally {
-    await page.close();
+    if (page) {
+      await page.close();
+    }
   }
 }

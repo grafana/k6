@@ -128,6 +128,8 @@ const (
 	NtSetloopatomic NodeType = 45
 	// Updates the bumpalong position to the current position.
 	NtUpdateBumpalong NodeType = 46
+	// Matches one Unicode extended grapheme cluster (\X).
+	NtGrapheme NodeType = 47
 )
 
 func newRegexNode(t NodeType, opt RegexOptions) *RegexNode {
@@ -693,8 +695,115 @@ func (n *RegexNode) reduceAtomic() *RegexNode {
 	// For everything else, try to reduce ending backtracking of the last contained expression.
 	default:
 		child.eliminateEndingBacktracking()
+		if child.T == NtAlternate && child.hasDisjointStartingSets() && child.hasOnlyIntrinsicallyAtomicBranches() {
+			return child
+		}
 		return atomic
 	}
+}
+
+// hasDisjointStartingSets reports whether every branch is non-nullable and
+// begins with a character set that cannot overlap any other branch. In that
+// case, once one branch has matched, no sibling branch could match the same
+// starting position.
+func (n *RegexNode) hasDisjointStartingSets() bool {
+	_, ok := n.disjointStartingSets()
+	return ok
+}
+
+// disjointStartingSets returns the non-nullable first-character set for each
+// branch when all of those sets are pairwise disjoint.
+func (n *RegexNode) disjointStartingSets() ([]*CharSet, bool) {
+	sets := make([]*CharSet, 0, len(n.Children))
+	for _, branch := range n.Children {
+		var set *CharSet
+		if tryFindFirstCharClass(branch, &set) != 1 || set == nil {
+			return nil, false
+		}
+		for _, previous := range sets {
+			if set.MayOverlap(previous) {
+				return nil, false
+			}
+		}
+		sets = append(sets, set)
+	}
+	return sets, true
+}
+
+// disjointAtomicBranchSets returns the first-character sets when an
+// alternation can select a branch without leaving a backtracking choice.
+func (n *RegexNode) disjointAtomicBranchSets() ([]*CharSet, bool) {
+	if n.T != NtAlternate || !n.hasOnlyIntrinsicallyAtomicBranches() {
+		return nil, false
+	}
+	return n.disjointStartingSets()
+}
+
+// dispatchCandidates returns disjoint branch sets and the leading nodes that
+// can be folded into a consuming Dispatch instruction.
+func (n *RegexNode) dispatchCandidates() ([]*CharSet, []*RegexNode, []bool, bool) {
+	if len(n.Children) >= 1<<16 {
+		return nil, nil, nil, false
+	}
+	sets, ok := n.disjointAtomicBranchSets()
+	if !ok {
+		return nil, nil, nil, false
+	}
+
+	leaders := make([]*RegexNode, len(n.Children))
+	complete := make([]bool, len(n.Children))
+	for i := range leaders {
+		branch := n.Children[i]
+		leader := branch
+		if leader.T == NtConcatenate && len(leader.Children) > 0 {
+			leader = leader.Children[0]
+		}
+		switch leader.T {
+		case NtOne, NtNotone, NtSet, NtMulti:
+			leaders[i] = leader
+		default:
+			return nil, nil, nil, false
+		}
+		complete[i] = leader == branch && (leader.T != NtMulti || len(leader.Str) == 1)
+	}
+	return sets, leaders, complete, true
+}
+
+func (n *RegexNode) hasOnlyIntrinsicallyAtomicBranches() bool {
+	for _, branch := range n.Children {
+		if !branch.isIntrinsicallyAtomic() {
+			return false
+		}
+	}
+	return true
+}
+
+// isIntrinsicallyAtomic reports whether a successful match of this node has no
+// alternative input-consuming path to explore if something later fails.
+func (n *RegexNode) isIntrinsicallyAtomic() bool {
+	switch n.T {
+	case NtOne, NtNotone, NtSet, NtMulti, NtRef, NtGrapheme,
+		NtBol, NtEol, NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary,
+		NtBeginning, NtStart, NtEndZ, NtEnd, NtNothing, NtEmpty, NtUpdateBumpalong,
+		NtOneloopatomic, NtNotoneloopatomic, NtSetloopatomic,
+		NtPosLook, NtNegLook, NtAtomic:
+		return true
+
+	case NtOneloop, NtNotoneloop, NtSetloop, NtOnelazy, NtNotonelazy, NtSetlazy:
+		return n.M == n.N
+
+	case NtCapture, NtGroup:
+		return len(n.Children) == 1 && n.Children[0].isIntrinsicallyAtomic()
+
+	case NtConcatenate:
+		for _, child := range n.Children {
+			if !child.isIntrinsicallyAtomic() {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (n *RegexNode) makeLoopAtomic() {
@@ -1680,6 +1789,12 @@ func (n *RegexNode) reduceConcatenationWithAdjacentStrings() {
 // Nested repeaters just get multiplied with each other if they're not
 // too lumpy
 func (n *RegexNode) reduceRep() *RegexNode {
+	// Repeating a literal empty expression has no observable effect. In addition to
+	// being unnecessary, retaining the loop would require one backtracking frame per
+	// mandatory iteration even though no input is consumed.
+	if len(n.Children) == 1 && n.Children[0].T == NtEmpty {
+		return n.Children[0]
+	}
 
 	u := n
 	t := n.T
@@ -1865,7 +1980,7 @@ func (n *RegexNode) makeQuantifier(lazy bool, min, max int) *RegexNode {
 // If the result is 0, there is no minimum we can enforce.
 func (n *RegexNode) ComputeMinLength() int {
 	switch n.T {
-	case NtOne, NtNotone, NtSet:
+	case NtOne, NtNotone, NtSet, NtGrapheme:
 		// single char
 		return 1
 	case NtMulti:
@@ -1937,6 +2052,8 @@ func (n *RegexNode) computeMaxLength() int {
 	switch n.T {
 	case NtOne, NtNotone, NtSet:
 		return 1
+	case NtGrapheme:
+		return -1
 	case NtMulti:
 		return len(n.Str)
 	case NtNotonelazy, NtNotoneloop, NtNotoneloopatomic,
@@ -2049,6 +2166,7 @@ var typeStr = []string{
 	"ECMABoundary", "NonECMABoundary",
 	"OneloopAtomic", "NotoneloopAtomic", "SetloopAtomic",
 	"UpdateBumpalong",
+	"Grapheme",
 }
 
 func (n *RegexNode) Description() string {

@@ -19,7 +19,6 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/v2/errext"
@@ -58,6 +57,9 @@ type Runner struct {
 	ActualResolver netext.MultiResolver
 	RPSLimit       *rate.Limiter
 	RunTags        *metrics.TagSet
+
+	// aiaFetcher owns the AIA cache + HTTP client when tlsAIAFetch is enabled.
+	aiaFetcher *netext.AIAFetcher
 
 	console    *console
 	setupData  []byte
@@ -195,6 +197,9 @@ func (r *Runner) newVU(
 		})
 		tlsConfig.NameToCertificate = nameToCert //nolint:staticcheck
 	}
+	if r.Bundle.Options.TLSAIAFetch.Bool {
+		tlsConfig = r.aiaFetcher.Wrap(tlsConfig, r.preInitState.Logger) //nolint:contextcheck
+	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		TLSClientConfig:     tlsConfig,
@@ -206,9 +211,11 @@ func (r *Runner) newVU(
 	}
 
 	if r.forceHTTP1() {
-		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
+		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper)
 	} else {
-		_ = http2.ConfigureTransport(transport) // send over h2 protocol
+		// net/http negotiates HTTP/2 over a Transport with a custom DialContext or
+		// TLSClientConfig only when ForceAttemptHTTP2 is set (see Go issue #14275).
+		transport.ForceAttemptHTTP2 = true
 	}
 
 	cookieJar, err := cookiejar.New(nil)
@@ -396,6 +403,10 @@ func (r *Runner) HandleSummary(
 		return nil, err
 	}
 
+	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, nil, nil); deadlineError != nil {
+		return nil, deadlineError
+	}
+
 	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", summaryCode, 1)
 	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
 	if err != nil {
@@ -574,6 +585,17 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		return err
 	}
 
+	// Rebuild the AIA fetcher against the new options — Blacklist / BlockedHostnames /
+	// Hosts / Resolver may have changed and the fetcher's dialer captures them.
+	runnerDialer := &netext.Dialer{
+		Dialer:           r.BaseDialer,
+		Resolver:         r.Resolver,
+		Blacklist:        opts.BlacklistIPs,
+		BlockedHostnames: opts.BlockedHostnames.Trie,
+		Hosts:            opts.Hosts.Trie,
+	}
+	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
+
 	// FIXME: add tests
 	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)
 
@@ -692,7 +714,7 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 	case consts.TeardownFn:
 		return r.Bundle.Options.TeardownTimeout.TimeDuration()
 	case consts.HandleSummaryFn:
-		return 2 * time.Minute // TODO: make configurable
+		return r.Bundle.Options.HandleSummaryTimeout.TimeDuration()
 	}
 	return d
 }
@@ -752,12 +774,14 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		params.Exec = consts.DefaultFn
 	}
 
-	// Override the preset global env with any custom env vars
+	// Override the preset global env with any custom env vars.
+	// __ENV is frozen when the freeze-env feature flag is active.
 	env := make(map[string]string, len(u.env)+len(params.Env))
 	maps.Copy(env, u.env)
 	maps.Copy(env, params.Env)
-	//nolint:errcheck,gosec // see https://github.com/grafana/k6/issues/1722#issuecomment-1761173634
-	u.Runtime.Set("__ENV", env)
+	if err := setupEnvObject(u.Runtime, env, u.Runner.preInitState.FeatureFlags); err != nil {
+		panic(err) // should not happen with string values
+	}
 
 	opts := u.Runner.Bundle.Options
 
@@ -870,8 +894,7 @@ func (u *ActiveVU) RunOnce() error {
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
 	if err != nil {
-		var x *sobek.InterruptedError
-		if errors.As(err, &x) {
+		if x, ok := errors.AsType[*sobek.InterruptedError](err); ok {
 			if v, ok := x.Value().(*errext.InterruptError); ok {
 				v.Reason = x.Error()
 				err = v
@@ -952,8 +975,7 @@ func (u *VU) runFn(
 		u.moduleVUImpl.eventLoop.WaitOnRegistered()
 	}
 	endTime := time.Now()
-	var exception *sobek.Exception
-	if errors.As(err, &exception) {
+	if exception, ok := errors.AsType[*sobek.Exception](err); ok {
 		err = &scriptExceptionError{inner: exception}
 	}
 
