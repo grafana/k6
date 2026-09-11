@@ -57,6 +57,8 @@ type testBrowser struct {
 	samples chan k6metrics.SampleContainer
 	// skipClose is set by the withSkipClose option.
 	skipClose bool
+	// skipLaunch is set by the withSkipLaunch option.
+	skipLaunch bool
 }
 
 // newTestBrowser configures and launches a new chrome browser.
@@ -70,6 +72,10 @@ type testBrowser struct {
 //   - withLogCache: enables the log cache.
 //   - withSamples: provides a channel to receive the browser metrics.
 //   - withSkipClose: skips closing the browser when the test finishes.
+//   - withSkipLaunch: skips launching the Go-level browser. Use this when the
+//     test only needs the VU + HTTP server and will build a managed browser via
+//     StartIteration (e.g. scripts that call browser.newContext()). Launching
+//     both browsers doubles Chromium processes and contributes to CI flakiness.
 func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tb.Helper()
 
@@ -81,6 +87,13 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.vu.ActivateVU()
 	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbr.applyOptions(opts...)           // apply post-init stage options.
+
+	if tbr.skipLaunch {
+		// Keep a usable context for helpers that call testBrowser.context()
+		// even when no Go-level browser is launched.
+		tbr.ctx = tbr.vu.Context()
+		return tbr
+	}
 
 	b, pid, err := tbr.browserType.Launch(context.Background(), tbr.vu.Context())
 	if err != nil {
@@ -301,6 +314,18 @@ func withSamples(sc chan k6metrics.SampleContainer) func(*testBrowser) {
 //	b := TestBrowser(t, withSkipClose())
 func withSkipClose() func(*testBrowser) {
 	return func(tb *testBrowser) { tb.skipClose = true }
+}
+
+// withSkipLaunch skips launching the Go-level Chromium process in
+// newTestBrowser. Use when the test drives the browser only through the JS
+// module (browser.newContext / newPage) after StartIteration, and only needs
+// the VU + optional HTTP test server from newTestBrowser.
+//
+// example:
+//
+//	b := newTestBrowser(t, withHTTPServer(), withSkipLaunch())
+func withSkipLaunch() func(*testBrowser) {
+	return func(tb *testBrowser) { tb.skipLaunch = true }
 }
 
 // GotoNewPage is a wrapper around testBrowser.NewPage and Page.Goto that fails
