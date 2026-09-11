@@ -4,9 +4,12 @@ import (
 	"context"
 	"io/fs"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"sort"
 	"testing"
+	"time"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
@@ -382,4 +385,80 @@ func TestParseArgs(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestResolveCDPWSEndpoint pins the connectOverCDP endpoint resolution: ws/wss
+// endpoints pass through unchanged, while an http(s) endpoint is resolved to the
+// browser-level WebSocket URL via /json/version (mirroring Playwright).
+func TestResolveCDPWSEndpoint(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ws passthrough", func(t *testing.T) {
+		t.Parallel()
+		got, err := resolveCDPWSEndpoint(context.Background(), "ws://localhost:9222/devtools/browser/abc", 0)
+		require.NoError(t, err)
+		assert.Equal(t, "ws://localhost:9222/devtools/browser/abc", got)
+	})
+
+	t.Run("wss passthrough", func(t *testing.T) {
+		t.Parallel()
+		got, err := resolveCDPWSEndpoint(context.Background(), "wss://example.com/x", 0)
+		require.NoError(t, err)
+		assert.Equal(t, "wss://example.com/x", got)
+	})
+
+	t.Run("http resolves via /json/version", func(t *testing.T) {
+		t.Parallel()
+		const wsURL = "ws://127.0.0.1:9222/devtools/browser/2f3a"
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/json/version", r.URL.Path)
+			_, _ = w.Write([]byte(`{"webSocketDebuggerUrl":"` + wsURL + `"}`))
+		}))
+		defer srv.Close()
+
+		got, err := resolveCDPWSEndpoint(context.Background(), srv.URL, time.Second)
+		require.NoError(t, err)
+		assert.Equal(t, wsURL, got)
+	})
+
+	t.Run("http with base path", func(t *testing.T) {
+		t.Parallel()
+		const wsURL = "ws://127.0.0.1:9222/devtools/browser/base"
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, "/cdp/json/version", r.URL.Path)
+			_, _ = w.Write([]byte(`{"webSocketDebuggerUrl":"` + wsURL + `"}`))
+		}))
+		defer srv.Close()
+
+		got, err := resolveCDPWSEndpoint(context.Background(), srv.URL+"/cdp", time.Second)
+		require.NoError(t, err)
+		assert.Equal(t, wsURL, got)
+	})
+
+	t.Run("errors", func(t *testing.T) {
+		t.Parallel()
+
+		srvEmpty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{}`))
+		}))
+		defer srvEmpty.Close()
+
+		srvBadStatus := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer srvBadStatus.Close()
+
+		cases := map[string]string{
+			"empty":              "",
+			"blank":              "   ",
+			"unsupported scheme": "ftp://localhost:9222",
+			"missing scheme":     "localhost:9222",
+			"no ws url in json":  srvEmpty.URL,
+			"bad status":         srvBadStatus.URL,
+		}
+		for name, endpoint := range cases {
+			_, err := resolveCDPWSEndpoint(context.Background(), endpoint, time.Second)
+			require.Errorf(t, err, "endpoint %q (%s) should be rejected", endpoint, name)
+		}
+	})
 }

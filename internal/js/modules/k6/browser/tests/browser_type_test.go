@@ -41,7 +41,7 @@ func TestBrowserTypeConnectOverCDP(t *testing.T) {
 	bt := chromium.NewBrowserType(vu)
 	vu.ActivateVU()
 
-	b, err := bt.ConnectOverCDP(context.Background(), tb.wsURL)
+	b, err := bt.ConnectOverCDP(context.Background(), tb.wsURL, chromium.ConnectOverCDPOptions{})
 	require.NoError(t, err)
 	t.Cleanup(b.Close)
 
@@ -59,12 +59,12 @@ func TestBrowserTypeConnectOverCDPValidation(t *testing.T) {
 	vu.ActivateVU()
 
 	for _, wsEndpoint := range []string{
-		"",                      // empty (e.g. an undefined value or failed lookup)
-		"   ",                   // blank
-		"http://localhost:9222", // wrong scheme
-		"localhost:9222",        // missing ws/wss scheme
+		"",                     // empty (e.g. an undefined value or failed lookup)
+		"   ",                  // blank
+		"ftp://localhost:9222", // unsupported scheme
+		"localhost:9222",       // missing scheme
 	} {
-		_, err := bt.ConnectOverCDP(context.Background(), wsEndpoint)
+		_, err := bt.ConnectOverCDP(context.Background(), wsEndpoint, chromium.ConnectOverCDPOptions{})
 		require.Errorf(t, err, "endpoint %q should be rejected", wsEndpoint)
 	}
 }
@@ -80,7 +80,7 @@ func TestChromiumConnectOverCDPAppliesBrowserTimeout(t *testing.T) {
 	bt := chromium.NewBrowserType(vu)
 	vu.ActivateVU()
 
-	b, err := bt.ConnectOverCDP(context.Background(), tb.wsURL)
+	b, err := bt.ConnectOverCDP(context.Background(), tb.wsURL, chromium.ConnectOverCDPOptions{})
 	require.NoError(t, err)
 	t.Cleanup(b.Close)
 
