@@ -34,7 +34,7 @@ type TagSet atlas.Node
 // If a tag with the specified name already exists in the set, it will be
 // overwritten with the new value in the returned set.
 func (ts *TagSet) With(name, value string) *TagSet {
-	return (*TagSet)(((*atlas.Node)(ts)).AddLink(name, value))
+	return (*TagSet)((*atlas.Node)(ts).AddLink(name, value))
 }
 
 // Without returns another TagSet object that contains all of the tags from the
@@ -47,29 +47,29 @@ func (ts *TagSet) With(name, value string) *TagSet {
 // If a tag with the specified name doesn't exist in the set, it will return the
 // receiver.
 func (ts *TagSet) Without(name string) *TagSet {
-	return (*TagSet)(((*atlas.Node)(ts)).DeleteKey(name))
+	return (*TagSet)((*atlas.Node)(ts).DeleteKey(name))
 }
 
 // Get returns the value of the tag with the given name and true, if that tag
 // exists in the set, and an empty string and false otherwise.
 func (ts *TagSet) Get(name string) (string, bool) {
-	return ((*atlas.Node)(ts)).ValueByKey(name)
+	return (*atlas.Node)(ts).ValueByKey(name)
 }
 
 // Contains checks that each key=value tag pair in the provided TagSet exists in
 // the receiver tag set as well, i.e. that the given set is a sub-set of it.
 func (ts *TagSet) Contains(other *TagSet) bool {
-	return ((*atlas.Node)(ts)).Contains((*atlas.Node)(other))
+	return (*atlas.Node)(ts).Contains((*atlas.Node)(other))
 }
 
 // IsEmpty checks if the tag set is empty, i.e. if it's the root atlas node.
 func (ts *TagSet) IsEmpty() bool {
-	return ((*atlas.Node)(ts)).IsRoot()
+	return (*atlas.Node)(ts).IsRoot()
 }
 
 // Map returns a {key: value} string map with all of the tags in the set.
 func (ts *TagSet) Map() map[string]string {
-	return ((*atlas.Node)(ts)).Path()
+	return (*atlas.Node)(ts).Path()
 }
 
 // WithTagsFromMap sorts the given tags by their keys and adds them to the

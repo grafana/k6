@@ -168,8 +168,7 @@ func parseDefinitions(t reflect.Type) (*definitions, error) {
 		byName: make(map[string]int),
 	}
 
-	for i := range t.NumField() {
-		f := t.Field(i)
+	for f := range t.Fields() {
 		if !f.IsExported() {
 			continue
 		}

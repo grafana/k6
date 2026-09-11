@@ -37,10 +37,10 @@ func (t digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	respBody, err := io.ReadAll(noAuthResponse.Body)
+	_ = noAuthResponse.Body.Close()
 	if err != nil {
 		return nil, err
 	}
-	_ = noAuthResponse.Body.Close()
 
 	// Calculate the Authorization header
 	// TODO: determine if we actually need the body, since I'm not sure that's

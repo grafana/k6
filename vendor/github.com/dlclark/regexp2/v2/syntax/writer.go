@@ -20,7 +20,16 @@ func Write(tree *RegexTree) (*Code, error) {
 		if err != nil {
 			return nil, err
 		}
+		if !dispatchTablesEqual(code.Dispatches, quickCode.Dispatches) {
+			return nil, fmt.Errorf("full and quick dispatch tables differ")
+		}
+		for i := range quickCode.Dispatches {
+			quickCode.Dispatches[i].Sets = code.Dispatches[i].Sets
+			quickCode.Dispatches[i].ASCII = code.Dispatches[i].ASCII
+			quickCode.Dispatches[i].ASCIIMasks = code.Dispatches[i].ASCIIMasks
+		}
 		code.QuickCodes = quickCode.Codes
+		code.QuickDispatches = quickCode.Dispatches
 	}
 	return code, nil
 }
@@ -31,6 +40,10 @@ func newWriter(quickCaptureSlots []bool) writer {
 		emitted:           make([]int, 2),
 		stringhash:        make(map[string]int),
 		sethash:           make(map[string]int),
+		preconsumed:       make(map[*RegexNode]bool),
+		dispatchInfo:      make(map[*RegexNode]dispatchInfo),
+		dispatchCodes:     make(map[*RegexNode]int),
+		dispatchGotos:     make(map[*RegexNode][]int),
 		quickCaptureSlots: quickCaptureSlots,
 	}
 }
@@ -44,11 +57,40 @@ type writer struct {
 	stringtable       [][]rune
 	sethash           map[string]int
 	settable          []*CharSet
+	dispatchtable     []DispatchTable
+	preconsumed       map[*RegexNode]bool
+	dispatchInfo      map[*RegexNode]dispatchInfo
+	dispatchCodes     map[*RegexNode]int
+	dispatchGotos     map[*RegexNode][]int
 	counting          bool
 	count             int
 	trackcount        int
 	caps              map[int]int
 	quickCaptureSlots []bool
+}
+
+type dispatchInfo struct {
+	sets     []*CharSet
+	leaders  []*RegexNode
+	complete []bool
+	ok       bool
+}
+
+func dispatchTablesEqual(left, right []DispatchTable) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for i := range left {
+		if !slices.Equal(left[i].Sets, right[i].Sets) ||
+			!slices.Equal(left[i].ASCIIMasks, right[i].ASCIIMasks) ||
+			(left[i].ASCII == nil) != (right[i].ASCII == nil) {
+			return false
+		}
+		if left[i].ASCII != nil && *left[i].ASCII != *right[i].ASCII {
+			return false
+		}
+	}
+	return true
 }
 
 const (
@@ -91,6 +133,8 @@ func (w *writer) codeFromTree(tree *RegexTree) (*Code, error) {
 	for {
 		if !w.counting {
 			w.emitted = make([]int, w.count)
+			w.dispatchCodes = make(map[*RegexNode]int)
+			w.dispatchGotos = make(map[*RegexNode][]int)
 		}
 
 		curNode = tree.Root
@@ -138,7 +182,7 @@ func (w *writer) codeFromTree(tree *RegexTree) (*Code, error) {
 		w.counting = false
 	}
 	if w.quickCaptureSlots != nil {
-		return &Code{Codes: w.emitted, TrackCount: w.trackcount}, nil
+		return &Code{Codes: w.emitted, Dispatches: w.dispatchtable, TrackCount: w.trackcount}, nil
 	}
 
 	fcPrefix := getFirstCharsPrefix(tree)
@@ -161,6 +205,7 @@ func (w *writer) codeFromTree(tree *RegexTree) (*Code, error) {
 		Codes:             w.emitted,
 		Strings:           w.stringtable,
 		Sets:              w.settable,
+		Dispatches:        w.dispatchtable,
 		TrackCount:        w.trackcount,
 		Caps:              w.caps,
 		Capsize:           capsize,
@@ -170,7 +215,45 @@ func (w *writer) codeFromTree(tree *RegexTree) (*Code, error) {
 		Anchors:           getAnchors(tree),
 		RightToLeft:       rtl,
 		FindOptimizations: tree.FindOptimizations,
+		LeftContextRunes:  AnalyzeLeftContext(tree.Root),
 	}, nil
+}
+
+// AnalyzeLeftContext returns how many runes before a candidate start the matcher
+// may inspect. Slicing the input down to that candidate is legal only when no
+// opcode depends on the original search origin or unbounded left text.
+//
+//	 0  never looks left of the start position
+//	 1  one previous rune is enough for \b, or to keep ^/\A from seeing
+//	    the candidate as the original start (they test leftchars()==0)
+//	-1  do not slice: lookbehind, or \G (NtStart), which keys off textstart
+func AnalyzeLeftContext(n *RegexNode) int {
+	if n == nil {
+		return 0
+	}
+
+	need := 0
+	switch n.T {
+	case NtPosLook, NtNegLook:
+		if n.Options&RightToLeft != 0 {
+			return -1
+		}
+	case NtStart:
+		return -1
+	case NtBol, NtBeginning, NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary:
+		need = 1
+	}
+
+	for _, child := range n.Children {
+		childNeed := AnalyzeLeftContext(child)
+		if childNeed < 0 {
+			return -1
+		}
+		if childNeed > need {
+			need = childNeed
+		}
+	}
+	return need
 }
 
 // The main RegexCode generator. It does a depth-first walk
@@ -192,13 +275,37 @@ func (w *writer) emitFragment(nodetype NodeType, node *RegexNode, curIndex int) 
 	case NtConcatenate | BeforeChild, NtConcatenate | AfterChild, NtEmpty:
 
 	case NtAlternate | BeforeChild:
-		if curIndex < len(node.Children)-1 {
+		if sets, leaders, _, ok := w.getDispatchCandidates(node); ok {
+			if curIndex == 0 {
+				w.dispatchCodes[node] = w.dispatchCode(sets)
+				w.emit1(Dispatch|bits, w.dispatchCodes[node])
+			}
+			w.preconsumed[leaders[curIndex]] = true
+			w.patchDispatchBranch(node, curIndex, w.curPos())
+		} else if curIndex < len(node.Children)-1 {
 			w.pushInt(w.curPos())
 			w.emit1(Lazybranch, 0)
 		}
 
 	case NtAlternate | AfterChild:
-		if curIndex < len(node.Children)-1 {
+		if _, _, complete, ok := w.getDispatchCandidates(node); ok {
+			if curIndex < len(node.Children)-1 && !complete[curIndex] {
+				gotoPos := w.curPos()
+				w.emit1(Goto, 0)
+				w.dispatchGotos[node] = append(w.dispatchGotos[node], gotoPos)
+			}
+			if curIndex == len(node.Children)-1 {
+				end := w.curPos()
+				for _, gotoPos := range w.dispatchGotos[node] {
+					w.patchJump(gotoPos, end)
+				}
+				for branch, isComplete := range complete {
+					if isComplete {
+						w.patchDispatchBranch(node, branch, end)
+					}
+				}
+			}
+		} else if curIndex < len(node.Children)-1 {
 			lbPos := w.popInt()
 			w.pushInt(w.curPos())
 			w.emit1(Goto, 0)
@@ -342,7 +449,9 @@ func (w *writer) emitFragment(nodetype NodeType, node *RegexNode, curIndex int) 
 		w.emit(Forejump)
 
 	case NtOne, NtNotone:
-		w.emit1(InstOp(node.T|ntBits), int(node.Ch))
+		if !w.preconsumed[node] {
+			w.emit1(InstOp(node.T|ntBits), int(node.Ch))
+		}
 
 	case NtNotoneloop, NtNotoneloopatomic, NtNotonelazy, NtOneloop, NtOneloopatomic, NtOnelazy:
 		if node.M > 0 {
@@ -373,16 +482,31 @@ func (w *writer) emitFragment(nodetype NodeType, node *RegexNode, curIndex int) 
 		}
 
 	case NtMulti:
-		w.emit1(InstOp(node.T|ntBits), w.stringCode(node.Str))
+		str := node.Str
+		if w.preconsumed[node] {
+			if bits&Rtl != 0 {
+				str = str[:len(str)-1]
+			} else {
+				str = str[1:]
+			}
+		}
+		if len(str) > 0 {
+			w.emit1(InstOp(node.T|ntBits), w.stringCode(str))
+		}
 
 	case NtSet:
-		w.emit1(InstOp(node.T|ntBits), w.setCode(node.Set))
+		if !w.preconsumed[node] {
+			w.emit1(InstOp(node.T|ntBits), w.setCode(node.Set))
+		}
 
 	case NtRef:
 		w.emit1(InstOp(node.T|ntBits), w.mapCapnum(node.M))
 
 	case NtNothing, NtBol, NtEol, NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary, NtBeginning, NtStart, NtEndZ, NtEnd, NtUpdateBumpalong:
 		w.emit(InstOp(node.T))
+
+	case NtGrapheme:
+		w.emit(InstOp(node.T | ntBits))
 
 	default:
 		return fmt.Errorf("unexpected opcode in regular expression generation: %v", nodetype)
@@ -432,6 +556,53 @@ func (w *writer) curPos() int {
 // so that it jumps to the specified jumpDest.
 func (w *writer) patchJump(offset, jumpDest int) {
 	w.emitted[offset+1] = jumpDest
+}
+
+func (w *writer) getDispatchCandidates(node *RegexNode) ([]*CharSet, []*RegexNode, []bool, bool) {
+	if info, found := w.dispatchInfo[node]; found {
+		return info.sets, info.leaders, info.complete, info.ok
+	}
+	sets, leaders, complete, ok := node.dispatchCandidates()
+	w.dispatchInfo[node] = dispatchInfo{sets: sets, leaders: leaders, complete: complete, ok: ok}
+	return sets, leaders, complete, ok
+}
+
+func (w *writer) dispatchCode(sets []*CharSet) int {
+	if w.counting {
+		return 0
+	}
+	table := DispatchTable{
+		Sets:     make([]int, len(sets)),
+		Branches: make([]int, len(sets)),
+	}
+	if len(sets) >= 4 {
+		table.ASCII = &[128]uint16{}
+	} else {
+		table.ASCIIMasks = make([]uint64, len(sets)*2)
+	}
+	for i, set := range sets {
+		table.Sets[i] = w.setCode(set)
+		for ch := rune(0); ch < 128; ch++ {
+			if set.CharIn(ch) {
+				if table.ASCII != nil {
+					table.ASCII[ch] = uint16(i + 1)
+				} else {
+					table.ASCIIMasks[i*2+int(ch>>6)] |= uint64(1) << (ch & 63)
+				}
+			}
+		}
+	}
+	index := len(w.dispatchtable)
+	w.dispatchtable = append(w.dispatchtable, table)
+	return index
+}
+
+func (w *writer) patchDispatchBranch(node *RegexNode, branch, target int) {
+	if w.counting {
+		return
+	}
+	table := w.dispatchCodes[node]
+	w.dispatchtable[table].Branches[branch] = target
 }
 
 // Returns an index in the set table for a charset
