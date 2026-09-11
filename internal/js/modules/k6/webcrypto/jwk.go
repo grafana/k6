@@ -3,7 +3,6 @@ package webcrypto
 import (
 	"crypto/ecdh"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
@@ -144,75 +143,71 @@ func (jwk *ecJWK) validate() error {
 	return nil
 }
 
-// encodeCurveBigInt encodes the private scalar D of an ECDSA key with padding.
-func encodeCurveBigInt(data *big.Int, curveBits int) string {
-	// Determine the expected byte length for the curve
-	byteLength := curveBits / 8
-	// Add one more byte if the bits are not a multiple of 8
-	if curveBits%8 != 0 {
-		byteLength++
-	}
-
-	dBytes := data.Bytes()
-	dPadded := padLeft(dBytes, byteLength) // Pad if necessary
-
-	return base64URLEncode(dPadded)
-}
-
 // padLeft pads the byte slice with zeros to the left to ensure it has a specific length.
 func padLeft(bytes []byte, size int) []byte {
 	padding := make([]byte, size-len(bytes), size)
 	return append(padding, bytes...)
 }
 
+// toFixedLength pads bytes to size with leading zeros, or returns an error
+// if bytes is already longer than size.
+func toFixedLength(bytes []byte, size int) ([]byte, error) {
+	if len(bytes) > size {
+		return nil, fmt.Errorf("value is %d bytes, want at most %d", len(bytes), size)
+	}
+	return padLeft(bytes, size), nil
+}
+
 func exportECJWK(key *CryptoKey) (any, error) {
 	exported := &JsonWebKey{}
 	exported.Set("kty", JWKECKeyType)
 
-	var x, y, d *big.Int
-	var curveParams *elliptic.CurveParams
+	var pub *ecdsa.PublicKey
+	var priv *ecdsa.PrivateKey
 
 	switch k := key.handle.(type) {
 	case *ecdsa.PrivateKey:
-		x = k.X
-		y = k.Y
-		d = k.D
-		curveParams = k.Params()
+		priv = k
+		pub = &k.PublicKey
 	case *ecdsa.PublicKey:
-		x = k.X
-		y = k.Y
-		curveParams = k.Params()
+		pub = k
 	case *ecdh.PrivateKey:
 		ecdsaKey, err := convertECDHtoECDSAKey(k)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert ECDH key to ECDSA key: %w", err)
 		}
 
-		x = ecdsaKey.X
-		y = ecdsaKey.Y
-		d = ecdsaKey.D
-		curveParams = ecdsaKey.Params()
+		priv = ecdsaKey
+		pub = &ecdsaKey.PublicKey
 	case *ecdh.PublicKey:
 		ecdsaKey, err := convertPublicECDHtoECDSA(k)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert ECDH key to ECDSA key: %w", err)
 		}
 
-		x = ecdsaKey.X
-		y = ecdsaKey.Y
-		curveParams = ecdsaKey.Params()
+		pub = ecdsaKey
 	default:
 		return nil, errors.New("key's handle isn't an ECDSA/ECDH public/private key")
 	}
 
-	exported.Set("crv", curveParams.Name)
-	curveBits := curveParams.BitSize
+	exported.Set("crv", pub.Params().Name)
 
-	exported.Set("x", base64URLEncode(x.Bytes()))
-	exported.Set("y", base64URLEncode(y.Bytes()))
+	// pubBytes is the SEC1 uncompressed point encoding: 0x04 || X || Y,
+	// with X and Y already padded to the curve's coordinate byte length.
+	pubBytes, err := pub.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode public key: %w", err)
+	}
+	coordLen := (len(pubBytes) - 1) / 2
+	exported.Set("x", base64URLEncode(pubBytes[1:1+coordLen]))
+	exported.Set("y", base64URLEncode(pubBytes[1+coordLen:]))
 
-	if d != nil {
-		exported.Set("d", encodeCurveBigInt(d, curveBits))
+	if priv != nil {
+		privBytes, err := priv.Bytes()
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode private key: %w", err)
+		}
+		exported.Set("d", base64URLEncode(privBytes))
 	}
 
 	return exported, nil
@@ -243,10 +238,21 @@ func importECDSAJWK(_ EllipticCurveKind, jsonKeyData []byte) (any, CryptoKeyType
 		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode Y coordinate: %w", err)
 	}
 
-	pk := &ecdsa.PublicKey{
-		Curve: crv,
-		X:     new(big.Int).SetBytes(x),
-		Y:     new(big.Int).SetBytes(y),
+	coordLen := (crv.Params().BitSize + 7) / 8
+
+	xPadded, err := toFixedLength(x, coordLen)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, fmt.Errorf("invalid X coordinate: %w", err)
+	}
+	yPadded, err := toFixedLength(y, coordLen)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, fmt.Errorf("invalid Y coordinate: %w", err)
+	}
+
+	uncompressed := append([]byte{0x04}, append(xPadded, yPadded...)...)
+	pk, err := ecdsa.ParseUncompressedPublicKey(crv, uncompressed)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, fmt.Errorf("invalid EC public key coordinates: %w", err)
 	}
 
 	// if the key is a public key, return it
@@ -259,10 +265,17 @@ func importECDSAJWK(_ EllipticCurveKind, jsonKeyData []byte) (any, CryptoKeyType
 		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode D: %w", err)
 	}
 
-	return &ecdsa.PrivateKey{
-		PublicKey: *pk,
-		D:         new(big.Int).SetBytes(d),
-	}, PrivateCryptoKeyType, nil
+	dPadded, err := toFixedLength(d, coordLen)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, fmt.Errorf("invalid D: %w", err)
+	}
+
+	priv, err := ecdsa.ParseRawPrivateKey(crv, dPadded)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, fmt.Errorf("invalid EC private key: %w", err)
+	}
+
+	return priv, PrivateCryptoKeyType, nil
 }
 
 func importECDHJWK(_ EllipticCurveKind, jsonKeyData []byte) (any, CryptoKeyType, error) {

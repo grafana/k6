@@ -225,16 +225,12 @@ func importECDSAPublicKey(curve EllipticCurveKind, keyData []byte) (any, CryptoK
 		return nil, UnknownCryptoKeyType, NewError(NotSupportedError, "invalid elliptic curve "+string(curve))
 	}
 
-	x, y := elliptic.Unmarshal(c, keyData) //nolint:staticcheck // we need to use the Unmarshal function
-	if x == nil {
+	pk, err := ecdsa.ParseUncompressedPublicKey(c, keyData)
+	if err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDSA public key data")
 	}
 
-	return &ecdsa.PublicKey{
-		Curve: c,
-		X:     x,
-		Y:     y,
-	}, PublicCryptoKeyType, nil
+	return pk, PublicCryptoKeyType, nil
 }
 
 // ECKeyGenParams  represents the object that should be passed as the algorithm
@@ -480,7 +476,12 @@ func extractPublicKeyBytes(alg string, handle any) ([]byte, error) {
 			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
 		}
 
-		return elliptic.Marshal(k.Curve, k.X, k.Y), nil //nolint:staticcheck // we need to use the Marshal function
+		b, err := k.Bytes()
+		if err != nil {
+			return nil, fmt.Errorf("marshaling ECDSA public key: %w", err)
+		}
+
+		return b, nil
 	}
 
 	return nil, errors.New("unsupported algorithm " + alg)
@@ -682,40 +683,45 @@ func (edsa *ECDSAParams) Verify(key CryptoKey, signature []byte, data []byte) (b
 }
 
 func convertECDHtoECDSAKey(k *ecdh.PrivateKey) (*ecdsa.PrivateKey, error) {
-	pk, err := convertPublicECDHtoECDSA(k.PublicKey())
+	crv, err := ecdhToEllipticCurve(k.Curve())
 	if err != nil {
 		return nil, err
 	}
 
-	return &ecdsa.PrivateKey{
-		PublicKey: *pk,
-		D:         new(big.Int).SetBytes(k.Bytes()),
-	}, nil
+	pk, err := ecdsa.ParseRawPrivateKey(crv, k.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert ECDH private key to ECDSA private key, curve: %s", crv.Params().Name)
+	}
+
+	return pk, nil
 }
 
 func convertPublicECDHtoECDSA(k *ecdh.PublicKey) (*ecdsa.PublicKey, error) {
-	var crv elliptic.Curve
-	switch k.Curve() {
-	case ecdh.P256():
-		crv = elliptic.P256()
-	case ecdh.P384():
-		crv = elliptic.P384()
-	case ecdh.P521():
-		crv = elliptic.P521()
-	default:
-		return nil, errors.New("curve not supported for converting to ECDSA key")
+	crv, err := ecdhToEllipticCurve(k.Curve())
+	if err != nil {
+		return nil, err
 	}
 
-	x, y := elliptic.Unmarshal(crv, k.Bytes()) //nolint:staticcheck // we need to use the Unmarshal function
-	if x == nil {
+	pk, err := ecdsa.ParseUncompressedPublicKey(crv, k.Bytes())
+	if err != nil {
 		return nil, fmt.Errorf("unable to convert ECDH public key to ECDSA public key, curve: %s", crv.Params().Name)
 	}
 
-	return &ecdsa.PublicKey{
-		Curve: crv,
-		X:     x,
-		Y:     y,
-	}, nil
+	return pk, nil
+}
+
+// ecdhToEllipticCurve maps an ecdh.Curve to its elliptic.Curve equivalent.
+func ecdhToEllipticCurve(c ecdh.Curve) (elliptic.Curve, error) {
+	switch c {
+	case ecdh.P256():
+		return elliptic.P256(), nil
+	case ecdh.P384():
+		return elliptic.P384(), nil
+	case ecdh.P521():
+		return elliptic.P521(), nil
+	default:
+		return nil, errors.New("curve not supported for converting to ECDSA key")
+	}
 }
 
 func ensureKeysUseSameCurve(k1, k2 CryptoKey) error {
