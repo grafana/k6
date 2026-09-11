@@ -1,4 +1,4 @@
-//go:build !amd64 || appengine || !gc || noasm
+//go:build (!amd64 && !arm64) || appengine || !gc || noasm
 
 package s2
 
@@ -7,7 +7,7 @@ import (
 	"math/bits"
 )
 
-const hasAmd64Asm = false
+const hasAsm = false
 
 // encodeBlock encodes a non-empty src to a guaranteed-large-enough dst. It
 // assumes that the varint-encoded length of the decompressed bytes has already
