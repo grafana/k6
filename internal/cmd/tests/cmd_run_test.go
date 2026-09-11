@@ -30,7 +30,7 @@ import (
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/cmd"
 	"go.k6.io/k6/v2/internal/cmd/tests/events"
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
 	"go.k6.io/k6/v2/js/modules"
@@ -2186,7 +2186,7 @@ func TestEventSystemOK(t *testing.T) {
 	ts := NewGlobalTestState(t)
 
 	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
-	mod := events.New(event.GlobalEvents, event.VUEvents)
+	mod := events.New(eventdispatcher.GlobalEvents, eventdispatcher.VUEvents)
 	modules.Register(moduleName, mod)
 
 	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
@@ -2312,7 +2312,7 @@ func TestEventSystemError(t *testing.T) {
 			ts := NewGlobalTestState(t)
 
 			moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
-			mod := events.New(event.GlobalEvents, event.VUEvents)
+			mod := events.New(eventdispatcher.GlobalEvents, eventdispatcher.VUEvents)
 			modules.Register(moduleName, mod)
 
 			ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
@@ -2369,7 +2369,7 @@ func BenchmarkRunEvents(b *testing.B) {
 		ts := NewGlobalTestState(b)
 
 		moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
-		mod := events.New(event.GlobalEvents, event.VUEvents)
+		mod := events.New(eventdispatcher.GlobalEvents, eventdispatcher.VUEvents)
 		modules.Register(moduleName, mod)
 
 		ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}

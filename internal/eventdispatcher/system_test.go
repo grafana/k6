@@ -1,4 +1,4 @@
-package event
+package eventdispatcher
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/v2/event"
 )
 
 func TestEventSystem(t *testing.T) {
@@ -24,23 +25,23 @@ func TestEventSystem(t *testing.T) {
 
 		require.Len(t, es.subscribers, 0)
 
-		s1id, s1ch := es.Subscribe(Init)
+		s1id, s1ch := es.Subscribe(event.Init)
 
 		assert.Equal(t, uint64(1), s1id)
 		assert.NotNil(t, s1ch)
 		assert.Len(t, es.subscribers, 1)
-		assert.Len(t, es.subscribers[Init], 1)
-		assert.Equal(t, (<-chan *Event)(es.subscribers[Init][s1id]), s1ch)
+		assert.Len(t, es.subscribers[event.Init], 1)
+		assert.Equal(t, (<-chan *event.Event)(es.subscribers[event.Init][s1id]), s1ch)
 
-		s2id, s2ch := es.Subscribe(Init, TestStart)
+		s2id, s2ch := es.Subscribe(event.Init, event.TestStart)
 
 		assert.Equal(t, uint64(2), s2id)
 		assert.NotNil(t, s2ch)
 		assert.Len(t, es.subscribers, 2)
-		assert.Len(t, es.subscribers[Init], 2)
-		assert.Len(t, es.subscribers[TestStart], 1)
-		assert.Equal(t, (<-chan *Event)(es.subscribers[Init][s2id]), s2ch)
-		assert.Equal(t, (<-chan *Event)(es.subscribers[TestStart][s2id]), s2ch)
+		assert.Len(t, es.subscribers[event.Init], 2)
+		assert.Len(t, es.subscribers[event.TestStart], 1)
+		assert.Equal(t, (<-chan *event.Event)(es.subscribers[event.Init][s2id]), s2ch)
+		assert.Equal(t, (<-chan *event.Event)(es.subscribers[event.TestStart][s2id]), s2ch)
 	})
 
 	t.Run("subscribe/panic", func(t *testing.T) {
@@ -62,12 +63,12 @@ func TestEventSystem(t *testing.T) {
 		logger.SetOutput(io.Discard)
 		es := NewEventSystem(10, logger)
 
-		s1id, s1ch := es.Subscribe(Init, Exit)
-		s2id, s2ch := es.Subscribe(Init, TestStart, TestEnd, Exit)
+		s1id, s1ch := es.Subscribe(event.Init, event.Exit)
+		s2id, s2ch := es.Subscribe(event.Init, event.TestStart, event.TestEnd, event.Exit)
 
 		type result struct {
 			sid    uint64
-			events []*Event
+			events []*event.Event
 			err    error
 		}
 		resultCh := make(chan result, 2)
@@ -83,12 +84,12 @@ func TestEventSystem(t *testing.T) {
 
 		var (
 			doneMx     sync.RWMutex
-			processed  = make(map[Type]int)
-			emitEvents = []Type{Init, TestStart, IterStart, IterEnd, TestEnd, Exit}
+			processed  = make(map[event.Type]int)
+			emitEvents = []event.Type{event.Init, event.TestStart, event.IterStart, event.IterEnd, event.TestEnd, event.Exit}
 			data       int
 		)
 		for _, et := range emitEvents {
-			evt := &Event{Type: et, Data: data, Done: func() {
+			evt := &event.Event{Type: et, Data: data, Done: func() {
 				doneMx.Lock()
 				processed[et]++
 				doneMx.Unlock()
@@ -104,19 +105,19 @@ func TestEventSystem(t *testing.T) {
 				switch result.sid {
 				case s1id:
 					require.Len(t, result.events, 2)
-					assert.Equal(t, Init, result.events[0].Type)
+					assert.Equal(t, event.Init, result.events[0].Type)
 					assert.Equal(t, 0, result.events[0].Data)
-					assert.Equal(t, Exit, result.events[1].Type)
+					assert.Equal(t, event.Exit, result.events[1].Type)
 					assert.Equal(t, 5, result.events[1].Data)
 				case s2id:
 					require.Len(t, result.events, 4)
-					assert.Equal(t, Init, result.events[0].Type)
+					assert.Equal(t, event.Init, result.events[0].Type)
 					assert.Equal(t, 0, result.events[0].Data)
-					assert.Equal(t, TestStart, result.events[1].Type)
+					assert.Equal(t, event.TestStart, result.events[1].Type)
 					assert.Equal(t, 1, result.events[1].Data)
-					assert.Equal(t, TestEnd, result.events[2].Type)
+					assert.Equal(t, event.TestEnd, result.events[2].Type)
 					assert.Equal(t, 4, result.events[2].Data)
-					assert.Equal(t, Exit, result.events[3].Type)
+					assert.Equal(t, event.Exit, result.events[3].Type)
 					assert.Equal(t, 5, result.events[3].Data)
 				}
 			case <-ctx.Done():
@@ -124,11 +125,11 @@ func TestEventSystem(t *testing.T) {
 			}
 		}
 
-		expProcessed := map[Type]int{
-			Init:      2,
-			TestStart: 1,
-			TestEnd:   1,
-			Exit:      2,
+		expProcessed := map[event.Type]int{
+			event.Init:      2,
+			event.TestStart: 1,
+			event.TestEnd:   1,
+			event.Exit:      2,
 		}
 		assert.Equal(t, expProcessed, processed)
 	})
@@ -146,7 +147,7 @@ func TestEventSystem(t *testing.T) {
 			numSubs = 100
 		)
 		for range numSubs {
-			sid, evtCh := es.Subscribe(Exit)
+			sid, evtCh := es.Subscribe(event.Exit)
 			wg.Go(func() {
 				_, err := processEvents(ctx, es, sid, evtCh)
 				require.NoError(t, err)
@@ -154,7 +155,7 @@ func TestEventSystem(t *testing.T) {
 		}
 
 		var done uint32
-		wait := es.Emit(&Event{Type: Exit, Done: func() {
+		wait := es.Emit(&event.Event{Type: event.Exit, Done: func() {
 			atomic.AddUint32(&done, 1)
 		}})
 		waitCtx, waitCancel := context.WithTimeout(ctx, time.Second)
@@ -184,7 +185,7 @@ func TestEventSystem(t *testing.T) {
 			numSubs = 100
 		)
 		for range numSubs {
-			sid, evtCh := es.Subscribe(Exit)
+			sid, evtCh := es.Subscribe(event.Exit)
 			wg.Go(func() {
 				_, err := processEvents(ctx, es, sid, evtCh)
 				require.NoError(t, err)
@@ -192,7 +193,7 @@ func TestEventSystem(t *testing.T) {
 		}
 
 		var done uint32
-		wait := es.Emit(&Event{Type: Exit, Done: func() {
+		wait := es.Emit(&event.Event{Type: event.Exit, Done: func() {
 			atomic.AddUint32(&done, 1)
 		}})
 		waitCtx, waitCancel := context.WithTimeout(ctx, time.Second)
@@ -212,14 +213,14 @@ func TestEventSystem(t *testing.T) {
 		logger.SetOutput(io.Discard)
 		es := NewEventSystem(10, logger)
 
-		sid, evtCh := es.Subscribe(Exit)
+		sid, evtCh := es.Subscribe(event.Exit)
 		var wg sync.WaitGroup
 		wg.Go(func() {
 			_, err := processEvents(ctx, es, sid, evtCh)
 			assert.NoError(t, err)
 		})
 
-		wait := es.Emit(&Event{Type: Exit, Done: func() {
+		wait := es.Emit(&event.Event{Type: event.Exit, Done: func() {
 			time.Sleep(200 * time.Millisecond)
 		}})
 		waitCtx, waitCancel := context.WithTimeout(ctx, 100*time.Millisecond)
@@ -243,24 +244,24 @@ func TestEventSystem(t *testing.T) {
 			subs    = make([]uint64, numSubs)
 		)
 		for i := range numSubs {
-			sid, _ := es.Subscribe(Init)
+			sid, _ := es.Subscribe(event.Init)
 			subs[i] = sid
 		}
 
-		require.Len(t, es.subscribers[Init], numSubs)
+		require.Len(t, es.subscribers[event.Init], numSubs)
 
 		es.Unsubscribe(subs[0])
-		assert.Len(t, es.subscribers[Init], numSubs-1)
+		assert.Len(t, es.subscribers[event.Init], numSubs-1)
 		es.Unsubscribe(subs[0]) // second unsubscribe does nothing
-		assert.Len(t, es.subscribers[Init], numSubs-1)
+		assert.Len(t, es.subscribers[event.Init], numSubs-1)
 
 		es.UnsubscribeAll()
-		assert.Len(t, es.subscribers[Init], 0)
+		assert.Len(t, es.subscribers[event.Init], 0)
 	})
 }
 
-func processEvents(ctx context.Context, es *System, sid uint64, evtCh <-chan *Event) ([]*Event, error) {
-	result := make([]*Event, 0)
+func processEvents(ctx context.Context, es *System, sid uint64, evtCh <-chan *event.Event) ([]*event.Event, error) {
+	result := make([]*event.Event, 0)
 
 	for {
 		select {
@@ -270,7 +271,7 @@ func processEvents(ctx context.Context, es *System, sid uint64, evtCh <-chan *Ev
 			}
 			result = append(result, evt)
 			evt.Done()
-			if evt.Type == Exit {
+			if evt.Type == event.Exit {
 				es.Unsubscribe(sid)
 			}
 		case <-ctx.Done():

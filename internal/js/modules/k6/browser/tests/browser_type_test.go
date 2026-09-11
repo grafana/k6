@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	k6event "go.k6.io/k6/v2/internal/event"
+	k6event "go.k6.io/k6/v2/event"
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/browser"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
@@ -194,8 +195,8 @@ func TestChromiumConnectOverCDPExitSweep(t *testing.T) {
 
 	// Fire the global Exit event, as k6 does on process exit / SIGTERM. The
 	// registry's clear() must close any still-connected browsers.
-	events, ok := vu.EventsField.Global.(*k6event.System)
-	require.True(t, ok, "want *k6event.System; got %T", events)
+	events, ok := vu.EventsField.Global.(*eventdispatcher.System)
+	require.True(t, ok, "want *eventdispatcher.System; got %T", events)
 	waitDone := events.Emit(&k6event.Event{Type: k6event.Exit})
 	require.NoError(t, waitDone(context.Background()), "error waiting on Exit done")
 

@@ -19,7 +19,7 @@ import (
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/build"
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	"go.k6.io/k6/v2/internal/js/compiler"
 	"go.k6.io/k6/v2/internal/js/eventloop"
 	"go.k6.io/k6/v2/internal/js/modules/k6/webcrypto"
@@ -120,7 +120,7 @@ func newBundle(
 		runtime: sobek.New(),
 		events: events{
 			global: piState.Events,
-			local:  event.NewEventSystem(100, piState.Logger),
+			local:  eventdispatcher.NewEventSystem(100, piState.Logger),
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
@@ -263,7 +263,7 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 		runtime: sobek.New(),
 		events: events{
 			global: b.preInitState.Events,
-			local:  event.NewEventSystem(100, b.preInitState.Logger),
+			local:  eventdispatcher.NewEventSystem(100, b.preInitState.Logger),
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
