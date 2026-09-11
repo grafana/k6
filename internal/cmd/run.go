@@ -470,6 +470,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		err = common.UnwrapSobekInterruptedError(err)
 		logger.WithError(err).Debug("Test finished with an error")
+		setExecutionResult(executionState, err)
 		return err
 	}
 
@@ -483,15 +484,30 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// ensure we return an error indicating that the test run was marked as failed, and the proper
 	// exit code is used.
 	if testRunState.TestStatus.Failed() {
-		return errext.WithExitCodeIfNone(
+		err = errext.WithExitCodeIfNone(
 			fmt.Errorf("test run was marked as failed"),
 			exitcodes.MarkedAsFailed,
 		)
+		setExecutionResult(executionState, err)
+		return err
 	}
 
 	logger.Debug("Test finished cleanly")
+	setExecutionResult(executionState, nil)
 
 	return nil
+}
+
+func setExecutionResult(executionState *lib.ExecutionState, err error) {
+	exitCode := 0
+	if err != nil {
+		exitCode = -1
+		var ecerr errext.HasExitCode
+		if errors.As(err, &ecerr) {
+			exitCode = int(ecerr.ExitCode())
+		}
+	}
+	executionState.SetExecutionResult(exitCode)
 }
 
 func getSummaryMode(runtimeOptions lib.RuntimeOptions) (summary.Mode, bool, error) {
