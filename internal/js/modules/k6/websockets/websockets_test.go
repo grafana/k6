@@ -207,6 +207,22 @@ type testMessage struct {
 	data []byte
 }
 
+// TestConstructorInInitContext verifies that using the WebSocket constructor in
+// the init context (before any VU state exists) throws an InitContextError
+// instead of panicking with a nil-pointer dereference. Regression test for the
+// crash reported in https://github.com/grafana/k6/issues/6353.
+func TestConstructorInInitContext(t *testing.T) {
+	t.Parallel()
+	runtime := modulestest.NewRuntime(t)
+	m := new(RootModule).NewModuleInstance(runtime.VU)
+	require.NoError(t, runtime.VU.RuntimeField.Set("WebSocket", m.Exports().Named["WebSocket"]))
+
+	// No MoveToVUContext call, so VU.State() is nil, i.e. we are in the init context.
+	_, err := runtime.VU.Runtime().RunString(`new WebSocket("ws://localhost/")`)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), errWSInInitContext.Error())
+}
+
 func TestBasic(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)

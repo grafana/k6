@@ -36,6 +36,13 @@ type WebSocketsAPI struct { //nolint:revive
 
 var _ modules.Module = &RootModule{}
 
+// errWSInInitContext is thrown when the WebSocket constructor is used in the init
+// context, i.e. before any VU state exists. This mirrors the guard the k6/ws
+// module already has and prevents a nil-pointer dereference panic.
+var errWSInInitContext = common.NewInitContextError(
+	"using websockets in the init context is not supported",
+)
+
 // New websockets root module
 func New() *RootModule {
 	return &RootModule{}
@@ -122,12 +129,17 @@ type ping struct {
 func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 	rt := r.vu.Runtime()
 
+	state := r.vu.State()
+	if state == nil {
+		common.Throw(rt, errWSInInitContext)
+	}
+
 	url, err := parseURL(c.Argument(0))
 	if err != nil {
 		common.Throw(rt, err)
 	}
 
-	params, err := buildParams(r.vu.State(), rt, c.Argument(2))
+	params, err := buildParams(state, rt, c.Argument(2))
 	if err != nil {
 		common.Throw(rt, err)
 	}
@@ -151,7 +163,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		url:             url,
 		tq:              taskqueue.New(r.vu.RegisterCallback),
 		readyState:      CONNECTING,
-		builtinMetrics:  r.vu.State().BuiltinMetrics,
+		builtinMetrics:  state.BuiltinMetrics,
 		done:            make(chan struct{}),
 		writeQueueCh:    make(chan message),
 		eventListeners:  newEventListeners(),
