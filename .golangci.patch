@@ -1,10 +1,11 @@
 --- a/.golangci.yml
 +++ b/.golangci.yml
-@@ -99,8 +99,28 @@
+@@ -99,8 +99,29 @@
            - gocognit
            - lll
            - gosec
 +          - goconst
++          - prealloc
          path: _(test|gen)\.go
        - linters:
 +          - contextcheck
