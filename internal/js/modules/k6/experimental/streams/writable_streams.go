@@ -305,6 +305,51 @@ func (stream *WritableStream) initialize() {
 	stream.backpressure = false
 }
 
+// createWritableStream implements the [specification]'s CreateWritableStream abstract operation.
+//
+// It creates a new [WritableStream] backed by the given algorithms, rather than by an
+// underlying sink object. It is used by the [TransformStream] to build its writable side.
+//
+// [specification]: https://streams.spec.whatwg.org/#create-writable-stream
+func createWritableStream(
+	vu modules.VU,
+	startAlgorithm UnderlyingSinkStartCallback,
+	writeAlgorithm UnderlyingSinkWriteCallback,
+	closeAlgorithm UnderlyingSinkCloseCallback,
+	abortAlgorithm UnderlyingSinkAbortCallback,
+	highWaterMark float64,
+	sizeAlgorithm SizeAlgorithm,
+) *WritableStream {
+	// 1. If highWaterMark was not passed, set it to 1.
+	// 2. If sizeAlgorithm was not passed, set it to an algorithm that returns 1.
+	// (Both are always passed by callers.)
+
+	// 3. Assert: ! IsNonNegativeNumber(highWaterMark) is true.
+	// (Guaranteed by callers.)
+
+	// 4. Let stream be a new WritableStream.
+	// 5. Perform ! InitializeWritableStream(stream).
+	stream := &WritableStream{runtime: vu.Runtime(), vu: vu}
+	stream.initialize()
+
+	// 6. Let controller be a new WritableStreamDefaultController.
+	controller := &WritableStreamDefaultController{}
+
+	// 7. Perform ? SetUpWritableStreamDefaultController(...).
+	stream.setupWritableStreamDefaultController(
+		controller,
+		startAlgorithm,
+		writeAlgorithm,
+		closeAlgorithm,
+		abortAlgorithm,
+		highWaterMark,
+		sizeAlgorithm,
+	)
+
+	// 8. Return stream.
+	return stream
+}
+
 // acquireDefaultWriter implements the [specification]'s AcquireWritableStreamDefaultWriter abstract operation.
 //
 // [specification]: https://streams.spec.whatwg.org/#acquire-writable-stream-default-writer
