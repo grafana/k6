@@ -507,6 +507,28 @@ func TestSetupDataPromise(t *testing.T) {
 	};`)
 }
 
+// TestSetupDataPendingPromise checks that a setup() whose promise never settles is reported as an
+// error rather than crashing k6.
+func TestSetupDataPendingPromise(t *testing.T) {
+	t.Parallel()
+	r, err := getSimpleRunner(t, "/script.js", `
+	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	exports.setup = async function() {
+		// Nothing that could ever settle this promise is registered with the event loop, so the
+		// loop runs dry with setup() still awaiting it. setupTimeout does not save us: there is no
+		// pending callback keeping the loop alive until the deadline, so it returns immediately.
+		await new Promise(function() {});
+		return {"data": "correct"};
+	}
+	exports.default = function() {};`)
+	require.NoError(t, err)
+
+	err = r.Setup(t.Context(), make(chan metrics.SampleContainer, 100))
+	require.Error(t, err, "a setup() that never finishes must be reported as an error")
+	require.Contains(t, err.Error(), "setup()")
+	require.Contains(t, err.Error(), "did not finish")
+}
+
 func TestRunnerIntegrationImports(t *testing.T) {
 	t.Parallel()
 	t.Run("Modules", func(t *testing.T) {
