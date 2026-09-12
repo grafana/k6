@@ -14,6 +14,9 @@ import (
 	sync "sync"
 	"time"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -38,8 +41,32 @@ func NewFeatureExplorerServer(features ...*Feature) *FeatureExplorerImplementati
 }
 
 // GetFeature returns the feature at the given point.
+// If both latitude and longitude are zero, it returns an InvalidArgument error with structured details.
 func (s *FeatureExplorerImplementation) GetFeature(_ context.Context, point *Point) (*Feature, error) {
 	s.Logf("GetFeature called with: %+v\n", point)
+
+	if point.Latitude == 0 && point.Longitude == 0 {
+		st := status.New(codes.InvalidArgument, "invalid coordinates")
+		st, err := st.WithDetails(
+			&errdetails.ErrorInfo{
+				Reason: "ZERO_COORDINATES",
+				Domain: "k6.io/grpc",
+				Metadata: map[string]string{
+					"hint": "latitude and longitude must be non-zero",
+				},
+			},
+			&errdetails.BadRequest{
+				FieldViolations: []*errdetails.BadRequest_FieldViolation{
+					{Field: "latitude", Description: "must be non-zero"},
+					{Field: "longitude", Description: "must be non-zero"},
+				},
+			},
+		)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to attach error details")
+		}
+		return nil, st.Err()
+	}
 
 	n := rand.Intn(1000) //nolint:gosec
 	time.Sleep(time.Duration(n) * time.Millisecond)

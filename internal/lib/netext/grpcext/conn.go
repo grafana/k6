@@ -178,19 +178,7 @@ func (c *Conn) Invoke(
 	marshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: c.types}
 
 	if err != nil {
-		sterr := status.Convert(err)
-		response.Status = sterr.Code()
-
-		// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
-		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
-		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
-		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
-		// JSON.Stringify() shows the object to be correctly present.
-
-		raw, _ := marshaler.Marshal(sterr.Proto())
-		errMsg := make(map[string]any)
-		_ = json.Unmarshal(raw, &errMsg)
-		response.Error = errMsg
+		response.Status, response.Error = convertInvokeError(err, c.types)
 	}
 
 	if resp != nil && !req.DiscardResponseMessage {
@@ -202,6 +190,90 @@ func (c *Conn) Invoke(
 		response.Message = msg
 	}
 	return &response, nil
+}
+
+// combinedResolver checks user-loaded types first, then falls back to the global registry.
+// This ensures both standard Google types (google.rpc.ErrorInfo, etc.) and user-defined
+// types loaded via client.load() are resolved correctly when marshaling error details.
+type combinedResolver struct {
+	user *protoregistry.Types
+}
+
+func (r combinedResolver) FindMessageByName(msg protoreflect.FullName) (protoreflect.MessageType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindMessageByName(msg)
+	}
+	if t, err := r.user.FindMessageByName(msg); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindMessageByName(msg)
+}
+
+func (r combinedResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindMessageByURL(url)
+	}
+	if t, err := r.user.FindMessageByURL(url); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindMessageByURL(url)
+}
+
+func (r combinedResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindExtensionByName(field)
+	}
+	if t, err := r.user.FindExtensionByName(field); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindExtensionByName(field)
+}
+
+func (r combinedResolver) FindExtensionByNumber(
+	msg protoreflect.FullName, field protoreflect.FieldNumber,
+) (protoreflect.ExtensionType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindExtensionByNumber(msg, field)
+	}
+	if t, err := r.user.FindExtensionByNumber(msg, field); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindExtensionByNumber(msg, field)
+}
+
+// convertInvokeError converts a gRPC invocation error into a status code and
+// a JSON-serializable error map. Rich error details from the
+// grpc-status-details-bin trailer are already parsed by grpc-go on the client
+// side, so status.Convert(err) carries them.
+func convertInvokeError(err error, userTypes *protoregistry.Types) (codes.Code, map[string]any) {
+	sterr := status.Convert(err)
+
+	// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
+	// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
+	// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
+	// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
+	// JSON.Stringify() shows the object to be correctly present.
+
+	// combinedResolver checks user-loaded types first, then falls back to the global registry,
+	// so both standard Google types and user-defined types in error details are resolved correctly.
+	errorMarshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: combinedResolver{user: userTypes}}
+	raw, err := errorMarshaler.Marshal(sterr.Proto())
+	if err != nil {
+		return sterr.Code(), map[string]any{
+			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
+			"message": sterr.Message(),
+			"details": []any{},
+		}
+	}
+	errMsg := make(map[string]any)
+	if err = json.Unmarshal(raw, &errMsg); err != nil {
+		return sterr.Code(), map[string]any{
+			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
+			"message": sterr.Message(),
+			"details": []any{},
+		}
+	}
+	return sterr.Code(), errMsg
 }
 
 // NewStream creates a new gRPC stream.
