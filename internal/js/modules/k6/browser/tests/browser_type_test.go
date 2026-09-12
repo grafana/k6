@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -67,6 +68,43 @@ func TestBrowserTypeConnectOverCDPValidation(t *testing.T) {
 		_, err := bt.ConnectOverCDP(context.Background(), wsEndpoint)
 		require.Errorf(t, err, "endpoint %q should be rejected", wsEndpoint)
 	}
+}
+
+// TestConnectOverCDPCloseAfterVUCancelWithOpenPage is a regression test for
+// ConnectOverCDP wiring the CDP connection to the VU context. Production
+// runFn cancels that context before IterEnd, so auto-close must still be able
+// to close open pages and drain detach events. Previously Close always hit
+// waitForPagesToDetach's full 1s timeout and left tabs open on the remote
+// browser.
+func TestConnectOverCDPCloseAfterVUCancelWithOpenPage(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	vu := k6test.NewVU(t)
+	bt := chromium.NewBrowserType(vu)
+	vu.ActivateVU()
+
+	vuCtx, cancel := context.WithCancel(context.Background())
+	b, err := bt.ConnectOverCDP(vuCtx, tb.wsURL)
+	require.NoError(t, err)
+
+	page, err := b.NewPage(nil)
+	require.NoError(t, err)
+	require.NotNil(t, page)
+
+	// Mimic runFn: cancel the VU context before IterEnd auto-close runs.
+	cancel()
+
+	start := time.Now()
+	b.Close()
+	elapsed := time.Since(start)
+
+	// waitForPagesToDetach times out at 1s when detach events cannot be
+	// processed. A healthy close finishes well under that.
+	require.Less(t, elapsed, 500*time.Millisecond,
+		"Close after VU cancel with an open page took %s; connection was likely tied to the VU context",
+		elapsed)
+	require.False(t, b.IsConnected(), "expected browser disconnected after Close")
 }
 
 // TestChromiumConnectOverCDPAppliesBrowserTimeout verifies that ConnectOverCDP

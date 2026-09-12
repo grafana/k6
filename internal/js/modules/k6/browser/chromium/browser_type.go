@@ -115,9 +115,14 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 // ConnectOverCDP attaches the k6 browser to an existing, user-managed browser
 // over CDP, without requiring scenario browser options.
 //
-// The passed context must be the context the caller wants to control both the
-// connection and the browser lifetime; when it is canceled (iteration ends),
-// the connection is torn down.
+// ctx is the VU/iteration context: browser APIs and in-flight CDP calls are
+// bound to it and fail when the iteration ends. The underlying CDP connection
+// deliberately uses a background context instead — the same split as Connect
+// and Launch — so that IterEnd auto-close can still send Target.closeTarget and
+// process Target.detachedFromTarget after runFn has canceled the VU context.
+// Tying the connection to ctx made Close hit waitForPagesToDetach's full 1s
+// timeout and left pages open on the remote browser whenever a page was still
+// open at iteration end.
 func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*common.Browser, error) {
 	// Validate wsEndpoint up front so an empty or malformed value
 	// fails fast with a clear error, instead of a confusing lower-level
@@ -135,7 +140,7 @@ func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*c
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, err := b.connect(ctx, ctx, wsEndpoint, browserOpts, logger)
+	bp, err := b.connect(context.Background(), ctx, wsEndpoint, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
