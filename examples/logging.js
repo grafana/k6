@@ -4,4 +4,6 @@ export default function() {
 	console.info("info", "a", "b");
 	console.warn("warn", "a", "b");
 	console.error("error", "a", "b");
+	console.assert(true, "this should not log");
+	console.assert(false, "this should log");
 }
