@@ -18,6 +18,17 @@ type Manager struct {
 	cache   map[string]*sync.Map
 }
 
+// Hook returns the logrus hook that redacts known secrets from log entries.
+// The same hook instance is registered on the primary logger; callers may also
+// add it to additional loggers (notably the consoleOutput file logger) so those
+// paths cannot bypass redaction.
+func (sm *Manager) Hook() logrus.Hook {
+	if sm == nil {
+		return nil
+	}
+	return sm.hook
+}
+
 // NewManager returns a new NewManager with the provided secretsHook and will redact secrets from the hook
 func NewManager(sources map[string]Source) (*Manager, logrus.Hook, error) {
 	cache := make(map[string]*sync.Map, len(sources)-1)
