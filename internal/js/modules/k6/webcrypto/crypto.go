@@ -3,7 +3,6 @@ package webcrypto
 import (
 	"crypto/rand"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/grafana/sobek"
@@ -36,6 +35,7 @@ type Crypto struct {
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
 func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
+	rt := c.vu.Runtime()
 	acceptedTypes := []JSType{
 		Int8ArrayConstructor,
 		Uint8ArrayConstructor,
@@ -47,48 +47,55 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	}
 
 	// 1.
-	if !IsInstanceOf(c.vu.Runtime(), typedArray, acceptedTypes...) {
-		common.Throw(c.vu.Runtime(), NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
+	if !IsInstanceOf(rt, typedArray, acceptedTypes...) {
+		common.Throw(rt, NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
 	}
 
 	// 2.
-	// Obtain the length of the typed array, and throw a QuotaExceededError if
-	// it's too big, as specified in the [spec's] 10.2.1.2 paragraph.
+	// The spec quotas and fills by byteLength of the view, not its element
+	// count. Using `.length` previously wrote a single random byte into each
+	// element, so Uint16/Uint32 arrays (including the documented example)
+	// only ever contained values in 0-255.
 	// [spec]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
-	obj := typedArray.ToObject(c.vu.Runtime())
-	objLength, ok := obj.Get("length").ToNumber().Export().(int64)
-	if !ok {
-		common.Throw(c.vu.Runtime(), NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
+	obj := typedArray.ToObject(rt)
+	byteLength := exportNonNegativeInt(obj.Get("byteLength"))
+	if byteLength < 0 {
+		common.Throw(rt, NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
 	}
 
-	if objLength > maxRandomValuesLength {
+	if byteLength > maxRandomValuesLength {
 		common.Throw(
-			c.vu.Runtime(),
+			rt,
 			NewError(
 				QuotaExceededError,
-				fmt.Sprintf("typedArray parameter is too big; maximum length is %d", maxRandomValuesLength),
+				fmt.Sprintf("typedArray parameter is too big; maximum byte length is %d", maxRandomValuesLength),
 			),
 		)
 	}
 
-	// 3.
-	// Create a buffer of a matching size and fill
-	// it with random values.
-	//
-	// We use crypto/rand.Read() here as it will use /dev/urandom or
-	// an equivalent on Unix-like systems, and CryptGenRandom()
-	// on Windows. This is the recommended way to generate random
-	// by the specification.
-	randomValues := make([]byte, objLength)
-	_, err := rand.Read(randomValues)
-	if err != nil {
-		common.Throw(c.vu.Runtime(), err)
+	byteOffset := exportNonNegativeInt(obj.Get("byteOffset"))
+	if byteOffset < 0 {
+		byteOffset = 0
 	}
 
-	for i := range objLength {
-		err := obj.Set(strconv.FormatInt(i, 10), randomValues[i])
-		if err != nil {
-			common.Throw(c.vu.Runtime(), err)
+	ab, ok := obj.Get("buffer").Export().(sobek.ArrayBuffer)
+	if !ok || ab.Detached() {
+		common.Throw(rt, NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
+	}
+
+	buf := ab.Bytes()
+	end := byteOffset + byteLength
+	if byteOffset > int64(len(buf)) || end > int64(len(buf)) {
+		common.Throw(rt, NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
+	}
+
+	// 3.
+	// Overwrite the view's bytes in the underlying ArrayBuffer so multi-byte
+	// typed arrays receive a full-width cryptographically random value per
+	// element. crypto/rand.Read uses /dev/urandom (or equivalent).
+	if byteLength > 0 {
+		if _, err := rand.Read(buf[byteOffset:end]); err != nil {
+			common.Throw(rt, err)
 		}
 	}
 
@@ -97,7 +104,19 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	return typedArray
 }
 
-// MaxRandomValues is the maximum number of random values that can be generated
+// exportNonNegativeInt returns v as an int64, or -1 if v is missing/invalid.
+func exportNonNegativeInt(v sobek.Value) int64 {
+	if common.IsNullish(v) {
+		return -1
+	}
+	n := v.ToInteger()
+	if n < 0 {
+		return -1
+	}
+	return n
+}
+
+// maxRandomValuesLength is the maximum view byteLength accepted by getRandomValues.
 const maxRandomValuesLength = 65536
 
 // RandomUUID returns a [RFC4122] compliant v4 UUID string.
