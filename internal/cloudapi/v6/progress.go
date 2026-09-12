@@ -38,8 +38,11 @@ const (
 
 // TestProgress holds the progress of a test run.
 type TestProgress struct {
-	Status            Status
-	Result            Result
+	Status Status
+	Result Result
+	// ResultMessage is the API's human-readable description of why the
+	// test failed or errored; empty while running or when it passed.
+	ResultMessage     string
 	EstimatedDuration int32
 	ExecutionDuration int32
 	StatusHistory     []StatusEvent
