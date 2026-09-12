@@ -272,9 +272,12 @@ func (mi *WS) dial(
 	conn, httpResponse, dialErr := wsd.DialContext(ctx, url, args.headers)
 	connEnd := time.Now()
 
-	if state.Options.SystemTags.Has(metrics.TagIP) && conn.RemoteAddr() != nil {
+	// DialContext leaves conn nil on dial/handshake failure. Guard before
+	// RemoteAddr — matching k6/websockets — so enabling the ip system tag does
+	// not panic when the peer is unreachable or rejects the upgrade.
+	if conn != nil && conn.RemoteAddr() != nil {
 		if ip, _, err := net.SplitHostPort(conn.RemoteAddr().String()); err == nil {
-			args.tagsAndMeta.SetSystemTagOrMeta(metrics.TagIP, ip)
+			args.tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagIP, ip)
 		}
 	}
 
