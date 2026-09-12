@@ -2,6 +2,7 @@ package httpext
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
 	"go.k6.io/k6/v2/lib"
@@ -22,13 +23,25 @@ type BatchParsedHTTPRequest struct {
 // pre-initialized. In addition, each processed request would emit either a nil
 // value, or an error, via the returned errors channel. The goroutines exit when
 // the requests channel is closed.
+//
+// If globalLimit is non-positive and there are requests to run, no workers would
+// be started and callers waiting on the errors channel would hang forever.
+// That case is rejected with a buffered error per request instead.
 func MakeBatchRequests(
 	ctx context.Context, state *lib.State,
 	requests []BatchParsedHTTPRequest,
 	reqCount, globalLimit, perHostLimit int,
 ) <-chan error {
-	workers := min(reqCount, globalLimit)
 	result := make(chan error, reqCount)
+	if reqCount > 0 && globalLimit < 1 {
+		err := fmt.Errorf("batch concurrency must be a positive number but is %d", globalLimit)
+		for range reqCount {
+			result <- err
+		}
+		return result
+	}
+
+	workers := min(reqCount, globalLimit)
 	perHostLimiter := lib.NewMultiSlotLimiter(perHostLimit)
 
 	makeRequest := func(req BatchParsedHTTPRequest) {
