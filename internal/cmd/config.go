@@ -35,7 +35,7 @@ func configFlagSet() *pflag.FlagSet {
 	flags.Bool(
 		"no-usage-report",
 		false,
-		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
+		"don't send anonymous usage stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
 	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 	return flags
