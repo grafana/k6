@@ -846,6 +846,50 @@ func TestParseHTML(t *testing.T) {
 				assert.Equal(t, true, sel.Eq(0).Is("form"))
 			}
 		})
+		t.Run("Negative start on non-empty", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("body").children().slice(-1)`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 1, sel.Length())
+				assert.True(t, sel.Is("footer"))
+			}
+		})
+		t.Run("Empty selection slice(-1) does not panic", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find(".does-not-exist").slice(-1).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(0), v.Export())
+			}
+		})
+		t.Run("Start past length returns empty", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("body").children().slice(100).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(0), v.Export())
+			}
+		})
+		t.Run("Negative start past -length returns all", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("body").children().slice(-100).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(5), v.Export())
+			}
+		})
+		t.Run("End past length is clamped", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("body").children().slice(3, 100).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(2), v.Export())
+			}
+		})
+		t.Run("Inverted range returns empty", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("body").children().slice(3, 1).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(0), v.Export())
+			}
+		})
+		t.Run("Negative end", func(t *testing.T) {
+			v, err := rt.RunString(`doc.find("body").children().slice(1, -1).size()`)
+			if assert.NoError(t, err) {
+				assert.Equal(t, int64(3), v.Export())
+			}
+		})
 	})
 	t.Run("Get", func(t *testing.T) {
 		t.Parallel()
