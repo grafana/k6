@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"archive/tar"
 	"bytes"
 	"fmt"
 	"io/fs"
@@ -365,6 +366,30 @@ func TestMalformedMetadata(t *testing.T) {
 	_, err = ReadArchive(b)
 	require.Error(t, err)
 	require.EqualError(t, err, `invalid character ',' looking for beginning of object key string`)
+}
+
+func TestReadArchiveMissingMetadataJSON(t *testing.T) {
+	t.Parallel()
+
+	// detectTestType() treats any readable tar as an archive, including tars that
+	// are not k6 bundles (no metadata.json). ReadArchive must return an error
+	// instead of panicking on the nil FilenameURL.
+	buf := bytes.NewBuffer(nil)
+	w := tar.NewWriter(buf)
+	require.NoError(t, w.WriteHeader(&tar.Header{
+		Name:     "dummy.txt",
+		Mode:     0o644,
+		Size:     5,
+		Typeflag: tar.TypeReg,
+	}))
+	_, err := w.Write([]byte("hello"))
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	arc, err := ReadArchive(buf)
+	require.Error(t, err)
+	require.Nil(t, arc)
+	require.EqualError(t, err, "incomplete archive: missing metadata.json")
 }
 
 func TestStrangePaths(t *testing.T) {
