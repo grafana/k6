@@ -87,11 +87,14 @@ func (c *Client) doWithRetry(req *http.Request) (*http.Response, error) {
 	return doWithRetry(c.apiClient.GetConfig().HTTPClient, req)
 }
 
-// doWithRetry runs req through httpClient, retrying on 5xx responses and
-// transport errors up to clientcfg.MaxRetries times, resetting the body
-// from req.GetBody before each attempt so a retried request with a body is
-// not sent empty. The retry wait honours req.Context() so a cancelled
-// request stops waiting promptly. 4xx responses are NOT retried.
+// doWithRetry runs req through httpClient, retrying on 5xx responses,
+// HTTP 429, and transport errors up to clientcfg.MaxRetries times,
+// resetting the body from req.GetBody before each attempt so a retried
+// request with a body is not sent empty. The retry wait honours
+// req.Context() so a cancelled request stops waiting promptly.
+// Other 4xx responses are NOT retried. Retrying 429 matches the legacy
+// cloudapi client: metrics flushes pop queued buckets before the push, so
+// a non-retried transient rate-limit response permanently drops samples.
 func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, error) {
 	var (
 		lastErr  error
@@ -122,7 +125,7 @@ func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, er
 			break
 		}
 
-		if lastResp.StatusCode >= 500 && attempt < clientcfg.MaxRetries {
+		if shouldRetryStatus(lastResp.StatusCode) && attempt < clientcfg.MaxRetries {
 			_, _ = io.Copy(io.Discard, lastResp.Body)
 			_ = lastResp.Body.Close()
 			select {
@@ -137,4 +140,10 @@ func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, er
 	}
 
 	return lastResp, lastErr
+}
+
+// shouldRetryStatus reports whether an HTTP status should be retried.
+// Matches cloudapi.shouldRetry: server errors and rate limiting.
+func shouldRetryStatus(statusCode int) bool {
+	return statusCode >= 500 || statusCode == http.StatusTooManyRequests
 }
