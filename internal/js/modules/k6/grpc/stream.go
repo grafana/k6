@@ -367,6 +367,11 @@ func (s *stream) close(err error) {
 	}
 
 	s.logger.Debugf("stream %s is closing", s.method)
+	// Mark writing closed before done so a stream.write() from an end/error
+	// listener (or after server-side EOF without client.end()) is a no-op
+	// instead of blocking forever on the unbuffered writeQueueCh after
+	// writeData has exited.
+	s.writingState = closed
 	close(s.done)
 
 	s.tq.Queue(func() error {
