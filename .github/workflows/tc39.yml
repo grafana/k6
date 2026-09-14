@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - v1.x
   pull_request:
       paths:
           - 'js/**'

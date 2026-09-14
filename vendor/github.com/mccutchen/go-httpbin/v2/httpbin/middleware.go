@@ -117,37 +117,50 @@ func observe(o Observer, h http.Handler) http.Handler {
 		mw := &metaResponseWriter{w: w}
 		t := time.Now()
 		h.ServeHTTP(mw, r)
-		o(Result{
-			Status:    mw.Status(),
-			Method:    r.Method,
-			URI:       r.URL.RequestURI(),
-			Size:      mw.Size(),
-			Duration:  time.Since(t),
-			UserAgent: r.Header.Get("User-Agent"),
-			ClientIP:  getClientIP(r),
+		o(r.Context(), Result{
+			Status:      mw.Status(),
+			Method:      r.Method,
+			URI:         r.URL.RequestURI(),
+			Route:       r.Pattern,
+			Size:        mw.Size(),
+			Duration:    time.Since(t),
+			UserAgent:   r.Header.Get("User-Agent"),
+			ClientIP:    getClientIP(r),
+			RequestSize: r.ContentLength,
 		})
 	})
 }
 
-// Result is the result of handling a request, used for instrumentation
+// Result records the details of an incoming request and the resulting
+// response, for instrumentation via an [Observer].
 type Result struct {
 	Status    int
 	Method    string
 	URI       string
-	Size      int64
 	Duration  time.Duration
 	UserAgent string
 	ClientIP  string
+
+	// Response size in bytes written. TODO: consider rename to ResponseSize
+	// for clarity/consistency with RequestSize.
+	Size int64
+
+	// Matched net/http handler route pattern, via [Request.Pattern]:
+	// https://pkg.go.dev/net/http#Request
+	Route string
+
+	// Request size via, incoming Content-Length header.
+	RequestSize int64
 }
 
 // Observer is a function that will be called with the details of a handled
 // request, which can be used for logging, instrumentation, etc
-type Observer func(result Result)
+type Observer func(ctx context.Context, result Result)
 
 // StdLogObserver creates an Observer that will log each request in structured
 // format using the given stdlib logger
 func StdLogObserver(l *slog.Logger) Observer {
-	return func(result Result) {
+	return func(ctx context.Context, result Result) {
 		logLevel := slog.LevelInfo
 		if result.Status >= 500 {
 			logLevel = slog.LevelError
@@ -155,16 +168,18 @@ func StdLogObserver(l *slog.Logger) Observer {
 			logLevel = slog.LevelWarn
 		}
 		l.LogAttrs(
-			context.Background(),
+			ctx,
 			logLevel,
 			fmt.Sprintf("%d %s %s %.1fms", result.Status, result.Method, result.URI, result.Duration.Seconds()*1e3),
 			slog.Int("status", result.Status),
 			slog.String("method", result.Method),
 			slog.String("uri", result.URI),
+			slog.String("route", result.Route),
 			slog.Int64("size_bytes", result.Size),
 			slog.Float64("duration_ms", result.Duration.Seconds()*1e3),
 			slog.String("user_agent", result.UserAgent),
 			slog.String("client_ip", result.ClientIP),
+			slog.Int64("request_size_bytes", result.RequestSize),
 		)
 	}
 }
