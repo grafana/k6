@@ -37,7 +37,13 @@ type eventListener struct {
 	// this return sobek.value *and* error in order to return error on exception instead of panic
 	// https://pkg.go.dev/github.com/dop251/goja#hdr-Functions
 	on   func(sobek.Value) (sobek.Value, error)
-	list []func(sobek.Value) (sobek.Value, error)
+	list []listenerEntry
+}
+
+// listenerEntry represents a single listener entry in the list of listeners
+type listenerEntry struct {
+	val sobek.Value
+	fn  func(sobek.Value) (sobek.Value, error)
 }
 
 // newListener creates a new listener of a certain type
@@ -48,8 +54,24 @@ func newListener(eventType string) *eventListener {
 }
 
 // add adds a listener to the listener list
-func (l *eventListener) add(fn func(sobek.Value) (sobek.Value, error)) {
-	l.list = append(l.list, fn)
+func (l *eventListener) add(entry listenerEntry) {
+	l.list = append(l.list, entry)
+}
+
+// remove removes all listeners matching the provided JavaScript value
+func (l *eventListener) remove(target sobek.Value) {
+	if len(l.list) == 0 {
+		return
+	}
+
+	newList := make([]listenerEntry, 0, len(l.list))
+	for _, entry := range l.list {
+		if !entry.val.SameAs(target) {
+			newList = append(newList, entry)
+		}
+	}
+
+	l.list = newList
 }
 
 // setOn sets a listener for the on* properties, like onopen, onmessage, etc.
@@ -64,11 +86,22 @@ func (l *eventListener) getOn() func(sobek.Value) (sobek.Value, error) {
 
 // return all possible listeners for a certain event type
 func (l *eventListener) all() []func(sobek.Value) (sobek.Value, error) {
-	if l.on == nil {
-		return l.list
+	size := len(l.list)
+	if l.on != nil {
+		size++
 	}
 
-	return append([]func(sobek.Value) (sobek.Value, error){l.on}, l.list...)
+	fns := make([]func(sobek.Value) (sobek.Value, error), 0, size)
+
+	if l.on != nil {
+		fns = append(fns, l.on)
+	}
+
+	for _, entry := range l.list {
+		fns = append(fns, entry.fn)
+	}
+
+	return fns
 }
 
 // getTypes return event listener of a certain type
@@ -92,14 +125,27 @@ func (l *eventListeners) getType(t string) *eventListener {
 }
 
 // add adds a listener to the listeners
-func (l *eventListeners) add(t string, f func(sobek.Value) (sobek.Value, error)) error {
+func (l *eventListeners) add(t string, entry listenerEntry) error {
 	list := l.getType(t)
 
 	if list == nil {
 		return fmt.Errorf("unknown event type: %s", t)
 	}
 
-	list.add(f)
+	list.add(entry)
+
+	return nil
+}
+
+// remove removes a listener from the listeners
+func (l *eventListeners) remove(t string, target sobek.Value) error {
+	list := l.getType(t)
+
+	if list == nil {
+		return fmt.Errorf("unknown event type: %s", t)
+	}
+
+	list.remove(target)
 
 	return nil
 }
