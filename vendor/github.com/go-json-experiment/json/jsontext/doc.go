@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 // Package jsontext implements syntactic processing of JSON
 // as specified in RFC 4627, RFC 7159, RFC 7493, RFC 8259, and RFC 8785.
 // JSON is a simple data interchange format that can represent
@@ -18,8 +20,8 @@
 //   - a JSON literal (i.e., null, true, or false)
 //   - a JSON string (e.g., "hello, world!")
 //   - a JSON number (e.g., 123.456)
-//   - a start or end delimiter for a JSON object (i.e., '{' or '}')
-//   - a start or end delimiter for a JSON array (i.e., '[' or ']')
+//   - a begin or end delimiter for a JSON object (i.e., '{' or '}')
+//   - a begin or end delimiter for a JSON array (i.e., '[' or ']')
 //
 // A JSON token is represented by the [Token] type in Go. Technically,
 // there are two additional structural characters (i.e., ':' and ','),
@@ -32,7 +34,7 @@
 //
 //   - a JSON literal, string, or number
 //   - a JSON object (e.g., `{"name":"value"}`)
-//   - a JSON array (e.g., `[1,2,3,]`)
+//   - a JSON array (e.g., `[1,2,3]`)
 //
 // A JSON value is represented by the [Value] type in Go and is a []byte
 // containing the raw textual representation of the value. There is some overlap
@@ -41,18 +43,18 @@
 //
 // The [Encoder] and [Decoder] types contain methods to read or write the next
 // [Token] or [Value] in a sequence. They maintain a state machine to validate
-// whether the sequence of JSON tokens and/or values produces a valid JSON.
+// whether the sequence of JSON tokens and/or values produces valid JSON.
 // [Options] may be passed to the [NewEncoder] or [NewDecoder] constructors
-// to configure the syntactic behavior of encoding and decoding.
+// to configure the behavior of encoding and decoding.
 //
 // # Terminology
 //
 // The terms "encode" and "decode" are used for syntactic functionality
 // that is concerned with processing JSON based on its grammar, and
 // the terms "marshal" and "unmarshal" are used for semantic functionality
-// that determines the meaning of JSON values as Go values and vice-versa.
-// This package (i.e., [jsontext]) deals with JSON at a syntactic layer,
-// while [encoding/json/v2] deals with JSON at a semantic layer.
+// that determines the meaning of JSON values as Go values and vice versa.
+// This package deals with JSON syntax,
+// while [encoding/json/v2] deals with JSON semantics.
 // The goal is to provide a clear distinction between functionality that
 // is purely concerned with encoding versus that of marshaling.
 // For example, one can directly encode a stream of JSON tokens without
@@ -96,6 +98,10 @@
 // RFC 7493 is a stricter subset of RFC 8259 and fully compliant with it.
 // In particular, it makes specific choices about behavior that RFC 8259
 // leaves as undefined in order to ensure greater interoperability.
+//
+// # Security Considerations
+//
+// See the "Security Considerations" section in [encoding/json/v2].
 package jsontext
 
 // requireKeyedLiterals can be embedded in a struct to require keyed literals.
