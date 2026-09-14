@@ -32,11 +32,6 @@ import (
 	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
-type jsFrameBaseOpts struct {
-	Timeout string
-	Strict  bool
-}
-
 const sampleHTML = `<div><b>Test</b><ol><li><i>One</i></li></ol></div>`
 
 func TestNestedFrames(t *testing.T) {
@@ -441,7 +436,7 @@ func TestPageInnerHTML(t *testing.T) {
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
 		popts := common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout())
-		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		popts.Timeout = 100 * time.Millisecond
 		_, err = p.InnerHTML("p", popts)
 		require.Error(t, err)
 	})
@@ -479,7 +474,7 @@ func TestPageInnerText(t *testing.T) {
 		require.NoError(t, err)
 
 		popts := common.NewFrameInnerTextOptions(p.MainFrame().Timeout())
-		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		popts.Timeout = 100 * time.Millisecond
 		_, err = p.InnerText("p", popts)
 		require.Error(t, err)
 	})

@@ -29,6 +29,9 @@ func TestConfigApply(t *testing.T) {
 		Headers: map[string]string{
 			"X-Header": "value",
 		},
+		Labels: map[string]string{
+			"test_id": "checkout",
+		},
 		TrendStats:   []string{"p(99)"},
 		StaleMarkers: null.BoolFrom(true),
 	}
@@ -295,6 +298,43 @@ func TestOptionHeaders(t *testing.T) {
 			"X-Scope-OrgID":  "my-org-id",
 			"another-header": "true",
 			"empty":          "",
+		},
+		TrendStats:   []string{"p(99)"},
+		StaleMarkers: null.BoolFrom(false),
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
+func TestOptionLabels(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"labels":{"environment":"production","server":"srv1"}}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_LABELS": "environment=production,server=srv1"}},
+		//nolint:gocritic
+		//"Arg":  {arg: "labels.environment=production,labels.server=srv1"},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom(defaultServerURL),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		PushInterval:          types.NullDurationFrom(defaultPushInterval),
+		Headers:               make(map[string]string),
+		Labels: map[string]string{
+			"environment": "production",
+			"server":      "srv1",
 		},
 		TrendStats:   []string{"p(99)"},
 		StaleMarkers: null.BoolFrom(false),

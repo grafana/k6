@@ -351,6 +351,35 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 	require.NoError(t, err, "failed to close page #2")
 }
 
+// TestContextlessConnectionDoesNotStallNavigation guards against connections
+// freezing each other's pages when they share a browser instance. Every new
+// page starts paused until all auto-attached connections resume it. A
+// connection that hadn't created its browser context yet used to claim other
+// connections' pages without ever releasing them, stalling their navigations
+// until it disconnected. The second connection here never creates a context,
+// which reproduces that state deterministically.
+func TestContextlessConnectionDoesNotStallNavigation(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+
+	b2, err := tb.browserType.Connect(context.Background(), tb.context(), tb.wsURL)
+	require.NoError(t, err)
+	t.Cleanup(b2.Close)
+
+	bctx, err := tb.NewContext(nil)
+	require.NoError(t, err)
+	p, err := bctx.NewPage()
+	require.NoError(t, err)
+
+	err = tb.awaitWithTimeout(10*time.Second, func() error {
+		opts := &common.FrameGotoOptions{Timeout: 10 * time.Second}
+		_, err := p.Goto("data:text/html,hello", opts)
+		return err
+	})
+	require.NoError(t, err)
+}
+
 func TestCloseContext(t *testing.T) {
 	t.Parallel()
 

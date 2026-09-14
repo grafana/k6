@@ -2,16 +2,9 @@ package common
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"time"
-
-	"github.com/grafana/sobek"
-
-	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
-	"go.k6.io/k6/v2/js/common"
 )
 
 type FrameBaseOptions struct {
@@ -165,6 +158,11 @@ var pollingTypeToID = map[string]PollingType{ //nolint:gochecknoglobals
 	"interval": PollingInterval,
 }
 
+func PollingIDFromString(format string) (PollingType, bool) {
+	id, exists := pollingTypeToID[format]
+	return id, exists
+}
+
 // MarshalJSON marshals the enum as a quoted JSON string.
 func (p PollingType) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
@@ -214,37 +212,11 @@ func NewFrameBaseOptions(defaultTimeout time.Duration) *FrameBaseOptions {
 	}
 }
 
-// Parse parses the frame base options.
-func (o *FrameBaseOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-	return nil
-}
-
 func NewFrameCheckOptions(defaultTimeout time.Duration) *FrameCheckOptions {
 	return &FrameCheckOptions{
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
 		Strict:                          false,
 	}
-}
-
-// Parse parses the frame check options.
-func (o *FrameCheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	o.Strict = parseStrict(ctx, opts)
-	return nil
 }
 
 func NewFrameClickOptions(defaultTimeout time.Duration) *FrameClickOptions {
@@ -254,15 +226,6 @@ func NewFrameClickOptions(defaultTimeout time.Duration) *FrameClickOptions {
 	}
 }
 
-// Parse parses the frame click options.
-func (o *FrameClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleClickOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	o.Strict = parseStrict(ctx, opts)
-	return nil
-}
-
 func NewFrameDblClickOptions(defaultTimeout time.Duration) *FrameDblclickOptions {
 	return &FrameDblclickOptions{
 		ElementHandleDblclickOptions: *NewElementHandleDblclickOptions(defaultTimeout),
@@ -270,29 +233,11 @@ func NewFrameDblClickOptions(defaultTimeout time.Duration) *FrameDblclickOptions
 	}
 }
 
-// Parse parses the frame dblclick options.
-func (o *FrameDblclickOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleDblclickOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	o.Strict = parseStrict(ctx, opts)
-	return nil
-}
-
 func NewFrameFillOptions(defaultTimeout time.Duration) *FrameFillOptions {
 	return &FrameFillOptions{
 		ElementHandleBaseOptions: *NewElementHandleBaseOptions(defaultTimeout),
 		Strict:                   false,
 	}
-}
-
-// Parse parses the frame fill options.
-func (o *FrameFillOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	o.Strict = parseStrict(ctx, opts)
-	return nil
 }
 
 func NewFrameGotoOptions(defaultReferer string, defaultTimeout time.Duration) *FrameGotoOptions {
@@ -303,42 +248,11 @@ func NewFrameGotoOptions(defaultReferer string, defaultTimeout time.Duration) *F
 	}
 }
 
-// Parse parses the frame goto options.
-func (o *FrameGotoOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "referer":
-				o.Referer = opts.Get(k).String()
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			case "waitUntil":
-				lifeCycle := opts.Get(k).String()
-				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
-					return fmt.Errorf("parsing goto options: %w", err)
-				}
-			}
-		}
-	}
-	return nil
-}
-
 func NewFrameHoverOptions(defaultTimeout time.Duration) *FrameHoverOptions {
 	return &FrameHoverOptions{
 		ElementHandleHoverOptions: *NewElementHandleHoverOptions(defaultTimeout),
 		Strict:                    false,
 	}
-}
-
-// Parse parses the frame hover options.
-func (o *FrameHoverOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleHoverOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	o.Strict = parseStrict(ctx, opts)
-	return nil
 }
 
 func NewFrameInnerHTMLOptions(defaultTimeout time.Duration) *FrameInnerHTMLOptions {
@@ -347,26 +261,10 @@ func NewFrameInnerHTMLOptions(defaultTimeout time.Duration) *FrameInnerHTMLOptio
 	}
 }
 
-// Parse parses the frame innerHTML options.
-func (o *FrameInnerHTMLOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
-}
-
 func NewFrameInnerTextOptions(defaultTimeout time.Duration) *FrameInnerTextOptions {
 	return &FrameInnerTextOptions{
 		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
 	}
-}
-
-// Parse parses the frame innerText options.
-func (o *FrameInnerTextOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
 }
 
 func NewFrameInputValueOptions(defaultTimeout time.Duration) *FrameInputValueOptions {
@@ -375,26 +273,10 @@ func NewFrameInputValueOptions(defaultTimeout time.Duration) *FrameInputValueOpt
 	}
 }
 
-// Parse parses the frame inputValue options.
-func (o *FrameInputValueOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
-}
-
 func NewFrameIsCheckedOptions(defaultTimeout time.Duration) *FrameIsCheckedOptions {
 	return &FrameIsCheckedOptions{
 		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
 	}
-}
-
-// Parse parses the frame isChecked options.
-func (o *FrameIsCheckedOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
 }
 
 func NewFrameIsDisabledOptions(defaultTimeout time.Duration) *FrameIsDisabledOptions {
@@ -403,26 +285,10 @@ func NewFrameIsDisabledOptions(defaultTimeout time.Duration) *FrameIsDisabledOpt
 	}
 }
 
-// Parse parses the frame isDisabled options.
-func (o *FrameIsDisabledOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
-}
-
 func NewFrameIsEditableOptions(defaultTimeout time.Duration) *FrameIsEditableOptions {
 	return &FrameIsEditableOptions{
 		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
 	}
-}
-
-// Parse parses the frame isEditable options.
-func (o *FrameIsEditableOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
 }
 
 func NewFrameIsEnabledOptions(defaultTimeout time.Duration) *FrameIsEnabledOptions {
@@ -431,34 +297,10 @@ func NewFrameIsEnabledOptions(defaultTimeout time.Duration) *FrameIsEnabledOptio
 	}
 }
 
-// Parse parses the frame isEnabled options.
-func (o *FrameIsEnabledOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
-}
-
 func NewFrameIsInViewportOptions(defaultTimeout time.Duration) *FrameIsInViewportOptions {
 	return &FrameIsInViewportOptions{
 		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
 	}
-}
-
-// Parse parses the frame isInViewport options.
-func (o *FrameIsInViewportOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	if !common.IsNullish(opts) {
-		obj := opts.ToObject(k6ext.Runtime(ctx))
-		for _, k := range obj.Keys() {
-			if k == "ratio" {
-				o.Ratio = obj.Get(k).ToFloat()
-			}
-		}
-	}
-	return nil
 }
 
 // NewFrameIsHiddenOptions creates and returns a new instance of FrameIsHiddenOptions.
@@ -466,21 +308,9 @@ func NewFrameIsHiddenOptions() *FrameIsHiddenOptions {
 	return &FrameIsHiddenOptions{}
 }
 
-// Parse parses FrameIsHiddenOptions from sobek.Value.
-func (o *FrameIsHiddenOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	o.Strict = parseStrict(ctx, opts)
-	return nil
-}
-
 // NewFrameIsVisibleOptions creates and returns a new instance of FrameIsVisibleOptions.
 func NewFrameIsVisibleOptions() *FrameIsVisibleOptions {
 	return &FrameIsVisibleOptions{}
-}
-
-// Parse parses FrameIsVisibleOptions from sobek.Value.
-func (o *FrameIsVisibleOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	o.Strict = parseStrict(ctx, opts)
-	return nil
 }
 
 func NewFramePressOptions(defaultTimeout time.Duration) *FramePressOptions {
@@ -505,42 +335,11 @@ func NewFrameSelectOptionOptions(defaultTimeout time.Duration) *FrameSelectOptio
 	}
 }
 
-// Parse parses the frame selectOption options.
-func (o *FrameSelectOptionOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	o.Strict = parseStrict(ctx, opts)
-	return nil
-}
-
 func NewFrameSetContentOptions(defaultTimeout time.Duration) *FrameSetContentOptions {
 	return &FrameSetContentOptions{
 		Timeout:   defaultTimeout,
 		WaitUntil: LifecycleEventLoad,
 	}
-}
-
-// Parse parses the frame setContent options.
-func (o *FrameSetContentOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			case "waitUntil":
-				lifeCycle := opts.Get(k).String()
-				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
-					return fmt.Errorf("parsing setContent options: %w", err)
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
 // NewFrameSetInputFilesOptions creates a new FrameSetInputFilesOptions.
@@ -551,14 +350,6 @@ func NewFrameSetInputFilesOptions(defaultTimeout time.Duration) *FrameSetInputFi
 	}
 }
 
-// Parse parses FrameSetInputFilesOptions from sobek.Value.
-func (o *FrameSetInputFilesOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleSetInputFilesOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
-}
-
 func NewFrameTapOptions(defaultTimeout time.Duration) *FrameTapOptions {
 	return &FrameTapOptions{
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
@@ -567,42 +358,10 @@ func NewFrameTapOptions(defaultTimeout time.Duration) *FrameTapOptions {
 	}
 }
 
-// Parse parses the frame tap options.
-func (o *FrameTapOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "modifiers":
-				var m []string
-				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
-					return err
-				}
-				o.Modifiers = m
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
-	return nil
-}
-
 func NewFrameTextContentOptions(defaultTimeout time.Duration) *FrameTextContentOptions {
 	return &FrameTextContentOptions{
 		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
 	}
-}
-
-// Parse parses the frame textContent options.
-func (o *FrameTextContentOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	return nil
 }
 
 func NewFrameTypeOptions(defaultTimeout time.Duration) *FrameTypeOptions {
@@ -626,15 +385,6 @@ func NewFrameUncheckOptions(defaultTimeout time.Duration) *FrameUncheckOptions {
 	}
 }
 
-// Parse parses the frame uncheck options.
-func (o *FrameUncheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
-		return err
-	}
-	o.Strict = parseStrict(ctx, opts)
-	return nil
-}
-
 func NewFrameWaitForFunctionOptions(defaultTimeout time.Duration) *FrameWaitForFunctionOptions {
 	return &FrameWaitForFunctionOptions{
 		Polling:  PollingRaf,
@@ -643,58 +393,10 @@ func NewFrameWaitForFunctionOptions(defaultTimeout time.Duration) *FrameWaitForF
 	}
 }
 
-// Parse JavaScript waitForFunction options.
-func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	if common.IsNullish(opts) {
-		return nil
-	}
-
-	rt := k6ext.Runtime(ctx)
-	obj := opts.ToObject(rt)
-	for _, k := range obj.Keys() {
-		v := obj.Get(k)
-		switch k {
-		case "timeout":
-			o.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
-		case "polling":
-			switch v.ExportType().Kind() {
-			case reflect.Int64:
-				o.Polling = PollingInterval
-				o.Interval = v.ToInteger()
-			case reflect.String:
-				if p, ok := pollingTypeToID[v.ToString().String()]; ok {
-					o.Polling = p
-					break
-				}
-				fallthrough
-			default:
-				return fmt.Errorf("wrong polling option value: %q; "+
-					`possible values: "raf", "mutation" or number`, v)
-			}
-		}
-	}
-
-	return nil
-}
-
 func NewFrameWaitForLoadStateOptions(defaultTimeout time.Duration) *FrameWaitForLoadStateOptions {
 	return &FrameWaitForLoadStateOptions{
 		Timeout: defaultTimeout,
 	}
-}
-
-// Parse parses the frame waitForLoadState options.
-func (o *FrameWaitForLoadStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "timeout" {
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-	return nil
 }
 
 func NewFrameWaitForNavigationOptions(defaultTimeout time.Duration) *FrameWaitForNavigationOptions {
@@ -705,36 +407,6 @@ func NewFrameWaitForNavigationOptions(defaultTimeout time.Duration) *FrameWaitFo
 	}
 }
 
-// Parse parses the frame waitForNavigation options.
-func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "url":
-				var val string
-				switch opts.Get(k).ExportType() {
-				case reflect.TypeFor[string]():
-					val = fmt.Sprintf("'%s'", opts.Get(k).String()) // Strings require quotes
-				default: // JS Regex, CSS, numbers or booleans
-					val = opts.Get(k).String() // No quotes
-				}
-
-				o.URL = val
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			case "waitUntil":
-				lifeCycle := opts.Get(k).String()
-				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
-					return fmt.Errorf("parsing waitForNavigation options: %w", err)
-				}
-			}
-		}
-	}
-	return nil
-}
-
 func NewFrameWaitForSelectorOptions(defaultTimeout time.Duration) *FrameWaitForSelectorOptions {
 	return &FrameWaitForSelectorOptions{
 		State:   DOMElementStateVisible,
@@ -743,58 +415,16 @@ func NewFrameWaitForSelectorOptions(defaultTimeout time.Duration) *FrameWaitForS
 	}
 }
 
-// Parse parses the frame waitForSelector options.
-func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "state":
-				state := opts.Get(k).String()
-				if s, ok := domElementStateToID[state]; ok {
-					o.State = s
-				} else {
-					return fmt.Errorf("%q is not a valid DOM state", state)
-				}
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
-	}
-
-	return nil
-}
-
 // FrameDispatchEventOptions are options for Frame.dispatchEvent.
 type FrameDispatchEventOptions struct {
-	*FrameBaseOptions
+	FrameBaseOptions
 }
 
 // NewFrameDispatchEventOptions returns a new FrameDispatchEventOptions.
 func NewFrameDispatchEventOptions(defaultTimeout time.Duration) *FrameDispatchEventOptions {
 	return &FrameDispatchEventOptions{
-		FrameBaseOptions: NewFrameBaseOptions(defaultTimeout),
+		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
 	}
-}
-
-func parseStrict(ctx context.Context, opts sobek.Value) bool {
-	var strict bool
-
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "strict" {
-				strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
-
-	return strict
 }
 
 // FrameWaitForURLOptions are options for Frame.waitForURL and Page.waitForURL.
@@ -809,24 +439,4 @@ func NewFrameWaitForURLOptions(defaultTimeout time.Duration) *FrameWaitForURLOpt
 		Timeout:   defaultTimeout,
 		WaitUntil: LifecycleEventLoad,
 	}
-}
-
-// Parse parses the frame waitForURL options.
-func (o *FrameWaitForURLOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if !common.IsNullish(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			case "waitUntil":
-				lifeCycle := opts.Get(k).String()
-				if err := o.WaitUntil.UnmarshalText([]byte(lifeCycle)); err != nil {
-					return fmt.Errorf("parsing waitForURL options: %w", err)
-				}
-			}
-		}
-	}
-	return nil
 }

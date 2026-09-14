@@ -496,8 +496,7 @@ func (controller *WritableStreamDefaultController) toObject() (*sobek.Object, er
 // exceptionValue extracts the underlying JavaScript value from a Go error, if it wraps a
 // [sobek.Exception]. Otherwise, it returns the error as-is.
 func exceptionValue(err error) any {
-	var ex *sobek.Exception
-	if errors.As(err, &ex) {
+	if ex, ok := errors.AsType[*sobek.Exception](err); ok {
 		return ex.Value()
 	}
 	return err

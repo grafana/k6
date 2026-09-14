@@ -1,5 +1,5 @@
 // Package grpc_wrappers_testing provides a test service that could be used for the testing gRPC wrappers
-package grpc_wrappers_testing //nolint:revive // we want to be consistent with the other packages
+package grpc_wrappers_testing
 
 import (
 	context "context"

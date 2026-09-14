@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  deps:
+  generate-check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -31,23 +31,19 @@ jobs:
         with:
           go-version: ${{ steps.go_versions.outputs.current }}
           check-latest: true
-      - name: Check dependencies
-        run: |
-            go version
-            test -z "$(go mod tidy && go mod vendor && git status --porcelain)"
-            go mod verify
       - name: Check code generation
         run: |
           make generate
-          test -z "$(git status --porcelain | tee >(cat 1>&2))"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "make generate produced changes:"
+            git status --porcelain
+            git --no-pager diff
+            exit 1
+          fi
 
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - name: Run linters
-        uses: ./.github/actions/lint/
+  k6-ci:
+    uses: grafana/k6-ci/.github/workflows/all.yml@03469f9ae7aad25369827832c456e8f8b7b8c1c2 # v0.5.0
+    with:
+      k6-ci-ref: 03469f9ae7aad25369827832c456e8f8b7b8c1c2 # v0.5.0
+      skip-tests: true
+      skip-extension-testing: true

@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -38,12 +37,21 @@ func mapToSobek(vu moduleVU, m mapping) *sobek.Object {
 }
 
 func parseFrameClickOptions(
-	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
+	rt *sobek.Runtime, opts sobek.Value, defaultTimeout time.Duration,
 ) (*common.FrameClickOptions, error) {
 	copts := common.NewFrameClickOptions(defaultTimeout)
-	if err := copts.Parse(ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing click options: %w", err)
+	if k6common.IsNullish(opts) {
+		return copts, nil
 	}
+
+	ehcopts, err := parseElementHandleClickOptions(rt, opts, defaultTimeout)
+	if err != nil {
+		return copts, err
+	}
+
+	copts.ElementHandleClickOptions = *ehcopts
+	copts.Strict = parseStrict(rt, opts)
+
 	return copts, nil
 }
 

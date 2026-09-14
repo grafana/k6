@@ -107,6 +107,22 @@ func ParseJSON(data json.RawMessage) (Config, error) {
 	return conf, err
 }
 
+// splitPathPrefixAndDB splits a URL path into the address prefix kept as part
+// of Addr and a database name. The last segment is treated as the DB name,
+// allowing InfluxDB to be hosted behind a reverse proxy that routes on a path
+// prefix (e.g. https://host/influxdbA/dbname -> prefix=/influxdbA, db=dbname).
+// A trailing slash means the whole path is the prefix and no DB is specified.
+func splitPathPrefixAndDB(path string) (prefix, db string) {
+	if path == "" {
+		return "", ""
+	}
+	if rest, ok := strings.CutSuffix(path, "/"); ok {
+		return rest, ""
+	}
+	idx := strings.LastIndex(path, "/")
+	return path[:idx], path[idx+1:]
+}
+
 // ParseURL parses the supplied URL into a Config.
 func ParseURL(text string) (Config, error) {
 	c := Config{}
@@ -115,9 +131,12 @@ func ParseURL(text string) (Config, error) {
 		return c, err
 	}
 	if u.Host != "" {
-		c.Addr = null.StringFrom(u.Scheme + "://" + u.Host)
-	}
-	if db := strings.TrimPrefix(u.Path, "/"); db != "" {
+		prefix, db := splitPathPrefixAndDB(u.Path)
+		c.Addr = null.StringFrom(u.Scheme + "://" + u.Host + prefix)
+		if db != "" {
+			c.DB = null.StringFrom(db)
+		}
+	} else if db := strings.TrimPrefix(u.Path, "/"); db != "" {
 		c.DB = null.StringFrom(db)
 	}
 	if u.User != nil {

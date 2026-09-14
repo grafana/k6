@@ -221,8 +221,7 @@ func (c *rootCommand) execute() {
 		return
 	}
 
-	var ecerr errext.HasExitCode
-	if errors.As(err, &ecerr) {
+	if ecerr, ok := errors.AsType[errext.HasExitCode](err); ok {
 		exitCode = int(ecerr.ExitCode())
 	}
 
@@ -262,8 +261,7 @@ func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCod
 
 	err = customBinary.run(c.globalState.Ctx, c.globalState)
 	// this only happens if we actually ran the binary and it exited afterwads, in which case we propagate the exit code
-	var ecerr errext.HasExitCode
-	if errors.As(err, &ecerr) {
+	if ecerr, ok := errors.AsType[errext.HasExitCode](err); ok {
 		return ecerr.ExitCode(), err
 	}
 
@@ -316,6 +314,10 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 
 	flags.BoolVar(&gs.Flags.NoColor, "no-color", gs.Flags.NoColor, "disable colored output")
 	flags.Lookup("no-color").DefValue = strconv.FormatBool(gs.DefaultFlags.NoColor)
+
+	flags.BoolVar(&gs.Flags.LogNanosecondTimestamps, "log-ns-timestamps",
+		gs.Flags.LogNanosecondTimestamps, "switch log timestamp precision from second to nanosecond")
+	flags.Lookup("log-ns-timestamps").DefValue = strconv.FormatBool(gs.DefaultFlags.LogNanosecondTimestamps)
 
 	// TODO: support configuring these through environment variables as well?
 	// either with croconf or through the hack above...
@@ -388,19 +390,7 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		return fmt.Errorf("unsupported log output '%s'", line)
 	}
 
-	switch c.globalState.Flags.LogFormat {
-	case "raw":
-		c.globalState.Logger.SetFormatter(&RawFormatter{})
-		c.globalState.Logger.Debug("Logger format: RAW")
-	case "json":
-		c.globalState.Logger.SetFormatter(&logrus.JSONFormatter{})
-		c.globalState.Logger.Debug("Logger format: JSON")
-	default:
-		c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
-			ForceColors: loggerForceColors, DisableColors: c.globalState.Flags.NoColor,
-		})
-		c.globalState.Logger.Debug("Logger format: TEXT")
-	}
+	setupLogFormat(c, loggerForceColors)
 
 	secretsources, err := createSecretSources(c.globalState)
 	if err != nil {
@@ -441,6 +431,28 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		_ = w.Close()
 	})
 	return nil
+}
+
+func setupLogFormat(c *rootCommand, loggerForceColors bool) {
+	timestampFormat := ""
+	if c.globalState.Flags.LogNanosecondTimestamps {
+		timestampFormat = time.RFC3339Nano
+	}
+
+	switch c.globalState.Flags.LogFormat {
+	case "raw":
+		c.globalState.Logger.SetFormatter(&RawFormatter{})
+		c.globalState.Logger.Debug("Logger format: RAW")
+	case "json":
+		c.globalState.Logger.SetFormatter(&logrus.JSONFormatter{TimestampFormat: timestampFormat})
+		c.globalState.Logger.Debug("Logger format: JSON")
+	default:
+		c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
+			ForceColors: loggerForceColors, DisableColors: c.globalState.Flags.NoColor,
+			TimestampFormat: timestampFormat,
+		})
+		c.globalState.Logger.Debug("Logger format: TEXT")
+	}
 }
 
 func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {

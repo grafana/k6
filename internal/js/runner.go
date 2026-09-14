@@ -58,6 +58,9 @@ type Runner struct {
 	RPSLimit       *rate.Limiter
 	RunTags        *metrics.TagSet
 
+	// aiaFetcher owns the AIA cache + HTTP client when tlsAIAFetch is enabled.
+	aiaFetcher *netext.AIAFetcher
+
 	console    *console
 	setupData  []byte
 	BufferPool *lib.BufferPool
@@ -193,6 +196,9 @@ func (r *Runner) newVU(
 			)
 		})
 		tlsConfig.NameToCertificate = nameToCert //nolint:staticcheck
+	}
+	if r.Bundle.Options.TLSAIAFetch.Bool {
+		tlsConfig = r.aiaFetcher.Wrap(tlsConfig, r.preInitState.Logger) //nolint:contextcheck
 	}
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
@@ -579,6 +585,17 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		return err
 	}
 
+	// Rebuild the AIA fetcher against the new options — Blacklist / BlockedHostnames /
+	// Hosts / Resolver may have changed and the fetcher's dialer captures them.
+	runnerDialer := &netext.Dialer{
+		Dialer:           r.BaseDialer,
+		Resolver:         r.Resolver,
+		Blacklist:        opts.BlacklistIPs,
+		BlockedHostnames: opts.BlockedHostnames.Trie,
+		Hosts:            opts.Hosts.Trie,
+	}
+	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
+
 	// FIXME: add tests
 	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)
 
@@ -877,8 +894,7 @@ func (u *ActiveVU) RunOnce() error {
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
 	if err != nil {
-		var x *sobek.InterruptedError
-		if errors.As(err, &x) {
+		if x, ok := errors.AsType[*sobek.InterruptedError](err); ok {
 			if v, ok := x.Value().(*errext.InterruptError); ok {
 				v.Reason = x.Error()
 				err = v
@@ -959,8 +975,7 @@ func (u *VU) runFn(
 		u.moduleVUImpl.eventLoop.WaitOnRegistered()
 	}
 	endTime := time.Now()
-	var exception *sobek.Exception
-	if errors.As(err, &exception) {
+	if exception, ok := errors.AsType[*sobek.Exception](err); ok {
 		err = &scriptExceptionError{inner: exception}
 	}
 
