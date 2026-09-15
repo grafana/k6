@@ -1603,14 +1603,23 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 }
 
 func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
+	return getSampleValuesWithMetadata(t, jsonOutput, metric, tags, nil)
+}
+
+func getSampleValuesWithMetadata(
+	t *testing.T, jsonOutput []byte, metric string, tags, metadata map[string]string,
+) []float64 {
 	jsonLines := bytes.Split(jsonOutput, []byte("\n"))
 	result := []float64{}
 
-	tagsMatch := func(rawTags any) bool {
-		sampleTags, ok := rawTags.(map[string]any)
+	valuesMatch := func(rawValues any, expected map[string]string) bool {
+		if len(expected) == 0 {
+			return true
+		}
+		sampleValues, ok := rawValues.(map[string]any)
 		require.True(t, ok)
-		for k, v := range tags {
-			rv, sok := sampleTags[k]
+		for k, v := range expected {
+			rv, sok := sampleValues[k]
 			if !sok {
 				return false
 			}
@@ -1642,7 +1651,7 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 		sampleData, ok := line["data"].(map[string]any)
 		require.True(t, ok)
 
-		if !tagsMatch(sampleData["tags"]) {
+		if !valuesMatch(sampleData["tags"], tags) || !valuesMatch(sampleData["metadata"], metadata) {
 			continue
 		}
 
