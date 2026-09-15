@@ -756,19 +756,27 @@ func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 		return errors.New("internal error: FrameSession is nil")
 	}
 
+	p.routesMu.RLock()
+	defer p.routesMu.RUnlock()
+
 	// This prevents a TOCTOU race where Close() snapshots owned sessions
 	// and then a new session is inserted outside that snapshot.
 	p.frameSessionsMu.Lock()
-	defer p.frameSessionsMu.Unlock()
 
 	if p.isClosing() {
 		p.logger.Debugf("Page:attachFrameSession", "rejected fid=%v: page is closing", fid)
+		p.frameSessionsMu.Unlock()
 		return errPageClosing
 	}
 
+	if err := fs.updateRequestInterception(len(p.routes) > 0); err != nil {
+		p.frameSessionsMu.Unlock()
+		return err
+	}
 	p.frameSessions[fid] = fs
+	p.frameSessionsMu.Unlock()
 
-	return nil
+	return fs.resume()
 }
 
 // waitForFrameSessions waits for every FrameSession's event goroutine
@@ -1361,7 +1369,7 @@ func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) erro
 	p.routesMu.Lock()
 	defer p.routesMu.Unlock()
 	if len(p.routes) == 0 {
-		err := p.mainFrameSession.updateRequestInterception(true)
+		err := p.updateRequestInterception(true)
 		if err != nil {
 			return err
 		}
@@ -1380,6 +1388,32 @@ func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) erro
 	return nil
 }
 
+// updateRequestInterception applies the page route state to every owned session.
+// The caller holds routesMu, serializing this update with frame attachment.
+func (p *Page) updateRequestInterception(enabled bool) error {
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+	for _, fs := range p.frameSessions {
+		select {
+		case <-fs.session.Done():
+			continue
+		default:
+		}
+		if err := fs.updateRequestInterception(enabled); err != nil {
+			if fs != p.mainFrameSession && errors.Is(err, ErrTargetCrashed) {
+				continue
+			}
+			select {
+			case <-fs.session.Done():
+				continue
+			default:
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Unroute removes the route(s) for the specified URL pattern.
 // If multiple routes match the same URL pattern, all of them are removed.
 func (p *Page) Unroute(path string) error {
@@ -1394,7 +1428,7 @@ func (p *Page) Unroute(path string) error {
 
 	// If no routes remain, disable request interception
 	if len(p.routes) == 0 {
-		return p.mainFrameSession.updateRequestInterception(false)
+		return p.updateRequestInterception(false)
 	}
 
 	return nil
@@ -1410,7 +1444,7 @@ func (p *Page) UnrouteAll() error {
 	p.routes = []*RouteHandler{}
 
 	// Disable request interception when no route is registered
-	return p.mainFrameSession.updateRequestInterception(false)
+	return p.updateRequestInterception(false)
 }
 
 // NavigationTimeout returns the page's navigation timeout.

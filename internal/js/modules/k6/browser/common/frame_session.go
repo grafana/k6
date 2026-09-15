@@ -154,8 +154,12 @@ func NewFrameSession(
 		hasUIWindow:          hasUIWindow,
 	}
 
-	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return nil, fmt.Errorf("run if waiting for debugger to attach: %w", err)
+	// A new top-level target may not acknowledge Network.enable until resumed.
+	// Child renderers stay paused until interception is installed and they are registered.
+	if parent == nil {
+		if err := fs.resume(); err != nil {
+			return nil, err
+		}
 	}
 
 	var parentNM *NetworkManager
@@ -220,6 +224,14 @@ func NewFrameSession(
 	}
 
 	return &fs, nil
+}
+
+// resume releases the renderer only after its owner has installed and published state.
+func (fs *FrameSession) resume() error {
+	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return fmt.Errorf("run if waiting for debugger to attach: %w", err)
+	}
+	return nil
 }
 
 func (fs *FrameSession) emulateLocale() error {
@@ -558,7 +570,6 @@ func (fs *FrameSession) initOptions() error {
 	var (
 		opts       = fs.manager.page.browserCtx.opts
 		optActions = []Action{}
-		state      = fs.vu.State()
 	)
 
 	if fs.isMainFrame() {
@@ -602,12 +613,7 @@ func (fs *FrameSession) initOptions() error {
 		return err
 	}
 
-	var reqIntercept bool
-	if state.Options.BlockedHostnames.Trie != nil ||
-		len(state.Options.BlacklistIPs) > 0 {
-		reqIntercept = true
-	}
-	if err := fs.updateRequestInterception(reqIntercept); err != nil {
+	if err := fs.updateRequestInterception(fs.page.hasRoutes()); err != nil {
 		return err
 	}
 
@@ -1073,12 +1079,17 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) error {
+	attached := false
+	defer func() {
+		if !attached {
+			detachSession(session)
+		}
+	}()
 	// If the page is closing, don't create a new FrameSession.
 	// Unblocks the target so the browser doesn't hang.
 	if fs.page.isClosing() {
 		fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 			"rejected frame; page is closing: tid=%v", ti.TargetID)
-		detachSession(session)
 		return nil
 	}
 
@@ -1117,12 +1128,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 		if errors.Is(err, errPageClosing) {
 			fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 				"rejected frame; page is closing: tid=%v", ti.TargetID)
-			detachSession(session)
 			return nil
 		}
 		return err
 	}
 
+	attached = true
 	return nil
 }
 
