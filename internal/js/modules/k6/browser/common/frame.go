@@ -1982,15 +1982,57 @@ func (f *Frame) waitForFunction(
 		"fid:%s furl:%q world:%s poll:%s timeout:%s",
 		f.ID(), f.URL(), world, polling, timeout)
 
-	f.waitForExecutionContext(world)
-
-	f.executionContextMu.RLock()
-	defer f.executionContextMu.RUnlock()
-
-	execCtx := f.executionContexts[world]
-	if execCtx == nil {
-		return nil, fmt.Errorf("waiting for function: execution context %q not found", world)
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		apiCtx, cancel = context.WithTimeout(apiCtx, timeout)
+		defer cancel()
 	}
+
+	retry := time.NewTicker(50 * time.Millisecond)
+	defer retry.Stop()
+	for {
+		if err := ContextErr(apiCtx); err != nil {
+			return nil, fmt.Errorf("waiting for function: %w", &k6ext.UserFriendlyError{Err: err, Timeout: timeout})
+		}
+		if f.IsDetached() {
+			return nil, fmt.Errorf("waiting for function: %w", ErrFrameDetached)
+		}
+		if f.page.IsClosed() {
+			return nil, errors.New("waiting for function: page is closed")
+		}
+
+		// Context lifecycle events must be able to run while a predicate is pending.
+		f.executionContextMu.RLock()
+		execCtx := f.executionContexts[world]
+		f.executionContextMu.RUnlock()
+		if execCtx != nil {
+			remaining := timeout
+			if deadline, ok := apiCtx.Deadline(); ok {
+				remaining = max(time.Until(deadline), time.Millisecond)
+			}
+			result, err := f.pollFunction(apiCtx, execCtx, js, polling, remaining, args...)
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				return nil, &k6ext.UserFriendlyError{Err: err, Timeout: timeout}
+			}
+			var protocolErr devToolsError
+			ok := errors.As(err, &protocolErr)
+			if !ok || (!strings.Contains(protocolErr.Message, "Inspected target navigated or closed") &&
+				!strings.Contains(protocolErr.Message, "Cannot find context with specified id") &&
+				!strings.Contains(protocolErr.Message, "Execution context was destroyed")) {
+				return result, err
+			}
+		}
+		select {
+		case <-apiCtx.Done():
+		case <-retry.C:
+		}
+	}
+}
+
+func (f *Frame) pollFunction(
+	apiCtx context.Context, execCtx frameExecutionContext, js string,
+	polling any, timeout time.Duration, args ...any,
+) (any, error) {
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
 		return nil, fmt.Errorf("getting injected script: %w", err)
@@ -2024,7 +2066,8 @@ func (f *Frame) waitForFunction(
 	}
 	// prevent passing a non-nil interface to the upper layers.
 	if result == nil {
-		return nil, nil //nolint:nilnil
+		// A canceled protocol send can return no object without an error.
+		return nil, ContextErr(apiCtx)
 	}
 
 	return result, nil

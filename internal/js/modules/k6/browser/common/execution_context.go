@@ -21,6 +21,11 @@ const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 // This error code originates from chromium.
 const devToolsServerErrorCode = -32000
 
+// Keep protocol errors distinguishable from exceptions thrown by page JavaScript.
+type devToolsError struct{ Message string }
+
+func (e devToolsError) Error() string { return e.Message }
+
 type executionWorld string
 
 const (
@@ -212,9 +217,7 @@ func (e *ExecutionContext) eval(
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		var cdpe *cdproto.Error
 		if errors.As(err, &cdpe) && cdpe.Code == devToolsServerErrorCode {
-			// By creating a new error instead of reusing it, we're removing the
-			// chromium specific error code.
-			return nil, errors.New(cdpe.Message)
+			return nil, devToolsError{cdpe.Message}
 		}
 
 		e.logger.Debugf("ExecutionContext:eval", "Unexpected DevTools server error: %v", err)
