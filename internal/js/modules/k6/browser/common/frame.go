@@ -249,15 +249,21 @@ func (f *Frame) defaultTimeout() time.Duration {
 }
 
 func (f *Frame) document() (*ElementHandle, error) {
+	return f.documentWithContext(f.ctx)
+}
+
+func (f *Frame) documentWithContext(apiCtx context.Context) (*ElementHandle, error) {
 	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.ID(), f.URL())
 
 	if cdh, ok := f.cachedDocumentHandle(); ok {
 		return cdh, nil
 	}
 
-	f.waitForExecutionContext(mainWorld)
+	if err := f.waitForExecutionContextWithContext(apiCtx, mainWorld); err != nil {
+		return nil, err
+	}
 
-	dh, err := f.newDocumentHandle()
+	dh, err := f.newDocumentHandleWithContext(apiCtx)
 	if err != nil {
 		return nil, fmt.Errorf("getting new document handle: %w", err)
 	}
@@ -281,8 +287,12 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 }
 
 func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
+	return f.newDocumentHandleWithContext(f.ctx)
+}
+
+func (f *Frame) newDocumentHandleWithContext(apiCtx context.Context) (*ElementHandle, error) {
 	result, err := f.evaluate(
-		f.ctx,
+		apiCtx,
 		mainWorld,
 		evalOptions{
 			forceCallable: false,
@@ -458,11 +468,15 @@ func (f *Frame) setID(id cdp.FrameID) {
 }
 
 func (f *Frame) waitForExecutionContext(world executionWorld) {
+	_ = f.waitForExecutionContextWithContext(f.ctx, world)
+}
+
+func (f *Frame) waitForExecutionContextWithContext(apiCtx context.Context, world executionWorld) error {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
 
 	if f.hasContext(world) {
-		return
+		return nil
 	}
 
 	t := time.NewTicker(50 * time.Millisecond)
@@ -471,10 +485,10 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 		select {
 		case <-t.C:
 			if f.hasContext(world) {
-				return
+				return nil
 			}
-		case <-f.ctx.Done():
-			return
+		case <-apiCtx.Done():
+			return apiCtx.Err()
 		}
 	}
 }
@@ -498,9 +512,13 @@ func (f *Frame) waitForSelectorRetry(
 // retry workaround is needed since the underlying DOM can change when the
 // wait action is performed during a navigation.
 func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+	return f.waitForSelectorWithContext(f.ctx, selector, opts)
+}
+
+func (f *Frame) waitForSelectorWithContext(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	handle, err := f.waitFor(selector, opts, 20)
+	handle, err := f.waitForWithContext(apiCtx, selector, opts, 20)
 	if err != nil {
 		return nil, err
 	}
@@ -544,6 +562,15 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 func (f *Frame) waitFor(
 	selector string, opts *FrameWaitForSelectorOptions, retryCount int,
 ) (_ *ElementHandle, rerr error) {
+	return f.waitForWithContext(f.ctx, selector, opts, retryCount)
+}
+
+func (f *Frame) waitForWithContext(
+	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions, retryCount int,
+) (_ *ElementHandle, rerr error) {
+	if err := apiCtx.Err(); err != nil {
+		return nil, err
+	}
 	f.log.Debugf("Frame:waitFor", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	retryCount--
@@ -551,27 +578,27 @@ func (f *Frame) waitFor(
 		return nil, errors.New("waitFor retry threshold reached")
 	}
 
-	document, err := f.document()
+	document, err := f.documentWithContext(apiCtx)
 	if err != nil {
 		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		return nil, err
 	}
 
-	handle, err := document.waitForSelector(f.ctx, selector, opts)
+	handle, err := document.waitForSelector(apiCtx, selector, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "Inspected target navigated or closed") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "Execution context was destroyed") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "visible") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 	}
 
@@ -2467,30 +2494,58 @@ func (f *Frame) newPointerAction(
 	selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFunc,
 	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
-	// We execute a frame pointer action in the following steps:
-	// 1. Find element matching specified selector
-	// 2. Wait for it to reach specified DOM state
-	// 3. Run element handle action (incl. actionability checks)
 	return func(apiCtx context.Context, resultCh chan any, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-		waitOpts.State = state
-		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
-		if err != nil {
-			select {
-			case <-apiCtx.Done():
-			case errCh <- err:
+		for {
+			if apiCtx.Err() != nil {
+				return
+			}
+			waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+			waitOpts.State = state
+			waitOpts.Strict = strict
+			if deadline, ok := apiCtx.Deadline(); opts.retry && ok {
+				waitOpts.Timeout = time.Until(deadline)
+				if waitOpts.Timeout <= 0 {
+					return
+				}
+			}
+			selectorCtx := f.ctx
+			if opts.retry {
+				selectorCtx = apiCtx
+			}
+			handle, err := f.waitForSelectorWithContext(selectorCtx, selector, waitOpts)
+			var result any
+			if err == nil && handle != nil {
+				action := handle.newPointerAction(fn, opts)
+				if !opts.retry {
+					action(apiCtx, resultCh, errCh)
+					return
+				}
+				// A locator owns the selector, so retry detached nodes by resolving
+				// it again. The original action context keeps the same deadline.
+				result, err = call(apiCtx, action, 0)
+				if errors.Is(err, ErrElementNotAttachedToDOM) {
+					// This selector-created handle is no longer usable. Release it
+					// before resolving another, under the same action deadline.
+					if releaseErr := handle.disposeWithContext(apiCtx); releaseErr != nil {
+						f.log.Debugf("Frame:newPointerAction", "releasing detached handle: %v", releaseErr)
+					}
+					if retry, _ := shouldRetry(apiCtx, err); retry {
+						continue
+					}
+				}
+			}
+			if err != nil {
+				select {
+				case <-apiCtx.Done():
+				case errCh <- err:
+				}
+			} else {
+				select {
+				case <-apiCtx.Done():
+				case resultCh <- result:
+				}
 			}
 			return
 		}
-		if handle == nil {
-			select {
-			case <-apiCtx.Done():
-			case resultCh <- nil:
-			}
-			return
-		}
-		f := handle.newPointerAction(fn, opts)
-		f(apiCtx, resultCh, errCh)
 	}
 }

@@ -116,6 +116,10 @@ func (h *BaseJSHandle) Dispose() error {
 
 // dispose sends a command to the browser to release the remote object.
 func (h *BaseJSHandle) dispose() error {
+	return h.disposeWithContext(h.ctx)
+}
+
+func (h *BaseJSHandle) disposeWithContext(ctx context.Context) error {
 	if h.disposed {
 		return nil
 	}
@@ -124,7 +128,7 @@ func (h *BaseJSHandle) dispose() error {
 		return nil
 	}
 	act := runtime.ReleaseObject(h.remoteObject.ObjectID)
-	if err := act.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	if err := act.Do(cdp.WithExecutor(ctx, h.session)); err != nil {
 		return fmt.Errorf("disposing element with ID %s: %w",
 			h.remoteObject.ObjectID, err)
 	}
