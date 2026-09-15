@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
@@ -262,5 +263,36 @@ func TestHasSourceURL(t *testing.T) {
 			t.Parallel()
 			require.Equal(t, c.result, hasSourceURL(c.js))
 		})
+	}
+}
+
+// createWaitForEventHandler used to close its wait channel on the first event
+// of the requested type even when the predicate returned false. That raced
+// with concurrent newPage/popup events and unblocked waiters too early.
+func TestCreateWaitForEventHandlerIgnoresNonMatching(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	emitter := NewBaseEventEmitter(ctx)
+	want := "want"
+	ch, remove := createWaitForEventHandler(
+		ctx, &emitter, []string{"page"},
+		func(data any) bool {
+			s, _ := data.(string)
+			return s == want
+		},
+	)
+	defer remove()
+
+	emitter.emit("page", "other")
+	emitter.emit("page", want)
+
+	select {
+	case got := <-ch:
+		require.Equal(t, want, got)
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for matching event; non-matching event likely closed the wait channel")
 	}
 }

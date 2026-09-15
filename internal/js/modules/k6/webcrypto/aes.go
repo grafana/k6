@@ -316,6 +316,12 @@ func (acp *AESCBCParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 		return nil, NewError(OperationError, "iv length is invalid, should be 16 bytes")
 	}
 
+	// Reject empty / non-block-aligned ciphertext before CryptBlocks, which panics on
+	// those inputs. Matches the Web Crypto AES-CBC decrypt operation.
+	if len(ciphertext) == 0 || len(ciphertext)%aes.BlockSize != 0 {
+		return nil, NewError(OperationError, "ciphertext length must be a multiple of 16 bytes")
+	}
+
 	keyHandle, ok := key.handle.([]byte)
 	if !ok {
 		return nil, NewError(OperationError, "invalid key handle")
@@ -599,8 +605,11 @@ func (agp *AESGCMParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	}
 
 	// 3.
-	if len(agp.Iv) < 1 || uint64(len(agp.Iv)) > maxAESGcmIvLength {
-		return nil, NewError(OperationError, "iv length is too long")
+	// Go's AES-GCM only supports a 12-byte IV/nonce. Encrypt already rejects other
+	// lengths; validate here too so Open is not called with a wrong nonce size
+	// (which panics in crypto/cipher).
+	if len(agp.Iv) != 12 {
+		return nil, NewError(NotSupportedError, "only 12 bytes long iv are supported")
 	}
 
 	// 4.
@@ -626,7 +635,10 @@ func (agp *AESGCMParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 		return nil, NewError(OperationError, "could not create GCM cipher")
 	}
 
-	// The Golang AES GCM cipher only supports a Nonce/Iv length of 12 bytes,
+	if len(agp.Iv) != gcm.NonceSize() {
+		return nil, NewError(NotSupportedError, "only 12 bytes long iv are supported")
+	}
+
 	plaintext, err := gcm.Open(nil, agp.Iv, ciphertext, agp.AdditionalData)
 	if err != nil {
 		return nil, NewError(OperationError, "could not decrypt ciphertext")
