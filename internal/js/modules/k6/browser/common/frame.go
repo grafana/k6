@@ -521,6 +521,9 @@ func (f *Frame) waitForSelectorWithContext(
 		return nil, err
 	}
 	if handle == nil {
+		if opts.State == DOMElementStateHidden || opts.State == DOMElementStateDetached {
+			return nil, nil //nolint:nilnil
+		}
 		return nil, fmt.Errorf("waiting for selector %q did not result in any nodes", selector)
 	}
 
