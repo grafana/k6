@@ -515,7 +515,9 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	return f.waitForSelectorWithContext(f.ctx, selector, opts)
 }
 
-func (f *Frame) waitForSelectorWithContext(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+func (f *Frame) waitForSelectorWithContext(
+	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
+) (*ElementHandle, error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	handle, err := f.waitForWithContext(apiCtx, selector, opts, 20)
@@ -2514,12 +2516,13 @@ func (f *Frame) newPointerAction(
 			}
 			handle, err := f.waitForSelectorWithContext(selectorCtx, selector, waitOpts)
 			var result any
-			if err == nil && handle != nil {
+			switch {
+			case err == nil && handle != nil && !opts.retry:
 				action := handle.newPointerAction(fn, opts)
-				if !opts.retry {
-					action(apiCtx, resultCh, errCh)
-					return
-				}
+				action(apiCtx, resultCh, errCh)
+				return
+			case err == nil && handle != nil:
+				action := handle.newPointerAction(fn, opts)
 				// A locator owns the selector, so retry detached nodes by resolving
 				// it again. The original action context keeps the same deadline.
 				result, err = call(apiCtx, action, 0)

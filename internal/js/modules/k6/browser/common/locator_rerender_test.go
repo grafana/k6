@@ -12,9 +12,13 @@ import (
 )
 
 func TestLocatorDetachedPointerReturnsForResolution(t *testing.T) {
+	t.Parallel()
+
 	for _, locator := range []bool{false, true} {
 		for _, detachAt := range []int{1, 3} {
 			t.Run(fmt.Sprintf("locator=%t/detachAt=%d", locator, detachAt), func(t *testing.T) {
+				t.Parallel()
+
 				calls := 0
 				opts := NewElementHandleBasePointerOptions(time.Second)
 				opts.retry = locator
@@ -37,6 +41,8 @@ func TestLocatorDetachedPointerReturnsForResolution(t *testing.T) {
 }
 
 func TestLocatorDetachedRetryCancellation(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	retry, err := shouldRetry(ctx, ErrElementNotAttachedToDOM)
@@ -45,6 +51,8 @@ func TestLocatorDetachedRetryCancellation(t *testing.T) {
 }
 
 func TestLocatorDetachedSelectorCancellation(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	// A canceled action must stop before touching frame/document state.
@@ -54,6 +62,8 @@ func TestLocatorDetachedSelectorCancellation(t *testing.T) {
 }
 
 func TestLocatorDetachedMissingDocumentCancellation(t *testing.T) {
+	t.Parallel()
+
 	frame := &Frame{ctx: context.Background(), log: log.NewNullLogger(), executionContexts: make(map[executionWorld]frameExecutionContext)}
 	ctx, cancel := context.WithCancel(frame.ctx)
 	defer cancel()
@@ -75,6 +85,8 @@ func TestLocatorDetachedMissingDocumentCancellation(t *testing.T) {
 }
 
 func TestLocatorDetachedDocumentEvaluationCancellation(t *testing.T) {
+	t.Parallel()
+
 	frame := &Frame{ctx: context.Background(), log: log.NewNullLogger(), executionContexts: make(map[executionWorld]frameExecutionContext)}
 	entered := make(chan struct{})
 	frame.executionContexts[mainWorld] = &executionContextTestStub{evalFn: func(ctx context.Context, _ evalOptions, _ string, _ ...any) (any, error) {
