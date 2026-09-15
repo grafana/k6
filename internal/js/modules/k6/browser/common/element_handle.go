@@ -684,7 +684,7 @@ func (h *ElementHandle) waitForSelector(
 			return nil, err
 		}
 
-		return frame.waitForSelector(afterFrameSelector, opts)
+		return frame.waitForSelectorWithContext(apiCtx, afterFrameSelector, opts)
 	}
 
 	// No frame navigation - proceed with normal waitForSelector logic
@@ -1804,7 +1804,7 @@ func retryPointerAction(
 ) (res any, err error) {
 	for {
 		res, err = fn(apiCtx, nil)
-		if opts.Force || err == nil {
+		if opts.Force || err == nil || (opts.retry && errors.Is(err, ErrElementNotAttachedToDOM)) {
 			return res, err
 		}
 
@@ -1816,8 +1816,8 @@ func retryPointerAction(
 			ScrollPositionNearest,
 		} {
 			s := ScrollIntoViewOptions{Block: p, Inline: p}
-			if res, err = fn(apiCtx, &s); err == nil {
-				return res, nil
+			if res, err = fn(apiCtx, &s); err == nil || (opts.retry && errors.Is(err, ErrElementNotAttachedToDOM)) {
+				return res, err
 			}
 		}
 
