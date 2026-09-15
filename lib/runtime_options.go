@@ -39,11 +39,16 @@ type RuntimeOptions struct {
 	// Environment variables passed onto the runner
 	Env map[string]string `json:"env"`
 
-	NoThresholds  null.Bool   `json:"noThresholds"`
-	SummaryMode   null.String `json:"summaryMode"`
-	SummaryExport null.String `json:"summaryExport"`
-	KeyWriter     null.String `json:"-"`
-	TracesOutput  null.String `json:"tracesOutput"`
+	NoThresholds     null.Bool   `json:"noThresholds"`
+	SummaryMode      null.String `json:"summaryMode"`
+	SummaryExport    null.String `json:"summaryExport"`
+	KeyWriter        null.String `json:"-"`
+	TracingEnabled   null.Bool   `json:"tracingEnabled"`
+	TracesOutput     null.String `json:"tracesOutput"`
+	TracesParent     null.String `json:"tracesParent"`
+	TracesSampler    null.String `json:"tracesSampler"`
+	TracesSamplerArg null.String `json:"tracesSamplerArg"`
+	TracesPropagator null.String `json:"tracesPropagator"`
 
 	// Until v2
 	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`

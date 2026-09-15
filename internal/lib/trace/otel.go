@@ -44,6 +44,15 @@ type TracerProvider struct {
 	shutdown tracerProvShutdownFunc
 }
 
+// Tracer returns a tracer from the configured provider or a no-op tracer when
+// the provider has not been configured.
+func (p *TracerProvider) Tracer(name string, options ...trace.TracerOption) trace.Tracer {
+	if p == nil || p.TracerProvider == nil {
+		return noop.NewTracerProvider().Tracer(name, options...)
+	}
+	return p.TracerProvider.Tracer(name, options...)
+}
+
 type tracerProviderParams struct {
 	proto    string
 	endpoint string
@@ -62,7 +71,9 @@ func defaultTracerProviderParams() tracerProviderParams {
 }
 
 // NewTracerProvider creates a new tracer provider.
-func NewTracerProvider(ctx context.Context, params tracerProviderParams) (*TracerProvider, error) {
+func NewTracerProvider(
+	ctx context.Context, params tracerProviderParams, sampler sdktrace.Sampler,
+) (*TracerProvider, error) {
 	client, err := newClient(params)
 	if err != nil {
 		return nil, fmt.Errorf("creating TracerProvider exporter client: %w", err)
@@ -76,6 +87,7 @@ func NewTracerProvider(ctx context.Context, params tracerProviderParams) (*Trace
 	prov := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(newResource()),
+		sdktrace.WithSampler(sampler),
 	)
 
 	// Set a noop TracerProvider globally so usage of tracing
@@ -86,6 +98,21 @@ func NewTracerProvider(ctx context.Context, params tracerProviderParams) (*Trace
 		TracerProvider: prov,
 		shutdown:       prov.Shutdown,
 	}, nil
+}
+
+// NewTracerProviderWithoutExporter creates a tracer provider that generates
+// spans without exporting them.
+func NewTracerProviderWithoutExporter(sampler sdktrace.Sampler) *TracerProvider {
+	prov := sdktrace.NewTracerProvider(
+		sdktrace.WithResource(newResource()),
+		sdktrace.WithSampler(sampler),
+	)
+	otel.SetTracerProvider(NewNoopTracerProvider())
+
+	return &TracerProvider{
+		TracerProvider: prov,
+		shutdown:       prov.Shutdown,
+	}
 }
 
 func newResource() *resource.Resource {
@@ -158,13 +185,15 @@ func (tp *TracerProvider) Shutdown(ctx context.Context) error {
 //   - header.<header_name>
 //
 // Example: otel=127.0.0.1:4318/v1/traces,proto=http,header.Authorization=token ***
-func TracerProviderFromConfigLine(ctx context.Context, line string) (*TracerProvider, error) {
+func TracerProviderFromConfigLine(
+	ctx context.Context, line string, sampler sdktrace.Sampler,
+) (*TracerProvider, error) {
 	params, err := tracerProviderParamsFromConfigLine(line)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewTracerProvider(ctx, params)
+	return NewTracerProvider(ctx, params, sampler)
 }
 
 func tracerProviderParamsFromConfigLine(line string) (tracerProviderParams, error) {

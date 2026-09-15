@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"go.opentelemetry.io/otel/propagation"
 
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/errext"
@@ -73,27 +74,21 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
 
-	// shutdownTracerProvider is set once the tracer provider is created below.
-	// It must run after the Exit event has been emitted and handled (e.g. by
-	// the browser module ending any open spans), but before globalCtx is
-	// cancelled by globalCancel above, since it derives its own timeout from
-	// globalCtx.
-	var shutdownTracerProvider func()
+	// endTestRunSpan and shutdownTracerProvider are set once the tracer provider
+	// is created below. They must run after the Exit event has been emitted and
+	// handled, but before globalCtx is cancelled by globalCancel above.
+	var (
+		endTestRunSpan         func(error)
+		shutdownTracerProvider func()
+	)
 	defer func() {
+		if endTestRunSpan != nil {
+			endTestRunSpan(err)
+		}
 		if shutdownTracerProvider != nil {
 			shutdownTracerProvider()
 		}
 	}()
-
-	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
-	// k6 was started with the --linger option.
-	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
-	defer lingerCancel()
-
-	// runCtx is used for the test run execution and is created with the special
-	// execution.NewTestRunContext() function so that it can be aborted even
-	// from sub-contexts while also attaching a reason for the abort.
-	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
 
 	emitEvent := func(evt *event.Event) func() {
 		waitDone := c.gs.Events.Emit(evt)
@@ -115,10 +110,45 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		c.gs.Events.UnsubscribeAll()
 	}()
 
+	runtimeOptions, err := getRuntimeOptions(cmd.Flags(), c.gs.Env)
+	if err != nil {
+		return err
+	}
+	tracerProvider, traceCtx, tracePropagator, err := newTracerProvider(globalCtx, runtimeOptions)
+	if err != nil {
+		return err
+	}
+	shutdownTracerProvider = func() {
+		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
+		defer cancel()
+		if tpErr := tracerProvider.Shutdown(ctx); tpErr != nil {
+			logger.Errorf("The tracer provider didn't stop gracefully: %v", tpErr)
+		}
+	}
+
+	// The test run span's lifetime includes test loading. testCtx carries it
+	// through the execution contexts created after loading.
+	testCtx, runSpan := trace.StartTestRun(traceCtx, tracerProvider)
+	endTestRunSpan = func(runErr error) {
+		trace.EndSpan(runSpan, runErr)
+	}
+
+	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
+	// k6 was started with the --linger option.
+	lingerCtx, lingerCancel := context.WithCancel(testCtx)
+	defer lingerCancel()
+
+	// runCtx is used for the test run execution and is created with the special
+	// execution.NewTestRunContext() function so that it can be aborted even
+	// from sub-contexts while also attaching a reason for the abort.
+	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
+
 	test, controller, err := c.loadConfiguredTest(cmd, args)
 	if err != nil {
 		return err
 	}
+	test.preInitState.TracerProvider = tracerProvider
+	test.preInitState.TracePropagator = tracePropagator
 	printBanner(c.gs)
 	if test.keyLogger != nil {
 		defer func() {
@@ -126,17 +156,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
 			}
 		}()
-	}
-
-	if err = c.setupTracerProvider(globalCtx, test); err != nil {
-		return err
-	}
-	shutdownTracerProvider = func() {
-		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
-		defer cancel()
-		if tpErr := test.preInitState.TracerProvider.Shutdown(ctx); tpErr != nil {
-			logger.Errorf("The tracer provider didn't stop gracefully: %v", tpErr)
-		}
 	}
 
 	// Write the full consolidated *and derived* options back to the Runner.
@@ -449,7 +468,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
-	err = execScheduler.Run(globalCtx, runCtx, samples)
+	err = execScheduler.Run(testCtx, runCtx, samples)
 
 	waitTestEndDone := emitEvent(&event.Event{Type: event.TestEnd})
 	defer waitTestEndDone()
@@ -512,20 +531,47 @@ func (c *cmdRun) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func (c *cmdRun) setupTracerProvider(ctx context.Context, test *loadedAndConfiguredTest) error {
-	ro := test.preInitState.RuntimeOptions
-	if ro.TracesOutput.String == "none" {
-		test.preInitState.TracerProvider = trace.NewNoopTracerProvider()
-		return nil
+func newTracerProvider(
+	ctx context.Context, runtimeOptions lib.RuntimeOptions,
+) (*trace.TracerProvider, context.Context, propagation.TextMapPropagator, error) {
+	output := runtimeOptions.TracesOutput.String
+	if output == "" {
+		output = "none"
+	}
+	enabled := runtimeOptions.TracingEnabled.Bool
+	if !runtimeOptions.TracingEnabled.Valid {
+		enabled = output != "none"
+	}
+	if !enabled {
+		if output != "none" {
+			return nil, ctx, nil, errors.New("traces output requires tracing to be enabled")
+		}
+		return trace.NewNoopTracerProvider(), ctx, propagation.TraceContext{}, nil
 	}
 
-	tp, err := trace.TracerProviderFromConfigLine(ctx, ro.TracesOutput.String)
+	sampler, err := trace.SamplerFromConfig(
+		runtimeOptions.TracesSampler.String, runtimeOptions.TracesSamplerArg.String,
+	)
 	if err != nil {
-		return err
+		return nil, ctx, nil, err
 	}
-	test.preInitState.TracerProvider = tp
+	propagator, err := trace.PropagatorFromConfig(runtimeOptions.TracesPropagator.String)
+	if err != nil {
+		return nil, ctx, nil, err
+	}
+	ctx, err = trace.ContextWithRemoteParent(ctx, runtimeOptions.TracesParent.String, propagator)
+	if err != nil {
+		return nil, ctx, nil, err
+	}
 
-	return nil
+	if output == "none" {
+		return trace.NewTracerProviderWithoutExporter(sampler), ctx, propagator, nil
+	}
+	tp, err := trace.TracerProviderFromConfigLine(ctx, output, sampler)
+	if err != nil {
+		return nil, ctx, nil, err
+	}
+	return tp, ctx, propagator, nil
 }
 
 func getCmdRun(gs *state.GlobalState) *cobra.Command {
