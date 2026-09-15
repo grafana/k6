@@ -516,7 +516,7 @@ func (m *FrameManager) requestFinished(req *Request) {
 	*/
 }
 
-func (m *FrameManager) requestStarted(req *Request) {
+func (m *FrameManager) requestStarted(req *Request, networkManager *NetworkManager) {
 	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s", m.ID(), req.URL())
 
 	m.framesMu.Lock()
@@ -536,11 +536,11 @@ func (m *FrameManager) requestStarted(req *Request) {
 		frame.pendingDocumentMu.Unlock()
 	}
 
-	if !m.page.hasRoutes() {
+	if req.interceptionID == "" || !m.page.hasRoutes() {
 		return
 	}
 
-	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, req)
+	route := NewRoute(m.logger, networkManager, req)
 	m.page.routesMu.RLock()
 	defer m.page.routesMu.RUnlock()
 	for _, r := range m.page.routes {
