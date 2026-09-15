@@ -105,7 +105,12 @@ func TestRunnerNew(t *testing.T) {
 func TestRunOnceStartsLinkedIterationTrace(t *testing.T) {
 	t.Parallel()
 
-	runner, err := getSimpleRunner(t, "/script.js", `exports.default = function() {}`)
+	runner, err := getSimpleRunner(t, "/script.js", `
+		import { currentSpan } from "k6/experimental/tracing";
+		export default function() {
+			currentSpan().setAttribute("script.attribute", "value");
+		}
+	`)
 	require.NoError(t, err)
 
 	exporter := &runnerTraceExporter{}
@@ -134,6 +139,13 @@ func TestRunOnceStartsLinkedIterationTrace(t *testing.T) {
 	require.False(t, iterationSpan.Parent().IsValid())
 	require.Len(t, iterationSpan.Links(), 1)
 	require.Equal(t, runSpan.SpanContext(), iterationSpan.Links()[0].SpanContext)
+	var scriptAttribute string
+	for _, attr := range iterationSpan.Attributes() {
+		if string(attr.Key) == "script.attribute" {
+			scriptAttribute = attr.Value.AsString()
+		}
+	}
+	require.Equal(t, "value", scriptAttribute)
 }
 
 func TestRunnerOptions(t *testing.T) {
