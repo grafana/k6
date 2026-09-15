@@ -78,6 +78,7 @@ func TestTracing(t *testing.T) {
 
 	rt := vu.Runtime()
 	root := browser.New()
+	root.EnableTracing()
 	mod := root.NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
@@ -205,6 +206,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 
 		rt := vu.Runtime()
 		root := browser.New()
+		root.EnableTracing()
 		mod := root.NewModuleInstance(vu)
 		jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 		require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
