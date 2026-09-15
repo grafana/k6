@@ -689,13 +689,13 @@ func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFra
 	}
 }
 
-func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (string, error) {
+func (fs *FrameSession) navigateFrame(ctx context.Context, frame *Frame, url, referrer string) (string, error) {
 	fs.logger.Debugf("FrameSession:navigateFrame",
 		"sid:%v fid:%s tid:%v url:%q referrer:%q",
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
-	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
+	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(ctx, fs.session))
 	if err != nil {
 		if errorText == "" {
 			err = fmt.Errorf("%w", err)

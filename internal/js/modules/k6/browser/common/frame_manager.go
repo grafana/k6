@@ -689,22 +689,6 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		fs = frame.page.mainFrameSession
 	}
 
-	var err error
-	newDocumentID, err = fs.navigateFrame(frame, url, parsedOpts.Referer)
-	if err != nil {
-		return nil, fmt.Errorf("navigating to %q: %w", url, err)
-	}
-
-	if newDocumentID == "" {
-		// It's a navigation within the same document (e.g., via anchor links or
-		// the History API), so don't wait for a response nor any lifecycle
-		// events.
-		return nil, nil //nolint:nilnil
-	}
-
-	// unblock the waiter goroutine
-	close(newDocIDIsReadyCh)
-
 	wrapTimeoutError := func(err error) error {
 		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
@@ -719,6 +703,25 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 
 		return err // TODO maybe wrap this as well?
 	}
+
+	var err error
+	newDocumentID, err = fs.navigateFrame(timeoutCtx, frame, url, parsedOpts.Referer)
+	if timeoutCtx.Err() != nil {
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("navigating to %q: %w", url, err)
+	}
+
+	if newDocumentID == "" {
+		// It's a navigation within the same document (e.g., via anchor links or
+		// the History API), so don't wait for a response nor any lifecycle
+		// events.
+		return nil, nil //nolint:nilnil
+	}
+
+	// unblock the waiter goroutine
+	close(newDocIDIsReadyCh)
 
 	var resp *Response
 	select {
