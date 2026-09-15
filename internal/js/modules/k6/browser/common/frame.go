@@ -286,10 +286,6 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 	return f.documentHandle, f.documentHandle != nil
 }
 
-func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
-	return f.newDocumentHandleWithContext(f.ctx)
-}
-
 func (f *Frame) newDocumentHandleWithContext(apiCtx context.Context) (*ElementHandle, error) {
 	result, err := f.evaluate(
 		apiCtx,
@@ -2501,20 +2497,10 @@ func (f *Frame) newPointerAction(
 			if apiCtx.Err() != nil {
 				return
 			}
-			waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-			waitOpts.State = state
-			waitOpts.Strict = strict
-			if deadline, ok := apiCtx.Deadline(); opts.retry && ok {
-				waitOpts.Timeout = time.Until(deadline)
-				if waitOpts.Timeout <= 0 {
-					return
-				}
+			handle, err := f.pointerActionHandle(apiCtx, selector, state, strict, opts.retry)
+			if apiCtx.Err() != nil {
+				return
 			}
-			selectorCtx := f.ctx
-			if opts.retry {
-				selectorCtx = apiCtx
-			}
-			handle, err := f.waitForSelectorWithContext(selectorCtx, selector, waitOpts)
 			var result any
 			switch {
 			case err == nil && handle != nil && !opts.retry:
@@ -2526,15 +2512,8 @@ func (f *Frame) newPointerAction(
 				// A locator owns the selector, so retry detached nodes by resolving
 				// it again. The original action context keeps the same deadline.
 				result, err = call(apiCtx, action, 0)
-				if errors.Is(err, ErrElementNotAttachedToDOM) {
-					// This selector-created handle is no longer usable. Release it
-					// before resolving another, under the same action deadline.
-					if releaseErr := handle.disposeWithContext(apiCtx); releaseErr != nil {
-						f.log.Debugf("Frame:newPointerAction", "releasing detached handle: %v", releaseErr)
-					}
-					if retry, _ := shouldRetry(apiCtx, err); retry {
-						continue
-					}
+				if f.retryDetachedPointerAction(apiCtx, handle, err) {
+					continue
 				}
 			}
 			if err != nil {
@@ -2551,4 +2530,37 @@ func (f *Frame) newPointerAction(
 			return
 		}
 	}
+}
+
+// pointerActionHandle resolves a selector under the locator's original deadline.
+func (f *Frame) pointerActionHandle(
+	apiCtx context.Context, selector string, state DOMElementState, strict, retry bool,
+) (*ElementHandle, error) {
+	waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+	waitOpts.State = state
+	waitOpts.Strict = strict
+	if deadline, ok := apiCtx.Deadline(); retry && ok {
+		waitOpts.Timeout = time.Until(deadline)
+		if waitOpts.Timeout <= 0 {
+			return nil, context.DeadlineExceeded
+		}
+	}
+	selectorCtx := f.ctx
+	if retry {
+		selectorCtx = apiCtx
+	}
+	return f.waitForSelectorWithContext(selectorCtx, selector, waitOpts)
+}
+
+func (f *Frame) retryDetachedPointerAction(apiCtx context.Context, handle *ElementHandle, err error) bool {
+	if !errors.Is(err, ErrElementNotAttachedToDOM) {
+		return false
+	}
+	// This selector-created handle is no longer usable. Release it before
+	// resolving another, under the same action deadline.
+	if releaseErr := handle.disposeWithContext(apiCtx); releaseErr != nil {
+		f.log.Debugf("Frame:newPointerAction", "releasing detached handle: %v", releaseErr)
+	}
+	retry, _ := shouldRetry(apiCtx, err)
+	return retry
 }
