@@ -23,3 +23,31 @@ func TestModuleNew(t *testing.T) {
 	require.NotNil(t, m.mod.NetworkProfiles, "Profiles should be set")
 	require.NotNil(t, m.mod.Chromium, "Chromium should be set")
 }
+
+func TestEnableTracing(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	root := New()
+	m := root.NewModuleInstance(vu).(*ModuleInstance)
+	require.False(t, root.tracingEnabled.Load())
+	require.NoError(t, vu.Runtime().Set("browser", m.mod.Browser))
+
+	_, err := vu.Runtime().RunString("browser.enableTracing()")
+	require.NoError(t, err)
+	require.True(t, root.tracingEnabled.Load())
+}
+
+func TestEnableTracingRequiresInitContext(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	root := New()
+	m := root.NewModuleInstance(vu).(*ModuleInstance)
+	require.NoError(t, vu.Runtime().Set("browser", m.mod.Browser))
+	vu.ActivateVU()
+
+	_, err := vu.Runtime().RunString("browser.enableTracing()")
+	require.ErrorContains(t, err, "browser.enableTracing() must be called in the init context")
+	require.False(t, root.tracingEnabled.Load())
+}

@@ -503,6 +503,7 @@ type browserAPI interface {
 	Close()
 	Context() *common.BrowserContext
 	CloseContext()
+	EnableTracing()
 	IsConnected() bool
 	NewContext(opts *common.BrowserContextOptions) (*common.BrowserContext, error)
 	NewPage(opts *common.BrowserContextOptions) (*common.Page, error)

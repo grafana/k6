@@ -23,7 +23,8 @@ type moduleVU struct {
 
 	filePersister
 
-	testRunID string
+	testRunID     string
+	enableTracing func()
 }
 
 // browser returns the VU browser instance for the current iteration.

@@ -208,7 +208,10 @@ func TestBrowserRegistry(t *testing.T) {
 
 		var (
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(
+				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil,
+				func() bool { return true },
+			)
 		)
 
 		vu.ActivateVU()
@@ -241,7 +244,9 @@ func TestBrowserRegistry(t *testing.T) {
 
 		var (
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(
+				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+			)
 		)
 
 		vu.ActivateVU()
@@ -271,7 +276,9 @@ func TestBrowserRegistry(t *testing.T) {
 
 		var (
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(
+				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+			)
 		)
 
 		vu.ActivateVU()
@@ -294,7 +301,9 @@ func TestBrowserRegistry(t *testing.T) {
 		vu := k6test.NewVU(t)
 		var cancel context.CancelFunc
 		vu.CtxField, cancel = context.WithCancel(vu.CtxField)
-		browserRegistry := newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+		browserRegistry := newBrowserRegistry(
+			context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+		)
 
 		vu.ActivateVU()
 
@@ -332,7 +341,9 @@ func TestBrowserRegistry(t *testing.T) {
 
 		var (
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(
+				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+			)
 		)
 
 		vu.ActivateVU()
@@ -371,9 +382,10 @@ func TestStartConnectTraceAttributes(t *testing.T) {
 	vu.State().VUID = 42 // non-zero so the test.vu assertion is meaningful
 
 	r := &browserRegistry{
-		vu:          vu,
-		m:           make(map[int64]*common.Browser),
-		userManaged: make(map[int64][]*common.Browser),
+		vu:             vu,
+		m:              make(map[int64]*common.Browser),
+		userManaged:    make(map[int64][]*common.Browser),
+		tracingEnabled: func() bool { return true },
 	}
 	r.startConnectTrace(vu.Context(), vu.State().Iteration)
 
@@ -381,6 +393,24 @@ func TestStartConnectTraceAttributes(t *testing.T) {
 	require.True(t, ok, "expected an 'iteration' root span")
 	require.Equal(t, int64(42), span.AttrInt64(t, "test.vu"))
 	require.Equal(t, "default", span.AttrString(t, "test.scenario"))
+}
+
+func TestStartConnectTraceDisabledByDefault(t *testing.T) {
+	t.Parallel()
+
+	recorder := k6test.NewSpanRecorder()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(provider))
+	vu.ActivateVU()
+	vu.StartIteration(t)
+
+	r := &browserRegistry{vu: vu}
+	gotCtx := r.startConnectTrace(vu.Context(), vu.State().Iteration)
+
+	require.Equal(t, vu.Context(), gotCtx)
+	require.Nil(t, r.tr)
+	_, found := recorder.Find("iteration")
+	require.False(t, found)
 }
 
 func TestTracesRegistryReusesCoreIterationSpan(t *testing.T) {
