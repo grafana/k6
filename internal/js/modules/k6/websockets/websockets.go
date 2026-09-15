@@ -888,6 +888,7 @@ func (w *webSocket) close(code int, reason string) error {
 	if code == 0 {
 		code = websocket.CloseNormalClosure
 	}
+	w.closeCode = code
 
 	wasConnecting := w.readyState == CONNECTING
 	w.readyState = CLOSING
@@ -905,8 +906,6 @@ func (w *webSocket) close(code int, reason string) error {
 		if !connectionEstablished {
 			return nil
 		}
-	} else {
-		w.closeCode = code
 	}
 
 	w.writeQueueCh <- message{

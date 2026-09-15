@@ -290,7 +290,7 @@ func TestCloseWhileConnectingCancelsHandshake(t *testing.T) {
 	err := runOnEventLoopWithTimeout(t, ts.runtime, ts.tb.Replacer.Replace(`
 		const ws = new WebSocket("WSBIN_URL/ws-pending-handshake");
 		ws.onerror = () => call("error:" + ws.readyState);
-		ws.onclose = () => call("close:" + ws.readyState);
+		ws.onclose = (event) => call("close:" + ws.readyState + ":" + event.code);
 
 		waitForRequest();
 		call("before:" + ws.readyState);
@@ -298,7 +298,7 @@ func TestCloseWhileConnectingCancelsHandshake(t *testing.T) {
 		call("after:" + ws.readyState);
 	`))
 	require.NoError(t, err)
-	require.Equal(t, []string{"before:0", "after:2", "error:3", "close:3"}, ts.callRecorder.Recorded())
+	require.Equal(t, []string{"before:0", "after:2", "error:3", "close:3:1000"}, ts.callRecorder.Recorded())
 
 	select {
 	case <-requestCanceled:
@@ -335,16 +335,16 @@ func TestCloseWhileHandshakeBecomesEstablished(t *testing.T) {
 		const ws = new WebSocket("WSBIN_URL/ws-close-during-upgrade");
 		ws.onopen = () => call("open");
 		ws.onerror = () => call("error:" + ws.readyState);
-		ws.onclose = () => call("close:" + ws.readyState);
+		ws.onclose = (event) => call("close:" + ws.readyState + ":" + event.code);
 
 		waitForUpgrade();
 		sleep(20_000_000);
 		call("before:" + ws.readyState);
-		ws.close();
+		ws.close(3001);
 		call("after:" + ws.readyState);
 	`))
 	require.NoError(t, err)
-	require.Equal(t, []string{"before:0", "after:2", "close:3"}, ts.callRecorder.Recorded())
+	require.Equal(t, []string{"before:0", "after:2", "error:3", "close:3:3001"}, ts.callRecorder.Recorded())
 
 	select {
 	case <-serverDone:
