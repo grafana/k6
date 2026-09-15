@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"net/http/cookiejar"
+	"sync/atomic"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/v2/js/common"
@@ -16,14 +17,17 @@ import (
 //
 // TODO: add sync.Once for all of the deprecation warnings we might want to do
 // for the old k6/http APIs here, so they are shown only once in a test run.
-type RootModule struct{}
+type RootModule struct {
+	tracingEnabled atomic.Bool
+}
 
 // ModuleInstance represents an instance of the HTTP module for every VU.
 type ModuleInstance struct {
-	vu            modules.VU
-	rootModule    *RootModule
-	defaultClient *Client
-	exports       *sobek.Object
+	vu             modules.VU
+	rootModule     *RootModule
+	tracingEnabled bool
+	defaultClient  *Client
+	exports        *sobek.Object
 }
 
 var (
@@ -40,9 +44,10 @@ func New() *RootModule {
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	rt := vu.Runtime()
 	mi := &ModuleInstance{
-		vu:         vu,
-		rootModule: r,
-		exports:    rt.NewObject(),
+		vu:             vu,
+		rootModule:     r,
+		tracingEnabled: r.tracingEnabled.Load(),
+		exports:        rt.NewObject(),
 	}
 	mi.defineConstants()
 
@@ -114,6 +119,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mustExport("request", mi.defaultClient.Request)
 	mustExport("asyncRequest", mi.defaultClient.asyncRequest)
 	mustExport("batch", mi.defaultClient.Batch)
+	mustExport("enableTracing", mi.EnableTracing)
 	mustExport("setResponseCallback", mi.defaultClient.SetResponseCallback)
 
 	mustExport("expectedStatuses", mi.expectedStatuses) // TODO: refactor?
@@ -134,6 +140,14 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 		Default: mi.exports,
 		// TODO: add new HTTP APIs like Client, Request (see above comment in
 		// NewModuleInstance()), etc. as named exports?
+	}
+}
+
+// EnableTracing enables native tracing for subsequent HTTP requests from this VU.
+func (mi *ModuleInstance) EnableTracing() {
+	mi.tracingEnabled = true
+	if mi.vu.State() == nil {
+		mi.rootModule.tracingEnabled.Store(true)
 	}
 }
 

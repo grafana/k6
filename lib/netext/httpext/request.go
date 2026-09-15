@@ -15,6 +15,7 @@ import (
 
 	"github.com/Azure/go-ntlmssp"
 	"github.com/sirupsen/logrus"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/lib"
@@ -51,6 +52,7 @@ type ParsedHTTPRequest struct {
 	ActiveJar        *cookiejar.Jar
 	Cookies          map[string]*HTTPRequestCookie
 	TagsAndMeta      metrics.TagsAndMeta
+	Tracing          bool
 }
 
 // ncloser matches non-compliant io.Closer implementations (e.g. zstd.Decoder).
@@ -111,7 +113,19 @@ func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 // TODO: split apart...
 //
 //nolint:cyclop, gocyclo, funlen, gocognit, nestif
-func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest) (*Response, error) {
+func MakeRequest(
+	ctx context.Context, state *lib.State, preq *ParsedHTTPRequest,
+) (result *Response, resultErr error) {
+	if preq.Tracing {
+		var span oteltrace.Span
+		ctx, span = startHTTPTrace(ctx, state, preq)
+		if span != nil {
+			defer func() {
+				endHTTPTrace(span, result, resultErr)
+			}()
+		}
+	}
+
 	respReq := &Request{
 		Method:  preq.Req.Method,
 		URL:     preq.Req.URL.String(),
