@@ -572,6 +572,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	}
 
 	req, err := NewRequest(m.ctx, m.logger, NewRequestParams{
+		session:           m.session,
 		event:             event,
 		frame:             frame,
 		redirectChain:     redirectChain,
