@@ -556,6 +556,13 @@ func (r *tracesRegistry) startIterationTrace(ctx context.Context, data k6event.I
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Core k6 owns iteration spans. Reuse one when it is already present, while
+	// retaining the fallback below for callers that only use the browser module.
+	if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+		r.tracer.ApplyMetadata(span)
+		return ctx
+	}
+
 	if t, ok := r.m[data.Iteration]; ok {
 		return t.ctx
 	}

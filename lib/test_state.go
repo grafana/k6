@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/propagation"
+
 	"go.k6.io/k6/v2/internal/event"
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/lib/trace"
@@ -18,16 +20,17 @@ import (
 // TestPreInitState contains all of the state that can be gathered and built
 // before the test run is initialized.
 type TestPreInitState struct {
-	RuntimeOptions RuntimeOptions
-	Registry       *metrics.Registry
-	BuiltinMetrics *metrics.BuiltinMetrics
-	Events         *event.System
-	KeyLogger      io.Writer
-	LookupEnv      func(key string) (val string, ok bool)
-	Logger         logrus.FieldLogger
-	TracerProvider *trace.TracerProvider
-	Usage          *usage.Usage
-	SecretsManager *secretsource.Manager
+	RuntimeOptions  RuntimeOptions
+	Registry        *metrics.Registry
+	BuiltinMetrics  *metrics.BuiltinMetrics
+	Events          *event.System
+	KeyLogger       io.Writer
+	LookupEnv       func(key string) (val string, ok bool)
+	Logger          logrus.FieldLogger
+	TracerProvider  *trace.TracerProvider
+	TracePropagator propagation.TextMapPropagator
+	Usage           *usage.Usage
+	SecretsManager  *secretsource.Manager
 
 	// FeatureFlags is the feature-flag activation set resolved once before test
 	// initialization and stable for the whole run.

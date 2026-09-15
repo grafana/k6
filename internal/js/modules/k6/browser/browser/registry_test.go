@@ -10,10 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
 
 	k6event "go.k6.io/k6/v2/internal/event"
 )
@@ -379,6 +381,24 @@ func TestStartConnectTraceAttributes(t *testing.T) {
 	require.True(t, ok, "expected an 'iteration' root span")
 	require.Equal(t, int64(42), span.AttrInt64(t, "test.vu"))
 	require.Equal(t, "default", span.AttrString(t, "test.scenario"))
+}
+
+func TestTracesRegistryReusesCoreIterationSpan(t *testing.T) {
+	t.Parallel()
+
+	recorder := k6test.NewSpanRecorder()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	traces := newTracesRegistry(browsertrace.NewTracer(provider, nil))
+	coreCtx, coreSpan := provider.Tracer("k6").Start(t.Context(), "iteration")
+
+	gotCtx := traces.startIterationTrace(coreCtx, k6event.IterData{Iteration: 1})
+	require.Equal(t, coreSpan.SpanContext(), oteltrace.SpanContextFromContext(gotCtx))
+	require.Equal(t, 0, traces.iterationTracesCount())
+
+	traces.endIterationTrace(1)
+	require.False(t, recorder.IsEnded(coreSpan.SpanContext().SpanID()))
+	coreSpan.End()
+	require.True(t, recorder.IsEnded(coreSpan.SpanContext().SpanID()))
 }
 
 func TestParseTracesMetadata(t *testing.T) {

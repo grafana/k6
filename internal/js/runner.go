@@ -27,6 +27,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/eventloop"
 	"go.k6.io/k6/v2/internal/lib/consts"
 	"go.k6.io/k6/v2/internal/lib/summary"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/internal/loader"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
@@ -240,23 +241,24 @@ func (r *Runner) newVU(
 	}
 
 	vu.state = &lib.State{
-		Logger:         vu.Runner.preInitState.Logger,
-		Options:        vu.Runner.Bundle.Options,
-		Transport:      vu.Transport,
-		Dialer:         vu.Dialer,
-		TLSConfig:      vu.TLSConfig,
-		CookieJar:      cookieJar,
-		RPSLimit:       vu.Runner.RPSLimit,
-		BufferPool:     vu.BufferPool,
-		VUID:           vu.ID,
-		VUIDGlobal:     vu.IDGlobal,
-		Samples:        vu.Samples,
-		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
-		BuiltinMetrics: r.preInitState.BuiltinMetrics,
-		FeatureFlags:   r.preInitState.FeatureFlags,
-		TracerProvider: r.preInitState.TracerProvider,
-		Usage:          r.preInitState.Usage,
-		TestStatus:     r.preInitState.TestStatus,
+		Logger:          vu.Runner.preInitState.Logger,
+		Options:         vu.Runner.Bundle.Options,
+		Transport:       vu.Transport,
+		Dialer:          vu.Dialer,
+		TLSConfig:       vu.TLSConfig,
+		CookieJar:       cookieJar,
+		RPSLimit:        vu.Runner.RPSLimit,
+		BufferPool:      vu.BufferPool,
+		VUID:            vu.ID,
+		VUIDGlobal:      vu.IDGlobal,
+		Samples:         vu.Samples,
+		Tags:            lib.NewVUStateTags(vu.Runner.RunTags),
+		BuiltinMetrics:  r.preInitState.BuiltinMetrics,
+		FeatureFlags:    r.preInitState.FeatureFlags,
+		TracerProvider:  r.preInitState.TracerProvider,
+		TracePropagator: r.preInitState.TracePropagator,
+		Usage:           r.preInitState.Usage,
+		TestStatus:      r.preInitState.TestStatus,
 	}
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
@@ -844,7 +846,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 }
 
 // RunOnce runs the configured Exec function once.
-func (u *ActiveVU) RunOnce() error {
+func (u *ActiveVU) RunOnce() (err error) {
 	select {
 	case <-u.RunContext.Done():
 		return lib.ContextErr(u.RunContext) // we are done, return
@@ -882,6 +884,17 @@ func (u *ActiveVU) RunOnce() error {
 
 	ctx, cancel := context.WithCancel(u.RunContext)
 	defer cancel()
+	previousCtx := u.moduleVUImpl.ctx
+	defer func() {
+		u.moduleVUImpl.ctx = previousCtx
+	}()
+	ctx, endIterationTrace := u.startIterationTrace(ctx)
+	iterationSpanEnded := false
+	defer func() {
+		if !iterationSpanEnded {
+			endIterationTrace(err)
+		}
+	}()
 	u.moduleVUImpl.ctx = ctx
 
 	eventIterData := event.IterData{
@@ -905,6 +918,9 @@ func (u *ActiveVU) RunOnce() error {
 	}
 
 	u.emitAndWaitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})
+	endIterationTrace(err)
+	iterationSpanEnded = true
+	u.moduleVUImpl.ctx = previousCtx
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder
@@ -919,6 +935,20 @@ func (u *ActiveVU) RunOnce() error {
 	}
 
 	return err
+}
+
+func (u *ActiveVU) startIterationTrace(ctx context.Context) (context.Context, func(error)) {
+	ctx, span := k6trace.StartIteration(ctx, u.state.TracerProvider, k6trace.IterationInfo{
+		Number:                      u.iteration,
+		VUID:                        u.ID,
+		VUIDGlobal:                  u.IDGlobal,
+		VUIterationInScenario:       u.scenarioIter[u.scenarioName],
+		Scenario:                    u.scenarioName,
+		ScenarioIterationInInstance: u.scIterLocal,
+		ScenarioIterationInTest:     u.scIterGlobal,
+		HasScenarioIterationNumbers: u.getNextIterationCounters != nil,
+	})
+	return ctx, func(err error) { k6trace.EndSpan(span, err) }
 }
 
 func (u *ActiveVU) emitAndWaitEvent(evt *event.Event) {
