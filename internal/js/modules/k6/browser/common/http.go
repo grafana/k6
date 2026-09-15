@@ -70,6 +70,8 @@ type RequestFailure struct {
 
 // Request represents a browser HTTP request.
 type Request struct {
+	// Request IDs belong to the CDP session that reported the request.
+	session        session
 	ctx            context.Context
 	frame          *Frame
 	responseMu     sync.RWMutex
@@ -117,6 +119,7 @@ type Request struct {
 
 // NewRequestParams are input parameters for NewRequest.
 type NewRequestParams struct {
+	session           session
 	event             *network.EventRequestWillBeSent
 	frame             *Frame
 	redirectChain     []*Request
@@ -159,6 +162,7 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 	}
 
 	r := Request{
+		session:             rp.session,
 		url:                 u,
 		frame:               rp.frame,
 		redirectChain:       rp.redirectChain,
@@ -592,7 +596,7 @@ func (r *Response) fetchBody() error {
 	var err error
 	maxRetries := 5
 	for i := 0; i <= maxRetries; i++ {
-		body, err = action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
+		body, err = action.Do(cdp.WithExecutor(r.ctx, r.request.session))
 		if err == nil {
 			break
 		}
