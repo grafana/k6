@@ -810,21 +810,21 @@ func (p *Page) hasRoutes() bool {
 	return len(p.routes) > 0
 }
 
-func (p *Page) resetViewport() error {
+func (p *Page) resetViewport(ctx context.Context) error {
 	p.logger.Debugf("Page:resetViewport", "sid:%v", p.sessionID())
 
 	action := emulation.SetDeviceMetricsOverride(0, 0, 0, false)
-	return action.Do(cdp.WithExecutor(p.ctx, p.session))
+	return action.Do(cdp.WithExecutor(ctx, p.session))
 }
 
-func (p *Page) setEmulatedSize(emulatedSize *EmulatedSize) error {
+func (p *Page) setEmulatedSize(ctx context.Context, emulatedSize *EmulatedSize) error {
 	p.logger.Debugf("Page:setEmulatedSize", "sid:%v", p.sessionID())
 
 	p.emulatedSize = emulatedSize
-	return p.mainFrameSession.updateViewport()
+	return p.mainFrameSession.updateViewport(ctx)
 }
 
-func (p *Page) setViewportSize(viewportSize *Size) error {
+func (p *Page) setViewportSize(ctx context.Context, viewportSize *Size) error {
 	p.logger.Debugf("Page:setViewportSize", "sid:%v vps:%v",
 		p.sessionID(), viewportSize)
 
@@ -836,7 +836,7 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}
-	return p.setEmulatedSize(NewEmulatedSize(viewport, screen))
+	return p.setEmulatedSize(ctx, NewEmulatedSize(viewport, screen))
 }
 
 func (p *Page) updateExtraHTTPHeaders() error {
@@ -1730,7 +1730,8 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp, p.logger)
+	s, cancel := newScreenshotter(spanCtx, p.defaultTimeout(), sp, p.logger)
+	defer cancel()
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
 		return nil, spanRecordErrorf(span, "taking screenshot of page: %w", err)
@@ -1787,7 +1788,7 @@ func (p *Page) SetInputFiles(selector string, files *Files, opts *FrameSetInputF
 func (p *Page) SetViewportSize(viewportSize *Size) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
-	if err := p.setViewportSize(viewportSize); err != nil {
+	if err := p.setViewportSize(p.ctx, viewportSize); err != nil {
 		return fmt.Errorf("setting viewport size: %w", err)
 	}
 

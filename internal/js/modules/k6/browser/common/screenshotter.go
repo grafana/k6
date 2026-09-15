@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
@@ -78,10 +79,17 @@ type screenshotter struct {
 
 func newScreenshotter(
 	ctx context.Context,
+	timeout time.Duration,
 	sp ScreenshotPersister,
 	logger *log.Logger,
-) *screenshotter {
-	return &screenshotter{ctx, sp, logger}
+) (*screenshotter, context.CancelFunc) {
+	var cancel context.CancelFunc
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+	} else {
+		ctx, cancel = context.WithCancel(ctx)
+	}
+	return &screenshotter{ctx, sp, logger}, cancel
 }
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
@@ -150,9 +158,9 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 
 func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 	if originalViewport != nil {
-		return p.setViewportSize(originalViewport)
+		return p.setViewportSize(s.ctx, originalViewport)
 	}
-	return p.resetViewport()
+	return p.resetViewport(s.ctx)
 }
 
 func (s *screenshotter) screenshot(
@@ -299,7 +307,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 			Width:  math.Max(viewportSize.Width, bbox.Width),
 			Height: math.Max(viewportSize.Height, bbox.Height),
 		}.enclosingIntSize()
-		if err := h.frame.page.setViewportSize(overriddenViewportSize); err != nil {
+		if err := h.frame.page.setViewportSize(s.ctx, overriddenViewportSize); err != nil {
 			return nil, fmt.Errorf("setting viewport size to %s: %w",
 				overriddenViewportSize, err)
 		}
@@ -384,7 +392,7 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) ([]
 		fitsViewport := fullPageSize.Width <= viewportSize.Width && fullPageSize.Height <= viewportSize.Height
 		if !fitsViewport {
 			overriddenViewportSize = fullPageSize
-			if err := p.setViewportSize(overriddenViewportSize); err != nil {
+			if err := p.setViewportSize(s.ctx, overriddenViewportSize); err != nil {
 				return nil, fmt.Errorf("setting viewport size to %s: %w",
 					overriddenViewportSize, err)
 			}
