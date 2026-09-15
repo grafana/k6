@@ -20,7 +20,7 @@ type timers struct {
 
 	timerIDCounter uint64
 
-	timers map[uint64]time.Time
+	timers map[uint64]*timer
 	// Maybe in the future if this moves to core it will be expanded to have multiple queues
 	queue *timerQueue
 
@@ -46,7 +46,7 @@ func SetupGlobally(vu modules.VU) error {
 func newTimers(vu modules.VU) *timers {
 	return &timers{
 		vu:     vu,
-		timers: make(map[uint64]time.Time),
+		timers: make(map[uint64]*timer),
 		queue:  new(timerQueue),
 	}
 }
@@ -138,40 +138,22 @@ func (e *timers) timerInitialization(
 		common.Throw(e.vu.Runtime(), fmt.Errorf("%s's callback isn't a callable function", name))
 	}
 
-	task := func() error {
-		// Specification 8.1: If id does not exist in global's map of active timers, then abort these steps.
-		if _, exist := e.timers[id]; !exist {
-			return nil
-		}
-
-		err := e.call(callback, args)
-
-		if _, exist := e.timers[id]; !exist { // 8.4
-			return err
-		}
-
-		if repeat {
-			e.timerInitialization(callback, timeout, args, repeat, id)
-		} else {
-			delete(e.timers, id)
-		}
-
-		return err
-	}
-
-	e.runAfterTimeout(&timer{
+	t := &timer{
 		id:          id,
-		task:        task,
 		nextTrigger: time.Now().Add(time.Duration(timeout * float64(time.Millisecond))),
 		name:        name,
-	})
+	}
+	t.task = func() error {
+		return e.runTask(t, callback, timeout, args, repeat)
+	}
+	e.runAfterTimeout(t)
 }
 
 // https://html.spec.whatwg.org/multipage/timers-and-user-prompts.html#run-steps-after-a-timeout
 // Notes: this just takes timers as makes the implementation way easier and we do not currently need
 // most of the functionality provided
 func (e *timers) runAfterTimeout(t *timer) {
-	e.timers[t.id] = t.nextTrigger
+	e.timers[t.id] = t
 
 	// as we have only one orderingId we have one queue
 	index := e.queue.add(t)
@@ -183,13 +165,23 @@ func (e *timers) runAfterTimeout(t *timer) {
 	e.setupTaskTimeout()
 }
 
-func (e *timers) runFirstTask() error {
-	t := e.queue.pop()
-	if t == nil {
-		return nil // everything was cleared
+func (e *timers) runTask(
+	t *timer, callback sobek.Callable, timeout float64, args []sobek.Value, repeat bool,
+) error {
+	if e.timers[t.id] != t {
+		return nil // the timer was cleared after its task was queued
 	}
+	e.queue.remove(t.id)
 
-	err := t.task()
+	err := e.call(callback, args)
+
+	if e.timers[t.id] == t {
+		if repeat {
+			e.timerInitialization(callback, timeout, args, repeat, t.id)
+		} else {
+			delete(e.timers, t.id)
+		}
+	}
 
 	if e.queue.length() > 0 {
 		e.setupTaskTimeout()
@@ -202,14 +194,15 @@ func (e *timers) runFirstTask() error {
 
 func (e *timers) setupTaskTimeout() {
 	e.queue.stopTimer()
-	delay := -time.Since(e.timers[e.queue.first().id])
+	t := e.queue.first()
+	delay := -time.Since(t.nextTrigger)
 	if e.taskQueue == nil {
 		e.taskQueue = taskqueue.New(e.vu.RegisterCallback)
 		e.setupTaskQueueCloserOnIterationEnd()
 	}
 	q := e.taskQueue
 	e.queue.head = time.AfterFunc(delay, func() {
-		q.Queue(e.runFirstTask)
+		q.Queue(t.task)
 	})
 }
 
@@ -264,7 +257,7 @@ func (e *timers) setupTaskQueueCloserOnIterationEnd() {
 			})
 			q.Close()
 		case <-ch:
-			e.timers = make(map[uint64]time.Time)
+			e.timers = make(map[uint64]*timer)
 			e.queue.stopTimer()
 			e.queue = new(timerQueue)
 			e.taskQueue = nil
@@ -313,16 +306,6 @@ func (tq *timerQueue) remove(id uint64) {
 	tq.queue = slices.DeleteFunc(tq.queue, func(t *timer) bool {
 		return id == t.id
 	})
-}
-
-func (tq *timerQueue) pop() *timer {
-	length := len(tq.queue)
-	if length == 0 {
-		return nil
-	}
-	t := tq.queue[0]
-	tq.queue = slices.Delete(tq.queue, 0, 1)
-	return t
 }
 
 func (tq *timerQueue) length() int {
