@@ -258,7 +258,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return f.IsChecked(selector, popts) //nolint:wrapcheck
 			}), nil
 		}),
-		"isDetached": f.IsDetached,
+		"isDetached": passiveCall(f.IsDetached),
 		"isDisabled": passiveCall(func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameIsDisabledOptions(rt, opts, f.Timeout())
 			if err != nil {
@@ -311,7 +311,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			mfl := mapFrameLocator(vu, f.FrameLocator(selector))
 			return rt.ToValue(mfl).ToObject(rt)
 		}),
-		"name": f.Name,
+		"name": passiveCall(f.Name),
 		"page": passiveCall(func() mapping {
 			return mapPage(vu, f.Page())
 		}),
@@ -427,7 +427,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, f.Uncheck(selector, popts) //nolint:wrapcheck
 			}), nil
 		}),
-		"url": f.URL,
+		"url": passiveCall(f.URL),
 		"waitForFunction": networkCall(func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				rt, f.Timeout(), pageFunc, opts, args...,
@@ -477,7 +477,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			return mapWaitForURL(rt, vu, f, url, opts)
 		}),
 	}
-	maps["$"] = func(selector string) *sobek.Promise {
+	maps["$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			eh, err := f.Query(selector, common.StrictModeOff)
 			if err != nil {
@@ -493,8 +493,8 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 
 			return ehm, nil
 		})
-	}
-	maps["$$"] = func(selector string) *sobek.Promise {
+	})
+	maps["$$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			ehs, err := f.QueryAll(selector)
 			if err != nil {
@@ -507,7 +507,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}
 			return mehs, nil
 		})
-	}
+	})
 
 	return withPageNetworkCalls(vu, f.Page(), maps)
 }

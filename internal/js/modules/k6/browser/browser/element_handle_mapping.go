@@ -305,7 +305,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}), nil
 		}),
 	}
-	maps["$"] = func(selector string) *sobek.Promise {
+	maps["$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			eh, err := eh.Query(selector, common.StrictModeOff)
 			if err != nil {
@@ -321,8 +321,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 
 			return ehm, nil
 		})
-	}
-	maps["$$"] = func(selector string) *sobek.Promise {
+	})
+	maps["$$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			ehs, err := eh.QueryAll(selector)
 			if err != nil {
@@ -335,9 +335,9 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}
 			return mehs, nil
 		})
-	}
+	})
 
-	jsHandleMap := mapJSHandle(vu, eh)
+	jsHandleMap := newJSHandleMapping(vu, eh)
 	maps0.Copy(maps, jsHandleMap)
 
 	return withPageNetworkCalls(vu, eh.Page(), maps)

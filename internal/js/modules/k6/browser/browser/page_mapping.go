@@ -294,7 +294,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.IsChecked(selector, popts) //nolint:wrapcheck
 			}), nil
 		}),
-		"isClosed": p.IsClosed,
+		"isClosed": passiveCall(p.IsClosed),
 		"isDisabled": passiveCall(func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameIsDisabledOptions(rt, opts, p.MainFrame().Timeout())
 			if err != nil {
@@ -340,7 +340,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.IsVisible(selector, popts) //nolint:wrapcheck
 			}), nil
 		}),
-		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
+		"keyboard": newKeyboardMapping(vu, p.GetKeyboard()),
 		"locator": passiveCall(func(selector string, opts sobek.Value) *sobek.Object {
 			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
 			return rt.ToValue(ml).ToObject(rt)
@@ -353,8 +353,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		}),
-		"mouse": mapMouse(vu, p.GetMouse()),
-		"on":    mapPageOn(vu, p),
+		"mouse": newMouseMapping(vu, p.GetMouse(), rt),
+		"on":    passiveCall(mapPageOn(vu, p)),
 		"opener": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return p.Opener(), nil
@@ -417,7 +417,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		}),
-		"route": mapPageRoute(vu, p),
+		"route": passiveCall(mapPageRoute(vu, p)),
 		"screenshot": passiveCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parsePageScreenshotOptions(rt, opts)
 			if err != nil {
@@ -475,8 +475,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.SetContent(html, popts) //nolint:wrapcheck
 			}), nil
 		}),
-		"setDefaultNavigationTimeout": p.SetDefaultNavigationTimeout,
-		"setDefaultTimeout":           p.SetDefaultTimeout,
+		"setDefaultNavigationTimeout": passiveCall(p.SetDefaultNavigationTimeout),
+		"setDefaultTimeout":           passiveCall(p.SetDefaultTimeout),
 		"setExtraHTTPHeaders": passiveCall(func(headers map[string]string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, p.SetExtraHTTPHeaders(headers) //nolint:wrapcheck
@@ -547,7 +547,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.Title() //nolint:wrapcheck
 			})
 		}),
-		"touchscreen": mapTouchscreen(vu, p.GetTouchscreen()),
+		"touchscreen": newTouchscreenMapping(vu, p.GetTouchscreen()),
 		"type": networkCall(func(selector string, text string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameTypeOptions(rt, opts, p.MainFrame().Timeout())
 			if err != nil {
@@ -578,8 +578,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.UnrouteAll()
 			}), nil
 		}),
-		"url":          p.URL,
-		"viewportSize": p.ViewportSize,
+		"url":          passiveCall(p.URL),
+		"viewportSize": passiveCall(p.ViewportSize),
 		"waitForFunction": networkCall(func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				rt, p.Timeout(), pageFunc, opts, args...,
@@ -736,7 +736,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(mws).ToObject(rt)
 		}),
 	}
-	maps["$"] = func(selector string) *sobek.Promise {
+	maps["$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			eh, err := p.Query(selector)
 			if err != nil {
@@ -752,8 +752,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			return ehm, nil
 		})
-	}
-	maps["$$"] = func(selector string) *sobek.Promise {
+	})
+	maps["$$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			ehs, err := p.QueryAll(selector)
 			if err != nil {
@@ -766,7 +766,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			return mehs, nil
 		})
-	}
+	})
 
 	// CDP request events run outside the event loop, so keep the context of each mapped call available
 	// until its returned promise settles. Loader-associated requests take precedence when possible.
