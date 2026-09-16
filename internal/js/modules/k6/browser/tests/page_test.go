@@ -674,6 +674,16 @@ func TestPageSetChecked(t *testing.T) {
 	assert.False(t, checked)
 }
 
+type timeoutScreenshotPersister struct {
+	called bool
+}
+
+func (p *timeoutScreenshotPersister) Persist(ctx context.Context, _ string, _ io.Reader) error {
+	p.called = true
+	<-ctx.Done()
+	return ctx.Err()
+}
+
 func TestPageScreenshotFullpage(t *testing.T) {
 	t.Parallel()
 
@@ -693,7 +703,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 
 		const div = document.createElement('div');
 		div.style.width = '1280px';
-		div.style.height = '800px';
+		div.style.height = '1600px';
 		div.style.background = 'linear-gradient(to bottom, red, blue)';
 
 		document.body.appendChild(div);
@@ -710,21 +720,37 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	opts.FullPage = true
 	buf, err := p.Screenshot(opts, &mockPersister{})
 	require.NoError(t, err)
+	assert.Equal(t, map[string]float64{"width": 1280, "height": 800}, p.ViewportSize())
+	viewportRestored, err := p.Evaluate(`() => window.innerWidth === 1280 && window.innerHeight === 800`)
+	require.NoError(t, err)
+	assert.Equal(t, true, viewportRestored)
 
 	reader := bytes.NewReader(buf)
 	img, err := png.Decode(reader)
 	assert.Nil(t, err)
 
 	assert.Equal(t, 1280, img.Bounds().Max.X, "want: screenshot width is 1280px, got: %dpx", img.Bounds().Max.X)
-	assert.Equal(t, 800, img.Bounds().Max.Y, "want: screenshot height is 800px, got: %dpx", img.Bounds().Max.Y)
+	assert.Equal(t, 1600, img.Bounds().Max.Y, "want: screenshot height is 1600px, got: %dpx", img.Bounds().Max.Y)
 
 	// Allow tolerance to account for differences in rendering between
 	// different platforms and browsers. The goal is to ensure that the
 	// screenshot is mostly red at the top and mostly blue at the bottom.
 	r, _, b, _ := img.At(0, 0).RGBA()
 	assert.Truef(t, r > b*2, "want: the top pixel to be dominantly red, got R: %d, B: %d", r, b)
-	r, _, b, _ = img.At(0, 799).RGBA()
+	r, _, b, _ = img.At(0, 1599).RGBA()
 	assert.Truef(t, b > r*2, "want: the bottom pixel to be dominantly blue, got R: %d, B: %d", r, b)
+
+	// A deadline after capture must also restore the enlarged viewport.
+	p.SetDefaultTimeout(2000)
+	opts.Path = "unused.png"
+	persister := &timeoutScreenshotPersister{}
+	_, err = p.Screenshot(opts, persister)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.True(t, persister.called)
+	assert.Equal(t, map[string]float64{"width": 1280, "height": 800}, p.ViewportSize())
+	viewportRestored, err = p.Evaluate(`() => window.innerWidth === 1280 && window.innerHeight === 800`)
+	require.NoError(t, err)
+	assert.Equal(t, true, viewportRestored)
 }
 
 func TestPageTitle(t *testing.T) {
