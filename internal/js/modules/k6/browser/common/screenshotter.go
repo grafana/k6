@@ -135,11 +135,10 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 	return &size, nil
 }
 
-func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
-	originalViewportSize := p.viewportSize()
-	viewportSize := originalViewportSize
+func (s *screenshotter) originalViewportSize(p *Page) (*Size, error) {
+	viewportSize := p.viewportSize()
 	if viewportSize.Width != 0 || viewportSize.Height != 0 {
-		return &viewportSize, &originalViewportSize, nil
+		return &viewportSize, nil
 	}
 
 	opts := evalOptions{
@@ -151,18 +150,18 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 		{ width: window.innerWidth, height: window.innerHeight }
 	)`)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting viewport dimensions: %w", err)
+		return nil, fmt.Errorf("getting viewport dimensions: %w", err)
 	}
 
 	var returnVal Size
 	if err := convert(result, &returnVal); err != nil {
-		return nil, nil, fmt.Errorf("unpacking window size: %w", err)
+		return nil, fmt.Errorf("unpacking window size: %w", err)
 	}
 
 	viewportSize.Width = returnVal.Width
 	viewportSize.Height = returnVal.Height
 
-	return &viewportSize, &originalViewportSize, nil
+	return &viewportSize, nil
 }
 
 func (s *screenshotter) restoreViewport(p *Page, originalSize *EmulatedSize) error {
@@ -289,7 +288,7 @@ func (s *screenshotter) screenshotElement(
 	h *ElementHandle, opts *ElementHandleScreenshotOptions,
 ) (buf []byte, err error) {
 	format := opts.Format
-	viewportSize, _, err := s.originalViewportSize(h.frame.page)
+	viewportSize, err := s.originalViewportSize(h.frame.page)
 	if err != nil {
 		return nil, fmt.Errorf("getting original viewport size: %w", err)
 	}
@@ -377,7 +376,7 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) (bu
 		}
 	}
 
-	viewportSize, originalViewportSize, err := s.originalViewportSize(p)
+	viewportSize, err := s.originalViewportSize(p)
 	if err != nil {
 		return nil, fmt.Errorf("getting original viewport size: %w", err)
 	}
@@ -399,7 +398,7 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) (bu
 			defer func() {
 				if restoreErr := s.restoreViewport(p, originalSize); restoreErr != nil {
 					err = errors.Join(err, fmt.Errorf("restoring viewport to %s: %w",
-						originalViewportSize, restoreErr))
+						viewportSize, restoreErr))
 				}
 			}()
 			if err := p.setViewportSize(s.ctx, fullPageSize); err != nil {

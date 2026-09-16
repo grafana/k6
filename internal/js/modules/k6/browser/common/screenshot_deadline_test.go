@@ -2,11 +2,14 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"testing/synctest"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
@@ -14,12 +17,14 @@ import (
 
 type screenshotDeadlineSession struct {
 	session
-	blocked                string
-	backgroundOverrides    int
-	backgroundRestoreError bool
+	blocked              string
+	backgroundColors     []*cdp.RGBA
+	backgroundRestoreErr bool
 }
 
-func (s *screenshotDeadlineSession) Execute(ctx context.Context, method string, _, result any) error {
+const screenshotTimeout = 20 * time.Millisecond
+
+func (s *screenshotDeadlineSession) Execute(ctx context.Context, method string, params, result any) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -27,15 +32,16 @@ func (s *screenshotDeadlineSession) Execute(ctx context.Context, method string, 
 		<-ctx.Done()
 		return ctx.Err()
 	}
+
 	switch method {
 	case "Page.getLayoutMetrics":
 		result.(*page.GetLayoutMetricsReturns).CSSVisualViewport = &page.VisualViewport{Scale: 1}
 	case "Page.captureScreenshot":
-		result.(*page.CaptureScreenshotReturns).Data = ""
 	case "Emulation.setDefaultBackgroundColorOverride":
-		s.backgroundOverrides++
-		if s.backgroundRestoreError && s.backgroundOverrides == 2 {
-			return fmt.Errorf("background restore failed")
+		color := params.(*emulation.SetDefaultBackgroundColorOverrideParams).Color
+		s.backgroundColors = append(s.backgroundColors, color)
+		if s.backgroundRestoreErr && color == nil {
+			return errors.New("background restore failed")
 		}
 	case "Emulation.setDeviceMetricsOverride":
 	default:
@@ -53,44 +59,82 @@ func testScreenshotPage(ctx context.Context, sess session, timeout time.Duration
 	}
 }
 
-func TestScreenshotDeadline(t *testing.T) {
+func TestScreenshotBehavior(t *testing.T) {
 	t.Parallel()
-	for _, method := range []string{"Page.getLayoutMetrics", "Page.captureScreenshot"} {
-		t.Run(method, func(t *testing.T) {
+	for _, tc := range []struct {
+		name                 string
+		blocked              string
+		timeout, cancelAfter time.Duration
+		wantErr              error
+		omitBackground       bool
+		backgroundRestoreErr bool
+	}{
+		{
+			name: "deadline at layout metrics", blocked: "Page.getLayoutMetrics",
+			timeout: screenshotTimeout, wantErr: context.DeadlineExceeded,
+		},
+		{
+			name: "deadline at capture", blocked: "Page.captureScreenshot",
+			timeout: screenshotTimeout, wantErr: context.DeadlineExceeded,
+		},
+		{
+			name: "restores transparent background", blocked: "Page.captureScreenshot",
+			timeout: screenshotTimeout, wantErr: context.DeadlineExceeded, omitBackground: true,
+		},
+		{
+			name: "joins background restore error", blocked: "Page.captureScreenshot",
+			timeout: screenshotTimeout, wantErr: context.DeadlineExceeded,
+			omitBackground: true, backgroundRestoreErr: true,
+		},
+		{
+			name: "parent cancellation with timeout", blocked: "Page.getLayoutMetrics",
+			timeout: time.Second, cancelAfter: 20 * time.Millisecond, wantErr: context.Canceled,
+		},
+		{
+			name: "parent cancellation with zero timeout", blocked: "Page.getLayoutMetrics",
+			cancelAfter: 20 * time.Millisecond, wantErr: context.Canceled,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			synctest.Test(t, func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 				defer cancel()
-				sess := &screenshotDeadlineSession{session: &Session{}, blocked: method}
-				p := testScreenshotPage(ctx, sess, 20*time.Millisecond)
+				if tc.cancelAfter > 0 {
+					go func() {
+						time.Sleep(tc.cancelAfter)
+						cancel()
+					}()
+				}
+				sess := &screenshotDeadlineSession{
+					session: &Session{}, blocked: tc.blocked,
+					backgroundRestoreErr: tc.backgroundRestoreErr,
+				}
+				p := testScreenshotPage(ctx, sess, tc.timeout)
+				opts := NewPageScreenshotOptions()
+				opts.OmitBackground = tc.omitBackground
 
 				start := time.Now()
-				_, err := p.Screenshot(NewPageScreenshotOptions(), nil)
-				t.Logf("elapsed=%s parentErr=%v", time.Since(start), ctx.Err())
-				require.ErrorIs(t, err, context.DeadlineExceeded)
-				require.ErrorContains(t, err, "timed out after 20ms")
-				require.Equal(t, 20*time.Millisecond, time.Since(start))
-				require.NoError(t, ctx.Err())
+				_, err := p.Screenshot(opts, nil)
+				require.ErrorIs(t, err, tc.wantErr)
+				require.Equal(t, screenshotTimeout, time.Since(start))
+				if errors.Is(tc.wantErr, context.DeadlineExceeded) {
+					require.ErrorContains(t, err, "timed out after 20ms")
+				}
+				if tc.omitBackground {
+					require.Equal(t, []*cdp.RGBA{{A: 0}, nil}, sess.backgroundColors)
+				}
+				if tc.backgroundRestoreErr {
+					require.ErrorContains(t, err, "resetting screenshot background color: background restore failed")
+				}
+				if tc.cancelAfter > 0 {
+					require.ErrorIs(t, ctx.Err(), context.Canceled)
+				} else {
+					require.NoError(t, ctx.Err())
+				}
 			})
 		})
 	}
-}
-
-func TestScreenshotRestoresBackgroundAfterCaptureError(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		sess := &screenshotDeadlineSession{session: &Session{}, blocked: "Page.captureScreenshot"}
-		p := testScreenshotPage(ctx, sess, 20*time.Millisecond)
-		opts := NewPageScreenshotOptions()
-		opts.OmitBackground = true
-
-		_, err := p.Screenshot(opts, nil)
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.Equal(t, 2, sess.backgroundOverrides)
-		require.NoError(t, ctx.Err())
-	})
 }
 
 func TestScreenshotRestoreUsesBoundedCleanup(t *testing.T) {
@@ -99,8 +143,9 @@ func TestScreenshotRestoreUsesBoundedCleanup(t *testing.T) {
 		ctx := t.Context()
 		sess := &screenshotDeadlineSession{session: &Session{}, blocked: "Emulation.setDeviceMetricsOverride"}
 		logger := log.NewNullLogger()
+		temporarySize := NewEmulatedSize(Viewport{Width: 300, Height: 300}, Screen{Width: 300, Height: 300})
 		p := &Page{
-			ctx: ctx, session: sess, logger: logger,
+			ctx: ctx, session: sess, logger: logger, emulatedSize: temporarySize,
 			browserCtx: &BrowserContext{opts: DefaultBrowserContextOptions()},
 		}
 		p.mainFrameSession = &FrameSession{ctx: ctx, session: sess, page: p, logger: logger}
@@ -112,77 +157,6 @@ func TestScreenshotRestoreUsesBoundedCleanup(t *testing.T) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Equal(t, screenshotCleanupTimeout, time.Since(start))
 		require.NoError(t, ctx.Err())
-	})
-}
-
-func TestScreenshotPreservesCaptureAndCleanupErrors(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-		sess := &screenshotDeadlineSession{
-			session: &Session{}, blocked: "Page.captureScreenshot", backgroundRestoreError: true,
-		}
-		p := testScreenshotPage(ctx, sess, 20*time.Millisecond)
-		opts := NewPageScreenshotOptions()
-		opts.OmitBackground = true
-
-		_, err := p.Screenshot(opts, nil)
-		require.ErrorIs(t, err, context.DeadlineExceeded)
-		require.ErrorContains(t, err, "resetting screenshot background color: background restore failed")
-	})
-}
-
-func TestScreenshotPreservesParentCancellation(t *testing.T) {
-	t.Parallel()
-	for _, timeout := range []time.Duration{0, time.Second} {
-		t.Run(timeout.String(), func(t *testing.T) {
-			t.Parallel()
-			synctest.Test(t, func(t *testing.T) {
-				ctx, cancel := context.WithCancel(t.Context())
-				defer cancel()
-				go func() {
-					time.Sleep(20 * time.Millisecond)
-					cancel()
-				}()
-				s, stop := newScreenshotter(ctx, timeout, nil, log.NewNullLogger())
-				defer stop()
-				if timeout == 0 {
-					_, hasDeadline := s.ctx.Deadline()
-					require.False(t, hasDeadline)
-				}
-
-				start := time.Now()
-				_, err := s.screenshot(
-					&screenshotDeadlineSession{blocked: "Page.getLayoutMetrics"},
-					nil, &Rect{Width: 100, Height: 100}, ImageFormatPNG, false, 0, "",
-				)
-				require.ErrorIs(t, err, context.Canceled)
-				require.Equal(t, 20*time.Millisecond, time.Since(start))
-				require.ErrorIs(t, ctx.Err(), context.Canceled)
-			})
-		})
-	}
-}
-
-func TestSetEmulatedSizeKeepsCachedSizeOnError(t *testing.T) {
-	t.Parallel()
-	synctest.Test(t, func(t *testing.T) {
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
-		logger := log.NewNullLogger()
-		sess := &screenshotDeadlineSession{session: &Session{}, blocked: "Emulation.setDeviceMetricsOverride"}
-		original := NewEmulatedSize(Viewport{Width: 100, Height: 100}, Screen{Width: 200, Height: 200})
-		p := &Page{
-			ctx: ctx, session: sess, logger: logger, emulatedSize: original,
-			browserCtx: &BrowserContext{opts: DefaultBrowserContextOptions()},
-		}
-		p.mainFrameSession = &FrameSession{ctx: ctx, session: sess, page: p, logger: logger}
-
-		err := p.setEmulatedSize(ctx, NewEmulatedSize(
-			Viewport{Width: 300, Height: 300}, Screen{Width: 300, Height: 300},
-		))
-		require.ErrorIs(t, err, context.Canceled)
-		require.Same(t, original, p.emulatedSize)
+		require.Same(t, temporarySize, p.emulatedSize, "failed restoration must not update the cached viewport")
 	})
 }
