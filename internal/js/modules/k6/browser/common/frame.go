@@ -492,8 +492,14 @@ func (f *Frame) waitForExecutionContextWithContext(apiCtx context.Context, world
 func (f *Frame) waitForSelectorRetry(
 	selector string, opts *FrameWaitForSelectorOptions, retry int,
 ) (h *ElementHandle, err error) {
+	apiCtx := f.ctx
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		apiCtx, cancel = context.WithTimeout(apiCtx, opts.Timeout)
+		defer cancel()
+	}
 	for ; retry >= 0; retry-- {
-		if h, err = f.waitForSelector(selector, opts); err == nil {
+		if h, err = f.waitForSelectorWithContext(apiCtx, selector, opts); err == nil {
 			return h, nil
 		}
 	}
@@ -569,6 +575,11 @@ func (f *Frame) waitFor(
 func (f *Frame) waitForWithContext(
 	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions, retryCount int,
 ) (_ *ElementHandle, rerr error) {
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		apiCtx, cancel = context.WithTimeout(apiCtx, opts.Timeout)
+		defer cancel()
+	}
 	if err := apiCtx.Err(); err != nil {
 		return nil, err
 	}

@@ -649,7 +649,7 @@ func (h *ElementHandle) stepIntoFrame(
 		return nil, "", ErrElementNotVisible
 	}
 
-	frame, err := iframeHandle.ContentFrame()
+	frame, err := iframeHandle.contentFrame(apiCtx)
 	if err != nil {
 		return nil, "", fmt.Errorf("getting iframe frame: %w", err)
 	}
@@ -850,12 +850,16 @@ func (h *ElementHandle) Click(opts *ElementHandleClickOptions) error {
 
 // ContentFrame returns the frame that contains this element.
 func (h *ElementHandle) ContentFrame() (*Frame, error) {
+	return h.contentFrame(h.ctx)
+}
+
+func (h *ElementHandle) contentFrame(apiCtx context.Context) (*Frame, error) {
 	var (
 		node *cdp.Node
 		err  error
 	)
 	action := dom.DescribeNode().WithObjectID(h.remoteObject.ObjectID)
-	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	if node, err = action.Do(cdp.WithExecutor(apiCtx, h.session)); err != nil {
 		return nil, fmt.Errorf("getting remote node %q: %w", h.remoteObject.ObjectID, err)
 	}
 	if node == nil || node.FrameID == "" {
@@ -1578,7 +1582,13 @@ func (h *ElementHandle) WaitForElementState(state string, opts *ElementHandleWai
 
 // WaitForSelector waits for the selector to appear in the DOM.
 func (h *ElementHandle) WaitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
-	handle, err := h.waitForSelector(h.ctx, selector, opts)
+	apiCtx := h.ctx
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		apiCtx, cancel = context.WithTimeout(apiCtx, opts.Timeout)
+		defer cancel()
+	}
+	handle, err := h.waitForSelector(apiCtx, selector, opts)
 	if err != nil {
 		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}
@@ -1592,7 +1602,7 @@ func (h *ElementHandle) evalWithScript(
 	ctx context.Context,
 	opts evalOptions, js string, args ...any,
 ) (any, error) {
-	script, err := h.execCtx.getInjectedScript(h.ctx)
+	script, err := h.execCtx.getInjectedScript(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting injected script: %w", err)
 	}
