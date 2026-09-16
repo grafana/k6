@@ -28,9 +28,10 @@ const k6BrowserNative = (() => {
   iframe.style.display = 'none';
 
   // grab the native browser object
-  document.documentElement.appendChild(iframe);
+  const parent = document.documentElement || document;
+  parent.appendChild(iframe);
   const win = iframe.contentWindow;
-  document.documentElement.removeChild(iframe);
+  parent.removeChild(iframe);
 
   return {
     Set: win.Set,
