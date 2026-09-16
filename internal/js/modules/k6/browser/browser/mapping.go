@@ -150,7 +150,7 @@ func callMapping(fn reflect.Value, args []reflect.Value) []reflect.Value {
 
 func mappingCallFailed(results []reflect.Value) bool {
 	for _, result := range results {
-		if err, ok := result.Interface().(error); ok && err != nil {
+		if err, ok := reflect.TypeAssert[error](result); ok && err != nil {
 			return true
 		}
 	}
@@ -159,7 +159,7 @@ func mappingCallFailed(results []reflect.Value) bool {
 
 func wrapMappingPromise(vu moduleVU, results []reflect.Value, complete func()) bool {
 	for i, result := range results {
-		promise, ok := result.Interface().(*sobek.Promise)
+		promise, ok := reflect.TypeAssert[*sobek.Promise](result)
 		if !ok || promise == nil {
 			continue
 		}
