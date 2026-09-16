@@ -575,6 +575,11 @@ func (f *Frame) waitFor(
 func (f *Frame) waitForWithContext(
 	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions, retryCount int,
 ) (_ *ElementHandle, rerr error) {
+	defer func() {
+		if errors.Is(rerr, context.DeadlineExceeded) && f.ctx.Err() == nil {
+			rerr = &k6ext.UserFriendlyError{Err: rerr, Timeout: opts.Timeout}
+		}
+	}()
 	if opts.Timeout > 0 {
 		var cancel context.CancelFunc
 		apiCtx, cancel = context.WithTimeout(apiCtx, opts.Timeout)

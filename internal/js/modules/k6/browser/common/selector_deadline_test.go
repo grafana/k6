@@ -93,3 +93,43 @@ func TestSelectorContentFrameUsesOperationContext(t *testing.T) {
 	require.Less(t, time.Since(start), 200*time.Millisecond)
 	require.NoError(t, parent.Err())
 }
+
+func TestSelectorWaitTimeoutMessage(t *testing.T) {
+	t.Parallel()
+	for _, caller := range []string{"frame", "locator"} {
+		for _, state := range []string{"timeout", "canceled", "parent deadline"} {
+			t.Run(caller+"/"+state, func(t *testing.T) {
+				t.Parallel()
+				parent, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				budget := 10 * time.Millisecond
+				want := context.DeadlineExceeded
+				switch state {
+				case "canceled":
+					cancel()
+					want = context.Canceled
+				case "parent deadline":
+					var stop context.CancelFunc
+					parent, stop = context.WithDeadline(parent, time.Now().Add(-time.Second))
+					defer stop()
+				}
+				frame := &Frame{ctx: parent, log: log.NewNullLogger(), executionContexts: make(map[executionWorld]frameExecutionContext)}
+				opts := NewFrameWaitForSelectorOptions(budget)
+				var err error
+				if caller == "frame" {
+					_, err = frame.WaitForSelector("#missing", opts)
+				} else {
+					locator := &Locator{frame: frame, selector: "#missing", log: log.NewNullLogger()}
+					err = locator.WaitFor(opts)
+				}
+				require.ErrorIs(t, err, want)
+				if state == "timeout" {
+					require.ErrorContains(t, err, "timed out after 10ms")
+					require.NoError(t, parent.Err())
+				} else {
+					require.NotContains(t, err.Error(), "timed out after")
+				}
+			})
+		}
+	}
+}
