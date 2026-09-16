@@ -206,6 +206,11 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 
 	switch preq.Auth {
 	case "digest":
+		// The URL can be shared when created with http.url, so copy it before
+		// digestTransport removes its user info.
+		requestURL := *preq.Req.URL
+		preq.Req.URL = &requestURL
+
 		// Until digest authentication is refactored, the first response will always
 		// be a 401 error, so we expect that.
 		if tracerTransport.responseCallback != nil {
