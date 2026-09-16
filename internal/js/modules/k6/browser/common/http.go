@@ -499,7 +499,8 @@ type Response struct {
 	timing            *network.ResourceTiming
 	vu                k6modules.VU
 
-	cachedJSON any
+	cachedJSONMu sync.Mutex
+	cachedJSON   any
 }
 
 // NewHTTPResponse creates a new HTTP response.
@@ -758,6 +759,9 @@ func (r *Response) HeadersArray() []HTTPHeader {
 
 // JSON returns the response body as JSON data.
 func (r *Response) JSON() (any, error) {
+	r.cachedJSONMu.Lock()
+	defer r.cachedJSONMu.Unlock()
+
 	if r.cachedJSON != nil {
 		return r.cachedJSON, nil
 	}
