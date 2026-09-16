@@ -15,6 +15,10 @@ import (
 
 // mapElementHandle to the JS module.
 func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,funlen,cyclop
+	if eh == nil {
+		return nil
+	}
+
 	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": func() *sobek.Promise {

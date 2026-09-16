@@ -1473,33 +1473,45 @@ func TestPageWaitForSelector(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name          string
-		url           string
-		opts          map[string]any
-		customTimeout time.Duration
-		selector      string
-		errAssert     func(*testing.T, error)
+		name     string
+		selector string
+		state    common.DOMElementState
+		timeout  time.Duration
+		wantNil  bool
+		wantErr  string
 	}{
 		{
 			name:     "should wait for selector",
-			url:      "wait_for.html",
 			selector: "#my-div",
-			errAssert: func(t *testing.T, e error) {
-				t.Helper()
-				assert.Nil(t, e)
-			},
+			state:    common.DOMElementStateVisible,
+			timeout:  common.DefaultTimeout,
 		},
 		{
-			name: "should TO waiting for selector",
-			url:  "wait_for.html",
-			// set a timeout smaller than the time
-			// it takes the element to show up
-			customTimeout: time.Nanosecond,
-			selector:      "#my-div",
-			errAssert: func(t *testing.T, e error) {
-				t.Helper()
-				assert.ErrorContains(t, e, "timed out after")
-			},
+			name:     "should TO waiting for selector",
+			selector: "#my-div",
+			state:    common.DOMElementStateVisible,
+			timeout:  time.Nanosecond,
+			wantErr:  "timed out after",
+		},
+		{
+			name:     "absent hidden element",
+			selector: "#absent",
+			state:    common.DOMElementStateHidden,
+			timeout:  time.Second,
+			wantNil:  true,
+		},
+		{
+			name:     "absent detached element",
+			selector: "#absent",
+			state:    common.DOMElementStateDetached,
+			timeout:  time.Second,
+			wantNil:  true,
+		},
+		{
+			name:     "existing hidden element",
+			selector: "head",
+			state:    common.DOMElementStateHidden,
+			timeout:  time.Second,
 		},
 	}
 
@@ -1508,24 +1520,25 @@ func TestPageWaitForSelector(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
-
 			page := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
+			_, err := page.Goto(tb.staticURL("wait_for.html"), &common.FrameGotoOptions{
 				Timeout: common.DefaultTimeout,
-			}
-			_, err := page.Goto(
-				tb.staticURL(tc.url),
-				opts,
-			)
+			})
 			require.NoError(t, err)
 
-			timeout := page.MainFrame().Timeout()
-			if tc.customTimeout != 0 {
-				timeout = tc.customTimeout
+			opts := common.NewFrameWaitForSelectorOptions(tc.timeout)
+			opts.State = tc.state
+			element, err := page.WaitForSelector(tc.selector, opts)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
 			}
-
-			_, err = page.WaitForSelector(tc.selector, common.NewFrameWaitForSelectorOptions(timeout))
-			tc.errAssert(t, err)
+			require.NoError(t, err)
+			if tc.wantNil {
+				assert.Nil(t, element)
+			} else {
+				assert.NotNil(t, element)
+			}
 		})
 	}
 }
