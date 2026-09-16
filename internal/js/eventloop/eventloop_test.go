@@ -213,6 +213,10 @@ func TestEventLoopRejectIsException(t *testing.T) {
 	msg, fields := errext.Format(err)
 	require.Equal(t, "stacktrace", fields["source"])
 	require.Equal(t, xerr.StackTrace(), msg)
+
+	// the hint distinguishes this from the "script exception" a synchronous
+	// throw reports, so the two are still told apart in the log line
+	require.Equal(t, "unhandled script exception", fields["hint"])
 }
 
 // A rejected value with no stack of its own still identifies as a script error,

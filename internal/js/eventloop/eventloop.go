@@ -225,7 +225,10 @@ type rejectionError struct {
 	cause error
 }
 
-var _ errext.Exception = &rejectionError{}
+var _ interface {
+	errext.Exception
+	errext.HasHint
+} = &rejectionError{}
 
 func (e *rejectionError) Error() string { return e.msg }
 func (e *rejectionError) Unwrap() error { return e.cause }
@@ -240,6 +243,10 @@ func (e *rejectionError) StackTrace() string { return e.msg }
 // AbortReason reports the same reason a synchronous throw does, since the two
 // differ only in when the script raised the error.
 func (e *rejectionError) AbortReason() errext.AbortReason { return errext.AbortedByScriptError }
+
+// Hint distinguishes this from the "script exception" a synchronous throw
+// reports, so the log line says which of the two happened.
+func (e *rejectionError) Hint() string { return "unhandled script exception" }
 
 // WaitOnRegistered waits on all registered callbacks so we know nothing is still doing work.
 // This does call back the callbacks and more can be queued over time.
