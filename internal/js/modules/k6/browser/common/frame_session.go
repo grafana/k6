@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 	k6metrics "go.k6.io/k6/v2/metrics"
 
@@ -397,7 +398,17 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	}
 
 	state := fs.vu.State()
-	tags := state.Tags.GetCurrentValues().Tags
+	// Web Vitals are reported asynchronously through a CDP binding, long after the navigation that
+	// produced them. Reading live tags here would attribute the sample to whatever group/tags happen
+	// to be active at report time. When async metric context is enabled, prefer the context captured
+	// by the navigation operation instead, mirroring how NetworkManager attributes delayed requests.
+	tagsAndMeta := state.Tags.GetCurrentValues()
+	if k6common.AsyncMetricContextEnabled(state) {
+		if captured, ok := fs.page.getNetworkTagsAndMeta(); ok {
+			tagsAndMeta = captured
+		}
+	}
+	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags = handleURLTag(fs.page, wv.URL, http.MethodGet, tags)
 	}
