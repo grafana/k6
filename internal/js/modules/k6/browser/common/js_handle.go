@@ -63,6 +63,13 @@ func NewJSHandle(
 	ro *runtime.RemoteObject,
 	l *log.Logger,
 ) jsHandle {
+	if ro == nil {
+		// CDP omits PropertyDescriptor.value for accessor properties
+		// (getters/setters). Treat a missing remote object as undefined so
+		// callers do not nil-deref on Subtype or ObjectID.
+		ro = &runtime.RemoteObject{Type: runtime.TypeUndefined}
+	}
+
 	eh := &BaseJSHandle{
 		ctx:          ctx,
 		session:      s,
@@ -181,6 +188,10 @@ func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
 	props := make(map[string]jsHandle, len(result))
 	for _, r := range result {
 		if !r.Enumerable {
+			continue
+		}
+		// Accessor properties have no materialized value (CDP omits `value`).
+		if r.Value == nil {
 			continue
 		}
 		props[r.Name] = NewJSHandle(h.ctx, h.session, h.execCtx, h.execCtx.Frame(), r.Value, h.logger)
