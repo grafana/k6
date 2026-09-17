@@ -421,6 +421,20 @@ func (writer *WritableStreamDefaultWriter) close() *sobek.Promise {
 	return stream.close()
 }
 
+func (writer *WritableStreamDefaultWriter) closeWithErrorPropagation() *sobek.Promise {
+	stream := writer.stream
+	if stream == nil {
+		return newRejectedPromise(writer.vu, newTypeError(writer.runtime, "stream is undefined").Err())
+	}
+	if stream.closeQueuedOrInFlight() || stream.state == WritableStreamStateClosed {
+		return writer.closedPromise.promise
+	}
+	if stream.state == WritableStreamStateErrored {
+		return newRejectedPromise(writer.vu, throwableValue(stream.storedError))
+	}
+	return writer.close()
+}
+
 // getDesiredSize implements the [specification]'s WritableStreamDefaultWriterGetDesiredSize
 // abstract operation.
 //

@@ -45,6 +45,39 @@ func TestReadableStream(t *testing.T) {
 	}
 }
 
+func TestReadableStreamPiping(t *testing.T) {
+	t.Parallel()
+	if _, err := os.Stat(webPlatformTestSuite); err != nil { //nolint:forbidigo
+		t.Skipf("pinned Web Platform Tests checkout is unavailable: %v", err)
+	}
+
+	suites := []string{
+		"close-propagation-backward.any.js",
+		"close-propagation-forward.any.js",
+		"error-propagation-backward.any.js",
+		"error-propagation-forward.any.js",
+		"flow-control.any.js",
+		"general-addition.any.js",
+		"general.any.js",
+		"multiple-propagation.any.js",
+		"pipe-through.any.js",
+		"then-interception.any.js",
+		"throwing-options.any.js",
+		"transform-streams.any.js",
+	}
+
+	for _, suite := range suites {
+		t.Run(suite, func(t *testing.T) {
+			t.Parallel()
+			ts := newConfiguredRuntime(t)
+			gotErr := ts.EventLoop.Start(func() error {
+				return executeTestScript(ts.VU, webPlatformTestSuite+"/streams/piping", suite)
+			})
+			assert.NoError(t, gotErr)
+		})
+	}
+}
+
 func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	rt := modulestest.NewRuntime(t)
 
