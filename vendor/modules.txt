@@ -216,8 +216,8 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.18.0
-## explicit; go 1.24.0
+# github.com/jhump/protoreflect v1.18.1
+## explicit; go 1.25.0
 github.com/jhump/protoreflect/desc
 github.com/jhump/protoreflect/desc/internal
 github.com/jhump/protoreflect/desc/internal/protoutil
