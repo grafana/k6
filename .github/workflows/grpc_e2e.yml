@@ -1,0 +1,40 @@
+name: gRPC E2E
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'release notes/**'
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  grpc-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: 1.x
+          check-latest: true
+      - name: Run gRPC E2E tests
+        # These tests build the k6 binary and a helper gRPC server and run them
+        # as separate OS processes, so that k6 cannot rely on the server's
+        # process-global protobuf registrations and must load proto definitions
+        # at runtime itself. See https://github.com/grafana/k6/issues/3552.
+        run: |
+          go version
+          go test -tags grpc_e2e -race -count=1 -timeout 600s ./internal/e2e/grpc/...
