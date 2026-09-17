@@ -87,10 +87,15 @@ func parseThresholdExpression(input string) (*thresholdExpression, error) {
 
 	parsedValue, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		err = fmt.Errorf("failed parsing threshold expresion's %q right hand side; "+
+		err = fmt.Errorf("failed parsing threshold expression's %q right hand side; "+
 			"reason: %w", input, err,
 		)
 		return nil, err
+	}
+	if math.IsNaN(parsedValue) || math.IsInf(parsedValue, 0) {
+		return nil, fmt.Errorf("failed parsing threshold expression's %q right hand side; "+
+			"reason: value must be a finite number", input,
+		)
 	}
 
 	condition := &thresholdExpression{
@@ -203,7 +208,7 @@ func parseThresholdAggregationMethod(input string) (string, null.Float, error) {
 		if err != nil {
 			return "", null.Float{}, fmt.Errorf("malformed percentile value; reason: %w", err)
 		}
-		if math.IsNaN(aggregationValue) || aggregationValue < 0 || aggregationValue > 100 {
+		if math.IsNaN(aggregationValue) || math.IsInf(aggregationValue, 0) || aggregationValue < 0 || aggregationValue > 100 {
 			return "", null.Float{}, fmt.Errorf("malformed percentile value, provide a number between 0 and 100")
 		}
 
