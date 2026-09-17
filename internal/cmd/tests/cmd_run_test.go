@@ -1603,14 +1603,23 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 }
 
 func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
+	return getSampleValuesWithMetadata(t, jsonOutput, metric, tags, nil)
+}
+
+func getSampleValuesWithMetadata(
+	t *testing.T, jsonOutput []byte, metric string, tags, metadata map[string]string,
+) []float64 {
 	jsonLines := bytes.Split(jsonOutput, []byte("\n"))
 	result := []float64{}
 
-	tagsMatch := func(rawTags any) bool {
-		sampleTags, ok := rawTags.(map[string]any)
+	valuesMatch := func(rawValues any, expected map[string]string) bool {
+		if len(expected) == 0 {
+			return true
+		}
+		sampleValues, ok := rawValues.(map[string]any)
 		require.True(t, ok)
-		for k, v := range tags {
-			rv, sok := sampleTags[k]
+		for k, v := range expected {
+			rv, sok := sampleValues[k]
 			if !sok {
 				return false
 			}
@@ -1642,7 +1651,7 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 		sampleData, ok := line["data"].(map[string]any)
 		require.True(t, ok)
 
-		if !tagsMatch(sampleData["tags"]) {
+		if !valuesMatch(sampleData["tags"], tags) || !valuesMatch(sampleData["metadata"], metadata) {
 			continue
 		}
 
@@ -2177,7 +2186,7 @@ func TestBadLogOutput(t *testing.T) {
 }
 
 // HACK: We need this so multiple tests can register differently named modules.
-var uniqueModuleNumber uint64 //nolint:gochecknoglobals
+var uniqueModuleNumber atomic.Uint64 //nolint:gochecknoglobals
 
 // Tests that the appropriate events are emitted in the correct order.
 func TestEventSystemOK(t *testing.T) {
@@ -2185,7 +2194,7 @@ func TestEventSystemOK(t *testing.T) {
 
 	ts := NewGlobalTestState(t)
 
-	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+	moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 	mod := events.New(event.GlobalEvents, event.VUEvents)
 	modules.Register(moduleName, mod)
 
@@ -2311,7 +2320,7 @@ func TestEventSystemError(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
 
-			moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+			moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 			mod := events.New(event.GlobalEvents, event.VUEvents)
 			modules.Register(moduleName, mod)
 
@@ -2368,7 +2377,7 @@ func BenchmarkRunEvents(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ts := NewGlobalTestState(b)
 
-		moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+		moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 		mod := events.New(event.GlobalEvents, event.VUEvents)
 		modules.Register(moduleName, mod)
 

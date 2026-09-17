@@ -135,8 +135,7 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 
 	u, err := url.Parse(ev.Request.URL)
 	if err != nil {
-		var uerr *url.Error
-		if errors.As(err, &uerr) {
+		if uerr, ok := errors.AsType[*url.Error](err); ok {
 			err = uerr.Err
 		}
 		return nil, fmt.Errorf("parsing URL %q: %w", ev.Request.URL, err)

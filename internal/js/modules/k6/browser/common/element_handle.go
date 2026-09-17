@@ -1868,8 +1868,7 @@ func errorFromDOMError(v any) error {
 	default:
 		return fmt.Errorf("unexpected DOM error type %T", v)
 	}
-	var uerr *k6ext.UserFriendlyError
-	if errors.As(err, &uerr) {
+	if _, ok := errors.AsType[*k6ext.UserFriendlyError](err); ok {
 		return err
 	}
 	if strings.Contains(serr, "timed out") {

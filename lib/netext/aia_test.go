@@ -343,10 +343,10 @@ func TestAIAFetcher_UsesProvidedDialer(t *testing.T) {
 func TestAIAFetcher_CacheIsolatedBetweenFetchers(t *testing.T) {
 	t.Parallel()
 
-	var aiaHits int32
+	var aiaHits atomic.Int32
 	handler := &tlstest.AIAHandler{}
 	aiaSrv := startAIAServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&aiaHits, 1)
+		aiaHits.Add(1)
 		handler.ServeHTTP(w, r)
 	}))
 	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.der")
@@ -361,14 +361,14 @@ func TestAIAFetcher_CacheIsolatedBetweenFetchers(t *testing.T) {
 	respA, errA := testHTTPClient(t, fetcherA.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
 	require.NoError(t, errA)
 	_ = respA.Body.Close()
-	hitsAfterA := atomic.LoadInt32(&aiaHits)
+	hitsAfterA := aiaHits.Load()
 	require.Equal(t, int32(1), hitsAfterA, "fetcher A should have fetched once")
 
 	// Fetcher B, independently, must hit the AIA server again — no shared cache.
 	respB, errB := testHTTPClient(t, fetcherB.Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
 	require.NoError(t, errB)
 	_ = respB.Body.Close()
-	hitsAfterB := atomic.LoadInt32(&aiaHits)
+	hitsAfterB := aiaHits.Load()
 	assert.Equal(t, int32(2), hitsAfterB, "fetcher B must fetch independently; caches are not shared across fetchers")
 }
 

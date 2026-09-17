@@ -23,13 +23,9 @@ jobs:
       go_current: ${{ steps.go_versions.outputs.current }}
       go_prev: ${{ steps.go_versions.outputs.prev }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
       - name: Resolve Go versions
         id: go_versions
-        uses: ./.github/actions/go-versions
+        uses: grafana/k6-ci/.github/actions/go-versions@03469f9ae7aad25369827832c456e8f8b7b8c1c2 # v0.5.0
 
   test-prev:
     needs: configure
