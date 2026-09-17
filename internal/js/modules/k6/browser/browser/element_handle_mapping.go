@@ -13,6 +13,16 @@ import (
 	k6common "go.k6.io/k6/v2/js/common"
 )
 
+// mapMaybeElementHandle maps eh, or returns an untyped nil so Sobek exposes JS null.
+// A nil *ElementHandle must not be passed to mapElementHandle: that builds a live
+// JS object whose methods dereference eh and panic (see waitForSelector hidden/detached).
+func mapMaybeElementHandle(vu moduleVU, eh *common.ElementHandle) any {
+	if eh == nil {
+		return nil
+	}
+	return mapElementHandle(vu, eh)
+}
+
 // mapElementHandle to the JS module.
 func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,funlen,cyclop
 	rt := vu.Runtime()
@@ -301,7 +311,10 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
-				return mapElementHandle(vu, eh), nil
+				// Injected waitForSelector returns a non-element (true/undefined) when the
+				// target is hidden or detached. Playwright resolves that to null; mapping
+				// the nil handle would yield a truthy zombie that SIGSEGVs on click/etc.
+				return mapMaybeElementHandle(vu, eh), nil
 			}), nil
 		},
 	}

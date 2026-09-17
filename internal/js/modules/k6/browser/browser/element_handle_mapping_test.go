@@ -9,6 +9,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	k6common "go.k6.io/k6/v2/js/common"
 )
 
 func TestParseElementHandleBaseOptions(t *testing.T) {
@@ -673,4 +674,39 @@ func TestParseElementHandleScreenshotOptions(t *testing.T) {
 			assert.Equal(t, tt.want, opts)
 		})
 	}
+}
+
+func TestMapMaybeElementHandleNilIsNullish(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	mvu := moduleVU{VU: vu.VU}
+	rt := mvu.Runtime()
+
+	// Playwright waitForSelector({state:'detached'|'hidden'}) resolves to null.
+	// An untyped nil must stay nullish so `if (handle)` is false.
+	val := rt.ToValue(mapMaybeElementHandle(mvu, nil))
+	require.True(t, k6common.IsNullish(val), "nil handle must map to JS null/undefined, got %v", val)
+
+	mapped := mapMaybeElementHandle(mvu, &common.ElementHandle{})
+	require.NotNil(t, mapped)
+	_, ok := mapped.(mapping)
+	require.True(t, ok)
+	require.False(t, k6common.IsNullish(rt.ToValue(mapped)))
+}
+
+func TestMapElementHandleNilBuildsLiveObject(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	mvu := moduleVU{VU: vu.VU}
+	rt := mvu.Runtime()
+
+	// Documents why waitForSelector must not call mapElementHandle(nil):
+	// Sobek exposes a truthy object, so Playwright-style null checks pass and
+	// later method calls dereference the nil *ElementHandle.
+	zombie := mapElementHandle(mvu, nil)
+	require.Contains(t, zombie, "click")
+	require.Contains(t, zombie, "waitForSelector")
+	require.False(t, k6common.IsNullish(rt.ToValue(zombie)), "mapped nil handle is a live JS object")
 }
