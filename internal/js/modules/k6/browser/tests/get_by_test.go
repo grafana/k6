@@ -43,9 +43,13 @@ func TestGetByRoleSuccess(t *testing.T) {
 				expected: 1, expectedText: "Link text",
 			},
 			{
-				name:     "area",
-				role:     "link",
-				opts:     &common.GetByRoleOptions{Name: toPtr(`'Map area'`)},
+				// Chromium styles <area> as display:none, including valid image-map hotspots.
+				name: "area",
+				role: "link",
+				opts: &common.GetByRoleOptions{
+					Name:          toPtr(`'Map area'`),
+					IncludeHidden: toPtr(true),
+				},
 				expected: 1, expectedText: "",
 			},
 			{
