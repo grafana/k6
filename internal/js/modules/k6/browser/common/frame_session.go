@@ -563,7 +563,7 @@ func (fs *FrameSession) initOptions() error {
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
-		if err := fs.updateViewport(); err != nil {
+		if err := fs.updateViewport(fs.ctx, fs.page.emulatedSize); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
 				fs.session.ID(), fs.targetID, err)
@@ -1279,7 +1279,7 @@ func (fs *FrameSession) updateRequestInterception(enable bool) error {
 	return fs.networkManager.setRequestInterception(enable)
 }
 
-func (fs *FrameSession) updateViewport() error {
+func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *EmulatedSize) error {
 	fs.logger.Debugf("NewFrameSession:updateViewport", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// other frames don't have viewports and,
@@ -1292,7 +1292,6 @@ func (fs *FrameSession) updateViewport() error {
 	}
 
 	opts := fs.page.browserCtx.opts
-	emulatedSize := fs.page.emulatedSize
 	if emulatedSize == nil {
 		return nil
 	}
@@ -1311,7 +1310,7 @@ func (fs *FrameSession) updateViewport() error {
 		WithScreenOrientation(&orientation).
 		WithScreenWidth(screen.Width).
 		WithScreenHeight(screen.Height)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	if err := action.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
@@ -1326,7 +1325,7 @@ func (fs *FrameSession) updateViewport() error {
 			Width:  viewport.Width,
 			Height: viewport.Height,
 		})
-		if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		if err := action2.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 			return fmt.Errorf("setting window bounds: %w", err)
 		}
 	}
