@@ -154,8 +154,12 @@ func NewFrameSession(
 		hasUIWindow:          hasUIWindow,
 	}
 
-	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return nil, fmt.Errorf("run if waiting for debugger to attach: %w", err)
+	// A new top-level target may not acknowledge Network.enable until resumed.
+	// Child renderers stay paused until interception is installed and they are registered.
+	if parent == nil {
+		if err := fs.resume(); err != nil {
+			return nil, err
+		}
 	}
 
 	var parentNM *NetworkManager
@@ -220,6 +224,14 @@ func NewFrameSession(
 	}
 
 	return &fs, nil
+}
+
+// resume releases the renderer only after its owner has installed and published state.
+func (fs *FrameSession) resume() error {
+	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return fmt.Errorf("run if waiting for debugger to attach: %w", err)
+	}
+	return nil
 }
 
 func (fs *FrameSession) emulateLocale() error {
@@ -558,12 +570,11 @@ func (fs *FrameSession) initOptions() error {
 	var (
 		opts       = fs.manager.page.browserCtx.opts
 		optActions = []Action{}
-		state      = fs.vu.State()
 	)
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
-		if err := fs.updateViewport(); err != nil {
+		if err := fs.updateViewport(fs.ctx); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
 				fs.session.ID(), fs.targetID, err)
@@ -602,12 +613,7 @@ func (fs *FrameSession) initOptions() error {
 		return err
 	}
 
-	var reqIntercept bool
-	if state.Options.BlockedHostnames.Trie != nil ||
-		len(state.Options.BlacklistIPs) > 0 {
-		reqIntercept = true
-	}
-	if err := fs.updateRequestInterception(reqIntercept); err != nil {
+	if err := fs.updateRequestInterception(fs.page.hasRoutes()); err != nil {
 		return err
 	}
 
@@ -683,13 +689,13 @@ func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFra
 	}
 }
 
-func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (string, error) {
+func (fs *FrameSession) navigateFrame(ctx context.Context, frame *Frame, url, referrer string) (string, error) {
 	fs.logger.Debugf("FrameSession:navigateFrame",
 		"sid:%v fid:%s tid:%v url:%q referrer:%q",
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
 	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
-	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
+	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(ctx, fs.session))
 	if err != nil {
 		if errorText == "" {
 			err = fmt.Errorf("%w", err)
@@ -1073,12 +1079,17 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) error {
+	attached := false
+	defer func() {
+		if !attached {
+			detachSession(session)
+		}
+	}()
 	// If the page is closing, don't create a new FrameSession.
 	// Unblocks the target so the browser doesn't hang.
 	if fs.page.isClosing() {
 		fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 			"rejected frame; page is closing: tid=%v", ti.TargetID)
-		detachSession(session)
 		return nil
 	}
 
@@ -1117,12 +1128,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 		if errors.Is(err, errPageClosing) {
 			fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 				"rejected frame; page is closing: tid=%v", ti.TargetID)
-			detachSession(session)
 			return nil
 		}
 		return err
 	}
 
+	attached = true
 	return nil
 }
 
@@ -1279,7 +1290,7 @@ func (fs *FrameSession) updateRequestInterception(enable bool) error {
 	return fs.networkManager.setRequestInterception(enable)
 }
 
-func (fs *FrameSession) updateViewport() error {
+func (fs *FrameSession) updateViewport(ctx context.Context) error {
 	fs.logger.Debugf("NewFrameSession:updateViewport", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// other frames don't have viewports and,
@@ -1311,7 +1322,7 @@ func (fs *FrameSession) updateViewport() error {
 		WithScreenOrientation(&orientation).
 		WithScreenWidth(screen.Width).
 		WithScreenHeight(screen.Height)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	if err := action.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
@@ -1326,7 +1337,7 @@ func (fs *FrameSession) updateViewport() error {
 			Width:  viewport.Width,
 			Height: viewport.Height,
 		})
-		if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		if err := action2.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 			return fmt.Errorf("setting window bounds: %w", err)
 		}
 	}

@@ -516,14 +516,14 @@ func (m *FrameManager) requestFinished(req *Request) {
 	*/
 }
 
-func (m *FrameManager) requestStarted(req *Request) {
+func (m *FrameManager) requestStarted(req *Request, networkManager *NetworkManager) {
 	m.logger.Debugf("FrameManager:requestStarted", "fmid:%d rurl:%s", m.ID(), req.URL())
 
 	m.framesMu.Lock()
-	defer m.framesMu.Unlock()
 
 	frame := req.getFrame()
 	if frame == nil {
+		m.framesMu.Unlock()
 		m.logger.Debugf("FrameManager:requestStarted:return",
 			"fmid:%d rurl:%s frame:nil", m.ID(), req.URL())
 		return
@@ -536,14 +536,17 @@ func (m *FrameManager) requestStarted(req *Request) {
 		frame.pendingDocumentMu.Unlock()
 	}
 
-	if !m.page.hasRoutes() {
+	m.framesMu.Unlock()
+
+	if req.interceptionID == "" || !m.page.hasRoutes() {
 		return
 	}
 
-	route := NewRoute(m.logger, m.page.mainFrameSession.networkManager, req)
+	route := NewRoute(m.logger, networkManager, req)
 	m.page.routesMu.RLock()
-	defer m.page.routesMu.RUnlock()
-	for _, r := range m.page.routes {
+	routes := append([]*RouteHandler(nil), m.page.routes...)
+	m.page.routesMu.RUnlock()
+	for _, r := range routes {
 		matched, err := r.urlMatcher(req.URL())
 		if err != nil {
 			m.logger.Errorf("FrameManager:requestStarted",
@@ -555,25 +558,22 @@ func (m *FrameManager) requestStarted(req *Request) {
 			continue
 		}
 
-		func() {
-			// In case routes are updated in the handler
-			m.page.routesMu.RUnlock()
-			defer m.page.routesMu.RLock()
-
-			err := r.handler(route)
-			if err != nil {
-				m.logger.Errorf("FrameManager:requestStarted",
-					"fmid:%d rurl:%s error handling request with route: %v", m.ID(), req.URL(), err)
-			}
-		}()
+		if err := r.handler(route); err != nil {
+			m.logger.Errorf("FrameManager:requestStarted",
+				"fmid:%d rurl:%s error handling request with route: %v", m.ID(), req.URL(), err)
+		}
 
 		return
 	}
 
-	if err := route.Continue(ContinueOptions{}); err != nil {
-		m.logger.Errorf("FrameManager:requestStarted",
-			"fmid:%d rurl:%s error continuing request: %v", m.ID(), req.URL(), err)
-	}
+	// Independent requests must not wait for this acknowledgment before being dispatched.
+	// Keep completion tracked so page teardown cancels and joins the originating manager's work.
+	networkManager.wg.Go(func() {
+		if err := route.Continue(ContinueOptions{}); err != nil {
+			m.logger.Errorf("FrameManager:requestStarted",
+				"fmid:%d rurl:%s error continuing request: %v", m.ID(), req.URL(), err)
+		}
+	})
 }
 
 // Frames returns a list of frames on the page.
@@ -689,22 +689,6 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		fs = frame.page.mainFrameSession
 	}
 
-	var err error
-	newDocumentID, err = fs.navigateFrame(frame, url, parsedOpts.Referer)
-	if err != nil {
-		return nil, fmt.Errorf("navigating to %q: %w", url, err)
-	}
-
-	if newDocumentID == "" {
-		// It's a navigation within the same document (e.g., via anchor links or
-		// the History API), so don't wait for a response nor any lifecycle
-		// events.
-		return nil, nil //nolint:nilnil
-	}
-
-	// unblock the waiter goroutine
-	close(newDocIDIsReadyCh)
-
 	wrapTimeoutError := func(err error) error {
 		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
@@ -719,6 +703,25 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 
 		return err // TODO maybe wrap this as well?
 	}
+
+	var err error
+	newDocumentID, err = fs.navigateFrame(timeoutCtx, frame, url, parsedOpts.Referer)
+	if timeoutCtx.Err() != nil {
+		return nil, wrapTimeoutError(ContextErr(timeoutCtx))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("navigating to %q: %w", url, err)
+	}
+
+	if newDocumentID == "" {
+		// It's a navigation within the same document (e.g., via anchor links or
+		// the History API), so don't wait for a response nor any lifecycle
+		// events.
+		return nil, nil //nolint:nilnil
+	}
+
+	// unblock the waiter goroutine
+	close(newDocIDIsReadyCh)
 
 	var resp *Response
 	select {

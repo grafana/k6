@@ -756,19 +756,27 @@ func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) error {
 		return errors.New("internal error: FrameSession is nil")
 	}
 
+	p.routesMu.RLock()
+	defer p.routesMu.RUnlock()
+
 	// This prevents a TOCTOU race where Close() snapshots owned sessions
 	// and then a new session is inserted outside that snapshot.
 	p.frameSessionsMu.Lock()
-	defer p.frameSessionsMu.Unlock()
 
 	if p.isClosing() {
 		p.logger.Debugf("Page:attachFrameSession", "rejected fid=%v: page is closing", fid)
+		p.frameSessionsMu.Unlock()
 		return errPageClosing
 	}
 
+	if err := fs.updateRequestInterception(len(p.routes) > 0); err != nil {
+		p.frameSessionsMu.Unlock()
+		return err
+	}
 	p.frameSessions[fid] = fs
+	p.frameSessionsMu.Unlock()
 
-	return nil
+	return fs.resume()
 }
 
 // waitForFrameSessions waits for every FrameSession's event goroutine
@@ -802,21 +810,21 @@ func (p *Page) hasRoutes() bool {
 	return len(p.routes) > 0
 }
 
-func (p *Page) resetViewport() error {
+func (p *Page) resetViewport(ctx context.Context) error {
 	p.logger.Debugf("Page:resetViewport", "sid:%v", p.sessionID())
 
 	action := emulation.SetDeviceMetricsOverride(0, 0, 0, false)
-	return action.Do(cdp.WithExecutor(p.ctx, p.session))
+	return action.Do(cdp.WithExecutor(ctx, p.session))
 }
 
-func (p *Page) setEmulatedSize(emulatedSize *EmulatedSize) error {
+func (p *Page) setEmulatedSize(ctx context.Context, emulatedSize *EmulatedSize) error {
 	p.logger.Debugf("Page:setEmulatedSize", "sid:%v", p.sessionID())
 
 	p.emulatedSize = emulatedSize
-	return p.mainFrameSession.updateViewport()
+	return p.mainFrameSession.updateViewport(ctx)
 }
 
-func (p *Page) setViewportSize(viewportSize *Size) error {
+func (p *Page) setViewportSize(ctx context.Context, viewportSize *Size) error {
 	p.logger.Debugf("Page:setViewportSize", "sid:%v vps:%v",
 		p.sessionID(), viewportSize)
 
@@ -828,7 +836,7 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}
-	return p.setEmulatedSize(NewEmulatedSize(viewport, screen))
+	return p.setEmulatedSize(ctx, NewEmulatedSize(viewport, screen))
 }
 
 func (p *Page) updateExtraHTTPHeaders() error {
@@ -1361,7 +1369,7 @@ func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) erro
 	p.routesMu.Lock()
 	defer p.routesMu.Unlock()
 	if len(p.routes) == 0 {
-		err := p.mainFrameSession.updateRequestInterception(true)
+		err := p.updateRequestInterception(true)
 		if err != nil {
 			return err
 		}
@@ -1380,6 +1388,32 @@ func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) erro
 	return nil
 }
 
+// updateRequestInterception applies the page route state to every owned session.
+// The caller holds routesMu, serializing this update with frame attachment.
+func (p *Page) updateRequestInterception(enabled bool) error {
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+	for _, fs := range p.frameSessions {
+		select {
+		case <-fs.session.Done():
+			continue
+		default:
+		}
+		if err := fs.updateRequestInterception(enabled); err != nil {
+			if fs != p.mainFrameSession && errors.Is(err, ErrTargetCrashed) {
+				continue
+			}
+			select {
+			case <-fs.session.Done():
+				continue
+			default:
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Unroute removes the route(s) for the specified URL pattern.
 // If multiple routes match the same URL pattern, all of them are removed.
 func (p *Page) Unroute(path string) error {
@@ -1394,7 +1428,7 @@ func (p *Page) Unroute(path string) error {
 
 	// If no routes remain, disable request interception
 	if len(p.routes) == 0 {
-		return p.mainFrameSession.updateRequestInterception(false)
+		return p.updateRequestInterception(false)
 	}
 
 	return nil
@@ -1410,7 +1444,7 @@ func (p *Page) UnrouteAll() error {
 	p.routes = []*RouteHandler{}
 
 	// Disable request interception when no route is registered
-	return p.mainFrameSession.updateRequestInterception(false)
+	return p.updateRequestInterception(false)
 }
 
 // NavigationTimeout returns the page's navigation timeout.
@@ -1696,7 +1730,8 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp, p.logger)
+	s, cancel := newScreenshotter(spanCtx, p.defaultTimeout(), sp, p.logger)
+	defer cancel()
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
 		return nil, spanRecordErrorf(span, "taking screenshot of page: %w", err)
@@ -1753,7 +1788,7 @@ func (p *Page) SetInputFiles(selector string, files *Files, opts *FrameSetInputF
 func (p *Page) SetViewportSize(viewportSize *Size) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
-	if err := p.setViewportSize(viewportSize); err != nil {
+	if err := p.setViewportSize(p.ctx, viewportSize); err != nil {
 		return fmt.Errorf("setting viewport size: %w", err)
 	}
 

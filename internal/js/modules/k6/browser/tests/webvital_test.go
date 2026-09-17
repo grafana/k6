@@ -57,6 +57,14 @@ func TestWebVitalMetric(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	// CLS observation starts after FCP. The reloaded document must paint
+	// before Close hides it and asks web-vitals to finalize measurements.
+	_, err = page.WaitForFunction(
+		`() => performance.getEntriesByName('first-contentful-paint', 'paint').length > 0`,
+		common.NewFrameWaitForFunctionOptions(page.Timeout()),
+	)
+	require.NoError(t, err)
+
 	require.NoError(t, page.Close())
 	close(samples)
 	markExpectedWebVitalsFromSamples(samples, expected)

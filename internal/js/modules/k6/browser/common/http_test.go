@@ -2,6 +2,7 @@ package common
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -210,6 +211,43 @@ func TestValidateResourceType(t *testing.T) {
 
 			got := validateResourceType(log.NewNullLogger(), tt.input)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestResponseJSONConcurrent(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name    string
+		body    string
+		want    any
+		wantErr bool
+	}{
+		{name: "object", body: `{"value":"` + strings.Repeat("x", 100000) + `"}`, want: map[string]any{"value": strings.Repeat("x", 100000)}},
+		{name: "null", body: "null"},
+		{name: "invalid", body: "{", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			response := &Response{body: []byte(tc.body)}
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			for range 16 {
+				wg.Go(func() {
+					<-start
+					for range 2 {
+						got, err := response.JSON()
+						if tc.wantErr {
+							assert.ErrorContains(t, err, "unmarshalling response body to JSON")
+						} else {
+							assert.NoError(t, err)
+							assert.Equal(t, tc.want, got)
+						}
+					}
+				})
+			}
+			close(start)
+			wg.Wait()
 		})
 	}
 }

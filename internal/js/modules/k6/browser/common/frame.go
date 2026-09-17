@@ -249,15 +249,21 @@ func (f *Frame) defaultTimeout() time.Duration {
 }
 
 func (f *Frame) document() (*ElementHandle, error) {
+	return f.documentWithContext(f.ctx)
+}
+
+func (f *Frame) documentWithContext(apiCtx context.Context) (*ElementHandle, error) {
 	f.log.Debugf("Frame:document", "fid:%s furl:%q", f.ID(), f.URL())
 
 	if cdh, ok := f.cachedDocumentHandle(); ok {
 		return cdh, nil
 	}
 
-	f.waitForExecutionContext(mainWorld)
+	if err := f.waitForExecutionContextWithContext(apiCtx, mainWorld); err != nil {
+		return nil, err
+	}
 
-	dh, err := f.newDocumentHandle()
+	dh, err := f.newDocumentHandleWithContext(apiCtx)
 	if err != nil {
 		return nil, fmt.Errorf("getting new document handle: %w", err)
 	}
@@ -280,9 +286,9 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 	return f.documentHandle, f.documentHandle != nil
 }
 
-func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
+func (f *Frame) newDocumentHandleWithContext(apiCtx context.Context) (*ElementHandle, error) {
 	result, err := f.evaluate(
-		f.ctx,
+		apiCtx,
 		mainWorld,
 		evalOptions{
 			forceCallable: false,
@@ -458,8 +464,16 @@ func (f *Frame) setID(id cdp.FrameID) {
 }
 
 func (f *Frame) waitForExecutionContext(world executionWorld) {
+	_ = f.waitForExecutionContextWithContext(f.ctx, world)
+}
+
+func (f *Frame) waitForExecutionContextWithContext(apiCtx context.Context, world executionWorld) error {
 	f.log.Debugf("Frame:waitForExecutionContext", "fid:%s furl:%q world:%s",
 		f.ID(), f.URL(), world)
+
+	if f.hasContext(world) {
+		return nil
+	}
 
 	t := time.NewTicker(50 * time.Millisecond)
 	defer t.Stop()
@@ -467,10 +481,10 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 		select {
 		case <-t.C:
 			if f.hasContext(world) {
-				return
+				return nil
 			}
-		case <-f.ctx.Done():
-			return
+		case <-apiCtx.Done():
+			return apiCtx.Err()
 		}
 	}
 }
@@ -478,8 +492,14 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 func (f *Frame) waitForSelectorRetry(
 	selector string, opts *FrameWaitForSelectorOptions, retry int,
 ) (h *ElementHandle, err error) {
+	apiCtx := f.ctx
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		apiCtx, cancel = context.WithTimeout(apiCtx, opts.Timeout)
+		defer cancel()
+	}
 	for ; retry >= 0; retry-- {
-		if h, err = f.waitForSelector(selector, opts); err == nil {
+		if h, err = f.waitForSelectorWithContext(apiCtx, selector, opts); err == nil {
 			return h, nil
 		}
 	}
@@ -494,13 +514,22 @@ func (f *Frame) waitForSelectorRetry(
 // retry workaround is needed since the underlying DOM can change when the
 // wait action is performed during a navigation.
 func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+	return f.waitForSelectorWithContext(f.ctx, selector, opts)
+}
+
+func (f *Frame) waitForSelectorWithContext(
+	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
+) (*ElementHandle, error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	handle, err := f.waitFor(selector, opts, 20)
+	handle, err := f.waitForWithContext(apiCtx, selector, opts, 20)
 	if err != nil {
 		return nil, err
 	}
 	if handle == nil {
+		if opts.State == DOMElementStateHidden || opts.State == DOMElementStateDetached {
+			return nil, nil //nolint:nilnil
+		}
 		return nil, fmt.Errorf("waiting for selector %q did not result in any nodes", selector)
 	}
 
@@ -540,6 +569,25 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 func (f *Frame) waitFor(
 	selector string, opts *FrameWaitForSelectorOptions, retryCount int,
 ) (_ *ElementHandle, rerr error) {
+	return f.waitForWithContext(f.ctx, selector, opts, retryCount)
+}
+
+func (f *Frame) waitForWithContext(
+	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions, retryCount int,
+) (_ *ElementHandle, rerr error) {
+	defer func() {
+		if errors.Is(rerr, context.DeadlineExceeded) && f.ctx.Err() == nil {
+			rerr = &k6ext.UserFriendlyError{Err: rerr, Timeout: opts.Timeout}
+		}
+	}()
+	if opts.Timeout > 0 {
+		var cancel context.CancelFunc
+		apiCtx, cancel = context.WithTimeout(apiCtx, opts.Timeout)
+		defer cancel()
+	}
+	if err := apiCtx.Err(); err != nil {
+		return nil, err
+	}
 	f.log.Debugf("Frame:waitFor", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	retryCount--
@@ -547,27 +595,27 @@ func (f *Frame) waitFor(
 		return nil, errors.New("waitFor retry threshold reached")
 	}
 
-	document, err := f.document()
+	document, err := f.documentWithContext(apiCtx)
 	if err != nil {
 		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		return nil, err
 	}
 
-	handle, err := document.waitForSelector(f.ctx, selector, opts)
+	handle, err := document.waitForSelector(apiCtx, selector, opts)
 	if err != nil {
 		if strings.Contains(err.Error(), "Inspected target navigated or closed") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "Execution context was destroyed") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 		if strings.Contains(err.Error(), "visible") {
-			return f.waitFor(selector, opts, retryCount)
+			return f.waitForWithContext(apiCtx, selector, opts, retryCount)
 		}
 	}
 
@@ -1982,15 +2030,57 @@ func (f *Frame) waitForFunction(
 		"fid:%s furl:%q world:%s poll:%s timeout:%s",
 		f.ID(), f.URL(), world, polling, timeout)
 
-	f.waitForExecutionContext(world)
-
-	f.executionContextMu.RLock()
-	defer f.executionContextMu.RUnlock()
-
-	execCtx := f.executionContexts[world]
-	if execCtx == nil {
-		return nil, fmt.Errorf("waiting for function: execution context %q not found", world)
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		apiCtx, cancel = context.WithTimeout(apiCtx, timeout)
+		defer cancel()
 	}
+
+	retry := time.NewTicker(50 * time.Millisecond)
+	defer retry.Stop()
+	for {
+		if err := ContextErr(apiCtx); err != nil {
+			return nil, fmt.Errorf("waiting for function: %w", &k6ext.UserFriendlyError{Err: err, Timeout: timeout})
+		}
+		if f.IsDetached() {
+			return nil, fmt.Errorf("waiting for function: %w", ErrFrameDetached)
+		}
+		if f.page.IsClosed() {
+			return nil, errors.New("waiting for function: page is closed")
+		}
+
+		// Context lifecycle events must be able to run while a predicate is pending.
+		f.executionContextMu.RLock()
+		execCtx := f.executionContexts[world]
+		f.executionContextMu.RUnlock()
+		if execCtx != nil {
+			remaining := timeout
+			if deadline, ok := apiCtx.Deadline(); ok {
+				remaining = max(time.Until(deadline), time.Millisecond)
+			}
+			result, err := f.pollFunction(apiCtx, execCtx, js, polling, remaining, args...)
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				return nil, &k6ext.UserFriendlyError{Err: err, Timeout: timeout}
+			}
+			var protocolErr devToolsError
+			ok := errors.As(err, &protocolErr)
+			if !ok || (!strings.Contains(protocolErr.Message, "Inspected target navigated or closed") &&
+				!strings.Contains(protocolErr.Message, "Cannot find context with specified id") &&
+				!strings.Contains(protocolErr.Message, "Execution context was destroyed")) {
+				return result, err
+			}
+		}
+		select {
+		case <-apiCtx.Done():
+		case <-retry.C:
+		}
+	}
+}
+
+func (f *Frame) pollFunction(
+	apiCtx context.Context, execCtx frameExecutionContext, js string,
+	polling any, timeout time.Duration, args ...any,
+) (any, error) {
 	injected, err := execCtx.getInjectedScript(apiCtx)
 	if err != nil {
 		return nil, fmt.Errorf("getting injected script: %w", err)
@@ -2024,7 +2114,8 @@ func (f *Frame) waitForFunction(
 	}
 	// prevent passing a non-nil interface to the upper layers.
 	if result == nil {
-		return nil, nil //nolint:nilnil
+		// A canceled protocol send can return no object without an error.
+		return nil, ContextErr(apiCtx)
 	}
 
 	return result, nil
@@ -2420,30 +2511,75 @@ func (f *Frame) newPointerAction(
 	selector string, state DOMElementState, strict bool, fn elementHandlePointerActionFunc,
 	opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {
-	// We execute a frame pointer action in the following steps:
-	// 1. Find element matching specified selector
-	// 2. Wait for it to reach specified DOM state
-	// 3. Run element handle action (incl. actionability checks)
 	return func(apiCtx context.Context, resultCh chan any, errCh chan error) {
-		waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
-		waitOpts.State = state
-		waitOpts.Strict = strict
-		handle, err := f.waitForSelector(selector, waitOpts)
-		if err != nil {
-			select {
-			case <-apiCtx.Done():
-			case errCh <- err:
+		for {
+			if apiCtx.Err() != nil {
+				return
+			}
+			handle, err := f.pointerActionHandle(apiCtx, selector, state, strict, opts.retry)
+			if apiCtx.Err() != nil {
+				return
+			}
+			var result any
+			switch {
+			case err == nil && handle != nil && !opts.retry:
+				action := handle.newPointerAction(fn, opts)
+				action(apiCtx, resultCh, errCh)
+				return
+			case err == nil && handle != nil:
+				action := handle.newPointerAction(fn, opts)
+				// A locator owns the selector, so retry detached nodes by resolving
+				// it again. The original action context keeps the same deadline.
+				result, err = call(apiCtx, action, 0)
+				if f.retryDetachedPointerAction(apiCtx, handle, err) {
+					continue
+				}
+			}
+			if err != nil {
+				select {
+				case <-apiCtx.Done():
+				case errCh <- err:
+				}
+			} else {
+				select {
+				case <-apiCtx.Done():
+				case resultCh <- result:
+				}
 			}
 			return
 		}
-		if handle == nil {
-			select {
-			case <-apiCtx.Done():
-			case resultCh <- nil:
-			}
-			return
-		}
-		f := handle.newPointerAction(fn, opts)
-		f(apiCtx, resultCh, errCh)
 	}
+}
+
+// pointerActionHandle resolves a selector under the locator's original deadline.
+func (f *Frame) pointerActionHandle(
+	apiCtx context.Context, selector string, state DOMElementState, strict, retry bool,
+) (*ElementHandle, error) {
+	waitOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
+	waitOpts.State = state
+	waitOpts.Strict = strict
+	if deadline, ok := apiCtx.Deadline(); retry && ok {
+		waitOpts.Timeout = time.Until(deadline)
+		if waitOpts.Timeout <= 0 {
+			return nil, context.DeadlineExceeded
+		}
+	}
+	selectorCtx := f.ctx
+	if retry {
+		selectorCtx = apiCtx
+	}
+	return f.waitForSelectorWithContext(selectorCtx, selector, waitOpts)
+}
+
+func (f *Frame) retryDetachedPointerAction(apiCtx context.Context, handle *ElementHandle, err error) bool {
+	if !errors.Is(err, ErrElementNotAttachedToDOM) {
+		return false
+	}
+	// This selector-created handle is no longer usable. Release it before
+	// resolving another, under the same action deadline.
+	if releaseErr := handle.disposeWithContext(apiCtx); releaseErr != nil {
+		f.log.Debugf("Frame:newPointerAction", "releasing detached handle: %v", releaseErr)
+	}
+	retry, _ := shouldRetry(apiCtx, err)
+	return retry
 }
