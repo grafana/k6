@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 func TestValueFromRemoteObject(t *testing.T) {
@@ -272,4 +273,47 @@ func TestParseRemoteObject(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValueFromUnserializableRemoteObject(t *testing.T) {
+	t.Parallel()
+
+	logger := log.NewNullLogger()
+
+	t.Run("window preview", func(t *testing.T) {
+		t.Parallel()
+
+		robj := &runtime.RemoteObject{
+			Type:     runtime.TypeObject,
+			ObjectID: runtime.RemoteObjectID("object_id_0123456789"),
+			Preview: &runtime.ObjectPreview{
+				Overflow: true,
+				Properties: []*runtime.PropertyPreview{
+					{Name: "document", Type: runtime.TypeObject, Subtype: runtime.SubtypeNode, Value: "#document"},
+					{Name: "location", Type: runtime.TypeObject, Value: "Location"},
+					{Name: "name", Type: runtime.TypeString, Value: ""},
+					{Name: "self", Type: runtime.TypeObject, Value: "Window"},
+					{Name: "window", Type: runtime.TypeObject, Value: "Window"},
+				},
+			},
+		}
+
+		got, err := valueFromUnserializableRemoteObject(logger, robj)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{
+			"document": "#document",
+			"location": "Location",
+			"name":     "",
+			"self":     "Window",
+			"window":   "Window",
+		}, got)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := valueFromUnserializableRemoteObject(logger, nil)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
 }

@@ -182,6 +182,27 @@ func valueFromRemoteObject(_ context.Context, robj *runtime.RemoteObject) (any, 
 	return val, err
 }
 
+// valueFromUnserializableRemoteObject converts a remote object that Chromium
+// refused to JSON-serialize (for example window) into a Go value using the
+// object preview. Overflow is ignored so a partial object is returned.
+func valueFromUnserializableRemoteObject(logger *log.Logger, robj *runtime.RemoteObject) (any, error) {
+	if robj == nil {
+		return nil, nil //nolint:nilnil
+	}
+	s, err := parseConsoleRemoteObject(logger, robj)
+	if err != nil {
+		return nil, err
+	}
+	if s == "" || s == "undefined" {
+		return nil, nil //nolint:nilnil
+	}
+	var v any
+	if json.Unmarshal([]byte(s), &v) == nil {
+		return v, nil
+	}
+	return s, nil
+}
+
 func parseConsoleRemoteObjectPreview(logger *log.Logger, op *runtime.ObjectPreview) (string, error) {
 	obj := make(map[string]string)
 	if op.Overflow {

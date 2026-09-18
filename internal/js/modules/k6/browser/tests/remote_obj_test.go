@@ -161,14 +161,6 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 		{
 			name: "scientific_notation", eval: "123e-5", want: 0.00123,
 		},
-		// TODO:
-		// {
-		// 	// This test is ignored until https://go.k6.io/k6/v2/js/modules/k6/browser/issues/1132
-		// 	// has been resolved.
-		// 	name: "partially_parsed",
-		// 	eval:  "window",
-		// 	want: `{"document":"#document","location":"Location","name":"","self":"Window","window":"Window"}`,
-		// },
 	}
 
 	for _, tt := range tests {
@@ -191,4 +183,20 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 			assert.EqualValues(t, tt.want, got)
 		})
 	}
+}
+
+func TestEvalWindowReturnsPartialObject(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+
+	got, err := p.Evaluate(`() => window`)
+	require.NoError(t, err)
+
+	m, ok := got.(map[string]any)
+	require.True(t, ok, "evaluate(window) should return a partial object, got %T", got)
+	assert.Equal(t, "#document", m["document"])
+	assert.Equal(t, "Window", m["window"])
+	assert.Equal(t, "Window", m["self"])
 }
