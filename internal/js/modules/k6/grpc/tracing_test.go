@@ -36,13 +36,13 @@ func TestEnableTracing(t *testing.T) {
 		t.Parallel()
 		runtime := modulestest.NewRuntime(t)
 		root := New()
-		module := root.NewModuleInstance(runtime.VU).(*ModuleInstance) //nolint:forcetypeassert
+		module := root.NewModuleInstance(runtime.VU).(*ModuleInstance)
 		module.EnableTracing()
 		require.True(t, module.tracingEnabled)
 		require.True(t, root.tracingEnabled.Load())
 
 		nextRuntime := modulestest.NewRuntime(t)
-		next := root.NewModuleInstance(nextRuntime.VU).(*ModuleInstance) //nolint:forcetypeassert
+		next := root.NewModuleInstance(nextRuntime.VU).(*ModuleInstance)
 		require.True(t, next.tracingEnabled)
 	})
 
@@ -50,7 +50,7 @@ func TestEnableTracing(t *testing.T) {
 		t.Parallel()
 		runtime := modulestest.NewRuntime(t)
 		root := New()
-		module := root.NewModuleInstance(runtime.VU).(*ModuleInstance) //nolint:forcetypeassert
+		module := root.NewModuleInstance(runtime.VU).(*ModuleInstance)
 		state := &lib.State{}
 		runtime.MoveToVUContext(state)
 		module.EnableTracing()
