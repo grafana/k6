@@ -3,9 +3,11 @@ package common
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -150,7 +152,6 @@ func NewConnection(
 	logger *log.Logger,
 	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool,
 ) (*Connection, error) {
-	var header http.Header
 	var tlsConfig *tls.Config
 	wsd := websocket.Dialer{
 		HandshakeTimeout: time.Second * 60,
@@ -160,9 +161,14 @@ func NewConnection(
 		ReadBufferSize:   wsWriteBufferSize,
 	}
 
+	dialURL, header, err := websocketURLAndHeaders(wsURL)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancelCtx := context.WithCancelCause(ctx)
 
-	conn, response, connErr := wsd.DialContext(ctx, wsURL, header)
+	conn, response, connErr := wsd.DialContext(ctx, dialURL, header)
 	if response != nil {
 		defer func() {
 			_ = response.Body.Close()
@@ -195,6 +201,24 @@ func NewConnection(
 	go c.sendLoop()
 
 	return &c, nil
+}
+
+// websocketURLAndHeaders strips userinfo from a DevTools websocket URL and
+// turns it into a Basic Authorization header. gorilla/websocket rejects
+// user:pass@host as a malformed ws URL.
+func websocketURLAndHeaders(wsURL string) (string, http.Header, error) {
+	u, err := url.Parse(wsURL)
+	if err != nil {
+		return "", nil, fmt.Errorf("parsing DevTools websocket URL: %w", err)
+	}
+	header := make(http.Header)
+	if u.User != nil {
+		user := u.User.Username()
+		pass, _ := u.User.Password()
+		header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(user+":"+pass)))
+		u.User = nil
+	}
+	return u.String(), header, nil
 }
 
 func (c *Connection) close(code int) error {

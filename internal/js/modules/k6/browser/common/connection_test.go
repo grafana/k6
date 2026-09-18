@@ -2,7 +2,10 @@ package common
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"sync"
 	"testing"
@@ -38,6 +41,50 @@ func TestConnection(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+}
+
+func TestWebsocketURLAndHeaders(t *testing.T) {
+	t.Parallel()
+
+	dialURL, header, err := websocketURLAndHeaders("wss://user:s3cret@cdp.example.com/devtools")
+	require.NoError(t, err)
+	assert.Equal(t, "wss://cdp.example.com/devtools", dialURL)
+	assert.Equal(t, "Basic "+base64.StdEncoding.EncodeToString([]byte("user:s3cret")), header.Get("Authorization"))
+
+	dialURL, header, err = websocketURLAndHeaders("ws://127.0.0.1:9222/devtools/browser/abc")
+	require.NoError(t, err)
+	assert.Equal(t, "ws://127.0.0.1:9222/devtools/browser/abc", dialURL)
+	assert.Empty(t, header.Get("Authorization"))
+}
+
+func TestConnectionUserinfoAuthorization(t *testing.T) {
+	t.Parallel()
+
+	gotAuth := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth <- r.Header.Get("Authorization")
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		_ = conn.Close()
+	}))
+	t.Cleanup(server.Close)
+
+	u, err := url.Parse(server.URL)
+	require.NoError(t, err)
+	wsURL := fmt.Sprintf("ws://user:s3cret@%s/devtools", u.Host)
+
+	conn, err := NewConnection(context.Background(), wsURL, log.NewNullLogger(), nil)
+	require.NoError(t, err)
+	conn.Close()
+
+	select {
+	case auth := <-gotAuth:
+		assert.Equal(t, "Basic "+base64.StdEncoding.EncodeToString([]byte("user:s3cret")), auth)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for the websocket handshake")
+	}
 }
 
 func TestConnectionClosureAbnormal(t *testing.T) {
