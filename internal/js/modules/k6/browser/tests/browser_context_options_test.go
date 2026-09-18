@@ -18,6 +18,7 @@ func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 	opts := common.DefaultBrowserContextOptions()
 	assert.False(t, opts.AcceptDownloads)
 	assert.Empty(t, opts.DownloadsPath)
+	assert.Empty(t, opts.BaseURL)
 	assert.False(t, opts.BypassCSP)
 	assert.Equal(t, common.ColorSchemeLight, opts.ColorScheme)
 	assert.Equal(t, 1.0, opts.DeviceScaleFactor)
@@ -118,4 +119,36 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+func TestBrowserContextOptionsBaseURL(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+
+	opts := common.DefaultBrowserContextOptions()
+	opts.BaseURL = tb.url("")
+	bctx, err := tb.NewContext(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := bctx.Close(); err != nil {
+			t.Log("closing browser context:", err)
+		}
+	})
+
+	p, err := bctx.NewPage()
+	require.NoError(t, err)
+
+	gotoOpts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	resp, err := p.Goto("/get", gotoOpts)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, tb.url("/get"), resp.URL())
+
+	resp, err = p.Goto(tb.url("/get"), gotoOpts)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Equal(t, tb.url("/get"), resp.URL())
 }

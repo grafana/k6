@@ -1250,6 +1250,9 @@ func (f *Frame) NavigationTimeout() time.Duration {
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
 func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
+	if f.page != nil {
+		url = f.page.browserCtx.resolveURL(url)
+	}
 	resp, err := f.manager.NavigateFrame(f, url, opts)
 	if err != nil {
 		return nil, fmt.Errorf("navigating frame to %q: %w", url, err)
@@ -2224,6 +2227,9 @@ func (f *Frame) WaitForTimeout(timeout int64) {
 // WaitForURL waits for the frame to navigate to a URL matching the given pattern.
 // RegExMatcher should be non-nil to be able to test against a URL pattern.
 func (f *Frame) WaitForURL(urlPattern string, opts *FrameWaitForURLOptions, rm RegExMatcher) error {
+	if f.page != nil {
+		urlPattern = f.page.browserCtx.resolveURLPattern(urlPattern)
+	}
 	f.log.Debugf("Frame:WaitForURL", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 	defer f.log.Debugf("Frame:WaitForURL:return", "fid:%s furl:%q pattern:%s", f.ID(), f.URL(), urlPattern)
 

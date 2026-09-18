@@ -1370,7 +1370,7 @@ func (p *Page) Route(path string, cb RouteHandlerCallback, rm RegExMatcher) erro
 		}
 	}
 
-	matcher, err := newPatternMatcher(path, rm)
+	matcher, err := newPatternMatcher(p.browserCtx.resolveURLPattern(path), rm)
 	if err != nil {
 		return fmt.Errorf("creating url matcher for path %s: %w", path, err)
 	}
@@ -2003,6 +2003,7 @@ func (p *Page) waitForEvent(
 func (p *Page) WaitForResponse(
 	urlPattern string, opts *PageWaitForResponseOptions, rm RegExMatcher,
 ) (*Response, error) {
+	urlPattern = p.browserCtx.resolveURLPattern(urlPattern)
 	p.logger.Debugf("Page:WaitForResponse", "sid:%v pattern:%s", p.sessionID(), urlPattern)
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForResponse")
 	defer span.End()
@@ -2032,6 +2033,7 @@ type PageWaitForRequestOptions struct {
 func (p *Page) WaitForRequest(
 	urlPattern string, opts *PageWaitForRequestOptions, rm RegExMatcher,
 ) (*Request, error) {
+	urlPattern = p.browserCtx.resolveURLPattern(urlPattern)
 	p.logger.Debugf("Page:waitForRequest", "sid:%v pattern:%s", p.sessionID(), urlPattern)
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForRequest")
 	defer span.End()

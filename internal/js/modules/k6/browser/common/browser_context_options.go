@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -9,6 +10,7 @@ import (
 type BrowserContextOptions struct {
 	AcceptDownloads   bool              `js:"acceptDownloads"`
 	DownloadsPath     string            `js:"downloadsPath"`
+	BaseURL           string            `js:"baseURL"`
 	BypassCSP         bool              `js:"bypassCSP"`
 	ColorScheme       ColorScheme       `js:"colorScheme"`
 	DeviceScaleFactor float64           `js:"deviceScaleFactor"`
@@ -82,6 +84,33 @@ func (g *Geolocation) Validate() error {
 		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, g.Accuracy)
 	}
 	return nil
+}
+
+// ResolveURL joins givenURL with baseURL using RFC 3986 reference resolution,
+// matching Playwright's `new URL(givenURL, baseURL)`. An empty or invalid
+// baseURL leaves givenURL unchanged.
+func ResolveURL(baseURL, givenURL string) string {
+	if baseURL == "" {
+		return givenURL
+	}
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return givenURL
+	}
+	ref, err := url.Parse(givenURL)
+	if err != nil {
+		return givenURL
+	}
+	return base.ResolveReference(ref).String()
+}
+
+// ResolveURLPattern applies ResolveURL unless the pattern is a glob that
+// starts with '*', matching Playwright's urlMatches helper.
+func ResolveURLPattern(baseURL, pattern string) string {
+	if pattern == "" || strings.HasPrefix(pattern, "*") {
+		return pattern
+	}
+	return ResolveURL(baseURL, pattern)
 }
 
 // GrantPermissionsOptions is used by BrowserContext.GrantPermissions.

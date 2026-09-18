@@ -273,6 +273,20 @@ func (b *BrowserContext) Pages() []*Page {
 	return append([]*Page{}, b.browser.getPages()...)
 }
 
+func (b *BrowserContext) resolveURL(givenURL string) string {
+	if b == nil || b.opts == nil {
+		return givenURL
+	}
+	return ResolveURL(b.opts.BaseURL, givenURL)
+}
+
+func (b *BrowserContext) resolveURLPattern(pattern string) string {
+	if b == nil || b.opts == nil {
+		return pattern
+	}
+	return ResolveURLPattern(b.opts.BaseURL, pattern)
+}
+
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
 func (b *BrowserContext) SetDefaultNavigationTimeout(timeout int64) {
 	b.logger.Debugf("BrowserContext:SetDefaultNavigationTimeout", "bctxid:%v timeout:%d", b.id, timeout)
