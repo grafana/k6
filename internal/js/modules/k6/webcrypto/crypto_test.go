@@ -117,3 +117,44 @@ func TestGetRandomValuesRejectsBadInput(t *testing.T) {
 		})
 	}
 }
+
+// TestEncryptCopiesIvAtCallTime asserts that mutating an AES-GCM iv after
+// subtle.encrypt returns cannot change the ciphertext. The spec copies
+// BufferSource algorithm parameters at the call.
+//
+// See https://github.com/grafana/k6/issues/6319
+func TestEncryptCopiesIvAtCallTime(t *testing.T) {
+	t.Parallel()
+
+	rt := modulestest.NewRuntime(t)
+	_, err := rt.RunOnEventLoop(`
+		(async function () {
+			const hex = (b) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, "0")).join("");
+			const key = await crypto.subtle.importKey(
+				"raw",
+				new Uint8Array(16),
+				{ name: "AES-GCM" },
+				false,
+				["encrypt"],
+			);
+			const data = new Uint8Array([1, 2, 3, 4]);
+			const iv = new Uint8Array(12);
+			const pending = crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
+			iv.fill(0xff);
+			globalThis.result = {
+				mutated: hex(await pending),
+				zero: hex(await crypto.subtle.encrypt({ name: "AES-GCM", iv: new Uint8Array(12) }, key, data)),
+				ones: hex(await crypto.subtle.encrypt({ name: "AES-GCM", iv: new Uint8Array(12).fill(0xff) }, key, data)),
+			};
+		})()
+	`)
+	require.NoError(t, err)
+
+	result := rt.VU.Runtime().Get("result").ToObject(rt.VU.Runtime())
+	mutated := result.Get("mutated").String()
+	zero := result.Get("zero").String()
+	ones := result.Get("ones").String()
+	require.NotEmpty(t, mutated)
+	assert.Equal(t, zero, mutated)
+	assert.NotEqual(t, ones, mutated)
+}

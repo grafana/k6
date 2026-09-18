@@ -43,6 +43,17 @@ func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value) ([]byte, error) {
 	return bytesCopy, nil
 }
 
+// cloneBytes returns a copy of b so later writes to a TypedArray or ArrayBuffer
+// cannot change algorithm parameters that the spec snapshots at call time.
+func cloneBytes(b []byte) []byte {
+	if b == nil {
+		return nil
+	}
+	out := make([]byte, len(b))
+	copy(out, b)
+	return out
+}
+
 // traverseObject traverses the given object using the given fields and returns the value
 // at the end of the traversal. It assumes that all the traversed fields are Objects.
 func traverseObject(rt *sobek.Runtime, src sobek.Value, fields ...string) (sobek.Value, error) {

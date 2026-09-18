@@ -56,5 +56,20 @@ func newEncryptDecrypter(
 		return nil, NewError(SyntaxError, errMsg)
 	}
 
+	// ExportTo of a TypedArray into []byte aliases the view's backing store.
+	// Encrypt/decrypt run after the JS call returns, so copy BufferSource
+	// fields now; otherwise a later iv.fill() changes the ciphertext.
+	switch p := ed.(type) {
+	case *AESCBCParams:
+		p.Iv = cloneBytes(p.Iv)
+	case *AESCTRParams:
+		p.Counter = cloneBytes(p.Counter)
+	case *AESGCMParams:
+		p.Iv = cloneBytes(p.Iv)
+		p.AdditionalData = cloneBytes(p.AdditionalData)
+	case *RSAOaepParams:
+		p.Label = cloneBytes(p.Label)
+	}
+
 	return ed, nil
 }

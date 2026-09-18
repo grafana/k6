@@ -100,7 +100,7 @@ func newPBKDF2DeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek
 		Name:       normalized.Name,
 		Hash:       normalizedHash.Name,
 		Iterations: int(numberIterations),
-		Salt:       byteSalt,
+		Salt:       cloneBytes(byteSalt),
 	}, nil
 }
 
