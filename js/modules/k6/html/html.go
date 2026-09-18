@@ -81,7 +81,8 @@ func (s Selection) emptySelection() Selection {
 
 func (s Selection) buildMatcher(v sobek.Value, sobekFn sobek.Callable) func(int, *goquery.Selection) bool {
 	return func(idx int, sel *goquery.Selection) bool {
-		fnRes, fnErr := sobekFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
+		selection := &Selection{sel: sel, URL: s.URL, rt: s.rt}
+		fnRes, fnErr := sobekFn(v, s.rt.ToValue(idx), s.rt.ToValue(selection))
 		if fnErr != nil {
 			common.Throw(s.rt, fnErr)
 		}
