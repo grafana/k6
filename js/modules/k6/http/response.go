@@ -188,7 +188,21 @@ func (res *Response) SubmitForm(args ...sobek.Value) (*Response, error) {
 		common.Throw(rt, err)
 	}
 
+	// Set the body based on the form values
+	values := form.SerializeObject()
+
+	// Set the name + value of the submit button and honor HTML formaction.
+	submit := form.Find(submitSelector)
+	submitName := submit.Attr("name")
+	submitValue := submit.Val()
+	if submitName != sobek.Undefined() && submitValue != sobek.Undefined() {
+		values[submitName.String()] = submitValue
+	}
+
 	actionAttr := form.Attr("action")
+	if submitAction := submit.Attr("formaction"); submitAction != sobek.Undefined() {
+		actionAttr = submitAction
+	}
 	var requestURL *url.URL
 	if actionAttr == sobek.Undefined() {
 		// Use the url of the response if no action is set
@@ -199,17 +213,6 @@ func (res *Response) SubmitForm(args ...sobek.Value) (*Response, error) {
 			common.Throw(rt, err)
 		}
 		requestURL = responseURL.ResolveReference(actionURL)
-	}
-
-	// Set the body based on the form values
-	values := form.SerializeObject()
-
-	// Set the name + value of the submit button
-	submit := form.Find(submitSelector)
-	submitName := submit.Attr("name")
-	submitValue := submit.Val()
-	if submitName != sobek.Undefined() && submitValue != sobek.Undefined() {
-		values[submitName.String()] = submitValue
 	}
 
 	// Set the values supplied in the arguments, overriding automatically set values
