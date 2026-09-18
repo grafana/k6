@@ -156,6 +156,12 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			expExitCode:  exitcodes.InvalidConfig,
 		},
 		{
+			testFilename: "invalidconfig/empty_tag.js",
+			name:         "run should fail with exit status 104 if a script tag has an empty value",
+			expErr:       `invalid tag "example", empty value`,
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
 			testFilename: "invalidconfig/option_env.js",
 			name:         "run should fail with exit status 104 if an invalid option is set through env variable",
 			expErr:       "envconfig.Process",
