@@ -645,6 +645,16 @@ type loadedAndConfiguredTest struct {
 	derivedConfig      Config
 }
 
+// makeArchive snapshots the test with consolidated options, matching `k6 archive`.
+// Derived options are not used: they expand execution shortcuts into scenarios and
+// would conflict with iterations/duration. The live runner is not mutated; local
+// execution already applied derived options for the run itself.
+func (lct *loadedAndConfiguredTest) makeArchive() *lib.Archive {
+	arc := lct.loadedTest.makeArchive()
+	arc.Options = lct.consolidatedConfig.Options
+	return arc
+}
+
 func loadAndConfigureLocalTest(
 	gs *state.GlobalState, cmd *cobra.Command, args []string,
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
