@@ -2343,6 +2343,124 @@ func TestDigestAuthWithBody(t *testing.T) {
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, 200, "")
 }
 
+// A server that answers a digest-authenticated request with a 401 carrying no
+// digest challenge (e.g. "Negotiate, NTLM", as IIS commonly sends) must not
+// crash k6 like the previous digest library did (index out of range panic), and
+// the actual 401 response must be surfaced to the script and the metrics.
+func TestDigestAuthNonDigestChallenge(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(false)
+
+	tb.Mux.HandleFunc("/negotiate-only", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", "Negotiate, NTLM")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("no digest here"))
+	}))
+
+	// A malformed Digest challenge must behave the same way as a missing one:
+	// the 401 response is surfaced instead of a transport error (with a warning
+	// logged by the transport).
+	tb.Mux.HandleFunc("/malformed-challenge", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Digest realm="unclosed, qop="auth"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+
+	for _, path := range []string{"/negotiate-only", "/malformed-challenge"} {
+		urlWithCreds := tb.Replacer.Replace(
+			"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT" + path)
+
+		_, err := rt.RunString(fmt.Sprintf(`
+			var res = http.get(%q, { auth: "digest" });
+			if (res.status !== 401) { throw new Error("wrong status: " + res.status); }
+			if (res.error_code !== 1401) { throw new Error("wrong error code: " + res.error_code); }
+			if (res.body !== "") { throw new Error("expected empty body, got: " + res.body); }
+		`, urlWithCreds))
+		require.NoError(t, err, "path: %s", path)
+	}
+
+	// The non-digest challenge response must keep its WWW-Authenticate header.
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/negotiate-only")
+	_, err := rt.RunString(fmt.Sprintf(`
+		var res = http.get(%q, { auth: "digest" });
+		if (res.headers["Www-Authenticate"] !== "Negotiate, NTLM") {
+			throw new Error("missing WWW-Authenticate header: " + JSON.stringify(res.headers));
+		}
+	`, urlWithCreds))
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace("http://HTTPBIN_IP:HTTPBIN_PORT/negotiate-only")
+	assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", urlRaw, 401, "")
+}
+
+// RFC 7616 digest authentication with the SHA-256 algorithm, which the previous
+// digest library (MD5-only, RFC 2617) could not complete.
+func TestDigestAuthWithSHA256(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd/SHA-256")
+
+	_, err := rt.RunString(fmt.Sprintf(`
+		var res = http.get(%q, { auth: "digest" });
+		if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
+		if (res.error_code !== 0) { throw new Error("wrong error code: " + res.error_code); }
+	`, urlWithCreds))
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace(
+		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd/SHA-256")
+	sampleContainers := metrics.GetBufferedSamples(samples)
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
+}
+
+// A digest-authenticated request to a server that requires no authentication
+// succeeds directly on the first response, and such a response must not be
+// marked as unexpected by the response callback.
+func TestDigestAuthDirectSuccess(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+
+	tb.Mux.HandleFunc("/no-auth-needed", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("come on in"))
+	}))
+
+	_, err := rt.RunString(`
+		http.setResponseCallback(http.expectedStatuses(200));
+	`)
+	require.NoError(t, err)
+
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/no-auth-needed")
+
+	_, err = rt.RunString(fmt.Sprintf(`
+		var res = http.get(%q, { auth: "digest" });
+		if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
+		if (res.body !== "come on in") { throw new Error("wrong body: " + res.body); }
+	`, urlWithCreds))
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace("http://HTTPBIN_IP:HTTPBIN_PORT/no-auth-needed")
+	assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", urlRaw, 200, "")
+}
+
 func TestBinaryResponseWithStatus0(t *testing.T) {
 	t.Parallel()
 	ts := newTestCase(t)
