@@ -19,13 +19,16 @@ import (
 type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
-	RootModule struct{}
+	RootModule struct {
+		connPool *connectionPool
+	}
 
 	// ModuleInstance represents an instance of the GRPC module for every VU.
 	ModuleInstance struct {
-		vu      modules.VU
-		exports map[string]any
-		metrics *instanceMetrics
+		vu       modules.VU
+		exports  map[string]any
+		metrics  *instanceMetrics
+		connPool *connectionPool
 	}
 )
 
@@ -36,7 +39,9 @@ var (
 
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
-	return &RootModule{}
+	return &RootModule{
+		connPool: newConnectionPool(),
+	}
 }
 
 // NewModuleInstance implements the modules.Module interface to return
@@ -48,9 +53,10 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	}
 
 	mi := &ModuleInstance{
-		vu:      vu,
-		exports: make(map[string]any),
-		metrics: metrics,
+		vu:       vu,
+		exports:  make(map[string]any),
+		metrics:  metrics,
+		connPool: r.connPool,
 	}
 
 	mi.exports["Client"] = mi.NewClient
@@ -63,7 +69,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // NewClient is the JS constructor for the grpc Client.
 func (mi *ModuleInstance) NewClient(_ sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
-	return rt.ToValue(&Client{vu: mi.vu, types: new(protoregistry.Types)}).ToObject(rt)
+	return rt.ToValue(&Client{vu: mi.vu, types: new(protoregistry.Types), connPool: mi.connPool}).ToObject(rt)
 }
 
 // defineConstants defines the constant variables of the module.
