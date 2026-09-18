@@ -2,11 +2,13 @@ package remote
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -42,6 +44,73 @@ func TestNewWriteClient(t *testing.T) {
 		wc, err := NewWriteClient("fake://bad url", nil)
 		require.Error(t, err)
 		assert.Nil(t, wc)
+	})
+}
+
+// newForwardProxy starts a test server acting as an HTTP forward proxy
+// for the given target and returns its URL and the number of proxied requests.
+func newForwardProxy(t *testing.T, target string) (*url.URL, *atomic.Int32) {
+	t.Helper()
+
+	var proxied atomic.Int32
+	h := func(rw http.ResponseWriter, r *http.Request) {
+		proxied.Add(1)
+		// A forward proxy receives the absolute URL of the final destination.
+		assert.Equal(t, target, r.Host)
+		assert.Equal(t, target, r.URL.Host)
+		assert.Equal(t, "/api/v1/write", r.URL.Path)
+		assert.Equal(t, "0.1.0", r.Header.Get("X-Prometheus-Remote-Write-Version"))
+		rw.WriteHeader(http.StatusNoContent)
+	}
+	proxy := httptest.NewServer(http.HandlerFunc(h))
+	t.Cleanup(proxy.Close)
+
+	proxyURL, err := url.Parse(proxy.URL)
+	require.NoError(t, err)
+	return proxyURL, &proxied
+}
+
+func TestNewWriteClientProxy(t *testing.T) {
+	t.Parallel()
+
+	// ".invalid" never resolves, so the request can only succeed
+	// if it is actually sent through the proxy.
+	const target = "prometheus.invalid:9090"
+
+	t.Run("ProxyOnly", func(t *testing.T) {
+		t.Parallel()
+		proxyURL, proxied := newForwardProxy(t, target)
+
+		wc, err := NewWriteClient("http://"+target+"/api/v1/write", &HTTPConfig{ProxyURL: proxyURL})
+		require.NoError(t, err)
+
+		transport, ok := wc.hc.Transport.(*http.Transport)
+		require.True(t, ok)
+		require.NotNil(t, transport.Proxy)
+		assert.Nil(t, transport.TLSClientConfig)
+
+		require.NoError(t, wc.Store(context.Background(), nil))
+		assert.Equal(t, int32(1), proxied.Load())
+	})
+
+	t.Run("ProxyWithTLSConfig", func(t *testing.T) {
+		t.Parallel()
+		proxyURL, proxied := newForwardProxy(t, target)
+
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS13}
+		wc, err := NewWriteClient("http://"+target+"/api/v1/write", &HTTPConfig{
+			ProxyURL:  proxyURL,
+			TLSConfig: tlsConfig,
+		})
+		require.NoError(t, err)
+
+		transport, ok := wc.hc.Transport.(*http.Transport)
+		require.True(t, ok)
+		require.NotNil(t, transport.Proxy)
+		assert.Same(t, tlsConfig, transport.TLSClientConfig)
+
+		require.NoError(t, wc.Store(context.Background(), nil))
+		assert.Equal(t, int32(1), proxied.Load())
 	})
 }
 
