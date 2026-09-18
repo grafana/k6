@@ -1215,17 +1215,32 @@ func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) error {
 }
 
 func (fs *FrameSession) updateGeolocation(initial bool) error {
-	fs.logger.Debugf("NewFrameSession:updateGeolocation", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
+	fs.logger.Debugf("NewFrameSession:updateGeolocation", "sid:%v tid:%v initial:%t",
+		fs.session.ID(), fs.targetID, initial)
 
 	geolocation := fs.page.browserCtx.opts.Geolocation
-	if !initial || geolocation != nil {
-		action := emulation.SetGeolocationOverride().
-			WithLatitude(geolocation.Latitude).
-			WithLongitude(geolocation.Longitude).
-			WithAccuracy(geolocation.Accuracy)
-		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-			return fmt.Errorf("%w", err)
-		}
+	if geolocation == nil {
+		return nil
+	}
+
+	// chromedp omits zero accuracy (omitzero), and CDP treats a missing
+	// accuracy as position unavailable. Always send the three fields.
+	params := struct {
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+		Accuracy  float64 `json:"accuracy"`
+	}{
+		Latitude:  geolocation.Latitude,
+		Longitude: geolocation.Longitude,
+		Accuracy:  geolocation.Accuracy,
+	}
+	if err := cdp.Execute(
+		cdp.WithExecutor(fs.ctx, fs.session),
+		emulation.CommandSetGeolocationOverride,
+		params,
+		nil,
+	); err != nil {
+		return fmt.Errorf("%w", err)
 	}
 
 	return nil

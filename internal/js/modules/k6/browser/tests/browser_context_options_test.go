@@ -119,3 +119,51 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+func TestBrowserContextOptionsGeolocationGrantsPermission(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	opts := common.DefaultBrowserContextOptions()
+	opts.Geolocation = &common.Geolocation{
+		Latitude:  18.452626,
+		Longitude: 33.930396,
+		Accuracy:  0,
+	}
+	bctx, err := tb.NewContext(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := bctx.Close(); err != nil {
+			t.Log("closing browser context:", err)
+		}
+	})
+
+	p, err := bctx.NewPage()
+	require.NoError(t, err)
+	tb.GotoPage(p, tb.url("/get"))
+
+	state, err := p.Evaluate(`() => navigator.permissions.query({name: "geolocation"}).then(r => r.state)`)
+	require.NoError(t, err)
+	assert.Equal(t, "granted", asString(t, state))
+
+	coords, err := p.Evaluate(`() => new Promise((resolve, reject) => {
+		navigator.geolocation.getCurrentPosition(
+			pos => resolve({
+				latitude: pos.coords.latitude,
+				longitude: pos.coords.longitude,
+			}),
+			err => reject(err.code + ':' + err.message),
+			{ timeout: 5000 }
+		);
+	})`)
+	require.NoError(t, err)
+
+	m, ok := coords.(map[string]any)
+	require.True(t, ok, "coords type %T", coords)
+	lat, ok := m["latitude"].(float64)
+	require.True(t, ok, "latitude type %T", m["latitude"])
+	lon, ok := m["longitude"].(float64)
+	require.True(t, ok, "longitude type %T", m["longitude"])
+	assert.InDelta(t, 18.452626, lat, 0.0001)
+	assert.InDelta(t, 33.930396, lon, 0.0001)
+}
