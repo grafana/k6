@@ -341,6 +341,7 @@ func (m *NetworkManager) handleRequestRedirect(
 	req.responseMu.Lock()
 	req.response = resp
 	req.responseMu.Unlock()
+	req.resolveTiming()
 	req.redirectChain = append(req.redirectChain, req)
 
 	// Emit the response metrics once the raw headers are resolved, off the
@@ -451,6 +452,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFailed(event.RequestID)
 	req.resolveRawHeaders()
+	req.resolveTiming()
 	m.frameManager.requestFailed(req, event.Canceled)
 }
 
@@ -465,6 +467,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFinished(event.RequestID)
 	req.resolveRawHeaders()
+	req.resolveTiming()
 	m.frameManager.requestFinished(req)
 	m.eventInterceptor.onRequestFinished(req)
 

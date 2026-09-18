@@ -213,3 +213,69 @@ func TestValidateResourceType(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestWaitForTiming(t *testing.T) {
+	t.Parallel()
+
+	newReq := func(t *testing.T) *Request {
+		t.Helper()
+		ts := cdp.MonotonicTime(time.Now())
+		wt := cdp.TimeSinceEpoch(time.Now())
+		evt := &network.EventRequestWillBeSent{
+			RequestID: network.RequestID("1234"),
+			Request: &network.Request{
+				URL:     "https://test/get",
+				Method:  "GET",
+				Headers: network.Headers{},
+			},
+			Timestamp: &ts,
+			WallTime:  &wt,
+		}
+		req, err := NewRequest(k6test.NewVU(t).Context(), log.NewNullLogger(), NewRequestParams{event: evt})
+		require.NoError(t, err)
+		return req
+	}
+
+	t.Run("attached", func(t *testing.T) {
+		t.Parallel()
+		req := newReq(t)
+		want := &Response{timing: &network.ResourceTiming{ReceiveHeadersEnd: 7}}
+		done := make(chan *resourceTiming, 1)
+		go func() {
+			req.WaitForTiming()
+			done <- req.Timing()
+		}()
+		req.responseMu.Lock()
+		req.response = want
+		req.responseMu.Unlock()
+		req.responseEndTiming = 12
+		req.resolveTiming()
+
+		select {
+		case got := <-done:
+			require.NotNil(t, got)
+			assert.Equal(t, 7.0, got.ResponseStart)
+			assert.Equal(t, 12.0, got.ResponseEnd)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for request timing")
+		}
+	})
+
+	t.Run("none", func(t *testing.T) {
+		t.Parallel()
+		req := newReq(t)
+		done := make(chan *resourceTiming, 1)
+		go func() {
+			req.WaitForTiming()
+			done <- req.Timing()
+		}()
+		req.resolveTiming()
+
+		select {
+		case got := <-done:
+			assert.Nil(t, got)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for nil request timing")
+		}
+	})
+}

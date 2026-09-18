@@ -70,8 +70,13 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return mapResponse(vu, resp), nil
 			})
 		},
-		"size":    r.Size,
-		"timing":  r.Timing,
+		"size": r.Size,
+		"timing": func() *sobek.Promise {
+			return promise(vu, func() (any, error) {
+				r.WaitForTiming()
+				return r.Timing(), nil
+			})
+		},
 		"url":     r.URL,
 		"failure": r.Failure,
 	}

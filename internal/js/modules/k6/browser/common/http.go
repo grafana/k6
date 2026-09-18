@@ -87,6 +87,11 @@ type Request struct {
 	// raw headers wait on it; see waitForRawHeaders.
 	rawHeadersCh   chan struct{}
 	rawHeadersOnce sync.Once
+	// timingCh is closed once loading finished or failed (or a redirect
+	// replaced the request). request.timing() waits on it so page.on('request')
+	// callers see ResourceTiming instead of null.
+	timingCh   chan struct{}
+	timingOnce sync.Once
 	// For now we're only going to work with the 0th entry of postDataEntries.
 	// We've not been able to reproduce a situation where more than one entry
 	// occupies the slice. Once we have a better idea of when more than one
@@ -176,6 +181,7 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		headers:             make(map[string][]string, len(ev.Request.Headers)),
 		ctx:                 ctx,
 		rawHeadersCh:        make(chan struct{}),
+		timingCh:            make(chan struct{}),
 	}
 	for n, v := range ev.Request.Headers {
 		if s, ok := v.(string); ok {
@@ -240,6 +246,21 @@ func (r *Request) resolveRawHeaders() {
 func (r *Request) WaitForRawHeaders() {
 	select {
 	case <-r.rawHeadersCh:
+	case <-r.ctx.Done():
+	}
+}
+
+// resolveTiming unblocks readers waiting for request timing. It is called when
+// loading finished or failed, or when a redirect replaces the request.
+func (r *Request) resolveTiming() {
+	r.timingOnce.Do(func() { close(r.timingCh) })
+}
+
+// WaitForTiming blocks until loading finished or failed, a redirect replaced
+// the request, or the request context is done.
+func (r *Request) WaitForTiming() {
+	select {
+	case <-r.timingCh:
 	case <-r.ctx.Done():
 	}
 }
@@ -429,11 +450,14 @@ type resourceTiming struct {
 
 // Timing returns the request timing information.
 func (r *Request) Timing() *resourceTiming {
-	if r.response == nil {
+	r.responseMu.RLock()
+	resp := r.response
+	r.responseMu.RUnlock()
+	if resp == nil || resp.timing == nil {
 		return nil
 	}
 
-	timing := r.response.timing
+	timing := resp.timing
 
 	return &resourceTiming{
 		StartTime:             (timing.RequestTime - float64(r.timestamp.Unix()) + float64(r.wallTime.Unix())) * 1000,
