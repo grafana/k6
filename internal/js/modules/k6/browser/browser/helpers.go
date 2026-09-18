@@ -84,12 +84,23 @@ func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) 
 	}
 }
 
+// errBrowserInitContext is returned when a browser API is used before the VU
+// has iteration state. State() is nil in the init context, and touching it
+// panics; async APIs do that in a goroutine with no recover, which kills k6.
+var errBrowserInitContext = k6common.NewInitContextError(
+	"the browser module can only be used in the iteration context (e.g. the default function), not in the init context",
+)
+
 // promise runs fn in a goroutine and returns a new sobek.Promise.
 //   - If fn returns a nil error, resolves the promise with the
 //     first result value fn returns.
 //   - Otherwise, rejects the promise with the error fn returns.
 func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 	p, resolve, reject := promises.New(vu)
+	if vu.State() == nil {
+		reject(k6ext.BrowserError(errBrowserInitContext))
+		return p
+	}
 	go func() {
 		v, err := fn()
 		if err != nil {

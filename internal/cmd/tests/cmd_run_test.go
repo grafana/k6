@@ -2549,6 +2549,49 @@ func TestBrowserExperimentalImport(t *testing.T) {
 	assert.Contains(t, loglines[0].Message, "use k6/browser instead of k6/experimental/browser")
 }
 
+func TestBrowserInitContextIsFriendlyError(t *testing.T) {
+	t.Parallel()
+
+	const want = "the browser module can only be used in the iteration context"
+
+	tests := []struct {
+		name   string
+		script string
+	}{
+		{
+			name: "sync_isConnected",
+			script: `
+				import { browser } from 'k6/browser';
+				browser.isConnected();
+				export default function () {}
+			`,
+		},
+		{
+			name: "async_newPage",
+			script: `
+				import { browser } from 'k6/browser';
+				const page = await browser.newPage();
+				export default async function () {}
+			`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ts := getSingleFileTestState(t, tt.script, []string{}, exitcodes.ScriptException)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			loglines := ts.LoggerHook.Drain()
+			require.NotEmpty(t, loglines)
+			assert.Contains(t, loglines[0].Message, want)
+			for _, e := range loglines {
+				assert.NotContains(t, e.Message, "unexpected k6 panic")
+				assert.NotContains(t, e.Message, "nil pointer dereference")
+			}
+		})
+	}
+}
+
 func TestSetupTimeout(t *testing.T) {
 	t.Parallel()
 	ts := NewGlobalTestState(t)
