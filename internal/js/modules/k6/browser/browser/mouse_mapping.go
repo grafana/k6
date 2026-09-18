@@ -71,6 +71,9 @@ func parseMouseClickOptions(rt *sobek.Runtime, opts sobek.Value) (*common.MouseC
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		v := obj.Get(k)
+		if k6common.IsNullish(v) {
+			continue
+		}
 		switch k {
 		case "button":
 			popts.Button = v.String()
@@ -104,6 +107,9 @@ func parseMouseDblClickOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Mou
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		v := obj.Get(k)
+		if k6common.IsNullish(v) {
+			continue
+		}
 		switch k {
 		case "button":
 			popts.Button = v.String()
@@ -130,6 +136,9 @@ func parseMouseDownUpOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Mouse
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		v := obj.Get(k)
+		if k6common.IsNullish(v) {
+			continue
+		}
 		switch k {
 		case "button":
 			popts.Button = v.String()
@@ -157,6 +166,9 @@ func parseMouseMoveOptions(rt *sobek.Runtime, opts sobek.Value) (*common.MouseMo
 	for _, k := range obj.Keys() {
 		if k == "steps" {
 			v := obj.Get(k)
+			if k6common.IsNullish(v) {
+				continue
+			}
 			switch v.ExportType().Kind() {
 			case reflect.Int64:
 				popts.Steps = v.ToInteger()
