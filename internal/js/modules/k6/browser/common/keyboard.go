@@ -66,6 +66,34 @@ func (k *Keyboard) Up(key string) error {
 	return nil
 }
 
+// holdModifiers presses each named modifier that is not already down and
+// returns a restore function that releases only the keys this call pressed.
+func (k *Keyboard) holdModifiers(names []string) (restore func(), err error) {
+	var pressed []string
+	restore = func() {
+		for i := len(pressed) - 1; i >= 0; i-- {
+			_ = k.Up(pressed[i])
+		}
+	}
+	for _, name := range names {
+		resolved := k.platformSpecificResolution(name)
+		bit := k.modifierBitFromKeyName(resolved)
+		if bit == 0 {
+			restore()
+			return nil, fmt.Errorf("unknown modifier %q", name)
+		}
+		if k.modifiers&bit != 0 {
+			continue
+		}
+		if err := k.Down(resolved); err != nil {
+			restore()
+			return nil, err
+		}
+		pressed = append(pressed, resolved)
+	}
+	return restore, nil
+}
+
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
 // A press message consists of successive key down and up messages.

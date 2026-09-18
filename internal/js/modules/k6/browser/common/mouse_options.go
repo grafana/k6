@@ -1,9 +1,10 @@
 package common
 
 type MouseClickOptions struct {
-	Button     string `json:"button"`
-	ClickCount int64  `json:"clickCount"`
-	Delay      int64  `json:"delay"`
+	Button     string   `json:"button"`
+	ClickCount int64    `json:"clickCount"`
+	Delay      int64    `json:"delay"`
+	Modifiers  []string `json:"modifiers"`
 }
 
 type MouseDblClickOptions struct {
