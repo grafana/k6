@@ -9,38 +9,24 @@ import (
 )
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
-// and returns a copy of the underlying byte slice.
+// and returns a copy of the bytes that view covers.
+//
+// TypedArray and DataView views must not be expanded to the whole underlying
+// ArrayBuffer; WebIDL's "get a copy of the bytes held by" uses the view's
+// byteOffset and byteLength.
 func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value) ([]byte, error) {
 	if common.IsNullish(v) {
 		return nil, NewError(TypeError, "data is null or undefined")
 	}
 
-	asObject := v.ToObject(rt)
-
-	var ab sobek.ArrayBuffer
-	var ok bool
-
-	if IsTypedArray(rt, v) {
-		ab, ok = asObject.Get("buffer").Export().(sobek.ArrayBuffer)
-		if !ok {
-			return nil, NewError(TypeError, "TypedArray.buffer is not an ArrayBuffer")
-		}
-	} else {
-		ab, ok = asObject.Export().(sobek.ArrayBuffer)
-		if !ok {
-			return nil, NewError(OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
-		}
+	var view []byte
+	if err := rt.ExportTo(v, &view); err != nil {
+		return nil, NewError(OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
 	}
 
-	// Copy the underlying byte slice to avoid the caller modifying it.
-	// Ensures this step complies with the expactations of the
-	// specification: "Let [...] be the result of getting a copy of the
-	// bytes held by the [...] parameter"
-	bytes := ab.Bytes()
-	bytesCopy := make([]byte, len(bytes))
-	copy(bytesCopy, bytes)
-
-	return bytesCopy, nil
+	out := make([]byte, len(view))
+	copy(out, view)
+	return out, nil
 }
 
 // traverseObject traverses the given object using the given fields and returns the value

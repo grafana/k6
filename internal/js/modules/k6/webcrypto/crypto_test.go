@@ -117,3 +117,36 @@ func TestGetRandomValuesRejectsBadInput(t *testing.T) {
 		})
 	}
 }
+
+// TestDigestCopiesTypedArrayView asserts that BufferSource arguments use the
+// view's bytes, not the whole underlying ArrayBuffer.
+//
+// See https://github.com/grafana/k6/issues/4259
+func TestDigestCopiesTypedArrayView(t *testing.T) {
+	t.Parallel()
+
+	rt := modulestest.NewRuntime(t)
+	_, err := rt.RunOnEventLoop(`
+		(async function () {
+			const hex = (b) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, "0")).join("");
+			const data = new Uint8Array([1, 2, 3, 4]);
+			const view = data.subarray(0, 2);
+			const dv = new DataView(data.buffer, 0, 2);
+			globalThis.result = {
+				view: hex(await crypto.subtle.digest("SHA-256", view)),
+				dataView: hex(await crypto.subtle.digest("SHA-256", dv)),
+				prefix: hex(await crypto.subtle.digest("SHA-256", new Uint8Array([1, 2]))),
+				whole: hex(await crypto.subtle.digest("SHA-256", data)),
+			};
+		})()
+	`)
+	require.NoError(t, err)
+
+	result := rt.VU.Runtime().Get("result").ToObject(rt.VU.Runtime())
+	prefix := result.Get("prefix").String()
+	whole := result.Get("whole").String()
+	require.NotEmpty(t, prefix)
+	require.NotEqual(t, prefix, whole)
+	assert.Equal(t, prefix, result.Get("view").String())
+	assert.Equal(t, prefix, result.Get("dataView").String())
+}
