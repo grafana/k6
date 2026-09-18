@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Resolve Go versions
         id: go_versions
-        uses: grafana/k6-ci/.github/actions/go-versions@03469f9ae7aad25369827832c456e8f8b7b8c1c2 # v0.5.0
+        uses: grafana/k6-ci/.github/actions/go-versions@41aaf8e365b56fd120b0396beae2eba3969babab # v0.5.1
 
   test-prev:
     needs: configure
