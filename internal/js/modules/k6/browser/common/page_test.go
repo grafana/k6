@@ -166,3 +166,12 @@ func TestPageOn(t *testing.T) {
 		assert.Len(t, p.eventHandlers["metric"], 1)
 	})
 }
+
+func TestPageIsClosedAfterDidClose(t *testing.T) {
+	t.Parallel()
+
+	p := &Page{}
+	require.False(t, p.IsClosed())
+	p.didClose()
+	require.True(t, p.IsClosed())
+}
