@@ -19,7 +19,6 @@ type httpDebugTransport struct {
 //
 // TODO: massively improve this, because the printed information can be wrong:
 //   - https://github.com/k6io/k6/issues/986
-//   - https://github.com/k6io/k6/issues/1042
 //   - https://github.com/k6io/k6/issues/774
 func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	id := uuid.NewString()
@@ -30,7 +29,9 @@ func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func (t httpDebugTransport) debugRequest(req *http.Request, requestID string) {
-	dump, err := httputil.DumpRequestOut(req, t.httpDebugOption == "full")
+	// DumpRequestOut invents Accept-Encoding: gzip to match net/http.Transport
+	// defaults. k6 disables compression, so dump the request as it will be sent.
+	dump, err := httputil.DumpRequest(req, t.httpDebugOption == "full")
 	if err != nil {
 		t.logger.Error(err)
 	}
