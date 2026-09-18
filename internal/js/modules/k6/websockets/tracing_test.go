@@ -25,13 +25,13 @@ func TestEnableTracing(t *testing.T) {
 		t.Parallel()
 		runtime := modulestest.NewRuntime(t)
 		root := New()
-		module := root.NewModuleInstance(runtime.VU).(*WebSocketsAPI) //nolint:forcetypeassert
+		module := root.NewModuleInstance(runtime.VU).(*WebSocketsAPI)
 		module.EnableTracing()
 		require.True(t, module.tracingEnabled)
 		require.True(t, root.tracingEnabled.Load())
 
 		nextRuntime := modulestest.NewRuntime(t)
-		next := root.NewModuleInstance(nextRuntime.VU).(*WebSocketsAPI) //nolint:forcetypeassert
+		next := root.NewModuleInstance(nextRuntime.VU).(*WebSocketsAPI)
 		require.True(t, next.tracingEnabled)
 	})
 
@@ -39,7 +39,7 @@ func TestEnableTracing(t *testing.T) {
 		t.Parallel()
 		runtime := modulestest.NewRuntime(t)
 		root := New()
-		module := root.NewModuleInstance(runtime.VU).(*WebSocketsAPI) //nolint:forcetypeassert
+		module := root.NewModuleInstance(runtime.VU).(*WebSocketsAPI)
 		state := &lib.State{}
 		runtime.MoveToVUContext(state)
 		module.EnableTracing()
