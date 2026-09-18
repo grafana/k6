@@ -668,6 +668,13 @@ func (fs *FrameSession) wait() {
 }
 
 func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
+	if frameTree == nil || frameTree.Frame == nil {
+		// GetFrameTree can return a nil tree on Windows with very short
+		// scripts; child frames can also be nil. Do not dereference.
+		fs.logger.Debugf("FrameSession:handleFrameTree", "nil page frame tree")
+		return
+	}
+
 	fs.logger.Debugf("FrameSession:handleFrameTree",
 		"fid:%v sid:%v tid:%v", frameTree.Frame.ID, fs.session.ID(), fs.targetID)
 
