@@ -390,7 +390,9 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 		return fmt.Errorf("unsupported log output '%s'", line)
 	}
 
-	setupLogFormat(c, loggerForceColors)
+	if err = setupLogFormat(c, loggerForceColors); err != nil {
+		return err
+	}
 
 	secretsources, err := createSecretSources(c.globalState)
 	if err != nil {
@@ -433,7 +435,7 @@ func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	return nil
 }
 
-func setupLogFormat(c *rootCommand, loggerForceColors bool) {
+func setupLogFormat(c *rootCommand, loggerForceColors bool) error {
 	timestampFormat := ""
 	if c.globalState.Flags.LogNanosecondTimestamps {
 		timestampFormat = time.RFC3339Nano
@@ -446,13 +448,20 @@ func setupLogFormat(c *rootCommand, loggerForceColors bool) {
 	case "json":
 		c.globalState.Logger.SetFormatter(&logrus.JSONFormatter{TimestampFormat: timestampFormat})
 		c.globalState.Logger.Debug("Logger format: JSON")
-	default:
+	case "", "text":
 		c.globalState.Logger.SetFormatter(&logrus.TextFormatter{
 			ForceColors: loggerForceColors, DisableColors: c.globalState.Flags.NoColor,
 			TimestampFormat: timestampFormat,
 		})
 		c.globalState.Logger.Debug("Logger format: TEXT")
+	default:
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("unsupported log format %q, must be one of: text, json, raw",
+				c.globalState.Flags.LogFormat),
+			exitcodes.InvalidConfig,
+		)
 	}
+	return nil
 }
 
 func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {

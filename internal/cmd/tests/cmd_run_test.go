@@ -268,6 +268,15 @@ func TestWrongCliFlagIterations(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))
 }
 
+func TestWrongLogFormat(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(t, `export default function() {}`,
+		[]string{"--log-format=xml"}, exitcodes.InvalidConfig)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `unsupported log format "xml"`))
+}
+
 func TestWrongEnvVarIterations(t *testing.T) {
 	t.Parallel()
 
