@@ -1,6 +1,7 @@
 package common
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -195,4 +196,97 @@ func TestKeyDefinitionCode(t *testing.T) {
 			assert.Contains(t, tt.expectedCodes, kd.Code)
 		})
 	}
+}
+
+func TestKeyDefinitionFromKeyWithModifiers(t *testing.T) {
+	t.Parallel()
+
+	t.Run("uppercase letter without modifiers uses shift layer", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		k := NewKeyboard(vu.Context(), nil)
+		kd := k.keyDefinitionFromKey("A")
+		assert.Equal(t, "KeyA", kd.Code)
+		assert.Equal(t, "A", kd.Key)
+		assert.Equal(t, "A", kd.Text)
+	})
+
+	t.Run("uppercase letter with control does not synthesize shift", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		k := NewKeyboard(vu.Context(), nil)
+		k.modifiers = ModifierKeyControl
+		kd := k.keyDefinitionFromKey("A")
+		assert.Equal(t, "KeyA", kd.Code)
+		assert.Equal(t, "a", kd.Key)
+		assert.Empty(t, kd.Text)
+	})
+
+	t.Run("uppercase letter with meta does not synthesize shift", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		k := NewKeyboard(vu.Context(), nil)
+		k.modifiers = ModifierKeyMeta
+		kd := k.keyDefinitionFromKey("A")
+		assert.Equal(t, "KeyA", kd.Code)
+		assert.Equal(t, "a", kd.Key)
+		assert.Empty(t, kd.Text)
+	})
+
+	t.Run("shift symbol with control still uses shift layer", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		k := NewKeyboard(vu.Context(), nil)
+		k.modifiers = ModifierKeyControl
+		kd := k.keyDefinitionFromKey("@")
+		assert.Equal(t, "Digit2", kd.Code)
+		assert.Equal(t, "@", kd.Key)
+		assert.Empty(t, kd.Text)
+	})
+}
+
+func TestEditingCommands(t *testing.T) {
+	t.Parallel()
+
+	selectAllMod := ModifierKeyControl
+	if runtime.GOOS == "darwin" {
+		selectAllMod = ModifierKeyMeta
+	}
+
+	t.Run("select all for platform modifier plus A", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		k := NewKeyboard(vu.Context(), nil)
+		k.modifiers = selectAllMod
+		kd := k.keyDefinitionFromKey("A")
+		assert.Equal(t, []string{"selectAll"}, k.editingCommands(kd))
+	})
+
+	t.Run("no select all without modifier", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		k := NewKeyboard(vu.Context(), nil)
+		kd := k.keyDefinitionFromKey("A")
+		assert.Nil(t, k.editingCommands(kd))
+	})
+
+	t.Run("alt arrow left on darwin", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		k := NewKeyboard(vu.Context(), nil)
+		k.modifiers = ModifierKeyAlt
+		kd := k.keyDefinitionFromKey("ArrowLeft")
+		if runtime.GOOS == "darwin" {
+			assert.Equal(t, []string{"moveWordLeft"}, k.editingCommands(kd))
+			return
+		}
+		assert.Nil(t, k.editingCommands(kd))
+	})
 }

@@ -160,7 +160,6 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("meta", func(t *testing.T) {
 		t.Parallel()
-		t.Skip("FIXME") // See https://go.k6.io/k6/v2/js/modules/k6/browser/issues/424
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()

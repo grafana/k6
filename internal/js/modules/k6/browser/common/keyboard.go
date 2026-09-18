@@ -129,6 +129,9 @@ func (k *Keyboard) down(key string) error {
 		WithText(text).
 		WithUnmodifiedText(text).
 		WithAutoRepeat(autoRepeat)
+	if cmds := k.editingCommands(keyDef); len(cmds) > 0 {
+		action = action.WithCommands(cmds)
+	}
 	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
 		return fmt.Errorf("dispatching key event down: %w", err)
 	}
@@ -186,8 +189,20 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 	var foundInShift bool
 	if !ok {
 		srcKeyDef = k.layout.ShiftKeyDefinition(key)
-		shift = k.modifiers | ModifierKeyShift
-		foundInShift = true
+		// Uppercase letters are the shift-layer aliases of KeyA-KeyZ. When Ctrl,
+		// Meta, or Alt is already held, do not synthesize Shift: Ctrl+A / Meta+A
+		// must stay select-all rather than Ctrl+Shift+A.
+		synthesizeShift := true
+		if k.modifiers&^ModifierKeyShift != 0 {
+			ks := string(key)
+			if len(ks) == 1 && ks[0] >= 'A' && ks[0] <= 'Z' {
+				synthesizeShift = false
+			}
+		}
+		if synthesizeShift {
+			shift = k.modifiers | ModifierKeyShift
+			foundInShift = true
+		}
 	}
 
 	var keyDef keyboardlayout.KeyDefinition
@@ -230,6 +245,31 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 		keyDef.Text = ""
 	}
 	return keyDef
+}
+
+// editingCommands returns Chromium editing commands to run with the key event.
+// Synthetic CDP key events do not always trigger OS shortcuts such as select-all,
+// especially Meta/Alt on macOS, so the commands must be sent explicitly.
+func (k *Keyboard) editingCommands(keyDef keyboardlayout.KeyDefinition) []string {
+	mods := k.modifiers &^ k.modifierBitFromKeyName(keyDef.Key)
+
+	if runtime.GOOS == "darwin" && mods == ModifierKeyAlt {
+		switch keyDef.Code {
+		case "ArrowLeft":
+			return []string{"moveWordLeft"}
+		case "ArrowRight":
+			return []string{"moveWordRight"}
+		}
+	}
+
+	selectAllMod := ModifierKeyControl
+	if runtime.GOOS == "darwin" {
+		selectAllMod = ModifierKeyMeta
+	}
+	if keyDef.Code == "KeyA" && mods == selectAllMod {
+		return []string{"selectAll"}
+	}
+	return nil
 }
 
 func (k *Keyboard) modifierBitFromKeyName(key string) int64 {
