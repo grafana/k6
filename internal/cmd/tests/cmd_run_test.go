@@ -2213,7 +2213,7 @@ func TestBadLogOutput(t *testing.T) {
 			ts := NewGlobalTestState(t)
 			ts.CmdArgs = []string{"k6", "run", "--log-output", tc, "-"}
 			ts.Stdin = bytes.NewBufferString(`export default function () {};`)
-			ts.ExpectedExitCode = -1
+			ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 		})
 	}
