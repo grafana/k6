@@ -94,6 +94,60 @@ func TestBuildConfigFromRuntimeConfig(t *testing.T) {
 	assert.Equal(t, []string{"lz", "level", "test_run_id"}, cfg.LogsAllowedLabels)
 }
 
+func TestResolveCloudTestName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		cfgName    null.String
+		scriptPath string
+		want       string
+		wantErr    bool
+	}{
+		{
+			name:       "stdin_dash",
+			scriptPath: "-",
+			want:       defaultTestName,
+		},
+		{
+			name:       "stdin_file_url",
+			scriptPath: "/-",
+			want:       defaultTestName,
+		},
+		{
+			name:       "script_basename",
+			scriptPath: "/tmp/http_2.js",
+			want:       "http_2.js",
+		},
+		{
+			name:    "explicit_name",
+			cfgName: null.StringFrom("my test"),
+			want:    "my test",
+		},
+		{
+			name:    "explicit_dash",
+			cfgName: null.StringFrom("-"),
+			want:    defaultTestName,
+		},
+		{
+			name:    "missing_name_and_path",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := resolveCloudTestName(tt.cfgName, tt.scriptPath)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.String)
+		})
+	}
+}
+
 func TestBuildConfigFromRuntimeConfig_InvalidDurationLogsWarning(t *testing.T) {
 	t.Parallel()
 

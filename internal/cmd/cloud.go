@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -251,10 +250,11 @@ func runCloudTest(gs *state.GlobalState, cmd *cobra.Command, args []string, opts
 
 	arc.Options.Cloud = b
 
-	name := cloudConfig.Name.String
-	if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
-		name = filepath.Base(test.sourceRootPath)
+	resolvedName, err := resolveCloudTestName(cloudConfig.Name, test.sourceRootPath)
+	if err != nil {
+		return err
 	}
+	name := resolvedName.String
 
 	globalCtx, globalCancel := context.WithCancel(gs.Ctx)
 	defer globalCancel()
