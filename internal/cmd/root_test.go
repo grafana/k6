@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,4 +114,12 @@ func TestAddressGlobalOptionPrecedence(t *testing.T) {
 	require.NoError(t, rootCmd.cmd.ParseFlags(ts.CmdArgs[1:]))
 
 	assert.Equal(t, "localhost:9091", ts.Flags.Address)
+}
+
+func TestIsFlagParseError(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, isFlagParseError(nil))
+	assert.False(t, isFlagParseError(assert.AnError))
+	assert.True(t, isFlagParseError(fmt.Errorf(`invalid argument "foo" for "--iterations" flag: bad`)))
 }

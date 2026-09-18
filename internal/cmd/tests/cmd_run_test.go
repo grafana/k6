@@ -256,16 +256,42 @@ func TestRelativeLogPathWithSetupAndTeardown(t *testing.T) {
 	assert.Equal(t, "init\ninit\ninit\nbar\nfoo\nfoo\ninit\nbaz\ninit\n", string(logContents)) //nolint:dupword
 }
 
-func TestWrongCliFlagIterations(t *testing.T) {
+func TestWrongCliFlagValues(t *testing.T) {
 	t.Parallel()
 
-	ts := NewGlobalTestState(t)
-	ts.CmdArgs = []string{"k6", "run", "--iterations", "foo", "-"}
-	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
-	// TODO: check for exitcodes.InvalidConfig after https://github.com/grafana/k6/issues/883 is done...
-	ts.ExpectedExitCode = -1
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "iterations",
+			args: []string{"k6", "run", "--iterations", "foo", "-"},
+			want: `invalid argument "foo"`,
+		},
+		{
+			name: "vus",
+			args: []string{"k6", "run", "--vus", "bar", "-"},
+			want: `invalid argument "bar"`,
+		},
+		{
+			name: "duration",
+			args: []string{"k6", "run", "--duration", "baz", "-"},
+			want: `invalid argument "baz"`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = tc.args
+			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+			ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, tc.want))
+		})
+	}
 }
 
 func TestWrongEnvVarIterations(t *testing.T) {
