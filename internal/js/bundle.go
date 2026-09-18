@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/grafana/sobek"
 	sobekencoding "github.com/grafana/sobek-webapi-encoding"
@@ -46,6 +47,8 @@ type Bundle struct {
 
 	callableExports map[string]struct{}
 	ModuleResolver  *modules.ModuleResolver
+
+	frozenOptionsWarn sync.Once
 }
 
 // A BundleInstance is a self-contained instance of a Bundle.
@@ -274,30 +277,61 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 	if err != nil {
 		return nil, err
 	}
-	if err = bi.manipulateOptions(b.Options); err != nil {
+	if err = bi.manipulateOptions(b); err != nil {
 		return nil, err
 	}
 
 	return bi, nil
 }
 
-func (bi *BundleInstance) manipulateOptions(options lib.Options) error {
+func (bi *BundleInstance) manipulateOptions(b *Bundle) error {
 	// Grab any exported functions that could be executed. These were
 	// already pre-validated in cmd.validateScenarioConfig(), just get them here.
 	jsOptions := bi.getExported(consts.Options)
-	var jsOptionsObj *sobek.Object
 	if common.IsNullish(jsOptions) {
 		return nil
 	}
 
-	jsOptionsObj = jsOptions.ToObject(bi.Runtime)
+	jsOptionsObj := jsOptions.ToObject(bi.Runtime)
+	if !objectIsExtensible(bi.Runtime, jsOptionsObj) {
+		b.frozenOptionsWarn.Do(func() {
+			if b.preInitState != nil && b.preInitState.Logger != nil {
+				b.preInitState.Logger.Warn(
+					"exported options is not extensible (for example Object.freeze); " +
+						"k6 will not copy resolved options back onto it. Use the k6/execution module " +
+						"for runtime option values",
+				)
+			}
+		})
+		return nil
+	}
+
 	var instErr error
-	options.ForEachSpecified("json", func(key string, val any) {
+	b.Options.ForEachSpecified("json", func(key string, val any) {
+		if instErr != nil {
+			return
+		}
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}
 	})
 	return instErr
+}
+
+func objectIsExtensible(rt *sobek.Runtime, obj *sobek.Object) bool {
+	objectCtor := rt.GlobalObject().Get("Object")
+	if common.IsNullish(objectCtor) {
+		return true
+	}
+	fn, ok := sobek.AssertFunction(objectCtor.ToObject(rt).Get("isExtensible"))
+	if !ok {
+		return true
+	}
+	v, err := fn(objectCtor, obj)
+	if err != nil {
+		return true
+	}
+	return v.ToBoolean()
 }
 
 func newCompiler(preInitState *lib.TestPreInitState, filesystems map[string]fsext.Fs) *compiler.Compiler {

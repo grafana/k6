@@ -873,6 +873,29 @@ func TestBundleInstantiate(t *testing.T) {
 		require.Equal(t, int64(10), vus)
 		b.Options.VUs = optOrig
 	})
+
+	t.Run("FrozenOptions", func(t *testing.T) {
+		t.Parallel()
+		logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+		b, err := getSimpleBundle(t, "/script.js", `
+			export const options = Object.freeze({});
+			export default function() { return true; }
+		`, logger)
+		require.NoError(t, err)
+
+		bi, err := b.Instantiate(context.Background(), 0)
+		require.NoError(t, err)
+		v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
+		require.NoError(t, err)
+		require.Equal(t, true, v.Export())
+
+		_, err = b.Instantiate(context.Background(), 1)
+		require.NoError(t, err)
+
+		entries := hook.Drain()
+		require.Len(t, entries, 1)
+		assert.Contains(t, entries[0].Message, "not extensible")
+	})
 }
 
 func TestBundleEnv(t *testing.T) {
