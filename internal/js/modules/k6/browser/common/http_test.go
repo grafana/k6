@@ -95,6 +95,73 @@ func TestRequest(t *testing.T) {
 	})
 }
 
+func TestRequestApplyContinueOverrides(t *testing.T) {
+	t.Parallel()
+
+	ts := cdp.MonotonicTime(time.Now())
+	wt := cdp.TimeSinceEpoch(time.Now())
+	evt := &network.EventRequestWillBeSent{
+		RequestID: network.RequestID("1234"),
+		Request: &network.Request{
+			URL:     "https://test/original",
+			Method:  "GET",
+			Headers: network.Headers(map[string]any{"key": "value"}),
+		},
+		Timestamp: &ts,
+		WallTime:  &wt,
+	}
+	vu := k6test.NewVU(t)
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event:          evt,
+		interceptionID: "intercept",
+	})
+	require.NoError(t, err)
+
+	req.applyContinueOverrides(ContinueOptions{
+		Headers:  []HTTPHeader{{Name: "foo", Value: "bar"}},
+		Method:   "POST",
+		PostData: []byte(`{"a":1}`),
+		URL:      "https://test/overridden",
+	})
+
+	assert.Equal(t, "POST", req.Method())
+	assert.Equal(t, `{"a":1}`, req.PostData())
+	assert.Equal(t, "https://test/overridden", req.URL())
+	assert.Equal(t, map[string]string{"foo": "bar"}, req.Headers())
+}
+
+func TestRequestApplyContinueOverridesNoop(t *testing.T) {
+	t.Parallel()
+
+	ts := cdp.MonotonicTime(time.Now())
+	wt := cdp.TimeSinceEpoch(time.Now())
+	evt := &network.EventRequestWillBeSent{
+		RequestID: network.RequestID("1234"),
+		Request: &network.Request{
+			URL:     "https://test/original",
+			Method:  "GET",
+			Headers: network.Headers(map[string]any{"key": "value"}),
+		},
+		Timestamp: &ts,
+		WallTime:  &wt,
+	}
+	vu := k6test.NewVU(t)
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event:          evt,
+		interceptionID: "intercept",
+	})
+	require.NoError(t, err)
+
+	// An empty ContinueOptions (e.g. route.continue() with no overrides)
+	// must leave the request's original values untouched.
+	req.applyContinueOverrides(ContinueOptions{})
+
+	assert.Equal(t, "GET", req.Method())
+	assert.Equal(t, "", req.PostData())
+	assert.Equal(t, "https://test/original", req.URL())
+	assert.Equal(t, map[string]string{"key": "value"}, req.Headers())
+}
+
 func TestResponse(t *testing.T) {
 	t.Parallel()
 
