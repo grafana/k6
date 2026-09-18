@@ -48,7 +48,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 					if !isCallable {
 						source = fmt.Sprintf("(%s);", script.ToString().String())
 					} else {
-						source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
+						source = fmt.Sprintf("(%s)(...args);", pageFuncString(script))
 					}
 				}
 

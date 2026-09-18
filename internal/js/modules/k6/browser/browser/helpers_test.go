@@ -24,3 +24,34 @@ func TestSobekEmptyString(t *testing.T) {
 		require.Truef(t, v.ToBoolean(), "got: false, want: true for %q", s)
 	}
 }
+
+func TestPageFuncStringClosesObjectLiteralParens(t *testing.T) {
+	t.Parallel()
+
+	rt := sobek.New()
+	v, err := rt.RunString(`() => ({ a: 1 })`)
+	require.NoError(t, err)
+	require.Equal(t, "() => ({ a: 1 }", v.String(), "document Sobek dropping the grouping paren")
+	require.Equal(t, "() => ({ a: 1 })", pageFuncString(v))
+}
+
+func TestCloseUnbalancedParens(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in, want string
+	}{
+		{in: "() => 0", want: "() => 0"},
+		{in: "() => ({ a: 1 }", want: "() => ({ a: 1 })"},
+		{in: "() => ({ window, document }", want: "() => ({ window, document })"},
+		{in: "() => ([1, 2]", want: "() => ([1, 2])"},
+		{in: `() => ("(")`, want: `() => ("(")`},
+		{in: "function() { return 1 }", want: "function() { return 1 }"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			t.Parallel()
+			require.Equal(t, tt.want, closeUnbalancedParens(tt.in))
+		})
+	}
+}

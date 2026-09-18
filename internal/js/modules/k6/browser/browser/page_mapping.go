@@ -106,7 +106,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
-			funcString := pageFunc.String()
+			funcString := pageFuncString(pageFunc)
 			gopts := exportArgs(gargs)
 			return promise(vu, func() (any, error) {
 				return p.Evaluate(funcString, gopts...)
@@ -116,7 +116,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
-			funcString := pageFunc.String()
+			funcString := pageFuncString(pageFunc)
 			gopts := exportArgs(gargs)
 			return promise(vu, func() (any, error) {
 				jsh, err := p.EvaluateHandle(funcString, gopts...)
@@ -822,7 +822,7 @@ func parseWaitForFunctionArgs(
 		return "", nil, nil, fmt.Errorf("parsing waitForFunction options: %w", err)
 	}
 
-	js := pageFunc.ToString().String()
+	js := pageFuncString(pageFunc)
 	_, isCallable := sobek.AssertFunction(pageFunc)
 	if !isCallable {
 		js = fmt.Sprintf("() => (%s)", js)

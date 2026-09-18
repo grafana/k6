@@ -87,7 +87,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
-			funcString := pageFunc.String()
+			funcString := pageFuncString(pageFunc)
 			gopts := exportArgs(gargs)
 			return promise(vu, func() (any, error) {
 				return lo.Evaluate(funcString, gopts...)
@@ -97,7 +97,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
-			funcString := pageFunc.String()
+			funcString := pageFuncString(pageFunc)
 			gopts := exportArgs(gargs)
 			return promise(vu, func() (any, error) {
 				jsh, err := lo.EvaluateHandle(funcString, gopts...)
