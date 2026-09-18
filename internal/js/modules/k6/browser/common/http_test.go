@@ -213,3 +213,76 @@ func TestValidateResourceType(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestApplyContinueOverrides(t *testing.T) {
+	t.Parallel()
+
+	ts := cdp.MonotonicTime(time.Now())
+	wt := cdp.TimeSinceEpoch(time.Now())
+	evt := &network.EventRequestWillBeSent{
+		RequestID: network.RequestID("1234"),
+		Request: &network.Request{
+			URL:     "https://test/old",
+			Method:  "GET",
+			Headers: network.Headers{"accept": "text/plain"},
+		},
+		Timestamp: &ts,
+		WallTime:  &wt,
+	}
+	req, err := NewRequest(k6test.NewVU(t).Context(), log.NewNullLogger(), NewRequestParams{event: evt})
+	require.NoError(t, err)
+
+	err = req.applyContinueOverrides(ContinueOptions{
+		Method:   "POST",
+		URL:      "https://test/new",
+		PostData: []byte(`{"customName":"Classic Pizza"}`),
+		Headers: []HTTPHeader{
+			{Name: "accept", Value: "application/json"},
+			{Name: "foo", Value: "bar"},
+		},
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "POST", req.Method())
+	assert.Equal(t, "https://test/new", req.URL())
+	assert.Equal(t, `{"customName":"Classic Pizza"}`, req.PostData())
+	assert.Equal(t, "bar", req.AllHeaders()["foo"])
+	assert.Equal(t, "application/json", req.AllHeaders()["accept"])
+}
+
+func TestRequestApplyFulfillOverrides(t *testing.T) {
+	t.Parallel()
+
+	ts := cdp.MonotonicTime(time.Now())
+	wt := cdp.TimeSinceEpoch(time.Now())
+	evt := &network.EventRequestWillBeSent{
+		RequestID: network.RequestID("1234"),
+		Request: &network.Request{
+			URL:     "https://test/get",
+			Method:  "GET",
+			Headers: network.Headers{},
+		},
+		Timestamp: &ts,
+		WallTime:  &wt,
+	}
+	req, err := NewRequest(k6test.NewVU(t).Context(), log.NewNullLogger(), NewRequestParams{event: evt})
+	require.NoError(t, err)
+
+	req.applyFulfillOverrides(FulfillOptions{
+		Body:        []byte(`{"data":"fulfilled"}`),
+		ContentType: "application/json",
+		Status:      201,
+		Headers:     []HTTPHeader{{Name: "x-k6", Value: "yes"}},
+	})
+
+	resp := req.Response()
+	require.NotNil(t, resp)
+	assert.Equal(t, int64(201), resp.Status())
+	assert.Equal(t, "yes", resp.Headers()["x-k6"])
+	got, err := resp.Body()
+	require.NoError(t, err)
+	assert.Equal(t, `{"data":"fulfilled"}`, string(got))
+
+	req.applyFulfillOverrides(FulfillOptions{Status: 500})
+	assert.Equal(t, int64(201), req.Response().Status())
+}

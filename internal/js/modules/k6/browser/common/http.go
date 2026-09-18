@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -453,6 +454,74 @@ func (r *Request) URL() string {
 	return r.url.String()
 }
 
+// applyContinueOverrides copies route.continue overrides onto the in-memory
+// request so later request.headers()/method()/postData()/url() match what was
+// sent. See https://github.com/grafana/k6/issues/5012
+func (r *Request) applyContinueOverrides(opts ContinueOptions) error {
+	if opts.Method != "" {
+		r.method = opts.Method
+	}
+	if opts.URL != "" {
+		u, err := url.Parse(opts.URL)
+		if err != nil {
+			return fmt.Errorf("parsing continue URL %q: %w", opts.URL, err)
+		}
+		r.url = u
+	}
+	if len(opts.PostData) > 0 {
+		r.postDataEntries = []string{string(opts.PostData)}
+	}
+	if len(opts.Headers) > 0 {
+		headers := make(map[string][]string, len(opts.Headers))
+		for _, h := range opts.Headers {
+			headers[h.Name] = append(headers[h.Name], h.Value)
+		}
+		r.headers = headers
+		r.extraHeadersMu.Lock()
+		r.extraHeaders = headers
+		r.extraHeadersMu.Unlock()
+	}
+	return nil
+}
+
+// applyFulfillOverrides records the synthetic response from route.fulfill on
+// the request when Chromium has not already attached one.
+func (r *Request) applyFulfillOverrides(opts FulfillOptions) {
+	r.responseMu.Lock()
+	defer r.responseMu.Unlock()
+	if r.response != nil {
+		return
+	}
+
+	status := opts.Status
+	if status == 0 {
+		status = http.StatusOK
+	}
+	headers := make(map[string][]string, len(opts.Headers)+1)
+	for _, h := range opts.Headers {
+		headers[h.Name] = append(headers[h.Name], h.Value)
+	}
+	if opts.ContentType != "" && len(headers["Content-Type"]) == 0 && len(headers["content-type"]) == 0 {
+		headers["Content-Type"] = []string{opts.ContentType}
+	}
+	body := opts.Body
+	if body == nil {
+		body = []byte{}
+	}
+	resp := &Response{
+		ctx:          r.ctx,
+		request:      r,
+		url:          r.URL(),
+		status:       status,
+		statusText:   http.StatusText(int(status)),
+		body:         body,
+		headers:      headers,
+		rawHeadersCh: make(chan struct{}),
+	}
+	resp.resolveRawHeaders()
+	r.response = resp
+}
+
 // RemoteAddress contains informationa about a remote target.
 type RemoteAddress struct {
 	IPAddress string `json:"ipAddress" js:"ipAddress"`
@@ -890,7 +959,10 @@ func (r *Route) Continue(opts ContinueOptions) error {
 		return err
 	}
 
-	return r.networkManager.ContinueRequest(r.request.interceptionID, opts, r.request.HeadersArray())
+	if err := r.networkManager.ContinueRequest(r.request.interceptionID, opts, r.request.HeadersArray()); err != nil {
+		return err
+	}
+	return r.request.applyContinueOverrides(opts)
 }
 
 // Fulfill fulfills the request with the given options for the response.
@@ -900,7 +972,11 @@ func (r *Route) Fulfill(opts FulfillOptions) error {
 		return err
 	}
 
-	return r.networkManager.FulfillRequest(r.request, opts)
+	if err := r.networkManager.FulfillRequest(r.request, opts); err != nil {
+		return err
+	}
+	r.request.applyFulfillOverrides(opts)
+	return nil
 }
 
 func (r *Route) startHandling() error {
