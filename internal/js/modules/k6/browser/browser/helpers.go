@@ -13,7 +13,6 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/taskqueue"
 	k6common "go.k6.io/k6/v2/js/common"
-	"go.k6.io/k6/v2/js/promises"
 )
 
 func panicIfFatalError(ctx context.Context, err error) {
@@ -87,18 +86,41 @@ func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) 
 // promise runs fn in a goroutine and returns a new sobek.Promise.
 //   - If fn returns a nil error, resolves the promise with the
 //     first result value fn returns.
-//   - Otherwise, rejects the promise with the error fn returns.
+//   - Otherwise, rejects the promise with a JS Error that has name and
+//     message set, so scripts can inspect those properties in catch.
 func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
-	p, resolve, reject := promises.New(vu)
+	rt := vu.Runtime()
+	p, resolve, reject := rt.NewPromise()
+	callback := vu.RegisterCallback()
 	go func() {
 		v, err := fn()
-		if err != nil {
-			reject(k6ext.BrowserError(err))
-			return
-		}
-		resolve(v)
+		callback(func() error {
+			if err != nil {
+				return reject(jsError(rt, k6ext.BrowserError(err)))
+			}
+			return resolve(v)
+		})
 	}()
 	return p
+}
+
+// jsError converts a Go error into a JS Error object with name and message.
+// Timeouts become TimeoutError.
+func jsError(rt *sobek.Runtime, err error) *sobek.Object {
+	ctor, ok := sobek.AssertConstructor(rt.Get("Error"))
+	if !ok {
+		return rt.NewGoError(err)
+	}
+	obj, ctorErr := ctor(nil, rt.ToValue(err.Error()))
+	if ctorErr != nil {
+		return rt.NewGoError(err)
+	}
+	name := "Error"
+	if errors.Is(err, context.DeadlineExceeded) {
+		name = "TimeoutError"
+	}
+	_ = obj.Set("name", name)
+	return obj
 }
 
 // queueTask queues the given function fn to run on the given task queue tq.
