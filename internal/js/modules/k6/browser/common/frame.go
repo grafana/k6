@@ -2413,8 +2413,15 @@ func (f *Frame) newAction(
 			}
 			return
 		}
-		f := handle.newAction(states, fn, force, retry, noWaitAfter, timeout)
-		f(apiCtx, resultCh, errCh)
+		action := handle.newAction(states, fn, force, retry, noWaitAfter, timeout)
+		action(apiCtx, resultCh, errCh)
+		if derr := handle.Dispose(); derr != nil {
+			f.log.Warnf(
+				"Frame:newAction",
+				"fid:%s furl:%q sel:%q disposing element handle: %v",
+				f.ID(), f.URL(), selector, derr,
+			)
+		}
 	}
 }
 
@@ -2446,7 +2453,14 @@ func (f *Frame) newPointerAction(
 			}
 			return
 		}
-		f := handle.newPointerAction(fn, opts)
-		f(apiCtx, resultCh, errCh)
+		action := handle.newPointerAction(fn, opts)
+		action(apiCtx, resultCh, errCh)
+		if derr := handle.Dispose(); derr != nil {
+			f.log.Warnf(
+				"Frame:newPointerAction",
+				"fid:%s furl:%q sel:%q disposing element handle: %v",
+				f.ID(), f.URL(), selector, derr,
+			)
+		}
 	}
 }

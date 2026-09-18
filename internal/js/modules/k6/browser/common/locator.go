@@ -648,7 +648,16 @@ func (l *Locator) WaitFor(opts *FrameWaitForSelectorOptions) error {
 	l.log.Debugf("Locator:WaitFor", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	opts.Strict = true
-	_, err := l.frame.waitFor(l.selector, opts, 20)
+	handle, err := l.frame.waitFor(l.selector, opts, 20)
+	if handle != nil {
+		if derr := handle.Dispose(); derr != nil {
+			l.log.Warnf(
+				"Locator:WaitFor",
+				"fid:%s furl:%q sel:%q disposing element handle: %v",
+				l.frame.ID(), l.frame.URL(), l.selector, derr,
+			)
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("waiting for %q: %w", l.selector, err)
 	}
