@@ -3,6 +3,7 @@ package httpext
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,21 @@ import (
 func TestDefaultError(t *testing.T) {
 	t.Parallel()
 	testErrorCode(t, defaultErrorCode, fmt.Errorf("random error"))
+}
+
+func TestCommonSentinelErrorCodes(t *testing.T) {
+	t.Parallel()
+	testTable := map[errCode]error{
+		httpEOFErrorCode:                io.EOF,
+		httpUnexpectedEOFErrorCode:      io.ErrUnexpectedEOF,
+		httpRequestCanceledErrorCode:    context.Canceled,
+		x509CertificateExpiredErrorCode: x509.CertificateInvalidError{Reason: x509.Expired},
+	}
+	testMapOfErrorCodes(t, testTable)
+
+	testErrorCode(t, httpRequestCanceledErrorCode, errors.New("net/http: request canceled"))
+	testErrorCode(t, httpRequestCanceledErrorCode, errors.New("net/http: request canceled while waiting for connection"))
+	testErrorCode(t, defaultTLSErrorCode, x509.CertificateInvalidError{Reason: x509.NotAuthorizedToSign})
 }
 
 func TestDNSErrors(t *testing.T) {

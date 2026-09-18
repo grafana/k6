@@ -1,10 +1,12 @@
 package httpext
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"os"
@@ -26,10 +28,11 @@ type errCode uint32
 
 const (
 	// non specific
-	defaultErrorCode          errCode = 1000
-	defaultNetNonTCPErrorCode errCode = 1010
-	invalidURLErrorCode       errCode = 1020
-	requestTimeoutErrorCode   errCode = 1050
+	defaultErrorCode             errCode = 1000
+	defaultNetNonTCPErrorCode    errCode = 1010
+	invalidURLErrorCode          errCode = 1020
+	httpRequestCanceledErrorCode errCode = 1040
+	requestTimeoutErrorCode      errCode = 1050
 	// DNS errors
 	defaultDNSErrorCode      errCode = 1100
 	dnsNoSuchHostErrorCode   errCode = 1101
@@ -45,10 +48,11 @@ const (
 	tcpDialUnknownErrnoCode  errCode = 1213
 	tcpResetByPeerErrorCode  errCode = 1220
 	// TLS errors
-	defaultTLSErrorCode           errCode = 1300
-	tlsHeaderErrorCode            errCode = 1301
-	x509UnknownAuthorityErrorCode errCode = 1310
-	x509HostnameErrorCode         errCode = 1311
+	defaultTLSErrorCode             errCode = 1300
+	tlsHeaderErrorCode              errCode = 1301
+	x509UnknownAuthorityErrorCode   errCode = 1310
+	x509HostnameErrorCode           errCode = 1311
+	x509CertificateExpiredErrorCode errCode = 1312
 
 	// HTTP2 errors
 	defaultHTTP2ErrorCode errCode = 1600 //nolint:unused
@@ -64,27 +68,35 @@ const (
 	unknownHTTP2ConnectionErrorCode errCode = 1650
 	// errors till 1651 + 13 are other HTTP2 Connection errors with a specific errCode
 
+	// HTTP/1 body and connection errors that previously fell through to 1000
+	httpEOFErrorCode           errCode = 1400
+	httpUnexpectedEOFErrorCode errCode = 1401
+
 	// Custom k6 content errors, i.e. when the magic fails
 	// defaultContentError errCode = 1700 // reserved for future use
 	responseDecompressionErrorCode errCode = 1701
 )
 
 const (
-	tcpResetByPeerErrorCodeMsg  = "%s: connection reset by peer"
-	tcpDialTimeoutErrorCodeMsg  = "dial: i/o timeout"
-	tcpDialRefusedErrorCodeMsg  = "dial: connection refused"
-	tcpBrokenPipeErrorCodeMsg   = "%s: broken pipe"
-	netUnknownErrnoErrorCodeMsg = "%s: unknown errno `%d` on %s with message `%s`"
-	dnsNoSuchHostErrorCodeMsg   = "lookup: no such host"
-	blackListedIPErrorCodeMsg   = "ip is blacklisted"
-	blockedHostnameErrorMsg     = "hostname is blocked"
-	http2GoAwayErrorCodeMsg     = "http2: received GoAway with http2 ErrCode %s"
-	http2StreamErrorCodeMsg     = "http2: stream error with http2 ErrCode %s"
-	http2ConnectionErrorCodeMsg = "http2: connection error with http2 ErrCode %s"
-	x509HostnameErrorCodeMsg    = "x509: certificate doesn't match hostname"
-	x509UnknownAuthority        = "x509: unknown authority"
-	requestTimeoutErrorCodeMsg  = "request timeout"
-	invalidURLErrorCodeMsg      = "invalid URL"
+	tcpResetByPeerErrorCodeMsg         = "%s: connection reset by peer"
+	tcpDialTimeoutErrorCodeMsg         = "dial: i/o timeout"
+	tcpDialRefusedErrorCodeMsg         = "dial: connection refused"
+	tcpBrokenPipeErrorCodeMsg          = "%s: broken pipe"
+	netUnknownErrnoErrorCodeMsg        = "%s: unknown errno `%d` on %s with message `%s`"
+	dnsNoSuchHostErrorCodeMsg          = "lookup: no such host"
+	blackListedIPErrorCodeMsg          = "ip is blacklisted"
+	blockedHostnameErrorMsg            = "hostname is blocked"
+	http2GoAwayErrorCodeMsg            = "http2: received GoAway with http2 ErrCode %s"
+	http2StreamErrorCodeMsg            = "http2: stream error with http2 ErrCode %s"
+	http2ConnectionErrorCodeMsg        = "http2: connection error with http2 ErrCode %s"
+	x509HostnameErrorCodeMsg           = "x509: certificate doesn't match hostname"
+	x509UnknownAuthority               = "x509: unknown authority"
+	x509CertificateExpiredErrorCodeMsg = "x509: certificate has expired or is not yet valid"
+	requestTimeoutErrorCodeMsg         = "request timeout"
+	invalidURLErrorCodeMsg             = "invalid URL"
+	httpRequestCanceledErrorCodeMsg    = "request canceled"
+	httpEOFErrorCodeMsg                = "EOF"
+	httpUnexpectedEOFErrorCodeMsg      = "unexpected EOF"
 )
 
 func http2ErrCodeOffset(code http2.ErrCode) errCode {
@@ -250,6 +262,11 @@ func errorCodeForError(err error) (errCode, string) {
 		return x509UnknownAuthorityErrorCode, x509UnknownAuthority
 	case x509.HostnameError:
 		return x509HostnameErrorCode, x509HostnameErrorCodeMsg
+	case x509.CertificateInvalidError:
+		if e.Reason == x509.Expired {
+			return x509CertificateExpiredErrorCode, x509CertificateExpiredErrorCodeMsg
+		}
+		return defaultTLSErrorCode, err.Error()
 	case tls.RecordHeaderError:
 		return tlsHeaderErrorCode, err.Error()
 	case *url.Error:
@@ -265,9 +282,28 @@ func errorCodeForError(err error) (errCode, string) {
 		if code, msg, ok := errorCodeForHTTP2Message(err.Error()); ok {
 			return code, msg
 		}
+		if code, msg, ok := errorCodeForCommonSentinel(err); ok {
+			return code, msg
+		}
 
 		return defaultErrorCode, err.Error()
 	}
+}
+
+func errorCodeForCommonSentinel(err error) (errCode, string, bool) {
+	switch {
+	case errors.Is(err, io.EOF):
+		return httpEOFErrorCode, httpEOFErrorCodeMsg, true
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return httpUnexpectedEOFErrorCode, httpUnexpectedEOFErrorCodeMsg, true
+	case errors.Is(err, context.Canceled):
+		return httpRequestCanceledErrorCode, httpRequestCanceledErrorCodeMsg, true
+	}
+	switch err.Error() {
+	case "net/http: request canceled", "net/http: request canceled while waiting for connection":
+		return httpRequestCanceledErrorCode, httpRequestCanceledErrorCodeMsg, true
+	}
+	return 0, "", false
 }
 
 // K6Error is a helper struct that enhances Go errors with custom k6-specific
