@@ -3,7 +3,6 @@ package webcrypto
 import (
 	"crypto/rand"
 	"fmt"
-	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/grafana/sobek"
@@ -61,22 +60,18 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	}
 
 	// 2.
-	// Obtain the length of the typed array, and throw a QuotaExceededError if
-	// it's too big, as specified in the [spec's] 10.2.1.2 paragraph.
+	// The spec's quota is on the view's byteLength, not its element count.
+	// ExportTo returns the ArrayBuffer bytes this view covers, so filling
+	// that slice in place also gives 16- and 32-bit arrays their full width
+	// instead of one random byte per element.
 	// [spec]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
-	obj := typedArray.ToObject(c.vu.Runtime())
-	objLength, ok := obj.Get("length").ToNumber().Export().(int64)
-	if !ok {
+	var view []byte
+	err := c.vu.Runtime().ExportTo(typedArray, &view)
+	if err != nil {
 		common.Throw(c.vu.Runtime(), NewError(TypeMismatchError, "typedArray parameter isn't a TypedArray instance"))
 	}
 
-	// The length property is script-controlled and can be overridden with a
-	// negative value, which would make the make() call below panic.
-	if objLength < 0 {
-		panic(c.vu.Runtime().NewTypeError("typedArray parameter's length is negative"))
-	}
-
-	if objLength > maxRandomValuesLength {
+	if int64(len(view)) > maxRandomValuesLength {
 		common.Throw(
 			c.vu.Runtime(),
 			NewError(
@@ -87,24 +82,13 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	}
 
 	// 3.
-	// Create a buffer of a matching size and fill
-	// it with random values.
-	//
 	// We use crypto/rand.Read() here as it will use /dev/urandom or
 	// an equivalent on Unix-like systems, and CryptGenRandom()
 	// on Windows. This is the recommended way to generate random
 	// by the specification.
-	randomValues := make([]byte, objLength)
-	_, err := rand.Read(randomValues)
+	_, err = rand.Read(view)
 	if err != nil {
 		common.Throw(c.vu.Runtime(), err)
-	}
-
-	for i := range objLength {
-		err := obj.Set(strconv.FormatInt(i, 10), randomValues[i])
-		if err != nil {
-			common.Throw(c.vu.Runtime(), err)
-		}
 	}
 
 	// Although the input array has been modified in place,
@@ -112,7 +96,8 @@ func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	return typedArray
 }
 
-// MaxRandomValues is the maximum number of random values that can be generated
+// maxRandomValuesLength is the maximum byteLength of a typed array that
+// getRandomValues will fill, per the Web Crypto API.
 const maxRandomValuesLength = 65536
 
 // RandomUUID returns a [RFC4122] compliant v4 UUID string.

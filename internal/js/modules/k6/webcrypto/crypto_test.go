@@ -80,16 +80,11 @@ func TestGetRandomValuesRejectsBadInput(t *testing.T) {
 			wantMessage:   "TypeMismatchError",
 		},
 		{
-			// The array is a real Uint8Array, so the element type is fine,
-			// but make([]byte, -1) panics.
-			name: "length overridden with a negative value",
-			script: `
-				const a = new Uint8Array(4);
-				Object.defineProperty(a, "length", { value: -1 });
-				crypto.getRandomValues(a);
-			`,
-			wantTypeError: true,
-			wantMessage:   "typedArray parameter's length is negative",
+			// Quota is on byteLength. 16385 Uint32 elements is 65540 bytes.
+			name:          "Uint32Array over the byte quota",
+			script:        `crypto.getRandomValues(new Uint32Array(16385))`,
+			wantTypeError: false,
+			wantMessage:   "QuotaExceededError",
 		},
 	}
 
@@ -116,4 +111,69 @@ func TestGetRandomValuesRejectsBadInput(t *testing.T) {
 			assert.Contains(t, result.Get("text").String(), tc.wantMessage)
 		})
 	}
+}
+
+// TestGetRandomValuesFillsFullElementWidth asserts that 16- and 32-bit typed
+// arrays get a full-width random value in each element, not a single byte.
+//
+// See https://github.com/grafana/k6/issues/6318
+func TestGetRandomValuesFillsFullElementWidth(t *testing.T) {
+	t.Parallel()
+
+	rt := modulestest.NewRuntime(t)
+	got, err := rt.VU.Runtime().RunString(`
+		(function () {
+			const u16 = new Uint16Array(256);
+			const u32 = new Uint32Array(256);
+			const viewHost = new Uint32Array(4);
+			viewHost.fill(0xdeadbeef);
+			const view = new Uint32Array(viewHost.buffer, 4, 2);
+
+			crypto.getRandomValues(u16);
+			crypto.getRandomValues(u32);
+			crypto.getRandomValues(view);
+
+			let u16Max = 0;
+			let u32Max = 0;
+			for (const n of u16) {
+				u16Max = Math.max(u16Max, n);
+			}
+			for (const n of u32) {
+				u32Max = Math.max(u32Max, n);
+			}
+
+			return {
+				u16Max: u16Max,
+				u32Max: u32Max,
+				viewHost0: viewHost[0],
+				viewHost3: viewHost[3],
+				viewChanged: viewHost[1] !== 0xdeadbeef || viewHost[2] !== 0xdeadbeef,
+			};
+		})()
+	`)
+	require.NoError(t, err)
+
+	result := got.ToObject(rt.VU.Runtime())
+	assert.Greater(t, result.Get("u16Max").ToInteger(), int64(255))
+	assert.Greater(t, result.Get("u32Max").ToInteger(), int64(65535))
+	assert.Equal(t, int64(0xdeadbeef), result.Get("viewHost0").ToInteger())
+	assert.Equal(t, int64(0xdeadbeef), result.Get("viewHost3").ToInteger())
+	assert.True(t, result.Get("viewChanged").ToBoolean())
+}
+
+// TestGetRandomValuesIgnoresOverriddenLength keeps the #6320 guarantee that a
+// script-controlled length cannot take the process down, now that filling uses
+// the view's real bytes instead of the length property.
+func TestGetRandomValuesIgnoresOverriddenLength(t *testing.T) {
+	t.Parallel()
+
+	rt := modulestest.NewRuntime(t)
+	require.NotPanics(t, func() {
+		_, err := rt.VU.Runtime().RunString(`
+			const a = new Uint8Array(4);
+			Object.defineProperty(a, "length", { value: -1 });
+			crypto.getRandomValues(a);
+		`)
+		require.NoError(t, err)
+	})
 }
