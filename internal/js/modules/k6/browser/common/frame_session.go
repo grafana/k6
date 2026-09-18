@@ -280,6 +280,7 @@ func (fs *FrameSession) initEvents() {
 	fs.wg.Go(func() {
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		defer recoverGoroutinePanic(fs.logger, "FrameSession:initEvents:go")
 		defer func() {
 			// If there is an active span for main frame,
 			// end it before exiting so it can be flushed
@@ -307,7 +308,6 @@ func (fs *FrameSession) initEvents() {
 			case <-fs.ctx.Done():
 				fs.logger.Debugf("FrameSession:initEvents:go:ctx.Done",
 					"sid:%v tid:%v", fs.session.ID(), fs.targetID)
-
 				return
 			case event := <-fs.eventCh:
 				switch ev := event.data.(type) {
