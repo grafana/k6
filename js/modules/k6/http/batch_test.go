@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -402,4 +403,30 @@ func TestBatchPut(t *testing.T) {
 			}`))
 	assert.NoError(t, err)
 	assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "PUT", sr("HTTPBIN_URL/put"), 200, "")
+}
+
+func TestBatchEmptyElement(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	sr := tb.Replacer.Replace
+	state := ts.runtime.VU.State()
+	state.Options.Throw.Bool = true
+
+	_, err := rt.RunString(sr(`
+		var res = http.batch([
+			["GET", "HTTPBIN_URL/"],
+			,
+		]);
+		if (res.length !== 2) { throw new Error("unexpected responses length: " + res.length); }
+		if (res[0].status != 200) { throw new Error("wrong status: " + res[0].status); }
+		if (!res[1].error || res[1].error.indexOf("empty batch request") === -1) {
+			throw new Error("expected empty-request error, got: " + (res[1] && res[1].error));
+		}
+	`))
+	require.NoError(t, err)
+	assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/"), 200, "")
+	assert.True(t, testutils.LogContains(ts.hook.Drain(), logrus.WarnLevel, "http.batch skipped empty request"))
 }
