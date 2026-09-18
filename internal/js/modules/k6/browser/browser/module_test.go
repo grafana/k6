@@ -29,7 +29,7 @@ func TestEnableTracing(t *testing.T) {
 
 	vu := k6test.NewVU(t)
 	root := New()
-	m := root.NewModuleInstance(vu).(*ModuleInstance) //nolint:forcetypeassert
+	m := root.NewModuleInstance(vu).(*ModuleInstance)
 	require.False(t, root.tracingEnabled.Load())
 	require.NoError(t, vu.Runtime().Set("browser", m.mod.Browser))
 
@@ -43,7 +43,7 @@ func TestEnableTracingRequiresInitContext(t *testing.T) {
 
 	vu := k6test.NewVU(t)
 	root := New()
-	m := root.NewModuleInstance(vu).(*ModuleInstance) //nolint:forcetypeassert
+	m := root.NewModuleInstance(vu).(*ModuleInstance)
 	require.NoError(t, vu.Runtime().Set("browser", m.mod.Browser))
 	vu.ActivateVU()
 
