@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
@@ -18,6 +19,13 @@ type browserProvider func() (*common.Browser, error)
 //nolint:gocognit,funlen
 func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 	m := mapping{
+		"enableTracing": func() error {
+			if vu.State() != nil {
+				return errors.New("browser.enableTracing() must be called in the init context")
+			}
+			vu.enableTracing()
+			return nil
+		},
 		"context": func() (mapping, error) {
 			b, err := browser()
 			if err != nil {

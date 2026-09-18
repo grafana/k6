@@ -4,6 +4,7 @@ package grpc
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -19,13 +20,17 @@ import (
 type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
-	RootModule struct{}
+	RootModule struct {
+		tracingEnabled atomic.Bool
+	}
 
 	// ModuleInstance represents an instance of the GRPC module for every VU.
 	ModuleInstance struct {
-		vu      modules.VU
-		exports map[string]any
-		metrics *instanceMetrics
+		vu             modules.VU
+		exports        map[string]any
+		metrics        *instanceMetrics
+		rootModule     *RootModule
+		tracingEnabled bool
 	}
 )
 
@@ -48,22 +53,33 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	}
 
 	mi := &ModuleInstance{
-		vu:      vu,
-		exports: make(map[string]any),
-		metrics: metrics,
+		vu:             vu,
+		exports:        make(map[string]any),
+		metrics:        metrics,
+		rootModule:     r,
+		tracingEnabled: r.tracingEnabled.Load(),
 	}
 
 	mi.exports["Client"] = mi.NewClient
+	mi.exports["enableTracing"] = mi.EnableTracing
 	mi.defineConstants()
 	mi.exports["Stream"] = mi.stream
 
 	return mi
 }
 
+// EnableTracing enables native tracing for subsequent gRPC operations from this VU.
+func (mi *ModuleInstance) EnableTracing() {
+	mi.tracingEnabled = true
+	if mi.vu.State() == nil {
+		mi.rootModule.tracingEnabled.Store(true)
+	}
+}
+
 // NewClient is the JS constructor for the grpc Client.
 func (mi *ModuleInstance) NewClient(_ sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
-	return rt.ToValue(&Client{vu: mi.vu, types: new(protoregistry.Types)}).ToObject(rt)
+	return rt.ToValue(&Client{vu: mi.vu, moduleInstance: mi, types: new(protoregistry.Types)}).ToObject(rt)
 }
 
 // defineConstants defines the constant variables of the module.
@@ -123,7 +139,7 @@ func (mi *ModuleInstance) stream(c sobek.ConstructorCall) *sobek.Object {
 		common.Throw(rt, fmt.Errorf("invalid GRPC Stream's method: %w", err))
 	}
 
-	p, err := newCallParams(mi.vu, c.Argument(2))
+	p, err := newCallParams(mi.vu, c.Argument(2), mi.tracingEnabled)
 	if err != nil {
 		common.Throw(rt, fmt.Errorf("invalid GRPC Stream's parameters: %w", err))
 	}
