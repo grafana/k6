@@ -403,3 +403,58 @@ func TestRequestForOnLoadingFinished(t *testing.T) {
 		})
 	}
 }
+
+func TestCredentials_IsEmpty(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		creds    Credentials
+		expected bool
+	}{
+		{
+			name:     "empty struct",
+			creds:    Credentials{},
+			expected: true,
+		},
+		{
+			name: "valid credentials",
+			creds: Credentials{
+				Username: "admin",
+				Password: "secretpassword",
+			},
+			expected: false,
+		},
+		{
+			name: "whitespace only",
+			creds: Credentials{
+				Username: "   ",
+				Password: " \t\n ",
+			},
+			expected: true,
+		},
+		{
+			name: "username only",
+			creds: Credentials{
+				Username: "admin",
+				Password: "",
+			},
+			expected: false,
+		},
+		{
+			name: "password only",
+			creds: Credentials{
+				Username: "",
+				Password: "secretpassword",
+			},
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.expected, tc.creds.IsEmpty())
+		})
+	}
+}
