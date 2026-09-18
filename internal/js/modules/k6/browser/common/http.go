@@ -87,6 +87,11 @@ type Request struct {
 	// raw headers wait on it; see waitForRawHeaders.
 	rawHeadersCh   chan struct{}
 	rawHeadersOnce sync.Once
+	// responseCh is closed once a Response is attached, or once it is known
+	// that none will arrive. request.response() waits on it so page.on('request')
+	// callers do not see a permanent null.
+	responseCh   chan struct{}
+	responseOnce sync.Once
 	// For now we're only going to work with the 0th entry of postDataEntries.
 	// We've not been able to reproduce a situation where more than one entry
 	// occupies the slice. Once we have a better idea of when more than one
@@ -176,6 +181,7 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		headers:             make(map[string][]string, len(ev.Request.Headers)),
 		ctx:                 ctx,
 		rawHeadersCh:        make(chan struct{}),
+		responseCh:          make(chan struct{}),
 	}
 	for n, v := range ev.Request.Headers {
 		if s, ok := v.(string); ok {
@@ -240,6 +246,21 @@ func (r *Request) resolveRawHeaders() {
 func (r *Request) WaitForRawHeaders() {
 	select {
 	case <-r.rawHeadersCh:
+	case <-r.ctx.Done():
+	}
+}
+
+// resolveResponse unblocks readers waiting for a Response. It is called when
+// a response is attached, or when loading failed/finished without one.
+func (r *Request) resolveResponse() {
+	r.responseOnce.Do(func() { close(r.responseCh) })
+}
+
+// WaitForResponse blocks until a Response is attached, loading finished
+// without one, or the request context is done.
+func (r *Request) WaitForResponse() {
+	select {
+	case <-r.responseCh:
 	case <-r.ctx.Done():
 	}
 }
@@ -399,6 +420,8 @@ func (r *Request) ResourceType() string {
 
 // Response returns the response for the request, if received.
 func (r *Request) Response() *Response {
+	r.responseMu.RLock()
+	defer r.responseMu.RUnlock()
 	return r.response
 }
 

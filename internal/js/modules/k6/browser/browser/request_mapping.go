@@ -63,6 +63,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		"resourceType": r.ResourceType,
 		"response": func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
+				r.WaitForResponse()
 				resp := r.Response()
 				if resp == nil {
 					return nil, nil

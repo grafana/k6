@@ -213,3 +213,66 @@ func TestValidateResourceType(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestWaitForResponse(t *testing.T) {
+	t.Parallel()
+
+	newReq := func(t *testing.T) *Request {
+		t.Helper()
+		ts := cdp.MonotonicTime(time.Now())
+		wt := cdp.TimeSinceEpoch(time.Now())
+		evt := &network.EventRequestWillBeSent{
+			RequestID: network.RequestID("1234"),
+			Request: &network.Request{
+				URL:     "https://test/get",
+				Method:  "GET",
+				Headers: network.Headers{},
+			},
+			Timestamp: &ts,
+			WallTime:  &wt,
+		}
+		req, err := NewRequest(k6test.NewVU(t).Context(), log.NewNullLogger(), NewRequestParams{event: evt})
+		require.NoError(t, err)
+		return req
+	}
+
+	t.Run("attached", func(t *testing.T) {
+		t.Parallel()
+		req := newReq(t)
+		want := &Response{url: "https://test/get"}
+		done := make(chan *Response, 1)
+		go func() {
+			req.WaitForResponse()
+			done <- req.Response()
+		}()
+		req.responseMu.Lock()
+		req.response = want
+		req.responseMu.Unlock()
+		req.resolveResponse()
+
+		select {
+		case got := <-done:
+			assert.Equal(t, want, got)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for a response")
+		}
+	})
+
+	t.Run("none", func(t *testing.T) {
+		t.Parallel()
+		req := newReq(t)
+		done := make(chan *Response, 1)
+		go func() {
+			req.WaitForResponse()
+			done <- req.Response()
+		}()
+		req.resolveResponse()
+
+		select {
+		case got := <-done:
+			assert.Nil(t, got)
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for a nil response")
+		}
+	})
+}
