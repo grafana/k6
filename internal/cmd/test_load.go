@@ -236,10 +236,14 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 			}
 			return nil
 		default:
-			return fmt.Errorf("archive '%s' has an unsupported test type '%s'", testPath, arc.Type)
+			return errext.WithExitCodeIfNone(
+				fmt.Errorf("archive '%s' has an unsupported test type '%s'", testPath, arc.Type),
+				exitcodes.InvalidConfig)
 		}
 	default:
-		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath),
+			exitcodes.InvalidConfig)
 	}
 }
 

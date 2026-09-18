@@ -3538,6 +3538,15 @@ func TestCloudSecretSourceInvalidForK6Run(t *testing.T) {
 	assert.Contains(t, ts.Stderr.String(), "'cloud' is not a valid value for --secret-source")
 }
 
+func TestInvalidTypeFlag(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(t, `export default function() {}`, []string{"--type=foo"}, exitcodes.InvalidConfig)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	assert.Contains(t, ts.Stderr.String(), "unknown or unspecified test type 'foo'")
+}
+
 // TestPLZCloudSecretsEnvVars verifies that setting K6_CLOUD_SECRETS_TOKEN and
 // K6_CLOUD_SECRETS_ENDPOINT configures the cloud secret source without a /v1/tests
 // API round-trip (the PLZ operator path).
