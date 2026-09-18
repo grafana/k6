@@ -1128,6 +1128,11 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 
 // attachWorkerToTarget attaches a Worker target to a given session.
 func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) error {
+	if session == nil {
+		fs.logger.Debugf("FrameSession:attachWorkerToTarget",
+			"skipped worker; nil session: tid=%v", ti.TargetID)
+		return nil
+	}
 	if fs.page.isClosing() {
 		fs.logger.Debugf("FrameSession:attachWorkerToTarget",
 			"rejected worker; page is closing: tid=%v", ti.TargetID)
