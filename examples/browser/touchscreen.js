@@ -14,7 +14,7 @@ export const options = {
 }
 
 export default async function () {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ hasTouch: true });
 
   await page.goto("https://quickpizza.grafana.com/test.k6.io/", { waitUntil: "networkidle" });
 

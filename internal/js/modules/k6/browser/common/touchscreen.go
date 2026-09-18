@@ -13,19 +13,24 @@ type Touchscreen struct {
 	ctx      context.Context
 	session  session
 	keyboard *Keyboard
+	hasTouch bool
 }
 
 // NewTouchscreen returns a new TouchScreen.
-func NewTouchscreen(ctx context.Context, s session, k *Keyboard) *Touchscreen {
+func NewTouchscreen(ctx context.Context, s session, k *Keyboard, hasTouch bool) *Touchscreen {
 	return &Touchscreen{
 		ctx:      ctx,
 		session:  s,
 		keyboard: k,
+		hasTouch: hasTouch,
 	}
 }
 
 // Tap dispatches a tap start and tap end event.
 func (t *Touchscreen) Tap(x float64, y float64) error {
+	if !t.hasTouch {
+		return fmt.Errorf("hasTouch must be enabled on the browser context before using the touchscreen")
+	}
 	if err := t.tap(x, y); err != nil {
 		return fmt.Errorf("tapping: %w", err)
 	}

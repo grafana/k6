@@ -347,7 +347,7 @@ func NewPage(
 	p.frameSessions[cdp.FrameID(tid)] = p.mainFrameSession
 	p.frameSessionsMu.Unlock()
 	p.Mouse = NewMouse(ctx, s, p.frameManager.MainFrame(), bctx.timeoutSettings, p.Keyboard)
-	p.Touchscreen = NewTouchscreen(ctx, s, p.Keyboard)
+	p.Touchscreen = NewTouchscreen(ctx, s, p.Keyboard, bctx.opts.HasTouch)
 
 	p.initEvents()
 
