@@ -39,10 +39,11 @@ func TestTracingDisabledUsesNoopProvider(t *testing.T) {
 func TestTracingRejectsOutputWhenExplicitlyDisabled(t *testing.T) {
 	t.Parallel()
 
-	_, _, _, err := newTracerProvider(t.Context(), lib.RuntimeOptions{
+	provider, _, _, err := newTracerProvider(t.Context(), lib.RuntimeOptions{
 		TracingEnabled: null.BoolFrom(false),
 		TracesOutput:   null.StringFrom("otel"),
 	})
+	require.Nil(t, provider)
 	require.ErrorContains(t, err, "requires tracing to be enabled")
 }
 

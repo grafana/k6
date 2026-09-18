@@ -171,8 +171,8 @@ func NewNoopTracerProvider() *TracerProvider {
 
 // Shutdown shuts down the TracerProvider releasing any held computational resources.
 // After Shutdown is called, all methods are no-ops.
-func (tp *TracerProvider) Shutdown(ctx context.Context) error {
-	return tp.shutdown(ctx)
+func (p *TracerProvider) Shutdown(ctx context.Context) error {
+	return p.shutdown(ctx)
 }
 
 // TracerProviderFromConfigLine initializes a new TracerProvider based on the configuration

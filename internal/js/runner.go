@@ -888,21 +888,11 @@ func (u *ActiveVU) RunOnce() (err error) {
 	defer func() {
 		u.moduleVUImpl.ctx = previousCtx
 	}()
-	hasScenarioIterationNumbers := u.getNextIterationCounters != nil
-	ctx, iterationSpan := k6trace.StartIteration(ctx, u.state.TracerProvider, k6trace.IterationInfo{
-		Number:                      u.iteration,
-		VUID:                        u.ID,
-		VUIDGlobal:                  u.IDGlobal,
-		VUIterationInScenario:       u.scenarioIter[u.scenarioName],
-		Scenario:                    u.scenarioName,
-		ScenarioIterationInInstance: u.scIterLocal,
-		ScenarioIterationInTest:     u.scIterGlobal,
-		HasScenarioIterationNumbers: hasScenarioIterationNumbers,
-	})
+	ctx, endIterationTrace := u.startIterationTrace(ctx)
 	iterationSpanEnded := false
 	defer func() {
 		if !iterationSpanEnded {
-			k6trace.EndSpan(iterationSpan, err)
+			endIterationTrace(err)
 		}
 	}()
 	u.moduleVUImpl.ctx = ctx
@@ -928,7 +918,7 @@ func (u *ActiveVU) RunOnce() (err error) {
 	}
 
 	u.emitAndWaitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})
-	k6trace.EndSpan(iterationSpan, err)
+	endIterationTrace(err)
 	iterationSpanEnded = true
 	u.moduleVUImpl.ctx = previousCtx
 
@@ -945,6 +935,20 @@ func (u *ActiveVU) RunOnce() (err error) {
 	}
 
 	return err
+}
+
+func (u *ActiveVU) startIterationTrace(ctx context.Context) (context.Context, func(error)) {
+	ctx, span := k6trace.StartIteration(ctx, u.state.TracerProvider, k6trace.IterationInfo{
+		Number:                      u.iteration,
+		VUID:                        u.ID,
+		VUIDGlobal:                  u.IDGlobal,
+		VUIterationInScenario:       u.scenarioIter[u.scenarioName],
+		Scenario:                    u.scenarioName,
+		ScenarioIterationInInstance: u.scIterLocal,
+		ScenarioIterationInTest:     u.scIterGlobal,
+		HasScenarioIterationNumbers: u.getNextIterationCounters != nil,
+	})
+	return ctx, func(err error) { k6trace.EndSpan(span, err) }
 }
 
 func (u *ActiveVU) emitAndWaitEvent(evt *event.Event) {
