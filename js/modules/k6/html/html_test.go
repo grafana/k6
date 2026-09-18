@@ -383,6 +383,17 @@ func TestParseHTML(t *testing.T) {
 				assert.Equal(t, 2, sel.Length())
 			}
 		})
+		t.Run("Function receives k6 Selection", func(t *testing.T) {
+			v, err := rt.RunString(`
+				doc.find("body").children().filter(function(idx, val) {
+					return typeof val.serialize === "function" && val.is("p");
+				})
+			`)
+			if assert.NoError(t, err) {
+				sel := v.Export().(Selection).sel
+				assert.Equal(t, 2, sel.Length())
+			}
+		})
 		t.Run("Selection", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("body").children().filter(doc.find("p"))`)
 			if assert.NoError(t, err) {
