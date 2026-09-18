@@ -300,6 +300,59 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("lookups_skip_slowMo", func(t *testing.T) {
+		t.Parallel()
+		t.Run("elementHandle_innerHTML", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+			testPageNoSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
+				h, err := p.Query("button")
+				require.NoError(t, err)
+				require.NotNil(t, h)
+				_, err = h.InnerHTML()
+				require.NoError(t, err)
+			})
+		})
+		t.Run("elementHandle_innerText", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+			testPageNoSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
+				h, err := p.Query("button")
+				require.NoError(t, err)
+				require.NotNil(t, h)
+				_, err = h.InnerText()
+				require.NoError(t, err)
+			})
+		})
+		t.Run("elementHandle_getAttribute", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+			testPageNoSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
+				h, err := p.Query("button")
+				require.NoError(t, err)
+				require.NotNil(t, h)
+				_, _, err = h.GetAttribute("id")
+				require.NoError(t, err)
+			})
+		})
+		t.Run("frame_innerHTML", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+			testFrameNoSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
+				_, err := f.InnerHTML("button", common.NewFrameInnerHTMLOptions(f.Timeout()))
+				require.NoError(t, err)
+			})
+		})
+		t.Run("frame_getAttribute", func(t *testing.T) {
+			t.Parallel()
+			tb := newTestBrowser(t, withFileServer())
+			testFrameNoSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
+				_, _, err := f.GetAttribute("button", "id", common.NewFrameBaseOptions(f.Timeout()))
+				require.NoError(t, err)
+			})
+		})
+	})
 }
 
 func testSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {
@@ -325,6 +378,22 @@ func testSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {
 	require.True(t, didSlowMo, "expected action to have been slowed down")
 }
 
+func testNoSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {
+	t.Helper()
+
+	hooks := common.GetHooks(tb.ctx)
+	currentHook := hooks.Get(common.HookApplySlowMo)
+	defer hooks.Register(common.HookApplySlowMo, currentHook)
+	called := false
+	hooks.Register(common.HookApplySlowMo, func(ctx context.Context) {
+		currentHook(ctx)
+		called = true
+	})
+
+	fn(tb)
+	require.False(t, called, "lookup should not apply slowMo")
+}
+
 func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *common.Page)) {
 	t.Helper()
 
@@ -342,6 +411,25 @@ func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *co
 	)
 	require.NoError(t, err)
 	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, p) })
+}
+
+func testPageNoSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *common.Page)) {
+	t.Helper()
+
+	p := tb.NewPage(nil)
+	err := p.SetContent(`
+		<button>a</button>
+		<input type="checkbox" class="check">
+		<input type="checkbox" checked=true class="uncheck">
+		<input class="fill">
+		<select>
+		<option>foo</option>
+		</select>
+		<input type="file" class="file">
+    	`, nil,
+	)
+	require.NoError(t, err)
+	testNoSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, p) })
 }
 
 func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser, f *common.Frame)) {
@@ -382,4 +470,44 @@ func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser,
     	`, nil)
 	require.NoError(tb.t, err)
 	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, f) })
+}
+
+func testFrameNoSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser, f *common.Frame)) {
+	t.Helper()
+
+	p := tb.NewPage(nil)
+
+	pageFn := `
+	async (frameId, url) => {
+		const frame = document.createElement('iframe');
+		frame.src = url;
+		frame.id = frameId;
+		document.body.appendChild(frame);
+		await new Promise(x => frame.onload = x);
+		return frame;
+	}
+	`
+
+	h, err := p.EvaluateHandle(
+		pageFn,
+		"frame1",
+		tb.staticURL("empty.html"),
+	)
+	require.NoError(tb.t, err)
+
+	f, err := h.AsElement().ContentFrame()
+	require.NoError(tb.t, err)
+
+	err = f.SetContent(`
+		<button>a</button>
+		<input type="checkbox" class="check">
+		<input type="checkbox" checked=true class="uncheck">
+		<input class="fill">
+		<select>
+		  <option>foo</option>
+		</select>
+		<input type="file" class="file">
+    	`, nil)
+	require.NoError(tb.t, err)
+	testNoSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, f) })
 }

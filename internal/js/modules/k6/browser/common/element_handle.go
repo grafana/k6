@@ -997,8 +997,6 @@ func (h *ElementHandle) InnerHTML() (string, error) {
 		return "", fmt.Errorf("getting element's inner HTML: %w", err)
 	}
 
-	applySlowMo(h.ctx)
-
 	s, ok := v.(string)
 	if !ok {
 		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
@@ -1020,8 +1018,6 @@ func (h *ElementHandle) InnerText() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("getting element's inner text: %w", err)
 	}
-
-	applySlowMo(h.ctx)
 
 	s, ok := v.(string)
 	if !ok {
