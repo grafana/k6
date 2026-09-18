@@ -13,7 +13,7 @@ func handleGetMetrics(cs *ControlSurface, rw http.ResponseWriter, _ *http.Reques
 	}
 
 	cs.MetricsEngine.MetricsLock.Lock()
-	metrics := newMetricsJSONAPI(cs.MetricsEngine.ObservedMetrics, t)
+	metrics := newMetricsJSONAPI(cs.MetricsEngine.ObservedMetrics, t, summaryTrendStats(cs))
 	cs.MetricsEngine.MetricsLock.Unlock()
 
 	data, err := json.Marshal(metrics)
@@ -37,7 +37,7 @@ func handleGetMetric(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request
 		apiError(rw, "Not Found", "No metric with that ID was found", http.StatusNotFound)
 		return
 	}
-	wrappedMetric := newMetricEnvelope(metric, t)
+	wrappedMetric := newMetricEnvelope(metric, t, summaryTrendStats(cs))
 	cs.MetricsEngine.MetricsLock.Unlock()
 
 	data, err := json.Marshal(wrappedMetric)
@@ -46,4 +46,11 @@ func handleGetMetric(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request
 		return
 	}
 	_, _ = rw.Write(data)
+}
+
+func summaryTrendStats(cs *ControlSurface) []string {
+	if cs.RunState == nil {
+		return nil
+	}
+	return cs.RunState.Options.SummaryTrendStats
 }
