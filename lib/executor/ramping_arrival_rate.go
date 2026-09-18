@@ -356,6 +356,8 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s"
 
+	var calendarComplete atomic.Bool
+
 	progressFn := func() (float64, []string) {
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
 		currentTickerPeriod := atomic.LoadInt64(&tickerPeriod)
@@ -371,7 +373,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		right := []string{progVUs, duration.String(), progIters}
 
 		spent := time.Since(startTime)
-		if spent > duration {
+		if calendarComplete.Load() || spent > duration {
 			return 1, right
 		}
 
@@ -502,6 +504,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		default: // we're already allocating a new VU
 		}
 	}
+	calendarComplete.Store(true)
 	return nil
 }
 

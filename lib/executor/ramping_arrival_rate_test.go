@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/ui/pb"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
 	"go.k6.io/k6/v2/metrics"
@@ -835,4 +836,35 @@ func TestRampingArrivalRateActiveVUs_GetExecutionRequirements(t *testing.T) {
 			require.Equal(t, exp, config.GetExecutionRequirements(et))
 		})
 	}
+}
+
+func TestRampingArrivalRateProgressCompleteWhenCalendarEndsEarly(t *testing.T) {
+	t.Parallel()
+
+	// Duration 2.5s at 1 iter/s schedules 2 iterations and then stops,
+	// leaving 0.5s on the clock. The bar must still finish as Done, not
+	// Interrupted. See https://github.com/grafana/k6/issues/2951
+	synctest.Test(t, func(t *testing.T) {
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			return nil
+		})
+		config := &RampingArrivalRateConfig{
+			BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+			TimeUnit:   types.NullDurationFrom(time.Second),
+			StartRate:  null.IntFrom(1),
+			Stages: []Stage{
+				{Duration: types.NullDurationFrom(2500 * time.Millisecond), Target: null.IntFrom(1)},
+			},
+			PreAllocatedVUs: null.IntFrom(1),
+			MaxVUs:          null.IntFrom(1),
+		}
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 100)
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+
+		rendered := test.executor.GetProgress().Render(0, 0)
+		assert.Equal(t, string(pb.Done), rendered.Status())
+	})
 }
