@@ -301,20 +301,13 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 				Value:      float64(bodySize),
 				Time:       wallTime,
 			},
+			{
+				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
+				Value:      failed,
+				Time:       wallTime,
+			},
 		},
 	})
-
-	if resp != nil && resp.timing != nil {
-		pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
-			Samples: []k6metrics.Sample{
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
-					Value:      failed,
-					Time:       wallTime,
-				},
-			},
-		})
-	}
 }
 
 // handleURLTag will check if the url tag needs to be grouped by testing
