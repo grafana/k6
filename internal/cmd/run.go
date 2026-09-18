@@ -178,7 +178,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	executionPlan := execScheduler.GetExecutionPlan()
 	outputs, err := createOutputs(c.gs, test, executionPlan)
 	if err != nil {
-		return err
+		return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
 	outputs = append(outputs, testRunState.GroupSummary)
