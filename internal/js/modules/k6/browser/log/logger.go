@@ -14,10 +14,28 @@ import (
 
 type Logger struct {
 	*logrus.Logger //nolint:forbidigo
+	parent         *logrus.Logger //nolint:forbidigo
 	mu             sync.Mutex
+	overrideMu     sync.Mutex
+	levelOverride  bool
+	overrideLevel  logrus.Level
 	lastLogCall    int64
 	iterID         string
 	categoryFilter *regexp.Regexp
+}
+
+// parentWriter writes to the current output of the parent k6 logger so later
+// SetOutput calls (for example test hooks) still apply.
+type parentWriter struct {
+	parent *logrus.Logger //nolint:forbidigo
+}
+
+func (w parentWriter) Write(p []byte) (int, error) {
+	out := w.parent.Out
+	if out == nil {
+		return len(p), nil
+	}
+	return out.Write(p)
 }
 
 // NewNullLogger will create a logger where log lines will
@@ -40,7 +58,17 @@ func New(logger logrus.FieldLogger, iterID string) *Logger {
 	} else if l, ok := logger.(*logrus.Logger); !ok { //nolint:forbidigo
 		ll.Warnf("Logger", "invalid logger type %T, using default", logger)
 	} else {
-		ll.Logger = l
+		// Use a child logger so K6_BROWSER_LOG / SetLevel / ReportCaller do not
+		// mutate the shared k6 logger that also handles console.log.
+		child := logrus.New()
+		child.SetOutput(parentWriter{parent: l})
+		child.SetFormatter(l.Formatter)
+		child.SetReportCaller(l.ReportCaller)
+		// Never drop internally; GetLevel() decides what the browser emits.
+		child.SetLevel(logrus.TraceLevel)
+		child.ReplaceHooks(l.Hooks)
+		ll.Logger = child
+		ll.parent = l
 	}
 
 	return ll
@@ -126,8 +154,25 @@ func (l *Logger) SetLevel(level string) error {
 	if err != nil {
 		return err
 	}
-	l.Logger.SetLevel(pl)
+	l.overrideMu.Lock()
+	l.overrideLevel = pl
+	l.levelOverride = true
+	l.overrideMu.Unlock()
 	return nil
+}
+
+// GetLevel returns the browser log level. If K6_BROWSER_LOG/SetLevel was not
+// used, this follows the parent k6 logger so tests and --verbose still apply.
+func (l *Logger) GetLevel() logrus.Level {
+	l.overrideMu.Lock()
+	defer l.overrideMu.Unlock()
+	if l.levelOverride {
+		return l.overrideLevel
+	}
+	if l.parent != nil {
+		return l.parent.GetLevel()
+	}
+	return l.Logger.GetLevel()
 }
 
 // DebugMode returns true if the logger level is set to Debug or higher.
