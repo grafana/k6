@@ -21,6 +21,9 @@ type Worker struct {
 
 // NewWorker creates a new page viewport.
 func NewWorker(ctx context.Context, s session, id target.ID, url string) (*Worker, error) {
+	if sessionIsNil(s) {
+		return nil, fmt.Errorf("creating worker for target %s: nil session", id)
+	}
 	w := Worker{
 		ctx:      ctx,
 		session:  s,
@@ -32,6 +35,16 @@ func NewWorker(ctx context.Context, s session, id target.ID, url string) (*Worke
 	}
 
 	return &w, nil
+}
+
+func sessionIsNil(s session) bool {
+	if s == nil {
+		return true
+	}
+	if sess, ok := s.(*Session); ok {
+		return sess == nil
+	}
+	return false
 }
 
 func (w *Worker) initEvents() error {
