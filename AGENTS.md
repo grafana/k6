@@ -110,7 +110,7 @@ make grpc-server-run
 
 - `.golangci.yml`: Linter configuration (version pinned at top)
 - `Makefile`: Build targets and development commands
-- `go.mod`: Go module dependencies (use Go 1.23+)
+- `go.mod`: Go module dependencies (see `go.mod` for the minimum required Go version)
 - `Dependencies.md`: Dependency update policy and guidelines
 - `modtools_frozen.yml`: Dependencies that should not be auto-updated
 
