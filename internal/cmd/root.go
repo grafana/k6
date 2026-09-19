@@ -221,6 +221,10 @@ func (c *rootCommand) execute() {
 		return
 	}
 
+	if isFlagParseError(err) {
+		err = errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+	}
+
 	if ecerr, ok := errors.AsType[errext.HasExitCode](err); ok {
 		exitCode = int(ecerr.ExitCode())
 	}
@@ -234,6 +238,14 @@ func (c *rootCommand) execute() {
 	if c.loggerIsRemote {
 		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
 	}
+}
+
+func isFlagParseError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "invalid argument") && strings.Contains(msg, "flag")
 }
 
 func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCode, error) {
