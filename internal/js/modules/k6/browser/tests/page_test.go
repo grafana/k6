@@ -208,6 +208,11 @@ func TestPageEvaluateMapping(t *testing.T) {
 			want:   sobek.Null(),
 		},
 		{
+			name:   "arrow_object_literal",
+			script: "() => ({ a: 'b' })",
+			want:   map[string]any{"a": "b"},
+		},
+		{
 			name:   "full_func_no_return",
 			script: "function() {3}",
 			want:   sobek.Null(),

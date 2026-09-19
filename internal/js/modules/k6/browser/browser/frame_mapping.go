@@ -73,7 +73,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
-			funcString := pageFunc.String()
+			funcString := pageFuncString(pageFunc)
 			gopts := exportArgs(gargs)
 			return promise(vu, func() (any, error) {
 				return f.Evaluate(funcString, gopts...)
@@ -83,7 +83,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
-			funcString := pageFunc.String()
+			funcString := pageFuncString(pageFunc)
 			gopts := exportArgs(gargs)
 			return promise(vu, func() (any, error) {
 				jsh, err := f.EvaluateHandle(funcString, gopts...)

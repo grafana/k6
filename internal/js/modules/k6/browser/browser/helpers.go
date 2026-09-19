@@ -67,6 +67,62 @@ func sobekEmptyString(v sobek.Value) bool {
 	return k6common.IsNullish(v) || strings.TrimSpace(v.String()) == ""
 }
 
+// pageFuncString returns JS source for a page function sent to Chromium.
+// Sobek's Function.toString() drops grouping parentheses around object and
+// array literals in arrow-function bodies (the parser unwraps them and the
+// stored source ends at the literal). Chromium then reports
+// "Unexpected end of input". Re-close any unmatched '('.
+func pageFuncString(v sobek.Value) string {
+	if v == nil {
+		return ""
+	}
+	return closeUnbalancedParens(v.String())
+}
+
+func closeUnbalancedParens(src string) string {
+	n := unmatchedParens(src)
+	if n <= 0 {
+		return src
+	}
+	return src + strings.Repeat(")", n)
+}
+
+func unmatchedParens(src string) int {
+	var (
+		n      int
+		inStr  byte
+		escape bool
+	)
+	for i := 0; i < len(src); i++ {
+		c := src[i]
+		if inStr != 0 {
+			if escape {
+				escape = false
+				continue
+			}
+			if c == '\\' {
+				escape = true
+				continue
+			}
+			if c == inStr {
+				inStr = 0
+			}
+			continue
+		}
+		switch c {
+		case '\'', '"', '`':
+			inStr = c
+		case '(':
+			n++
+		case ')':
+			if n > 0 {
+				n--
+			}
+		}
+	}
+	return n
+}
+
 // newRegExMatcher returns a function that runs in the JS runtime's event loop
 // for pattern matching. It uses ECMAScript RegEx engine for consistency.
 //
