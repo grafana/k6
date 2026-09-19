@@ -433,10 +433,19 @@ func (c *Client) prepareBatchArray(requests []any) (
 	[]httpext.BatchParsedHTTPRequest, []*Response, error,
 ) {
 	reqCount := len(requests)
-	batchReqs := make([]httpext.BatchParsedHTTPRequest, reqCount)
+	batchReqs := make([]httpext.BatchParsedHTTPRequest, 0, reqCount)
 	results := make([]*Response, reqCount)
 
 	for i, req := range requests {
+		if req == nil {
+			resp := httpext.NewResponse()
+			resp.Error = fmt.Sprintf("empty batch request at index %d", i)
+			results[i] = c.responseFromHTTPext(resp)
+			if state := c.moduleInstance.vu.State(); state != nil {
+				state.Logger.WithField("index", i).Warn("http.batch skipped empty request")
+			}
+			continue
+		}
 		resp := httpext.NewResponse()
 		parsedReq, err := c.parseBatchRequest(i, req)
 		if err != nil {
@@ -447,10 +456,10 @@ func (c *Client) prepareBatchArray(requests []any) (
 			results[i] = c.responseFromHTTPext(resp)
 			return batchReqs, results, err
 		}
-		batchReqs[i] = httpext.BatchParsedHTTPRequest{
+		batchReqs = append(batchReqs, httpext.BatchParsedHTTPRequest{
 			ParsedHTTPRequest: parsedReq,
 			Response:          resp,
-		}
+		})
 		results[i] = c.responseFromHTTPext(resp)
 	}
 
