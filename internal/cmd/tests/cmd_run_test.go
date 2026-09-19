@@ -268,6 +268,15 @@ func TestWrongCliFlagIterations(t *testing.T) {
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid argument "foo"`))
 }
 
+func TestWrongTracesOutput(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(t, `export default function() {}`,
+		[]string{"--traces-output=bar"}, exitcodes.InvalidConfig)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `invalid traces output "bar"`))
+}
+
 func TestWrongEnvVarIterations(t *testing.T) {
 	t.Parallel()
 

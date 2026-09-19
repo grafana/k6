@@ -129,7 +129,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	if err = c.setupTracerProvider(globalCtx, test); err != nil {
-		return err
+		return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 	shutdownTracerProvider = func() {
 		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
