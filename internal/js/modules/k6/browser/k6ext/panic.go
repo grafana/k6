@@ -11,7 +11,6 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/errext"
-	k6common "go.k6.io/k6/v2/js/common"
 )
 
 // Abortf will shutdown the whole test run. This should
@@ -29,10 +28,13 @@ func Abortf(ctx context.Context, format string, a ...any) {
 // Panicf will cause a panic with the given error which will stop
 // the current iteration. Before panicking, it will find the
 // browser process from the context and kill it if it still exists.
+//
+// The panic is a Go error, not a Sobek exception. CDP event goroutines
+// must not touch the JS runtime. See grafana/k6#5534.
 // TODO: test.
 func Panicf(ctx context.Context, format string, a ...any) {
-	failFunc := func(rt *sobek.Runtime, a ...any) {
-		k6common.Throw(rt, BrowserError(fmt.Errorf(format, a...)))
+	failFunc := func(_ *sobek.Runtime, a ...any) {
+		panic(BrowserError(fmt.Errorf(format, a...)))
 	}
 	sharedPanic(ctx, failFunc, a...)
 }
