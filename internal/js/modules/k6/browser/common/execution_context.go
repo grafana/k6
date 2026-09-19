@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
@@ -168,6 +169,7 @@ func (e *ExecutionContext) eval(
 		e.sid, e.stid, e.fid, e.id, e.furl, opts)
 
 	suffix := `//# sourceURL=` + evaluationScriptURL
+	origJS := js
 
 	var action interface {
 		Do(context.Context) (*runtime.RemoteObject, *runtime.ExceptionDetails, error)
@@ -212,6 +214,16 @@ func (e *ExecutionContext) eval(
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		var cdpe *cdproto.Error
 		if errors.As(err, &cdpe) && cdpe.Code == devToolsServerErrorCode {
+			// Chromium cannot JSON-serialize some values (window, document, …)
+			// when ReturnByValue is set. Retry without it and parse the object
+			// preview instead of surfacing "Object reference chain is too long".
+			if opts.returnByValue && isUnserializableRemoteObjectError(cdpe.Message) {
+				res, ferr := e.evalByPreview(apiCtx, opts, origJS, args...)
+				if ferr != nil {
+					return nil, errors.New(cdpe.Message)
+				}
+				return res, nil
+			}
 			// By creating a new error instead of reusing it, we're removing the
 			// chromium specific error code.
 			return nil, errors.New(cdpe.Message)
@@ -245,6 +257,46 @@ func (e *ExecutionContext) eval(
 	}
 
 	return res, nil
+}
+
+// isUnserializableRemoteObjectError reports CDP messages that mean the result
+// exists but cannot be returned by value. Playwright maps these to undefined;
+// we parse the object preview instead so evaluate(() => window) still works.
+func isUnserializableRemoteObjectError(msg string) bool {
+	return strings.Contains(msg, "Object reference chain is too long") ||
+		strings.Contains(msg, "Object couldn't be returned by value")
+}
+
+func remoteObjectFromHandle(res any) *runtime.RemoteObject {
+	switch v := res.(type) {
+	case *BaseJSHandle:
+		return v.remoteObject
+	case *ElementHandle:
+		return v.remoteObject
+	default:
+		return nil
+	}
+}
+
+// evalByPreview re-evaluates without ReturnByValue and converts the remote
+// object preview into a Go value. The caller must only use this after a
+// ReturnByValue evaluation failed with an unserializable-object CDP error.
+func (e *ExecutionContext) evalByPreview(
+	apiCtx context.Context, opts evalOptions, js string, args ...any,
+) (any, error) {
+	opts.returnByValue = false
+	res, err := e.eval(apiCtx, opts, js, args...)
+	if err != nil {
+		return nil, err
+	}
+	robj := remoteObjectFromHandle(res)
+	if robj == nil {
+		return res, nil
+	}
+	if h, ok := res.(jsHandle); ok {
+		defer func() { _ = h.dispose() }()
+	}
+	return valueFromUnserializableRemoteObject(e.logger, robj)
 }
 
 // Based on: https://github.com/microsoft/playwright/blob/master/src/server/injected/injectedScript.ts
