@@ -831,4 +831,16 @@ func TestValidate(t *testing.T) {
 			})
 		}
 	})
+	t.Run("RunTags validation", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, Options{RunTags: map[string]string{"env": "prod"}}.Validate())
+
+		errs := Options{RunTags: map[string]string{"example": ""}}.Validate()
+		require.Len(t, errs, 1)
+		assert.EqualError(t, errs[0], `invalid tag "example", empty value`)
+
+		errs = Options{RunTags: map[string]string{"": "value"}}.Validate()
+		require.Len(t, errs, 1)
+		assert.EqualError(t, errs[0], "invalid tag, empty name")
+	})
 }
