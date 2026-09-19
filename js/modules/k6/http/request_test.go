@@ -970,6 +970,25 @@ func TestRequest(t *testing.T) {
 					assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
 					assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
 				})
+				t.Run("reused URL", func(t *testing.T) {
+					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/bob/pass")
+					urlRaw := sr("HTTPBIN_IP_URL/digest-auth/auth/bob/pass")
+
+					_, err := rt.RunString("var url = http.url`" + url + "`;" + `
+					for (let i = 0; i < 2; i++) {
+						const res = http.get(url, { auth: "digest" });
+						if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+						if (res.error_code != 0) { throw new Error("wrong error code: " + res.error_code); }
+					}
+					`)
+					assert.NoError(t, err)
+
+					sampleContainers := metrics.GetBufferedSamples(samples)
+					assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
+					assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
+					assertRequestMetricsEmitted(t, sampleContainers[2:3], "GET", urlRaw, 401, "")
+					assertRequestMetricsEmitted(t, sampleContainers[3:4], "GET", urlRaw, 200, "")
+				})
 				t.Run("failure", func(t *testing.T) {
 					url := sr("http://bob:pass@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/failure")
 
