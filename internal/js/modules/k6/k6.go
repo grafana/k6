@@ -114,7 +114,9 @@ func (mi *K6) Group(name string, val sobek.Value) (sobek.Value, error) {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
 	if !mi.asyncGroups && common.IsAsyncFunction(mi.vu.Runtime(), val) {
-		return sobek.Undefined(), errors.New("group() does not support async functions as arguments, " +
+		return sobek.Undefined(), errors.New("group() does not support async functions as arguments " +
+			"unless the async-metric-context experimental feature is enabled " +
+			"(pass --features async-metric-context or set K6_FEATURES=async-metric-context), " +
 			"please see https://grafana.com/docs/k6/latest/javascript-api/k6/group/ for more info")
 	}
 
