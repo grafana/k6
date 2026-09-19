@@ -81,3 +81,38 @@ func TestElementHandleBasePointerOptionsParse(t *testing.T) {
 		})
 	}
 }
+
+func TestElementHandleClickOptionsToMouseClickOptions(t *testing.T) {
+	t.Parallel()
+
+	src := &ElementHandleClickOptions{
+		Button:     "right",
+		ClickCount: 2,
+		Delay:      50,
+		Modifiers:  []string{"Shift", "ControlOrMeta"},
+	}
+
+	got := src.ToMouseClickOptions()
+
+	assert.Equal(t, "right", got.Button)
+	assert.Equal(t, int64(2), got.ClickCount)
+	assert.Equal(t, int64(50), got.Delay)
+	assert.Equal(t, []string{"Shift", "ControlOrMeta"}, got.Modifiers)
+}
+
+func TestElementHandleDblclickOptionsToMouseClickOptions(t *testing.T) {
+	t.Parallel()
+
+	src := &ElementHandleDblclickOptions{
+		Button:    "right",
+		Delay:     50,
+		Modifiers: []string{"Alt"},
+	}
+
+	got := src.ToMouseClickOptions()
+
+	assert.Equal(t, "right", got.Button)
+	assert.Equal(t, int64(2), got.ClickCount)
+	assert.Equal(t, int64(50), got.Delay)
+	assert.Equal(t, []string{"Alt"}, got.Modifiers)
+}
