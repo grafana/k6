@@ -4,14 +4,11 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 )
 
 const _builtinOutputName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetryopentelemetrysummary"
 
 var _builtinOutputIndex = [...]uint8{0, 5, 8, 15, 41, 49, 53, 58, 64, 90, 103, 110}
-
-const _builtinOutputLowerName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetryopentelemetrysummary"
 
 func (i builtinOutput) String() string {
 	if i >= builtinOutput(len(_builtinOutputIndex)-1) {
@@ -20,62 +17,20 @@ func (i builtinOutput) String() string {
 	return _builtinOutputName[_builtinOutputIndex[i]:_builtinOutputIndex[i+1]]
 }
 
-// An "invalid array index" compiler error signifies that the constant values have changed.
-// Re-run the stringer command to generate them again.
-func _builtinOutputNoOp() {
-	var x [1]struct{}
-	_ = x[builtinOutputCloud-(0)]
-	_ = x[builtinOutputCSV-(1)]
-	_ = x[builtinOutputDatadog-(2)]
-	_ = x[builtinOutputExperimentalPrometheusRW-(3)]
-	_ = x[builtinOutputInfluxdb-(4)]
-	_ = x[builtinOutputJSON-(5)]
-	_ = x[builtinOutputKafka-(6)]
-	_ = x[builtinOutputStatsd-(7)]
-	_ = x[builtinOutputExperimentalOpentelemetry-(8)]
-	_ = x[builtinOutputOpentelemetry-(9)]
-	_ = x[builtinOutputSummary-(10)]
-}
-
-var _builtinOutputValues = []builtinOutput{builtinOutputCloud, builtinOutputCSV, builtinOutputDatadog, builtinOutputExperimentalPrometheusRW, builtinOutputInfluxdb, builtinOutputJSON, builtinOutputKafka, builtinOutputStatsd, builtinOutputExperimentalOpentelemetry, builtinOutputOpentelemetry, builtinOutputSummary}
+var _builtinOutputValues = []builtinOutput{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 
 var _builtinOutputNameToValueMap = map[string]builtinOutput{
-	_builtinOutputName[0:5]:          builtinOutputCloud,
-	_builtinOutputLowerName[0:5]:     builtinOutputCloud,
-	_builtinOutputName[5:8]:          builtinOutputCSV,
-	_builtinOutputLowerName[5:8]:     builtinOutputCSV,
-	_builtinOutputName[8:15]:         builtinOutputDatadog,
-	_builtinOutputLowerName[8:15]:    builtinOutputDatadog,
-	_builtinOutputName[15:41]:        builtinOutputExperimentalPrometheusRW,
-	_builtinOutputLowerName[15:41]:   builtinOutputExperimentalPrometheusRW,
-	_builtinOutputName[41:49]:        builtinOutputInfluxdb,
-	_builtinOutputLowerName[41:49]:   builtinOutputInfluxdb,
-	_builtinOutputName[49:53]:        builtinOutputJSON,
-	_builtinOutputLowerName[49:53]:   builtinOutputJSON,
-	_builtinOutputName[53:58]:        builtinOutputKafka,
-	_builtinOutputLowerName[53:58]:   builtinOutputKafka,
-	_builtinOutputName[58:64]:        builtinOutputStatsd,
-	_builtinOutputLowerName[58:64]:   builtinOutputStatsd,
-	_builtinOutputName[64:90]:        builtinOutputExperimentalOpentelemetry,
-	_builtinOutputLowerName[64:90]:   builtinOutputExperimentalOpentelemetry,
-	_builtinOutputName[90:103]:       builtinOutputOpentelemetry,
-	_builtinOutputLowerName[90:103]:  builtinOutputOpentelemetry,
-	_builtinOutputName[103:110]:      builtinOutputSummary,
-	_builtinOutputLowerName[103:110]: builtinOutputSummary,
-}
-
-var _builtinOutputNames = []string{
-	_builtinOutputName[0:5],
-	_builtinOutputName[5:8],
-	_builtinOutputName[8:15],
-	_builtinOutputName[15:41],
-	_builtinOutputName[41:49],
-	_builtinOutputName[49:53],
-	_builtinOutputName[53:58],
-	_builtinOutputName[58:64],
-	_builtinOutputName[64:90],
-	_builtinOutputName[90:103],
-	_builtinOutputName[103:110],
+	_builtinOutputName[0:5]:     0,
+	_builtinOutputName[5:8]:     1,
+	_builtinOutputName[8:15]:    2,
+	_builtinOutputName[15:41]:   3,
+	_builtinOutputName[41:49]:   4,
+	_builtinOutputName[49:53]:   5,
+	_builtinOutputName[53:58]:   6,
+	_builtinOutputName[58:64]:   7,
+	_builtinOutputName[64:90]:   8,
+	_builtinOutputName[90:103]:  9,
+	_builtinOutputName[103:110]: 10,
 }
 
 // builtinOutputString retrieves an enum value from the enum constants string name.
@@ -84,23 +39,12 @@ func builtinOutputString(s string) (builtinOutput, error) {
 	if val, ok := _builtinOutputNameToValueMap[s]; ok {
 		return val, nil
 	}
-
-	if val, ok := _builtinOutputNameToValueMap[strings.ToLower(s)]; ok {
-		return val, nil
-	}
 	return 0, fmt.Errorf("%s does not belong to builtinOutput values", s)
 }
 
 // builtinOutputValues returns all values of the enum
 func builtinOutputValues() []builtinOutput {
 	return _builtinOutputValues
-}
-
-// builtinOutputStrings returns a slice of all String values of the enum
-func builtinOutputStrings() []string {
-	strs := make([]string, len(_builtinOutputNames))
-	copy(strs, _builtinOutputNames)
-	return strs
 }
 
 // IsAbuiltinOutput returns "true" if the value is listed in the enum definition. "false" otherwise
