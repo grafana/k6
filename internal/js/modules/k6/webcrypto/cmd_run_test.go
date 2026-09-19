@@ -99,6 +99,148 @@ func TestExamplesInputOutput(t *testing.T) {
 	}
 }
 
+func TestDigestBufferSources(t *testing.T) {
+	t.Parallel()
+
+	const script = `
+function toHex(buffer) {
+    return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function assertDigestMatches(value, expectedBytes, label) {
+    const [actual, expected] = await Promise.all([
+        crypto.subtle.digest("SHA-256", value),
+        crypto.subtle.digest("SHA-256", expectedBytes.buffer),
+    ]);
+    if (toHex(actual) !== toHex(expected)) {
+        throw new Error(label + " used the wrong bytes");
+    }
+}
+
+async function assertSnapshot(view, backingBytes, label) {
+    const expectedBytes = backingBytes.slice(view.byteOffset, view.byteOffset + view.byteLength);
+    const actualPromise = crypto.subtle.digest("SHA-256", view);
+    const expectedPromise = crypto.subtle.digest("SHA-256", expectedBytes.buffer);
+    backingBytes.fill(255);
+    const [actual, expected] = await Promise.all([actualPromise, expectedPromise]);
+    if (toHex(actual) !== toHex(expected)) {
+        throw new Error(label + " did not copy its view bytes");
+    }
+}
+
+async function assertRejected(value, label) {
+    try {
+        await crypto.subtle.digest("SHA-256", value);
+    } catch (error) {
+        if (error.name !== "OperationError") {
+            throw new Error(label + " threw " + error.name + " instead of OperationError");
+        }
+        return;
+    }
+    throw new Error(label + " was accepted");
+}
+
+export default async function () {
+    ArrayBuffer.isView = () => false;
+    await assertDigestMatches(
+        new Uint8Array([1, 2, 3, 4]).subarray(1, 3),
+        new Uint8Array([2, 3]),
+        "first call after isView=false",
+    );
+
+    const overriddenArrayBuffer = new Uint8Array([1, 2, 3, 4]).buffer;
+    overriddenArrayBuffer.constructor = Object;
+    await assertDigestMatches(overriddenArrayBuffer, new Uint8Array([1, 2, 3, 4]), "ArrayBuffer constructor override");
+
+    const overriddenTypedArray = new Uint8Array([1, 2, 3, 4]).subarray(1, 3);
+    overriddenTypedArray.constructor = Object;
+    await assertDigestMatches(overriddenTypedArray, new Uint8Array([2, 3]), "TypedArray constructor override");
+
+    const overriddenDataView = new DataView(new Uint8Array([1, 2, 3, 4]).buffer, 1, 2);
+    overriddenDataView.constructor = Object;
+    await assertDigestMatches(overriddenDataView, new Uint8Array([2, 3]), "DataView constructor override");
+
+    class CustomArrayBuffer extends ArrayBuffer {}
+    const customArrayBuffer = new CustomArrayBuffer(4);
+    new Uint8Array(customArrayBuffer).set([1, 2, 3, 4]);
+    await assertDigestMatches(customArrayBuffer, new Uint8Array([1, 2, 3, 4]), "ArrayBuffer subclass");
+
+    class CustomUint8Array extends Uint8Array {}
+    await assertDigestMatches(
+        new CustomUint8Array([1, 2, 3, 4]).subarray(1, 3),
+        new Uint8Array([2, 3]),
+        "TypedArray subclass",
+    );
+
+    class CustomDataView extends DataView {}
+    await assertDigestMatches(
+        new CustomDataView(new Uint8Array([1, 2, 3, 4]).buffer, 1, 2),
+        new Uint8Array([2, 3]),
+        "DataView subclass",
+    );
+
+    ArrayBuffer.isView = () => true;
+    await assertDigestMatches(new Uint8Array([5, 6]), new Uint8Array([5, 6]), "real view after isView=true");
+    await assertRejected(
+        { constructor: Uint8Array, length: 2, 0: 2, 1: 3 },
+        "constructor-spoofed array-like",
+    );
+    await assertRejected(
+        Object.setPrototypeOf(
+            { length: 2, 0: 2, 1: 3, [Symbol.iterator]: undefined },
+            Uint8Array.prototype,
+        ),
+        "prototype-spoofed array-like",
+    );
+
+    ArrayBuffer.isView = null;
+    await assertDigestMatches(new Uint8Array([7, 8]), new Uint8Array([7, 8]), "real view after non-function isView");
+    await assertRejected(
+        Object.setPrototypeOf({ length: 2, 0: 7, 1: 8 }, DataView.prototype),
+        "DataView prototype-spoofed array-like",
+    );
+
+    const typedArrayConstructors = [
+        Int8Array,
+        Uint8Array,
+        Uint8ClampedArray,
+        Int16Array,
+        Uint16Array,
+        Int32Array,
+        Uint32Array,
+        Float32Array,
+        Float64Array,
+        BigInt64Array,
+        BigUint64Array,
+    ];
+    for (const TypedArray of typedArrayConstructors) {
+        const bytesPerElement = TypedArray.BYTES_PER_ELEMENT;
+        const buffer = new ArrayBuffer(bytesPerElement * 5);
+        const backingBytes = new Uint8Array(buffer);
+        backingBytes.forEach((_, index) => { backingBytes[index] = index + 1; });
+        const view = new TypedArray(buffer, bytesPerElement, 2);
+        await assertSnapshot(view, backingBytes, TypedArray.name);
+    }
+
+    const dataViewBuffer = new ArrayBuffer(8);
+    const dataViewBytes = new Uint8Array(dataViewBuffer);
+    dataViewBytes.set([1, 2, 3, 4, 5, 6, 7, 8]);
+    await assertSnapshot(new DataView(dataViewBuffer, 2, 4), dataViewBytes, "DataView");
+
+    console.log("digest BufferSource checks passed");
+}
+`
+
+	ts := getSingleFileTestState(t, script, []string{"--quiet", "--no-color", "--log-output=stdout"}, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	assert.Contains(t, stdout, "digest BufferSource checks passed")
+	assert.NotContains(t, stdout, "Uncaught")
+	assert.NotContains(t, stdout, "level=error")
+	assert.Empty(t, ts.Stderr.String())
+}
+
 func getFiles(t *testing.T, path string) []string {
 	t.Helper()
 

@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -10,37 +11,61 @@ import (
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
 // and returns a copy of the underlying byte slice.
-func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value) ([]byte, error) {
+func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value, arrayBufferIsView sobek.Callable) ([]byte, error) {
 	if common.IsNullish(v) {
 		return nil, NewError(TypeError, "data is null or undefined")
 	}
 
-	asObject := v.ToObject(rt)
-
-	var ab sobek.ArrayBuffer
-	var ok bool
-
-	if IsTypedArray(rt, v) {
-		ab, ok = asObject.Get("buffer").Export().(sobek.ArrayBuffer)
-		if !ok {
-			return nil, NewError(TypeError, "TypedArray.buffer is not an ArrayBuffer")
+	if v.ExportType() != reflect.TypeFor[sobek.ArrayBuffer]() {
+		isView, err := isArrayBufferView(v, arrayBufferIsView)
+		if err != nil {
+			return nil, NewError(OperationError, err.Error())
 		}
-	} else {
-		ab, ok = asObject.Export().(sobek.ArrayBuffer)
-		if !ok {
+		if !isView {
 			return nil, NewError(OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
 		}
+	}
+
+	var bytes []byte
+	if err := rt.ExportTo(v, &bytes); err != nil {
+		return nil, NewError(OperationError, err.Error())
 	}
 
 	// Copy the underlying byte slice to avoid the caller modifying it.
 	// Ensures this step complies with the expactations of the
 	// specification: "Let [...] be the result of getting a copy of the
 	// bytes held by the [...] parameter"
-	bytes := ab.Bytes()
 	bytesCopy := make([]byte, len(bytes))
 	copy(bytesCopy, bytes)
 
 	return bytesCopy, nil
+}
+
+func getArrayBufferIsView(rt *sobek.Runtime) (sobek.Callable, error) {
+	var value sobek.Value
+	if exception := rt.Try(func() {
+		value = rt.Get(string(ArrayBufferConstructor)).ToObject(rt).Get("isView")
+	}); exception != nil {
+		return nil, exception
+	}
+
+	isView, ok := sobek.AssertFunction(value)
+	if !ok {
+		return nil, fmt.Errorf("ArrayBuffer.isView is not a function")
+	}
+	return isView, nil
+}
+
+func isArrayBufferView(v sobek.Value, isView sobek.Callable) (bool, error) {
+	if isView == nil {
+		return false, fmt.Errorf("ArrayBuffer.isView was not captured")
+	}
+
+	result, err := isView(nil, v)
+	if err != nil {
+		return false, err
+	}
+	return result.ToBoolean(), nil
 }
 
 // traverseObject traverses the given object using the given fields and returns the value
