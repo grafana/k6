@@ -10,6 +10,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/grafana/sobek"
 
@@ -37,6 +38,7 @@ type (
 		tracesMetadata map[string]string
 		filePersister  filePersister
 		testRunID      string
+		tracingEnabled atomic.Bool
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -79,14 +81,16 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	})
 
 	mvu := moduleVU{
-		VU:          vu,
-		pidRegistry: m.PidRegistry,
+		VU:            vu,
+		pidRegistry:   m.PidRegistry,
+		enableTracing: m.EnableTracing,
 		browserRegistry: newBrowserRegistry(
 			context.Background(),
 			vu,
 			m.remoteRegistry,
 			m.PidRegistry,
 			m.tracesMetadata,
+			m.tracingEnabled.Load,
 		),
 		taskQueueRegistry: newTaskQueueRegistry(vu),
 		filePersister:     m.filePersister,
@@ -101,6 +105,11 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 			NetworkProfiles: common.GetNetworkProfiles(),
 		},
 	}
+}
+
+// EnableTracing enables native tracing for browser operations.
+func (m *RootModule) EnableTracing() {
+	m.tracingEnabled.Store(true)
 }
 
 // Exports returns the exports of the JS module so that it can be used in test

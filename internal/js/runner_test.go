@@ -28,6 +28,7 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/time/rate"
 	"gopkg.in/guregu/null.v3"
 
@@ -41,6 +42,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/v2/internal/lib/testutils/mockoutput"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	k6http "go.k6.io/k6/v2/js/modules/k6/http"
 	"go.k6.io/k6/v2/lib"
 	_ "go.k6.io/k6/v2/lib/executor" // TODO: figure out something better
@@ -49,6 +51,19 @@ import (
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/output"
 )
+
+type runnerTraceExporter struct {
+	spans []sdktrace.ReadOnlySpan
+}
+
+func (e *runnerTraceExporter) ExportSpans(_ context.Context, spans []sdktrace.ReadOnlySpan) error {
+	e.spans = append(e.spans, spans...)
+	return nil
+}
+
+func (*runnerTraceExporter) Shutdown(context.Context) error {
+	return nil
+}
 
 func TestRunnerNew(t *testing.T) {
 	t.Parallel()
@@ -85,6 +100,52 @@ func TestRunnerNew(t *testing.T) {
 		_, err := getSimpleRunner(t, "/script.js", `blarg`)
 		assert.EqualError(t, err, "ReferenceError: blarg is not defined\n\tat file:///script.js:1:28(1)\n")
 	})
+}
+
+func TestRunOnceStartsLinkedIterationTrace(t *testing.T) {
+	t.Parallel()
+
+	runner, err := getSimpleRunner(t, "/script.js", `
+		import { currentSpan } from "k6/experimental/tracing";
+		export default function() {
+			currentSpan().setAttribute("script.attribute", "value");
+		}
+	`)
+	require.NoError(t, err)
+
+	exporter := &runnerTraceExporter{}
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	runner.preInitState.TracerProvider = &k6trace.TracerProvider{TracerProvider: provider}
+	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider)
+
+	initVU, err := runner.NewVU(runCtx, 2, 7, make(chan metrics.SampleContainer, 10))
+	require.NoError(t, err)
+	activeVU := initVU.Activate(&lib.VUActivationParams{
+		RunContext: runCtx,
+		Scenario:   "checkout",
+		GetNextIterationCounters: func() (uint64, uint64) {
+			return 8, 13
+		},
+	})
+	require.NoError(t, activeVU.RunOnce())
+	require.Same(t, runCtx, initVU.(*VU).moduleVUImpl.Context())
+	require.NoError(t, activeVU.RunOnce())
+	require.Same(t, runCtx, initVU.(*VU).moduleVUImpl.Context())
+	k6trace.EndSpan(runSpan, nil)
+
+	require.Len(t, exporter.spans, 3)
+	iterationSpan := exporter.spans[0]
+	require.Equal(t, "iteration", iterationSpan.Name())
+	require.False(t, iterationSpan.Parent().IsValid())
+	require.Len(t, iterationSpan.Links(), 1)
+	require.Equal(t, runSpan.SpanContext(), iterationSpan.Links()[0].SpanContext)
+	var scriptAttribute string
+	for _, attr := range iterationSpan.Attributes() {
+		if string(attr.Key) == "script.attribute" {
+			scriptAttribute = attr.Value.AsString()
+		}
+	}
+	require.Equal(t, "value", scriptAttribute)
 }
 
 func TestRunnerOptions(t *testing.T) {

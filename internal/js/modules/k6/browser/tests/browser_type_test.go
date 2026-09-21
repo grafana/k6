@@ -95,7 +95,9 @@ func setupChromiumVU(t *testing.T, opts ...any) *k6test.VU {
 	t.Helper()
 
 	vu := k6test.NewVU(t, opts...)
-	mod := browser.New().NewModuleInstance(vu)
+	root := browser.New()
+	root.EnableTracing()
+	mod := root.NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 

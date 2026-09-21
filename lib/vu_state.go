@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 
@@ -93,7 +94,8 @@ type State struct {
 	GetScenarioGlobalVUIter func() uint64
 
 	// Tracing instrumentation.
-	TracerProvider TracerProvider
+	TracerProvider  TracerProvider
+	TracePropagator propagation.TextMapPropagator
 
 	// Usage is a way to report usage statistics
 	Usage *usage.Usage
