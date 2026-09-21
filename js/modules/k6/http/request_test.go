@@ -2426,6 +2426,41 @@ func TestDigestAuthWithSHA256(t *testing.T) {
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
 }
 
+// A URL created with http.url can be shared between requests, so the digest
+// credentials must survive across calls: the second request must not end up
+// authenticated with empty credentials after the first one removed the URL's
+// user info (#6397).
+func TestDigestAuthReusedURL(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd")
+
+	_, err := rt.RunString("var target = http.url`" + urlWithCreds + "`;" + `
+		for (var i = 0; i < 2; i++) {
+			var res = http.get(target, { auth: "digest" });
+			if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
+			if (res.error_code !== 0) { throw new Error("wrong error code: " + res.error_code); }
+		}
+	`)
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace(
+		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd")
+	sampleContainers := metrics.GetBufferedSamples(samples)
+	// Each call performs the full challenge handshake: 401 then 200.
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
+	assertRequestMetricsEmitted(t, sampleContainers[2:3], "GET", urlRaw, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[3:4], "GET", urlRaw, 200, "")
+}
+
 // A digest-authenticated request to a server that requires no authentication
 // succeeds directly on the first response, and such a response must not be
 // marked as unexpected by the response callback.
