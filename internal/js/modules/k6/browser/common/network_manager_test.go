@@ -318,6 +318,45 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	}
 }
 
+func TestEmitResponseMetricsFailedWithoutTiming(t *testing.T) {
+	t.Parallel()
+
+	registry := k6metrics.NewRegistry()
+	k6m := k6ext.RegisterCustomMetrics(registry)
+	vu := k6test.NewVU(t)
+	nm := &NetworkManager{ctx: vu.Context(), vu: vu, customMetrics: k6m, eventInterceptor: &EventInterceptorMock{}}
+	vu.ActivateVU()
+
+	now := time.Now()
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event: &network.EventRequestWillBeSent{
+			Request:   &network.Request{},
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+		},
+	})
+	require.NoError(t, err)
+
+	res := NewHTTPResponse(vu.Context(), req, &network.Response{
+		Status: 403,
+		URL:    "https://example.com/blocked",
+	}, (*cdp.MonotonicTime)(&now))
+	require.Nil(t, res.timing)
+
+	nm.emitResponseMetrics(res, req)
+
+	var failedSamples int
+	n := vu.AssertSamples(func(s k6metrics.Sample) {
+		if s.Metric.Name != "browser_http_req_failed" {
+			return
+		}
+		failedSamples++
+		assert.Equal(t, 1.0, s.Value)
+	})
+	assert.Equal(t, 3, n)
+	assert.Equal(t, 1, failedSamples)
+}
+
 func TestRequestForOnLoadingFinished(t *testing.T) {
 	t.Parallel()
 
