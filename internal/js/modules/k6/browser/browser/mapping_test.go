@@ -70,8 +70,8 @@ func TestAroundMappingCallsIncludesAllNestedMappings(t *testing.T) {
 		},
 	}, func() (func(), func()) {
 		calls = append(calls, "begin")
-		return func() { calls = append(calls, "complete") },
-			func() { calls = append(calls, "cancel") }
+		return func() { calls = append(calls, "finish and retain") },
+			func() { calls = append(calls, "abort and discard") }
 	})
 
 	require.Equal(t, "value", m["top"].(func(string) string)("value"))
@@ -79,9 +79,9 @@ func TestAroundMappingCallsIncludesAllNestedMappings(t *testing.T) {
 	nested := m["nested"].(mapping)
 	require.Equal(t, 42, nested["call"].(func(int) int)(42))
 	require.Equal(t, []string{
-		"begin", "top:value", "complete",
-		"begin", "skipped", "complete",
-		"begin", "nested", "complete",
+		"begin", "top:value", "finish and retain",
+		"begin", "skipped", "finish and retain",
+		"begin", "nested", "finish and retain",
 	}, calls)
 }
 
@@ -133,24 +133,24 @@ func TestFinishMappingPreservesReturnedMappings(t *testing.T) {
 	require.Equal(t, int64(1), value.ToInteger())
 }
 
-func TestAroundMappingCallsCancelsFailedCall(t *testing.T) {
+func TestAroundMappingCallsAbortsFailedCallBeforeLaunch(t *testing.T) {
 	t.Parallel()
 
 	expectedErr := assert.AnError
-	canceled := false
-	completed := false
+	abortedAndDiscarded := false
+	finishedAndRetained := false
 	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: sobek.New()}}
 	m := aroundMappingCalls(vu, mapping{
 		"call": networkCall(func() (*sobek.Promise, error) { return nil, expectedErr }),
 	}, func() (func(), func()) {
-		return func() { completed = true }, func() { canceled = true }
+		return func() { finishedAndRetained = true }, func() { abortedAndDiscarded = true }
 	})
 
 	promise, err := m["call"].(func() (*sobek.Promise, error))()
 	assert.Nil(t, promise)
 	assert.ErrorIs(t, err, expectedErr)
-	assert.False(t, completed)
-	assert.True(t, canceled)
+	assert.False(t, finishedAndRetained)
+	assert.True(t, abortedAndDiscarded)
 }
 
 func TestAroundMappingCallsKeepsOperationUntilPromiseSettles(t *testing.T) {
@@ -175,6 +175,30 @@ func TestAroundMappingCallsKeepsOperationUntilPromiseSettles(t *testing.T) {
 	assert.False(t, active)
 	assert.Equal(t, sobek.PromiseStateFulfilled, wrapped.State())
 	assert.Equal(t, "result", wrapped.Result().String())
+}
+
+func TestAroundMappingCallsRetainsOperationWhenPromiseRejects(t *testing.T) {
+	t.Parallel()
+
+	rt := sobek.New()
+	vu := moduleVU{VU: &k6modulestest.VU{RuntimeField: rt}}
+	promise, _, reject := rt.NewPromise()
+	abortedAndDiscarded := false
+	finishedAndRetained := false
+	m := aroundMappingCalls(vu, mapping{
+		"call": networkCall(func() *sobek.Promise { return promise }),
+	}, func() (func(), func()) {
+		return func() { finishedAndRetained = true }, func() { abortedAndDiscarded = true }
+	})
+
+	wrapped := m["call"].(func() *sobek.Promise)()
+	require.NoError(t, reject("failure"))
+	_, err := rt.RunString(`0`)
+	require.NoError(t, err)
+	assert.True(t, finishedAndRetained)
+	assert.False(t, abortedAndDiscarded)
+	assert.Equal(t, sobek.PromiseStateRejected, wrapped.State())
+	assert.Equal(t, "failure", wrapped.Result().String())
 }
 
 func BenchmarkAroundMappingCalls(b *testing.B) {

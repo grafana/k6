@@ -1253,9 +1253,12 @@ func (p *Page) SetNetworkFallbackTagsAndMeta(tagsAndMeta k6metrics.TagsAndMeta) 
 }
 
 // BeginNetworkOperation makes tagsAndMeta available to requests observed while the operation is
-// active and retains it for CDP request events that arrive just after the operation settles. Calling
-// cancel instead discards it because the browser operation did not start.
-func (p *Page) BeginNetworkOperation(tagsAndMeta k6metrics.TagsAndMeta) (complete, cancel func()) {
+// active. Calling finishAndRetain keeps it for CDP request events that arrive just after the
+// operation settles, including unsuccessful settlement. Calling abortAndDiscard instead removes it
+// when the browser operation was not launched.
+func (p *Page) BeginNetworkOperation(
+	tagsAndMeta k6metrics.TagsAndMeta,
+) (finishAndRetain, abortAndDiscard func()) {
 	operation := &networkOperationContext{
 		id:          p.networkOperationID.Add(1),
 		tagsAndMeta: tagsAndMeta,

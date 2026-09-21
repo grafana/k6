@@ -46,9 +46,9 @@ func finishMapping(m mapping) mapping {
 }
 
 func withPageNetworkCalls(vu moduleVU, page *common.Page, m mapping) mapping {
-	var begin func() (complete, cancel func())
+	var begin func() (finishAndRetain, abortAndDiscard func())
 	if page != nil && k6common.AsyncMetricContextEnabled(vu.State()) {
-		begin = func() (complete, cancel func()) {
+		begin = func() (finishAndRetain, abortAndDiscard func()) {
 			state := vu.State()
 			if state == nil || state.Tags == nil {
 				return func() {}, func() {}
@@ -62,7 +62,7 @@ func withPageNetworkCalls(vu moduleVU, page *common.Page, m mapping) mapping {
 func finishMappingCalls(
 	vu moduleVU,
 	m mapping,
-	begin func() (complete, cancel func()),
+	begin func() (finishAndRetain, abortAndDiscard func()),
 	path string,
 ) mapping {
 	for name, value := range m {
@@ -104,7 +104,7 @@ func finishMappingCalls(
 func aroundMappingCalls(
 	vu moduleVU,
 	m mapping,
-	begin func() (complete, cancel func()),
+	begin func() (finishAndRetain, abortAndDiscard func()),
 ) mapping {
 	return finishMappingCalls(vu, m, begin, "")
 }
@@ -112,18 +112,18 @@ func aroundMappingCalls(
 func aroundMappingCall(
 	vu moduleVU,
 	value any,
-	begin func() (complete, cancel func()),
+	begin func() (finishAndRetain, abortAndDiscard func()),
 ) (any, bool) {
 	original := reflect.ValueOf(value)
 	if original.Kind() != reflect.Func {
 		return nil, false
 	}
 	wrapped := reflect.MakeFunc(original.Type(), func(args []reflect.Value) []reflect.Value {
-		complete, cancel := begin()
-		operationStarted := false
+		finishAndRetain, abortAndDiscard := begin()
+		operationLaunched := false
 		defer func() {
-			if !operationStarted {
-				cancel()
+			if !operationLaunched {
+				abortAndDiscard()
 			}
 		}()
 
@@ -131,10 +131,10 @@ func aroundMappingCall(
 		if mappingCallFailed(results) {
 			return results
 		}
-		operationStarted = wrapMappingPromise(vu, results, complete)
-		if !operationStarted {
-			complete()
-			operationStarted = true
+		operationLaunched = wrapMappingPromise(vu, results, finishAndRetain)
+		if !operationLaunched {
+			finishAndRetain()
+			operationLaunched = true
 		}
 		return results
 	})
@@ -157,13 +157,13 @@ func mappingCallFailed(results []reflect.Value) bool {
 	return false
 }
 
-func wrapMappingPromise(vu moduleVU, results []reflect.Value, complete func()) bool {
+func wrapMappingPromise(vu moduleVU, results []reflect.Value, finishAndRetain func()) bool {
 	for i, result := range results {
 		promise, ok := reflect.TypeAssert[*sobek.Promise](result)
 		if !ok || promise == nil {
 			continue
 		}
-		results[i] = reflect.ValueOf(endOperationOnPromiseSettlement(vu, promise, complete))
+		results[i] = reflect.ValueOf(endOperationOnPromiseSettlement(vu, promise, finishAndRetain))
 		return true
 	}
 	return false
@@ -172,21 +172,23 @@ func wrapMappingPromise(vu moduleVU, results []reflect.Value, complete func()) b
 func endOperationOnPromiseSettlement(
 	vu moduleVU,
 	promise *sobek.Promise,
-	end func(),
+	finishAndRetain func(),
 ) *sobek.Promise {
 	rt := vu.Runtime()
 	wrapped, resolve, reject := rt.NewPromise()
-	end = sync.OnceFunc(end)
+	finishAndRetain = sync.OnceFunc(finishAndRetain)
 
 	onFulfilled := func(call sobek.FunctionCall) sobek.Value {
-		end()
+		finishAndRetain()
 		if err := resolve(call.Argument(0)); err != nil {
 			k6common.Throw(rt, err)
 		}
 		return sobek.Undefined()
 	}
 	onRejected := func(call sobek.FunctionCall) sobek.Value {
-		end()
+		// Rejection means the launched operation settled unsuccessfully, not that it never
+		// reached the browser. Retain its context for related CDP requests observed afterward.
+		finishAndRetain()
 		if err := reject(call.Argument(0)); err != nil {
 			k6common.Throw(rt, err)
 		}
@@ -202,7 +204,7 @@ func endOperationOnPromiseSettlement(
 		rt.ToValue(onFulfilled),
 		rt.ToValue(onRejected),
 	); err != nil {
-		end()
+		finishAndRetain()
 		if rejectErr := reject(err); rejectErr != nil {
 			k6common.Throw(rt, rejectErr)
 		}

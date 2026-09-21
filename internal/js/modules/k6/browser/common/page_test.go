@@ -192,26 +192,26 @@ func TestPageNetworkOperationContext(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "fallback", contextName(tagsAndMeta))
 
-	firstComplete, _ := p.BeginNetworkOperation(metricContext("first"))
-	secondComplete, _ := p.BeginNetworkOperation(metricContext("second"))
+	firstFinishAndRetain, _ := p.BeginNetworkOperation(metricContext("first"))
+	secondFinishAndRetain, _ := p.BeginNetworkOperation(metricContext("second"))
 
 	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
 	require.True(t, ok)
 	assert.Equal(t, "second", contextName(tagsAndMeta))
 
-	firstComplete()
+	firstFinishAndRetain()
 	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
 	require.True(t, ok)
 	assert.Equal(t, "second", contextName(tagsAndMeta))
 
-	secondComplete()
-	secondComplete()
+	secondFinishAndRetain()
+	secondFinishAndRetain()
 	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
 	require.True(t, ok)
 	assert.Equal(t, "second", contextName(tagsAndMeta))
 
-	_, failedCancel := p.BeginNetworkOperation(metricContext("failed"))
-	failedCancel()
+	_, failedAbortAndDiscard := p.BeginNetworkOperation(metricContext("failed"))
+	failedAbortAndDiscard()
 	tagsAndMeta, ok = p.getNetworkTagsAndMeta()
 	require.True(t, ok)
 	assert.Equal(t, "second", contextName(tagsAndMeta))
@@ -230,16 +230,16 @@ func TestPageNetworkLoaderContextOutlivesUnrelatedCalls(t *testing.T) {
 	}
 
 	p := &Page{}
-	navigationComplete, _ := p.BeginNetworkOperation(metricContext("navigation"))
+	navigationFinishAndRetain, _ := p.BeginNetworkOperation(metricContext("navigation"))
 	tagsAndMeta, _, ok := p.getNetworkTagsAndMetaForRequest(
 		cdp.FrameID("frame"), cdp.LoaderID("loader"), true, true,
 	)
 	require.True(t, ok)
 	assert.Equal(t, "navigation", contextName(tagsAndMeta))
-	navigationComplete()
+	navigationFinishAndRetain()
 
-	inspectionComplete, _ := p.BeginNetworkOperation(metricContext("inspection"))
-	inspectionComplete()
+	inspectionFinishAndRetain, _ := p.BeginNetworkOperation(metricContext("inspection"))
+	inspectionFinishAndRetain()
 
 	tagsAndMeta, _, ok = p.getNetworkTagsAndMetaForRequest(
 		cdp.FrameID("frame"), cdp.LoaderID("loader"), true, false,

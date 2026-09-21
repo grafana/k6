@@ -36,8 +36,8 @@ func reportWebVitalGroup(t *testing.T, asyncEnabled bool, navGroup, liveGroup st
 	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
 		tagsAndMeta.SetTag(k6metrics.TagGroup.String(), navGroup)
 	})
-	complete, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
-	complete()
+	finishAndRetain, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
+	finishAndRetain()
 
 	// The VU moves on: the live group tag no longer reflects the navigation that
 	// produced the web vital.

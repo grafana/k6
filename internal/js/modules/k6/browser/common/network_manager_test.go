@@ -388,20 +388,20 @@ func TestNetworkManagerRedirectKeepsLoaderOperation(t *testing.T) {
 	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
 		tagsAndMeta.SetTag("operation", "navigation")
 	})
-	navigationComplete, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
+	navigationFinishAndRetain, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
 	navigationTags, navigationOperation := nm.networkTagsAndMeta(state, &network.EventRequestWillBeSent{
 		FrameID:  cdp.FrameID("frame"),
 		LoaderID: cdp.LoaderID("initial-loader"),
 		Type:     network.ResourceTypeDocument,
 	}, nil)
 	require.NotNil(t, navigationOperation)
-	navigationComplete()
+	navigationFinishAndRetain()
 
 	state.Tags.Modify(func(tagsAndMeta *k6metrics.TagsAndMeta) {
 		tagsAndMeta.SetTag("operation", "unrelated")
 	})
-	unrelatedComplete, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
-	defer unrelatedComplete()
+	unrelatedFinishAndRetain, _ := page.BeginNetworkOperation(state.Tags.GetCurrentValues())
+	defer unrelatedFinishAndRetain()
 
 	redirectTags, redirectOperation := nm.networkTagsAndMeta(state, &network.EventRequestWillBeSent{
 		FrameID:  cdp.FrameID("frame"),
