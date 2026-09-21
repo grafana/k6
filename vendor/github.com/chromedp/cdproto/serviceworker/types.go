@@ -110,6 +110,93 @@ func (t *VersionStatus) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
+// RouterCondition mostly corresponds to RouterCondition in ServiceWorker
+// spec (https://www.w3.org/TR/service-workers/#dictdef-routercondition).
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/ServiceWorker#type-ServiceWorkerRouterCondition
+type RouterCondition struct {
+	URLPattern         string               `json:"urlPattern,omitempty,omitzero"` // Plain text, or JSON serialization of URLPatternInit or URLPattern
+	RequestMethod      string               `json:"requestMethod,omitempty,omitzero"`
+	RequestMode        string               `json:"requestMode,omitempty,omitzero"`
+	RequestDestination string               `json:"requestDestination,omitempty,omitzero"`
+	RunningStatus      VersionRunningStatus `json:"runningStatus,omitempty,omitzero"`
+	Or                 []*RouterCondition   `json:"or,omitempty,omitzero"`
+	Not                *RouterCondition     `json:"not,omitempty,omitzero"`
+}
+
+// RouterSourceType [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/ServiceWorker#type-ServiceWorkerRouterSourceType
+type RouterSourceType string
+
+// String returns the RouterSourceType as string value.
+func (t RouterSourceType) String() string {
+	return string(t)
+}
+
+// RouterSourceType values.
+const (
+	RouterSourceTypeCache                      RouterSourceType = "cache"
+	RouterSourceTypeFetchEvent                 RouterSourceType = "fetchEvent"
+	RouterSourceTypeNetwork                    RouterSourceType = "network"
+	RouterSourceTypeRaceNetworkAndFetchHandler RouterSourceType = "raceNetworkAndFetchHandler"
+	RouterSourceTypeRaceNetworkAndCache        RouterSourceType = "raceNetworkAndCache"
+	RouterSourceTypeSourceDict                 RouterSourceType = "sourceDict"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *RouterSourceType) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch RouterSourceType(s) {
+	case RouterSourceTypeCache:
+		*t = RouterSourceTypeCache
+	case RouterSourceTypeFetchEvent:
+		*t = RouterSourceTypeFetchEvent
+	case RouterSourceTypeNetwork:
+		*t = RouterSourceTypeNetwork
+	case RouterSourceTypeRaceNetworkAndFetchHandler:
+		*t = RouterSourceTypeRaceNetworkAndFetchHandler
+	case RouterSourceTypeRaceNetworkAndCache:
+		*t = RouterSourceTypeRaceNetworkAndCache
+	case RouterSourceTypeSourceDict:
+		*t = RouterSourceTypeSourceDict
+	default:
+		return fmt.Errorf("unknown RouterSourceType value: %v", s)
+	}
+	return nil
+}
+
+// RouterSourceDict
+// https://www.w3.org/TR/service-workers/#dictdef-routersourcedict.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/ServiceWorker#type-ServiceWorkerRouterSourceDict
+type RouterSourceDict struct {
+	CacheName string `json:"cacheName"`
+}
+
+// RouterSource corresponds to RouterSource in the spec while the
+// representation is different as follows.
+// (https://www.w3.org/TR/service-workers/#typedefdef-routersource) -
+// RouterSourceEnum: type equals cache, sourceDict is null. - RouterSourceDict:
+// type equals sourceDict, sourceDict has valid value.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/ServiceWorker#type-ServiceWorkerRouterSource
+type RouterSource struct {
+	Type       RouterSourceType  `json:"type"`
+	SourceDict *RouterSourceDict `json:"sourceDict,omitempty,omitzero"` // Non-empty iff type equals "sourceDict".
+}
+
+// RouterRule [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/ServiceWorker#type-ServiceWorkerRouterRule
+type RouterRule struct {
+	Condition *RouterCondition `json:"condition"`
+	Source    *RouterSource    `json:"source"`
+	ID        int64            `json:"id"` // Rule ID assigned by the browser. Unique within each ServiceWorkerVersion.
+}
+
 // Version serviceWorker version.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/ServiceWorker#type-ServiceWorkerVersion
@@ -123,7 +210,8 @@ type Version struct {
 	ScriptResponseTime float64              `json:"scriptResponseTime,omitempty,omitzero"` // The time at which the response headers of the main script were received from the server. For cached script it is the last time the cache entry was validated.
 	ControlledClients  []target.ID          `json:"controlledClients,omitempty,omitzero"`
 	TargetID           target.ID            `json:"targetId,omitempty,omitzero"`
-	RouterRules        string               `json:"routerRules,omitempty,omitzero"`
+	RouterRules        string               `json:"routerRules,omitempty,omitzero"` // Migration to typedRouterRules is in progress. The browser sends either routerRules or typedRouterRules. TODO(crbug.com/540469610): Remove routerRules after the migration.
+	TypedRouterRules   []*RouterRule        `json:"typedRouterRules,omitempty,omitzero"`
 }
 
 // ErrorMessage serviceWorker error message.
