@@ -98,9 +98,14 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
 	})
+	// methodQuery is the HTTP QUERY method, standardized by RFC 10008. The Go
+	// standard library doesn't define a constant for it yet.
+	const methodQuery = "QUERY"
+
 	mustExport("post", mi.defaultClient.getMethodClosure(http.MethodPost))
 	mustExport("put", mi.defaultClient.getMethodClosure(http.MethodPut))
 	mustExport("patch", mi.defaultClient.getMethodClosure(http.MethodPatch))
+	mustExport("query", mi.defaultClient.getMethodClosure(methodQuery))
 	mustExport("del", mi.defaultClient.getMethodClosure(http.MethodDelete))
 	mustExport("options", mi.defaultClient.getMethodClosure(http.MethodOptions))
 	mustExport("request", mi.defaultClient.Request)
