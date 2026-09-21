@@ -1048,6 +1048,7 @@ func TestPageClose(t *testing.T) {
 
 		err := p.Close()
 		assert.NoError(t, err)
+		assert.True(t, p.IsClosed())
 	})
 
 	t.Run("page_from_browserContext", func(t *testing.T) {
@@ -1062,6 +1063,7 @@ func TestPageClose(t *testing.T) {
 
 		err = p.Close()
 		assert.NoError(t, err)
+		assert.True(t, p.IsClosed())
 	})
 }
 

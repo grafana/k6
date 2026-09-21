@@ -251,6 +251,7 @@ type Page struct {
 	jsEnabled bool
 
 	// protects from race between:
+	// - Page.Close->Page.didClose
 	// - Browser.initEvents.onDetachedFromTarget->Page.didClose
 	// - FrameSession.initEvents.onFrameDetached->FrameManager.frameDetached.removeFramesRecursively->Page.IsClosed
 	closedMu sync.RWMutex
@@ -1035,6 +1036,10 @@ func (p *Page) Close() error {
 		if len(closeErrs) > 0 {
 			p.closeErr = spanRecordError(span, errors.Join(closeErrs...))
 		}
+
+		// Mark closed here so page.isClosed() is true as soon as Close()
+		// returns. Waiting only for CDP Target.detachedFromTarget races.
+		p.didClose()
 	})
 
 	return p.closeErr
