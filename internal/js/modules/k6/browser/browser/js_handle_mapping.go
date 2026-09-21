@@ -10,7 +10,18 @@ import (
 
 // mapJSHandle to the JS module.
 func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
-	return finishMapping(newJSHandleMapping(vu, jsh))
+	// Register network operations against the handle's owning page so that
+	// network-classified calls (evaluate/evaluateHandle) invoked directly on a
+	// standalone handle are attributed like they are on element handles. Page()
+	// is not part of the JS-facing JSHandleAPI, so reach it via the concrete
+	// implementations (BaseJSHandle/ElementHandle). It is nil for worker or
+	// isolated-world handles, in which case withPageNetworkCalls falls back to
+	// finishing the mapping without a network-operation begin.
+	var page *common.Page
+	if ph, ok := jsh.(interface{ Page() *common.Page }); ok {
+		page = ph.Page()
+	}
+	return withPageNetworkCalls(vu, page, newJSHandleMapping(vu, jsh))
 }
 
 func newJSHandleMapping(vu moduleVU, jsh common.JSHandleAPI) mapping {
