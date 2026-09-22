@@ -99,7 +99,10 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
 	})
 	// methodQuery is the HTTP QUERY method, standardized by RFC 10008. The Go
-	// standard library doesn't define a constant for it yet.
+	// standard library doesn't define a constant for it yet, but Go 1.28 adds
+	// net/http.MethodQuery (see the net/http section of the Go 1.28 release
+	// notes). Once k6 moves to Go 1.28, this local constant should be replaced
+	// by the standard library one.
 	const methodQuery = "QUERY"
 
 	mustExport("post", mi.defaultClient.getMethodClosure(http.MethodPost))
