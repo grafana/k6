@@ -26,7 +26,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.18.0
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.20.0
 	github.com/mattn/go-colorable v0.1.15
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mccutchen/go-httpbin/v2 v2.25.0
@@ -61,7 +61,7 @@ require (
 	golang.org/x/sync v0.22.0
 	golang.org/x/term v0.45.0
 	golang.org/x/time v0.15.0
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
