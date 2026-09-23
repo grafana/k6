@@ -451,9 +451,7 @@ func (r *Reader) DecodeConcurrent(w io.Writer, concurrent int) (written int64, e
 	}
 	// Writer
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for toWrite := range queue {
 			entry := <-toWrite
 			reUse <- toWrite
@@ -480,7 +478,7 @@ func (r *Reader) DecodeConcurrent(w io.Writer, concurrent int) (written int64, e
 			}
 			aWritten += int64(n)
 		}
-	}()
+	})
 
 	defer func() {
 		if r.err != nil {

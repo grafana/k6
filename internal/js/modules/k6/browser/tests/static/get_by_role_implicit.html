@@ -10,7 +10,8 @@
     <!-- a[href] -->
     <a href="#">Link text</a>
     <!-- area[href] -->
-    <map><area href="#" aria-label="Map area"></map>
+    <map name="implicit-role-map"><area shape="rect" coords="0,0,10,10" href="#" aria-label="Map area"></map>
+    <img usemap="#implicit-role-map" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'%3E%3C/svg%3E" alt="" role="none" width="10" height="10">
     <!-- button -->
     <button>Click</button>
     <!-- input type=submit -->

@@ -13,13 +13,13 @@ import (
 
 // mapRoute to the JS module.
 func mapRoute(vu moduleVU, route *common.Route) mapping {
-	return mapping{
-		"abort": func(reason string) *sobek.Promise {
+	return finishMapping(mapping{
+		"abort": passiveCall(func(reason string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, route.Abort(reason)
 			})
-		},
-		"continue": func(opts sobek.Value) *sobek.Promise {
+		}),
+		"continue": passiveCall(func(opts sobek.Value) *sobek.Promise {
 			copts, err := parseContinueOptions(vu.Context(), opts)
 			return promise(vu, func() (any, error) {
 				if err != nil {
@@ -27,8 +27,8 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 				}
 				return nil, route.Continue(copts)
 			})
-		},
-		"fulfill": func(opts sobek.Value) *sobek.Promise {
+		}),
+		"fulfill": passiveCall(func(opts sobek.Value) *sobek.Promise {
 			fopts, err := parseFulfillOptions(vu.Context(), opts)
 			return promise(vu, func() (any, error) {
 				if err != nil {
@@ -36,11 +36,11 @@ func mapRoute(vu moduleVU, route *common.Route) mapping {
 				}
 				return nil, route.Fulfill(fopts)
 			})
-		},
-		"request": func() mapping {
+		}),
+		"request": passiveCall(func() mapping {
 			return mapRequest(vu, route.Request())
-		},
-	}
+		}),
+	})
 }
 
 func parseContinueOptions(ctx context.Context, opts sobek.Value) (common.ContinueOptions, error) {

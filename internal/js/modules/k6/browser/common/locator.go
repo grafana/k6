@@ -26,6 +26,14 @@ type Locator struct {
 	log *log.Logger
 }
 
+// Page returns the page that owns the locator.
+func (l *Locator) Page() *Page {
+	if l == nil || l.frame == nil {
+		return nil
+	}
+	return l.frame.Page()
+}
+
 // LocatorOptions allows modifying the [Locator] behavior.
 type LocatorOptions struct {
 	// Matches only elements that contain the specified text.

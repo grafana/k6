@@ -43,15 +43,7 @@ type Browser struct {
 	// A *Connection is saved to this field, see: connect().
 	conn connection
 
-	// This mutex is only needed in an edge case where we have multiple
-	// instances of k6 connecting to the same chrome instance. In this
-	// case when a page is created by the first k6 instance, the second
-	// instance of k6 will also receive an onAttachedToTarget event. When
-	// this occurs there's a small chance that at the same time a new
-	// context is being created by the second k6 instance. So the read
-	// occurs in getDefaultBrowserContextOrMatchedID which is called by
-	// onAttachedToTarget, and the write in NewContext. This mutex protects
-	// the read/write race condition for this one case.
+	// contextMu protects concurrent access to the browser contexts.
 	contextMu      sync.RWMutex
 	context        *BrowserContext
 	defaultContext *BrowserContext
@@ -181,7 +173,9 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	if err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
 		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
+	b.contextMu.Lock()
 	b.context = nil
+	b.contextMu.Unlock()
 
 	return nil
 }
@@ -688,14 +682,17 @@ func (b *Browser) waitForPagesToDetach(timeout time.Duration) {
 // CloseContext is a short-cut function to close the current browser's context.
 // If there is no active browser context, it returns an error.
 func (b *Browser) CloseContext() error {
-	if b.context == nil {
+	context := b.Context()
+	if context == nil {
 		return errors.New("cannot close context as none is active in browser")
 	}
-	return b.context.Close()
+	return context.Close()
 }
 
 // Context returns the current browser context or nil.
 func (b *Browser) Context() *BrowserContext {
+	b.contextMu.RLock()
+	defer b.contextMu.RUnlock()
 	return b.context
 }
 
@@ -713,7 +710,7 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	if b.closing.Load() {
 		return nil, spanRecordErrorf(span, "browser has been closed")
 	}
-	if b.context != nil {
+	if b.Context() != nil {
 		return nil, spanRecordErrorf(span, "existing browser context must be closed before creating a new one")
 	}
 	if opts == nil {
