@@ -119,7 +119,7 @@ func TestOptions(t *testing.T) {
 				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
 
 				assert.NotNil(t, opts.TLSCipherSuites)
-				assert.Len(t, *(opts.TLSCipherSuites), 1)
+				assert.Len(t, *opts.TLSCipherSuites, 1)
 				assert.Equal(t, suiteID, (*opts.TLSCipherSuites)[0])
 			})
 		}

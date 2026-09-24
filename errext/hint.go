@@ -32,8 +32,7 @@ func (wh withHintError) Unwrap() error {
 
 func (wh withHintError) Hint() string {
 	hint := wh.hint
-	var oldhint HasHint
-	if errors.As(wh.error, &oldhint) {
+	if oldhint, ok := errors.AsType[HasHint](wh.error); ok {
 		// The given error already had a hint, wrap it
 		hint = hint + " (" + oldhint.Hint() + ")"
 	}

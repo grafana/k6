@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -240,6 +241,62 @@ func TestConnectionOnAttachedToTarget(t *testing.T) {
 			require.Equal(t, tt.want, b.connectionOnAttachedToTarget(ev))
 		})
 	}
+}
+
+func TestBrowserContextDisposeAndLookupRace(t *testing.T) {
+	t.Parallel()
+
+	const browserContextID cdp.BrowserContextID = "context"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	b := newBrowser(context.Background(), ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	b.context = &BrowserContext{id: browserContextID}
+	b.defaultContext = &BrowserContext{}
+	b.conn = fakeConn{
+		execute: func(context.Context, string, any, any) error {
+			return nil
+		},
+	}
+
+	const iterations = 100
+	const workers = 3
+	var (
+		wg             sync.WaitGroup
+		disposeErrors  = make(chan error, workers*iterations)
+		lookupContexts = make(chan *BrowserContext, workers*iterations)
+	)
+
+	for range workers { // make multiple goroutines
+		wg.Add(2)
+		go func() { // writes to context
+			defer wg.Done()
+			for range iterations {
+				disposeErrors <- b.disposeContext(browserContextID)
+			}
+		}()
+
+		go func() { // reads from context
+			defer wg.Done()
+			for range iterations {
+				lookupContexts <- b.getDefaultBrowserContextOrMatchedID(browserContextID)
+				b.Context()
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(disposeErrors)
+	close(lookupContexts)
+
+	for err := range disposeErrors {
+		require.NoError(t, err)
+	}
+	for browserContext := range lookupContexts {
+		require.NotNil(t, browserContext)
+	}
+	require.Nil(t, b.Context())
+	require.Same(t, b.defaultContext, b.getDefaultBrowserContextOrMatchedID(browserContextID))
 }
 
 // TestBrowserRejectedTarget ensures a target the connection accepts but the

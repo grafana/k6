@@ -423,8 +423,7 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 		return cloudapi.RunStatusFinished
 	}
 
-	var err errext.HasAbortReason
-	if errors.As(testErr, &err) {
+	if err, ok := errors.AsType[errext.HasAbortReason](testErr); ok {
 		abortReason := err.AbortReason()
 		switch abortReason {
 		case errext.AbortedByUser:

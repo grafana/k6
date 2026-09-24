@@ -11,11 +11,30 @@ import (
 )
 
 func IndexOfAny(in []rune, find []rune) int {
-	// special case
-	if len(find) == 0 {
+	switch len(find) {
+	case 0:
+		return -1
+	case 1:
+		return IndexOfAny1(in, find[0])
+	case 2:
+		return IndexOfAny2(in, find[0], find[1])
+	case 3:
+		return IndexOfAny3(in, find[0], find[1], find[2])
+	}
+
+	if IsASCIIRunes(find) {
+		var bits [2]uint64
+		for _, c := range find {
+			bits[c>>6] |= 1 << (c & 63)
+		}
+		for i, c := range in {
+			if uint32(c) < 128 && bits[c>>6]&(1<<(c&63)) != 0 {
+				return i
+			}
+		}
 		return -1
 	}
-	// naive version
+
 	for i, c := range in {
 		if slices.Contains(find, c) {
 			return i
@@ -25,8 +44,10 @@ func IndexOfAny(in []rune, find []rune) int {
 }
 
 func IndexOfAny1(in []rune, find rune) int {
-	//TODO: bytes optimization?
-	return slices.Index(in, find)
+	if len(in) < ASCIISearchMin {
+		return slices.Index(in, find)
+	}
+	return indexOfRuneBytes(runeSliceBytes(in), find)
 }
 
 func IndexOfAny2(in []rune, find1, find2 rune) int {
@@ -125,28 +146,34 @@ func IndexFunc(in []rune, f func(ch rune) bool) int {
 }
 
 func IndexOfAnyExceptInSet(in []rune, set syntax.CharSet) int {
-	//TODO: this
-	panic("not implemented")
+	for i, c := range in {
+		if !set.Contains(c) {
+			return i
+		}
+	}
+	return -1
 }
 
 func LastIndexOf(in []rune, find []rune) int {
-	end := len(in) - len(find)
-	first := find[0]
-	lastOffset := len(find) - 1
-	last := find[lastOffset]
-	for i := end; i >= 0; i-- {
-		//TODO: check 2 chars needed?
-		// match start and end...check the middle
-		if in[i] == first && in[i+lastOffset] == last {
-			// found our first char
-			// check if the rest are equal
-			if bytesEqual(in[i:i+len(find)], find) {
-				return i
-			}
-		}
+	if len(find) == 0 {
+		return len(in)
 	}
-
-	//not found
+	if len(in) < len(find) {
+		return -1
+	}
+	haystack := runeSliceBytes(in)
+	needle := runeSliceBytes(find)
+	end := len(haystack)
+	for end >= len(needle) {
+		idx := bytes.LastIndex(haystack[:end], needle)
+		if idx < 0 {
+			return -1
+		}
+		if idx%4 == 0 {
+			return idx / 4
+		}
+		end = idx + len(needle) - 1
+	}
 	return -1
 }
 
@@ -160,15 +187,10 @@ func LastIndexOfAnyExcept1(in []rune, not rune) int {
 }
 
 func LastIndexOfAny1(in []rune, find rune) int {
-	for i := len(in) - 1; i >= 0; i-- {
-		if in[i] == find {
-			// found our char
-			return i
-		}
+	if len(in) == 0 {
+		return -1
 	}
-
-	//not found
-	return -1
+	return lastIndexOfRuneBytes(runeSliceBytes(in), find)
 }
 
 func LastIndexOfAnyInRange(in []rune, first, last rune) int {
@@ -291,30 +313,66 @@ func foldASCII(c rune) rune {
 }
 
 func IndexOf(in []rune, find []rune) int {
-	/*
-		Since we auto-gen the find code this shouldn't happen
-		if len(find) == 0 {
-			//special case
-			return -1
-		}*/
+	if len(find) == 0 {
+		return 0
+	}
+	if len(in) < len(find) {
+		return -1
+	}
 	end := len(in) - len(find)
 	first := find[0]
-	//TODO: benchmark checking last char too or first two chars
-	for i := 0; i <= end; i++ {
-		// match start...check the rest
-		if in[i] == first {
-			// found our first char
-			// check if the rest are equal
-			if bytesEqual(in[i:i+len(find)], find) {
-				return i
-			}
-			/*if slices.Equal(in[i:i+len(find)], find) {
-				return i
-			}*/
+	for i := 0; i <= end; {
+		off := IndexOfAny1(in[i:end+1], first)
+		if off < 0 {
+			return -1
 		}
+		i += off
+		if bytesEqual(in[i:i+len(find)], find) {
+			return i
+		}
+		i++
 	}
+	return -1
+}
 
-	//not found
+func runeSliceBytes(in []rune) []byte {
+	if len(in) == 0 {
+		return nil
+	}
+	return unsafe.Slice((*byte)(unsafe.Pointer(&in[0])), len(in)*4)
+}
+
+func indexOfRuneBytes(haystack []byte, find rune) int {
+	needleRune := [1]rune{find}
+	needle := runeSliceBytes(needleRune[:])
+	start := 0
+	for {
+		idx := bytes.Index(haystack[start:], needle)
+		if idx < 0 {
+			return -1
+		}
+		idx += start
+		if idx%4 == 0 {
+			return idx / 4
+		}
+		start = idx + 1
+	}
+}
+
+func lastIndexOfRuneBytes(haystack []byte, find rune) int {
+	needleRune := [1]rune{find}
+	needle := runeSliceBytes(needleRune[:])
+	end := len(haystack)
+	for end >= 4 {
+		idx := bytes.LastIndex(haystack[:end], needle)
+		if idx < 0 {
+			return -1
+		}
+		if idx%4 == 0 {
+			return idx / 4
+		}
+		end = idx + 3
+	}
 	return -1
 }
 

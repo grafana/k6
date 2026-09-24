@@ -8,7 +8,6 @@ LINT_DIR      ?= build/lint
 LINT_BASE     := $(LINT_DIR)/.golangci-base.yml
 LINT_FINAL    := $(LINT_DIR)/.golangci.yml
 LINT_PATCH    ?= .golangci.patch
-GOLANGCI_LINT_VERSION = $(shell head -n 1 $(LINT_BASE) 2>/dev/null | tr -d '\# ')
 
 ifeq ($(OS),Windows_NT)
     DETECTED_OS := Windows
@@ -75,7 +74,7 @@ $(LINT_FINAL): $(LINT_BASE) $(wildcard $(LINT_PATCH))
 ## lint: Run golangci-lint with the k6-ci config + $(LINT_PATCH).
 lint: $(LINT_FINAL)
 	echo "Running linters..."
-	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) \
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$$(head -n 1 $(LINT_BASE) | tr -d '# ') \
 	  run --config=$(LINT_FINAL) ./...
 
 ## update-lint-patch: Regenerate $(LINT_PATCH) from the locally edited $(LINT_FINAL).

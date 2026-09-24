@@ -60,7 +60,6 @@ func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 	dialer := k6netext.NewDialer(net.Dialer{
 		Timeout:   2 * time.Second,
 		KeepAlive: 10 * time.Second,
-		DualStack: true,
 	}, k6netext.NewResolver(net.LookupIP, 0, k6types.DNSfirst, k6types.DNSpreferIPv4))
 
 	const wsURL = "wsbin.local"

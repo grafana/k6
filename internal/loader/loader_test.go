@@ -210,7 +210,7 @@ func TestLoad(t *testing.T) {
 			pwdURL, err := url.Parse(sr("HTTPSBIN_URL"))
 			require.NoError(t, err)
 
-			moduleSpecifier := ("./robots.txt")
+			moduleSpecifier := "./robots.txt"
 			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 

@@ -167,3 +167,9 @@ func (m *orderedMap) clear() {
 	m.hashTable = make(map[uint64]*mapEntry)
 	m.size = 0
 }
+
+func (m *orderedMap) copyTo(dest *orderedMap) {
+	for entry := m.iterFirst; entry != nil; entry = entry.iterNext {
+		dest.set(entry.key, entry.value)
+	}
+}
