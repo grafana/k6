@@ -11,16 +11,14 @@ import (
 	"testing"
 	"time"
 
-	k6netext "go.k6.io/k6/v2/lib/netext"
-	k6types "go.k6.io/k6/v2/lib/types"
-
 	"github.com/chromedp/cdproto"
 	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
 	"github.com/gorilla/websocket"
 	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/http2"
+	k6netext "go.k6.io/k6/v2/lib/netext"
+	k6types "go.k6.io/k6/v2/lib/types"
 )
 
 //nolint:gochecknoglobals
@@ -72,7 +70,10 @@ func NewServer(t testing.TB, opts ...func(*Server)) *Server {
 	transport := &http.Transport{
 		DialContext: dialer.DialContext,
 	}
-	require.NoError(t, http2.ConfigureTransport(transport))
+
+	transport.Protocols = &http.Protocols{}
+	transport.Protocols.SetHTTP1(true)
+	transport.Protocols.SetHTTP2(true)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(func() {
