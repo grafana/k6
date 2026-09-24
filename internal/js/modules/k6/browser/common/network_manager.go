@@ -1044,6 +1044,37 @@ func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) error {
 	return nil
 }
 
+// emulateNetworkConditions applies the current offline/networkProfile state
+// to the browser. emulateNetworkConditionsByRule throttles actual traffic,
+// and overrideNetworkState updates the navigator.onLine/navigator.connection
+// state exposed to page JS.
+func (m *NetworkManager) emulateNetworkConditions() error {
+	byRule := network.EmulateNetworkConditionsByRule([]*network.Conditions{
+		{
+			// Empty URLPattern applies these as global conditions.
+			Offline:            m.offline,
+			Latency:            m.networkProfile.Latency,
+			DownloadThroughput: m.networkProfile.Download,
+			UploadThroughput:   m.networkProfile.Upload,
+		},
+	})
+	if _, err := byRule.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("emulating network conditions by rule: %w", err)
+	}
+
+	override := network.OverrideNetworkState(
+		m.offline,
+		m.networkProfile.Latency,
+		m.networkProfile.Download,
+		m.networkProfile.Upload,
+	)
+	if err := override.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("overriding network state: %w", err)
+	}
+
+	return nil
+}
+
 // SetOfflineMode toggles offline mode on/off.
 func (m *NetworkManager) SetOfflineMode(offline bool) error {
 	if m.offline == offline {
@@ -1051,13 +1082,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) error {
 	}
 	m.offline = offline
 
-	action := network.EmulateNetworkConditions(
-		m.offline,
-		m.networkProfile.Latency,
-		m.networkProfile.Download,
-		m.networkProfile.Upload,
-	)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := m.emulateNetworkConditions(); err != nil {
 		return fmt.Errorf("emulating network conditions: %w", err)
 	}
 
@@ -1072,13 +1097,7 @@ func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
 	}
 	m.networkProfile = networkProfile
 
-	action := network.EmulateNetworkConditions(
-		m.offline,
-		m.networkProfile.Latency,
-		m.networkProfile.Download,
-		m.networkProfile.Upload,
-	)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := m.emulateNetworkConditions(); err != nil {
 		return fmt.Errorf("throttling network: %w", err)
 	}
 
