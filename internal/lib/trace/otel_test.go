@@ -31,7 +31,7 @@ func TestNilTracerProviderUsesNoopTracer(t *testing.T) {
 	runCtx, runSpan := StartTestRun(context.Background(), provider)
 	require.False(t, runSpan.SpanContext().IsValid())
 
-	iterationCtx, iterationSpan := StartIteration(runCtx, provider, IterationInfo{})
+	iterationCtx, iterationSpan := StartIteration(runCtx, provider, IterationInfo{}, false)
 	require.False(t, iterationSpan.SpanContext().IsValid())
 	require.False(t, oteltrace.SpanContextFromContext(iterationCtx).IsValid())
 }
@@ -80,7 +80,7 @@ func TestTestRunUsesRemoteParent(t *testing.T) {
 	require.Equal(t, parentSpanID, exporter.spans[0].Parent().SpanID())
 }
 
-func TestIterationSpanLifecycle(t *testing.T) {
+func TestIterationSpanLifecycleSplit(t *testing.T) {
 	t.Parallel()
 
 	exporter := &recordingExporter{}
@@ -96,7 +96,7 @@ func TestIterationSpanLifecycle(t *testing.T) {
 		ScenarioIterationInInstance: 8,
 		ScenarioIterationInTest:     13,
 		HasScenarioIterationNumbers: true,
-	})
+	}, true)
 	iterationSpanContext := iterationSpan.SpanContext()
 
 	require.NotEqual(t, runSpanContext.TraceID(), iterationSpanContext.TraceID())
@@ -116,6 +116,49 @@ func TestIterationSpanLifecycle(t *testing.T) {
 		"test.vu":                           int64(2),
 		"test.scenario":                     "checkout",
 		"k6.run.id":                         runSpanContext.TraceID().String(),
+		"k6.vu.id_in_instance":              int64(2),
+		"k6.vu.id_in_test":                  int64(7),
+		"k6.vu.iteration_in_scenario":       int64(1),
+		"k6.scenario.iteration_in_instance": int64(8),
+		"k6.scenario.iteration_in_test":     int64(13),
+	}, spanAttributes(iteration))
+}
+
+func TestIterationSpanLifecycleNested(t *testing.T) {
+	t.Parallel()
+
+	exporter := &recordingExporter{}
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	runCtx, runSpan := StartTestRun(context.Background(), provider)
+	runSpanContext := runSpan.SpanContext()
+	iterationCtx, iterationSpan := StartIteration(runCtx, provider, IterationInfo{
+		Number:                      3,
+		VUID:                        2,
+		VUIDGlobal:                  7,
+		VUIterationInScenario:       1,
+		Scenario:                    "checkout",
+		ScenarioIterationInInstance: 8,
+		ScenarioIterationInTest:     13,
+		HasScenarioIterationNumbers: true,
+	}, false)
+	iterationSpanContext := iterationSpan.SpanContext()
+
+	require.Equal(t, runSpanContext.TraceID(), iterationSpanContext.TraceID())
+	require.Equal(t, iterationSpanContext, oteltrace.SpanContextFromContext(iterationCtx))
+
+	EndSpan(iterationSpan, nil)
+	EndSpan(runSpan, nil)
+	require.Len(t, exporter.spans, 2)
+
+	iteration := exporter.spans[0]
+	require.Equal(t, "iteration", iteration.Name())
+	require.True(t, iteration.Parent().IsValid())
+	require.Equal(t, runSpanContext.SpanID(), iteration.Parent().SpanID())
+	require.Empty(t, iteration.Links())
+	require.Equal(t, map[string]any{
+		"test.iteration.number":             int64(3),
+		"test.vu":                           int64(2),
+		"test.scenario":                     "checkout",
 		"k6.vu.id_in_instance":              int64(2),
 		"k6.vu.id_in_test":                  int64(7),
 		"k6.vu.iteration_in_scenario":       int64(1),

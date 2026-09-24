@@ -49,6 +49,8 @@ extended: base + sets "global" as alias for "globalThis"
 	flags.String("traces-sampler", "parentbased_always_on", "set the trace sampler")
 	flags.String("traces-sampler-arg", "", "set the trace sampler argument")
 	flags.String("traces-propagator", "tracecontext", "set the trace propagator, tracecontext or jaeger")
+	flags.Bool("traces-split", false,
+		"keep iteration traces independent, linked to their VU span, instead of nesting under it")
 	return flags
 }
 
@@ -95,6 +97,7 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		TracesSampler:             getOptionalNullString(flags, "traces-sampler"),
 		TracesSamplerArg:          getOptionalNullString(flags, "traces-sampler-arg"),
 		TracesPropagator:          getOptionalNullString(flags, "traces-propagator"),
+		TracesSplit:               getNullBool(flags, "traces-split"),
 		Env:                       make(map[string]string),
 	}
 	return opts
@@ -163,6 +166,9 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 		if envVar, ok := environment[envName]; !option.Valid && ok {
 			*option = null.StringFrom(envVar)
 		}
+	}
+	if err := saveBoolFromEnv(environment, "K6_TRACES_SPLIT", &opts.TracesSplit); err != nil {
+		return opts, err
 	}
 
 	// If enabled, gather the actual system environment variables

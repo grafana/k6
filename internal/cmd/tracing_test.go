@@ -71,7 +71,7 @@ func TestTracingParentAndSamplingConfiguration(t *testing.T) {
 	)
 	require.True(t, runSpan.SpanContext().IsSampled(), "the run inherits its sampled remote parent")
 
-	_, iterationSpan := k6trace.StartIteration(runCtx, provider, k6trace.IterationInfo{})
+	_, iterationSpan := k6trace.StartIteration(runCtx, provider, k6trace.IterationInfo{}, true)
 	require.True(t, iterationSpan.SpanContext().IsValid())
 	require.False(t, iterationSpan.SpanContext().IsSampled(), "the iteration is an independently sampled root")
 	require.NotEqual(t, runSpan.SpanContext().TraceID(), iterationSpan.SpanContext().TraceID())

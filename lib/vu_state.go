@@ -100,6 +100,8 @@ type State struct {
 	// Tracing is the resolved set of modules with tracing enabled by
 	// default, copied once from TestPreInitState at VU construction.
 	Tracing moduletrace.Set
+	// TracesSplit mirrors TestPreInitState.TracesSplit.
+	TracesSplit bool
 
 	// Usage is a way to report usage statistics
 	Usage *usage.Usage

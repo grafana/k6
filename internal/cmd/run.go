@@ -151,6 +151,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	test.preInitState.TracerProvider = tracerProvider
 	test.preInitState.TracePropagator = tracePropagator
 	test.preInitState.Tracing = tracingSet
+	test.preInitState.TracesSplit = runtimeOptions.TracesSplit.Bool
 	printBanner(c.gs)
 	if test.keyLogger != nil {
 		defer func() {

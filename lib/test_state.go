@@ -32,7 +32,12 @@ type TestPreInitState struct {
 	TracePropagator propagation.TextMapPropagator
 	// Tracing is the resolved set of modules that default to tracing-enabled
 	// for this run, computed once from RuntimeOptions.Tracing.
-	Tracing        moduletrace.Set
+	Tracing moduletrace.Set
+	// TracesSplit mirrors RuntimeOptions.TracesSplit: scenario/VU spans are
+	// always created regardless of this flag; when true, iteration spans
+	// stay independent traces linked to their VU span instead of nesting
+	// under it.
+	TracesSplit    bool
 	Usage          *usage.Usage
 	SecretsManager *secretsource.Manager
 

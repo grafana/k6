@@ -49,6 +49,7 @@ type RuntimeOptions struct {
 	TracesSampler    null.String `json:"tracesSampler"`
 	TracesSamplerArg null.String `json:"tracesSamplerArg"`
 	TracesPropagator null.String `json:"tracesPropagator"`
+	TracesSplit      null.Bool   `json:"tracesSplit"`
 
 	// Until v2
 	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`

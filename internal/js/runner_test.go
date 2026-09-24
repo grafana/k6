@@ -65,6 +65,15 @@ func (*runnerTraceExporter) Shutdown(context.Context) error {
 	return nil
 }
 
+func (e *runnerTraceExporter) findByName(name string) sdktrace.ReadOnlySpan {
+	for _, s := range e.spans {
+		if s.Name() == name {
+			return s
+		}
+	}
+	return nil
+}
+
 func TestRunnerNew(t *testing.T) {
 	t.Parallel()
 	t.Run("Valid", func(t *testing.T) {
@@ -116,36 +125,117 @@ func TestRunOnceStartsLinkedIterationTrace(t *testing.T) {
 	exporter := &runnerTraceExporter{}
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	runner.preInitState.TracerProvider = &k6trace.TracerProvider{TracerProvider: provider}
+	runner.preInitState.TracesSplit = true // this test specifically exercises the split/linked behavior
 	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider)
+	vuCtx, cancel := context.WithCancel(runCtx)
 
-	initVU, err := runner.NewVU(runCtx, 2, 7, make(chan metrics.SampleContainer, 10))
+	initVU, err := runner.NewVU(vuCtx, 2, 7, make(chan metrics.SampleContainer, 10))
 	require.NoError(t, err)
+
+	deactivated := make(chan struct{})
 	activeVU := initVU.Activate(&lib.VUActivationParams{
-		RunContext: runCtx,
+		RunContext: vuCtx,
 		Scenario:   "checkout",
 		GetNextIterationCounters: func() (uint64, uint64) {
 			return 8, 13
 		},
+		DeactivateCallback: func(lib.InitializedVU) { close(deactivated) },
 	})
 	require.NoError(t, activeVU.RunOnce())
-	require.Same(t, runCtx, initVU.(*VU).moduleVUImpl.Context())
 	require.NoError(t, activeVU.RunOnce())
-	require.Same(t, runCtx, initVU.(*VU).moduleVUImpl.Context())
+
+	// Tear down this activation so the VU span (ended on deactivation) is
+	// flushed to the exporter before we inspect it.
+	cancel()
+	<-deactivated
 	k6trace.EndSpan(runSpan, nil)
 
-	require.Len(t, exporter.spans, 3)
-	iterationSpan := exporter.spans[0]
-	require.Equal(t, "iteration", iterationSpan.Name())
-	require.False(t, iterationSpan.Parent().IsValid())
-	require.Len(t, iterationSpan.Links(), 1)
-	require.Equal(t, runSpan.SpanContext(), iterationSpan.Links()[0].SpanContext)
+	require.Len(t, exporter.spans, 4) // 2 iterations + 1 VU + 1 run
+
+	vuSpan := exporter.findByName("k6.vu")
+	require.NotNil(t, vuSpan, "expected a k6.vu span to have been exported")
+	require.True(t, vuSpan.Parent().IsValid())
+	require.Equal(t, runSpan.SpanContext().SpanID(), vuSpan.Parent().SpanID(),
+		"the VU span should be a direct child of the run span")
+
+	iterationSpans := make([]sdktrace.ReadOnlySpan, 0, 2)
+	for _, s := range exporter.spans {
+		if s.Name() == "iteration" {
+			iterationSpans = append(iterationSpans, s)
+		}
+	}
+	require.Len(t, iterationSpans, 2)
+	for _, iterationSpan := range iterationSpans {
+		require.False(t, iterationSpan.Parent().IsValid(), "iteration should be an independent root when split")
+		require.Len(t, iterationSpan.Links(), 1)
+		require.Equal(t, vuSpan.SpanContext(), iterationSpan.Links()[0].SpanContext,
+			"the iteration's link should point at the VU span, not the run span")
+	}
+
 	var scriptAttribute string
-	for _, attr := range iterationSpan.Attributes() {
+	for _, attr := range iterationSpans[0].Attributes() {
 		if string(attr.Key) == "script.attribute" {
 			scriptAttribute = attr.Value.AsString()
 		}
 	}
 	require.Equal(t, "value", scriptAttribute)
+}
+
+func TestActivateNestsIterationsUnderVUSpan(t *testing.T) {
+	t.Parallel()
+
+	runner, err := getSimpleRunner(t, "/script.js", `
+		export default function() {}
+	`)
+	require.NoError(t, err)
+
+	exporter := &runnerTraceExporter{}
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	runner.preInitState.TracerProvider = &k6trace.TracerProvider{TracerProvider: provider}
+	// TracesSplit defaults to false: the new nested behavior under test.
+
+	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider)
+	vuCtx, cancel := context.WithCancel(runCtx)
+
+	initVU, err := runner.NewVU(vuCtx, 2, 7, make(chan metrics.SampleContainer, 10))
+	require.NoError(t, err)
+
+	deactivated := make(chan struct{})
+	activeVU := initVU.Activate(&lib.VUActivationParams{
+		RunContext:         vuCtx,
+		Scenario:           "checkout",
+		DeactivateCallback: func(lib.InitializedVU) { close(deactivated) },
+	})
+	require.NoError(t, activeVU.RunOnce())
+	require.NoError(t, activeVU.RunOnce())
+
+	// Tear down this activation so the VU span (ended on deactivation) is
+	// flushed to the exporter before we inspect it.
+	cancel()
+	<-deactivated
+	k6trace.EndSpan(runSpan, nil)
+
+	require.Len(t, exporter.spans, 4) // 2 iterations + 1 VU + 1 run
+
+	vuSpan := exporter.findByName("k6.vu")
+	require.NotNil(t, vuSpan, "expected a k6.vu span to have been exported")
+	require.True(t, vuSpan.Parent().IsValid())
+	require.Equal(t, runSpan.SpanContext().SpanID(), vuSpan.Parent().SpanID())
+	require.Equal(t, runSpan.SpanContext().TraceID(), vuSpan.SpanContext().TraceID())
+
+	iterationSpans := make([]sdktrace.ReadOnlySpan, 0, 2)
+	for _, s := range exporter.spans {
+		if s.Name() == "iteration" {
+			iterationSpans = append(iterationSpans, s)
+		}
+	}
+	require.Len(t, iterationSpans, 2)
+	for _, iterationSpan := range iterationSpans {
+		require.True(t, iterationSpan.Parent().IsValid())
+		require.Equal(t, vuSpan.SpanContext().SpanID(), iterationSpan.Parent().SpanID())
+		require.Equal(t, runSpan.SpanContext().TraceID(), iterationSpan.SpanContext().TraceID())
+		require.Empty(t, iterationSpan.Links())
+	}
 }
 
 func TestRunnerOptions(t *testing.T) {

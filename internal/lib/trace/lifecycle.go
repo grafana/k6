@@ -27,6 +27,19 @@ type IterationInfo struct {
 	HasScenarioIterationNumbers bool
 }
 
+// ScenarioInfo contains the identifiers attached to a scenario span.
+type ScenarioInfo struct {
+	Name     string
+	Executor string
+}
+
+// VUInfo contains the identifiers attached to a VU span.
+type VUInfo struct {
+	VUID       uint64
+	VUIDGlobal uint64
+	Scenario   string
+}
+
 // StartTestRun starts the span that represents a k6 test run.
 func StartTestRun(
 	ctx context.Context, provider tracerProvider,
@@ -38,18 +51,56 @@ func StartTestRun(
 	return provider.Tracer(instrumentationName).Start(ctx, "k6.run", options...)
 }
 
-// StartIteration starts an independent root trace for an iteration and links it
-// to the test run span carried by ctx.
-func StartIteration(
-	ctx context.Context, provider tracerProvider, info IterationInfo,
+// StartScenario starts a child span representing a single scenario's run,
+// nested under whatever span ctx carries (normally the test run span).
+func StartScenario(
+	ctx context.Context, provider tracerProvider, info ScenarioInfo,
 ) (context.Context, oteltrace.Span) {
 	if provider == nil {
-		return noop.NewTracerProvider().Tracer(instrumentationName).Start(
-			ctx, "iteration", oteltrace.WithNewRoot(),
-		)
+		return noop.NewTracerProvider().Tracer(instrumentationName).Start(ctx, "k6.scenario")
+	}
+	return provider.Tracer(instrumentationName).Start(ctx, "k6.scenario", oteltrace.WithAttributes(
+		attribute.String("test.scenario", info.Name),
+		attribute.String("k6.scenario.executor", info.Executor),
+	))
+}
+
+// StartVU starts a child span representing a single VU activation, nested
+// under whatever span ctx carries (normally the scenario span).
+func StartVU(
+	ctx context.Context, provider tracerProvider, info VUInfo,
+) (context.Context, oteltrace.Span) {
+	if provider == nil {
+		return noop.NewTracerProvider().Tracer(instrumentationName).Start(ctx, "k6.vu")
+	}
+	return provider.Tracer(instrumentationName).Start(ctx, "k6.vu", oteltrace.WithAttributes(
+		uint64Attribute("test.vu", info.VUID),
+		uint64Attribute("k6.vu.id_in_instance", info.VUID),
+		uint64Attribute("k6.vu.id_in_test", info.VUIDGlobal),
+		attribute.String("test.scenario", info.Scenario),
+	))
+}
+
+// StartIteration starts the span for a single iteration.
+//
+// ctx normally carries the VU span (scenario/VU spans are always created,
+// regardless of split -- see StartScenario/StartVU). When split is true,
+// the iteration gets its own independent root trace, merely linked to
+// whatever span ctx carries (in practice, the VU span) instead of nesting
+// under it -- this is the pre-existing behavior kept for --traces-split.
+// When split is false, the iteration span is a normal child of that span.
+func StartIteration(
+	ctx context.Context, provider tracerProvider, info IterationInfo, split bool,
+) (context.Context, oteltrace.Span) {
+	if provider == nil {
+		options := make([]oteltrace.SpanStartOption, 0, 1)
+		if split {
+			options = append(options, oteltrace.WithNewRoot())
+		}
+		return noop.NewTracerProvider().Tracer(instrumentationName).Start(ctx, "iteration", options...)
 	}
 
-	runSpanContext := oteltrace.SpanContextFromContext(ctx)
+	parentSpanContext := oteltrace.SpanContextFromContext(ctx)
 	attrs := []attribute.KeyValue{
 		attribute.Int64("test.iteration.number", info.Number),
 		uint64Attribute("test.vu", info.VUID),
@@ -58,8 +109,8 @@ func StartIteration(
 		uint64Attribute("k6.vu.id_in_test", info.VUIDGlobal),
 		uint64Attribute("k6.vu.iteration_in_scenario", info.VUIterationInScenario),
 	}
-	if runSpanContext.IsValid() {
-		attrs = append(attrs, attribute.String("k6.run.id", runSpanContext.TraceID().String()))
+	if split && parentSpanContext.IsValid() {
+		attrs = append(attrs, attribute.String("k6.run.id", parentSpanContext.TraceID().String()))
 	}
 	if info.HasScenarioIterationNumbers {
 		attrs = append(attrs,
@@ -69,11 +120,13 @@ func StartIteration(
 	}
 
 	options := []oteltrace.SpanStartOption{
-		oteltrace.WithNewRoot(),
 		oteltrace.WithAttributes(attrs...),
 	}
-	if runSpanContext.IsValid() {
-		options = append(options, oteltrace.WithLinks(oteltrace.Link{SpanContext: runSpanContext}))
+	if split {
+		options = append(options, oteltrace.WithNewRoot())
+		if parentSpanContext.IsValid() {
+			options = append(options, oteltrace.WithLinks(oteltrace.Link{SpanContext: parentSpanContext}))
+		}
 	}
 	return provider.Tracer(instrumentationName).Start(ctx, "iteration", options...)
 }
