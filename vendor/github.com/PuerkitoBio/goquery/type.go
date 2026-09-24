@@ -175,22 +175,31 @@ type singleMatcher struct {
 	Matcher
 }
 
-func (m singleMatcher) MatchAll(n *html.Node) []*html.Node {
+// MatchFirst returns the first node that matches, or nil if none does. It uses
+// the underlying Matcher's MatchFirst method if it provides one (cascadia-
+// compiled matchers all do), avoiding building a result slice. Otherwise it
+// falls back to MatchAll and returns its first element.
+func (m singleMatcher) MatchFirst(n *html.Node) *html.Node {
 	// Optimized version - stops finding at the first match (cascadia-compiled
 	// matchers all use this code path).
 	if mm, ok := m.Matcher.(interface{ MatchFirst(*html.Node) *html.Node }); ok {
-		node := mm.MatchFirst(n)
-		if node == nil {
-			return nil
-		}
-		return []*html.Node{node}
+		return mm.MatchFirst(n)
 	}
 
 	// Fallback version, for e.g. test mocks that don't provide the MatchFirst
 	// method.
 	nodes := m.Matcher.MatchAll(n)
 	if len(nodes) > 0 {
-		return nodes[:1:1]
+		return nodes[0]
+	}
+	return nil
+}
+
+func (m singleMatcher) MatchAll(n *html.Node) []*html.Node {
+	// Wrap MatchFirst's single result in a slice to respect the Matcher
+	// interface's MatchAll signature.
+	if node := m.MatchFirst(n); node != nil {
+		return []*html.Node{node}
 	}
 	return nil
 }
