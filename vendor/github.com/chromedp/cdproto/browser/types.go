@@ -94,7 +94,9 @@ const (
 	PermissionTypeIdleDetection            PermissionType = "idleDetection"
 	PermissionTypeKeyboardLock             PermissionType = "keyboardLock"
 	PermissionTypeLocalFonts               PermissionType = "localFonts"
+	PermissionTypeLocalNetwork             PermissionType = "localNetwork"
 	PermissionTypeLocalNetworkAccess       PermissionType = "localNetworkAccess"
+	PermissionTypeLoopbackNetwork          PermissionType = "loopbackNetwork"
 	PermissionTypeMidi                     PermissionType = "midi"
 	PermissionTypeMidiSysex                PermissionType = "midiSysex"
 	PermissionTypeNfc                      PermissionType = "nfc"
@@ -155,8 +157,12 @@ func (t *PermissionType) UnmarshalJSON(buf []byte) error {
 		*t = PermissionTypeKeyboardLock
 	case PermissionTypeLocalFonts:
 		*t = PermissionTypeLocalFonts
+	case PermissionTypeLocalNetwork:
+		*t = PermissionTypeLocalNetwork
 	case PermissionTypeLocalNetworkAccess:
 		*t = PermissionTypeLocalNetworkAccess
+	case PermissionTypeLoopbackNetwork:
+		*t = PermissionTypeLoopbackNetwork
 	case PermissionTypeMidi:
 		*t = PermissionTypeMidi
 	case PermissionTypeMidiSysex:
@@ -303,38 +309,6 @@ type Histogram struct {
 	Sum     int64     `json:"sum"`     // Sum of sample values.
 	Count   int64     `json:"count"`   // Total number of samples.
 	Buckets []*Bucket `json:"buckets"` // Buckets.
-}
-
-// PrivacySandboxAPI [no description].
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#type-PrivacySandboxAPI
-type PrivacySandboxAPI string
-
-// String returns the PrivacySandboxAPI as string value.
-func (t PrivacySandboxAPI) String() string {
-	return string(t)
-}
-
-// PrivacySandboxAPI values.
-const (
-	PrivacySandboxAPIBiddingAndAuctionServices PrivacySandboxAPI = "BiddingAndAuctionServices"
-	PrivacySandboxAPITrustedKeyValue           PrivacySandboxAPI = "TrustedKeyValue"
-)
-
-// UnmarshalJSON satisfies [json.Unmarshaler].
-func (t *PrivacySandboxAPI) UnmarshalJSON(buf []byte) error {
-	s := string(buf)
-	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
-
-	switch PrivacySandboxAPI(s) {
-	case PrivacySandboxAPIBiddingAndAuctionServices:
-		*t = PrivacySandboxAPIBiddingAndAuctionServices
-	case PrivacySandboxAPITrustedKeyValue:
-		*t = PrivacySandboxAPITrustedKeyValue
-	default:
-		return fmt.Errorf("unknown PrivacySandboxAPI value: %v", s)
-	}
-	return nil
 }
 
 // DownloadProgressState download status.

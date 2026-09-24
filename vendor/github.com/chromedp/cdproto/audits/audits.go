@@ -121,35 +121,6 @@ func (p *EnableParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandEnable, nil, nil)
 }
 
-// CheckContrastParams runs the contrast check for the target page. Found
-// issues are reported using Audits.issueAdded event.
-type CheckContrastParams struct {
-	ReportAAA bool `json:"reportAAA"` // Whether to report WCAG AAA level issues. Default is false.
-}
-
-// CheckContrast runs the contrast check for the target page. Found issues
-// are reported using Audits.issueAdded event.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Audits#method-checkContrast
-//
-// parameters:
-func CheckContrast() *CheckContrastParams {
-	return &CheckContrastParams{
-		ReportAAA: false,
-	}
-}
-
-// WithReportAAA whether to report WCAG AAA level issues. Default is false.
-func (p CheckContrastParams) WithReportAAA(reportAAA bool) *CheckContrastParams {
-	p.ReportAAA = reportAAA
-	return &p
-}
-
-// Do executes Audits.checkContrast against the provided context.
-func (p *CheckContrastParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandCheckContrast, p, nil)
-}
-
 // CheckFormsIssuesParams runs the form issues check for the target page.
 // Found issues are reported using Audits.issueAdded event.
 type CheckFormsIssuesParams struct{}
@@ -188,6 +159,5 @@ const (
 	CommandGetEncodedResponse = "Audits.getEncodedResponse"
 	CommandDisable            = "Audits.disable"
 	CommandEnable             = "Audits.enable"
-	CommandCheckContrast      = "Audits.checkContrast"
 	CommandCheckFormsIssues   = "Audits.checkFormsIssues"
 )

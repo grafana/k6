@@ -19,7 +19,8 @@ import (
 type TriggerParams struct {
 	FieldID cdp.BackendNodeID `json:"fieldId"`                    // Identifies a field that serves as an anchor for autofill.
 	FrameID cdp.FrameID       `json:"frameId,omitempty,omitzero"` // Identifies the frame that field belongs to.
-	Card    *CreditCard       `json:"card"`                       // Credit card information to fill out the form. Credit card data is not saved.
+	Card    *CreditCard       `json:"card,omitempty,omitzero"`    // Credit card information to fill out the form. Credit card data is not saved.  Mutually exclusive with address.
+	Address *Address          `json:"address,omitempty,omitzero"` // Address to fill out the form. Address data is not saved. Mutually exclusive with card.
 }
 
 // Trigger trigger autofill on a form identified by the fieldId. If the field
@@ -30,17 +31,29 @@ type TriggerParams struct {
 // parameters:
 //
 //	fieldID - Identifies a field that serves as an anchor for autofill.
-//	card - Credit card information to fill out the form. Credit card data is not saved.
-func Trigger(fieldID cdp.BackendNodeID, card *CreditCard) *TriggerParams {
+func Trigger(fieldID cdp.BackendNodeID) *TriggerParams {
 	return &TriggerParams{
 		FieldID: fieldID,
-		Card:    card,
 	}
 }
 
 // WithFrameID identifies the frame that field belongs to.
 func (p TriggerParams) WithFrameID(frameID cdp.FrameID) *TriggerParams {
 	p.FrameID = frameID
+	return &p
+}
+
+// WithCard credit card information to fill out the form. Credit card data is
+// not saved. Mutually exclusive with address.
+func (p TriggerParams) WithCard(card *CreditCard) *TriggerParams {
+	p.Card = card
+	return &p
+}
+
+// WithAddress address to fill out the form. Address data is not saved.
+// Mutually exclusive with card.
+func (p TriggerParams) WithAddress(address *Address) *TriggerParams {
+	p.Address = address
 	return &p
 }
 

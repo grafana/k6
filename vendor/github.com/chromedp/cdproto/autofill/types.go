@@ -24,7 +24,7 @@ type CreditCard struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Autofill#type-AddressField
 type AddressField struct {
-	Name  string `json:"name"`  // address field name, for example GIVEN_NAME.
+	Name  string `json:"name"`  // address field name, for example GIVEN_NAME. The full list of supported field names: https://source.chromium.org/chromium/chromium/src/+/main:components/autofill/core/browser/field_types.cc;l=38
 	Value string `json:"value"` // address field value, for example Jon Doe.
 }
 
