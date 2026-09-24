@@ -24,6 +24,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2424,6 +2425,45 @@ func TestDigestAuthWithSHA256(t *testing.T) {
 	sampleContainers := metrics.GetBufferedSamples(samples)
 	assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
+}
+
+// An open redirect in front of a digest-authenticated URL must not cause k6 to
+// answer a digest challenge from the redirect target with the original
+// credentials. Default k6 follows redirects, and the digest transport would
+// otherwise attach those credentials on the later hop.
+func TestDigestAuthDoesNotForwardCredentialsAcrossHosts(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+
+	var leaked atomic.Bool
+	other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			leaked.Store(true)
+		}
+		w.Header().Set("WWW-Authenticate", `Digest realm="evil", nonce="n", qop="auth", algorithm=MD5`)
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("nope"))
+	}))
+	t.Cleanup(other.Close)
+
+	tb.Mux.HandleFunc("/digest-open-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL+"/steal", http.StatusFound)
+	}))
+
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-open-redirect")
+
+	_, err := rt.RunString(fmt.Sprintf(`
+		var res = http.get(%q, { auth: "digest", redirects: 5 });
+		if (res.status !== 401) { throw new Error("wrong status: " + res.status + " body: " + res.body); }
+		if (res.body !== "nope") { throw new Error("wrong body: " + res.body); }
+	`, urlWithCreds))
+	require.NoError(t, err)
+	require.False(t, leaked.Load(), "digest credentials were sent to the redirect target")
 }
 
 // A digest-authenticated request to a server that requires no authentication
