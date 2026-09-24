@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
@@ -27,13 +26,6 @@ func mapBrowser(vu moduleVU, browser browserProvider) mapping {
 			}
 			return mapBrowserContext(vu, b.Context()), nil
 		}),
-		"enableTracing": func() error {
-			if vu.State() != nil {
-				return errors.New("browser.enableTracing() must be called in the init context")
-			}
-			vu.enableTracing()
-			return nil
-		},
 		"closeContext": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				b, err := browser()

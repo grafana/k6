@@ -10,7 +10,6 @@ import (
 	"context"
 	"io"
 	"sync"
-	"sync/atomic"
 
 	"github.com/grafana/sobek"
 
@@ -20,7 +19,16 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
 	k6modules "go.k6.io/k6/v2/js/modules"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 )
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "browser"
+
+func init() {
+	moduletrace.Register(tracingModuleName)
+}
 
 type (
 	// filePersister is the type that all file persisters must implement. It's job is
@@ -38,7 +46,6 @@ type (
 		tracesMetadata map[string]string
 		filePersister  filePersister
 		testRunID      string
-		tracingEnabled atomic.Bool
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -81,16 +88,21 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	})
 
 	mvu := moduleVU{
-		VU:            vu,
-		pidRegistry:   m.PidRegistry,
-		enableTracing: m.EnableTracing,
+		VU:          vu,
+		pidRegistry: m.PidRegistry,
 		browserRegistry: newBrowserRegistry(
 			context.Background(),
 			vu,
 			m.remoteRegistry,
 			m.PidRegistry,
 			m.tracesMetadata,
-			m.tracingEnabled.Load,
+			// Read fresh on every VU's own instantiation, rather than caching
+			// it once alongside the sync.Once-gated fields below: the very
+			// first NewModuleInstance call happens while the script is being
+			// loaded, before the resolved --tracing value has been attached
+			// to the test's TestPreInitState, so caching it here would latch
+			// tracing off for the whole run regardless of the flag.
+			vu.InitEnv().Tracing.Enabled(tracingModuleName),
 		),
 		taskQueueRegistry: newTaskQueueRegistry(vu),
 		filePersister:     m.filePersister,
@@ -105,11 +117,6 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 			NetworkProfiles: common.GetNetworkProfiles(),
 		},
 	}
-}
-
-// EnableTracing enables native tracing for browser operations.
-func (m *RootModule) EnableTracing() {
-	m.tracingEnabled.Store(true)
 }
 
 // Exports returns the exports of the JS module so that it can be used in test

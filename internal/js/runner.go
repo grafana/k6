@@ -257,6 +257,7 @@ func (r *Runner) newVU(
 		FeatureFlags:    r.preInitState.FeatureFlags,
 		TracerProvider:  r.preInitState.TracerProvider,
 		TracePropagator: r.preInitState.TracePropagator,
+		Tracing:         r.preInitState.Tracing,
 		Usage:           r.preInitState.Usage,
 		TestStatus:      r.preInitState.TestStatus,
 	}

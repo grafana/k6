@@ -13,7 +13,7 @@ import (
 
 	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/js/modulestest"
-	"go.k6.io/k6/v2/lib"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -39,35 +39,27 @@ func (e *httpTraceExporter) exportedSpans() []sdktrace.ReadOnlySpan {
 	return append([]sdktrace.ReadOnlySpan(nil), e.spans...)
 }
 
-func TestEnableTracing(t *testing.T) {
+func TestModuleInstanceTracingDefault(t *testing.T) {
 	t.Parallel()
 
-	t.Run("init context", func(t *testing.T) {
+	t.Run("enabled via --tracing", func(t *testing.T) {
 		t.Parallel()
 
 		testRuntime := modulestest.NewRuntime(t)
-		root := New()
-		module := root.NewModuleInstance(testRuntime.VU).(*ModuleInstance)
-		module.EnableTracing()
-		require.True(t, module.tracingEnabled)
-		require.True(t, root.tracingEnabled.Load())
+		set, err := moduletrace.ParseSet("http")
+		require.NoError(t, err)
+		testRuntime.VU.InitEnvField.Tracing = set
 
-		nextRuntime := modulestest.NewRuntime(t)
-		next := root.NewModuleInstance(nextRuntime.VU).(*ModuleInstance)
-		require.True(t, next.tracingEnabled)
+		module := New().NewModuleInstance(testRuntime.VU).(*ModuleInstance)
+		require.True(t, module.tracingEnabled)
 	})
 
-	t.Run("VU context", func(t *testing.T) {
+	t.Run("disabled by default", func(t *testing.T) {
 		t.Parallel()
 
 		testRuntime := modulestest.NewRuntime(t)
-		root := New()
-		module := root.NewModuleInstance(testRuntime.VU).(*ModuleInstance)
-		state := &lib.State{}
-		testRuntime.MoveToVUContext(state)
-		module.EnableTracing()
-		require.True(t, module.tracingEnabled)
-		require.False(t, root.tracingEnabled.Load())
+		module := New().NewModuleInstance(testRuntime.VU).(*ModuleInstance)
+		require.False(t, module.tracingEnabled)
 	})
 }
 

@@ -43,7 +43,7 @@ type RuntimeOptions struct {
 	SummaryMode      null.String `json:"summaryMode"`
 	SummaryExport    null.String `json:"summaryExport"`
 	KeyWriter        null.String `json:"-"`
-	TracingEnabled   null.Bool   `json:"tracingEnabled"`
+	Tracing          null.String `json:"tracing"`
 	TracesOutput     null.String `json:"tracesOutput"`
 	TracesParent     null.String `json:"tracesParent"`
 	TracesSampler    null.String `json:"tracesSampler"`

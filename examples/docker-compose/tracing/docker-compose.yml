@@ -23,7 +23,7 @@ services:
       - ./script.js:/scripts/script.js:ro
     command:
       - run
-      - --tracing
+      - --tracing=http
       - --traces-output=otel=http://jaeger:4318/v1/traces
       - --traces-sampler=parentbased_traceidratio
       - "--traces-sampler-arg=${K6_TRACES_SAMPLER_ARG:-1}"

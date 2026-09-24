@@ -13,6 +13,7 @@ import (
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/internal/usage"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/secretsource"
 )
@@ -29,8 +30,11 @@ type TestPreInitState struct {
 	Logger          logrus.FieldLogger
 	TracerProvider  *trace.TracerProvider
 	TracePropagator propagation.TextMapPropagator
-	Usage           *usage.Usage
-	SecretsManager  *secretsource.Manager
+	// Tracing is the resolved set of modules that default to tracing-enabled
+	// for this run, computed once from RuntimeOptions.Tracing.
+	Tracing        moduletrace.Set
+	Usage          *usage.Usage
+	SecretsManager *secretsource.Manager
 
 	// FeatureFlags is the feature-flag activation set resolved once before test
 	// initialization and stable for the whole run.

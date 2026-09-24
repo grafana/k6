@@ -58,3 +58,18 @@ func (m *VU) checkIntegrity() {
 		panic("there is a bug in the test: InitEnvField and StateField are not allowed at the same time")
 	}
 }
+
+// WithInitContext temporarily gives the VU a fresh init context (InitEnvField
+// set, StateField nil) for the duration of fn, then restores whatever VU
+// context it had before. Use it to build a module instance -- which, like a
+// real VU, expects to run in the init context -- on a VU that has already
+// moved into VU context via [Runtime.MoveToVUContext].
+func WithInitContext[T any](vu *VU, fn func() T) T {
+	state := vu.StateField
+	vu.StateField = nil
+	vu.InitEnvField = &common.InitEnvironment{TestPreInitState: &lib.TestPreInitState{}}
+	result := fn()
+	vu.InitEnvField = nil
+	vu.StateField = state
+	return result
+}

@@ -34,6 +34,7 @@ import (
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/fsext"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/output"
 )
@@ -114,7 +115,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	tracerProvider, traceCtx, tracePropagator, err := newTracerProvider(globalCtx, runtimeOptions)
+	tracerProvider, traceCtx, tracePropagator, tracingSet, err := newTracerProvider(globalCtx, runtimeOptions)
 	if err != nil {
 		return err
 	}
@@ -149,6 +150,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 	test.preInitState.TracerProvider = tracerProvider
 	test.preInitState.TracePropagator = tracePropagator
+	test.preInitState.Tracing = tracingSet
 	printBanner(c.gs)
 	if test.keyLogger != nil {
 		defer func() {
@@ -548,45 +550,61 @@ func (c *cmdRun) flagSet() *pflag.FlagSet {
 
 func newTracerProvider(
 	ctx context.Context, runtimeOptions lib.RuntimeOptions,
-) (*trace.TracerProvider, context.Context, propagation.TextMapPropagator, error) {
+) (*trace.TracerProvider, context.Context, propagation.TextMapPropagator, moduletrace.Set, error) {
 	output := runtimeOptions.TracesOutput.String
 	if output == "" {
 		output = "none"
 	}
-	enabled := runtimeOptions.TracingEnabled.Bool
-	if !runtimeOptions.TracingEnabled.Valid {
-		enabled = output != "none"
+
+	// When --tracing is left entirely unset, fall back to the legacy
+	// behavior (predating the --tracing flag) of enabling browser tracing
+	// whenever --traces-output is configured, so that already-released
+	// `--traces-output=otel=...` usage keeps working unmodified. An explicit
+	// --tracing value (including "none") always overrides this inference.
+	var (
+		tracingSet moduletrace.Set
+		err        error
+	)
+	switch {
+	case runtimeOptions.Tracing.Valid:
+		tracingSet, err = moduletrace.ParseSet(runtimeOptions.Tracing.String)
+	case output != "none":
+		tracingSet, err = moduletrace.ParseSet("browser")
 	}
-	if !enabled {
+	if err != nil {
+		return nil, ctx, nil, moduletrace.Set{}, err
+	}
+
+	if !tracingSet.Any() {
 		if output != "none" {
-			return nil, ctx, nil, errors.New("traces output requires tracing to be enabled")
+			return nil, ctx, nil, tracingSet, errors.New("traces output requires tracing to be enabled")
 		}
-		return trace.NewNoopTracerProvider(), ctx, propagation.TraceContext{}, nil
+		return trace.NewNoopTracerProvider(), ctx, propagation.TraceContext{}, tracingSet, nil
 	}
 
 	sampler, err := trace.SamplerFromConfig(
 		runtimeOptions.TracesSampler.String, runtimeOptions.TracesSamplerArg.String,
 	)
 	if err != nil {
-		return nil, ctx, nil, err
+		return nil, ctx, nil, tracingSet, err
 	}
 	propagator, err := trace.PropagatorFromConfig(runtimeOptions.TracesPropagator.String)
 	if err != nil {
-		return nil, ctx, nil, err
+		return nil, ctx, nil, tracingSet, err
 	}
 	ctx, err = trace.ContextWithRemoteParent(ctx, runtimeOptions.TracesParent.String, propagator)
 	if err != nil {
-		return nil, ctx, nil, err
+		return nil, ctx, nil, tracingSet, err
 	}
 
 	if output == "none" {
-		return trace.NewTracerProviderWithoutExporter(sampler), ctx, propagator, nil
+		return trace.NewTracerProviderWithoutExporter(sampler), ctx, propagator, tracingSet, nil
 	}
 	tp, err := trace.TracerProviderFromConfigLine(ctx, output, sampler)
 	if err != nil {
-		return nil, ctx, nil, err
+		return nil, ctx, nil, tracingSet, err
 	}
-	return tp, ctx, propagator, nil
+	return tp, ctx, propagator, tracingSet, nil
 }
 
 func getCmdRun(gs *state.GlobalState) *cobra.Command {

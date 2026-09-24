@@ -176,7 +176,7 @@ type browserRegistry struct {
 	tr             *tracesRegistry
 	trInit         sync.Once
 	tracesMetadata map[string]string
-	tracingEnabled func() bool
+	tracingEnabled bool
 
 	mu sync.RWMutex
 	m  map[int64]*common.Browser
@@ -207,7 +207,7 @@ func newBrowserRegistry(
 	remote *remoteRegistry,
 	pids *pidRegistry,
 	tracesMetadata map[string]string,
-	tracingEnabled func() bool,
+	tracingEnabled bool,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
 	builder := func(ctx, vuCtx context.Context) (*common.Browser, error) {
@@ -524,7 +524,7 @@ func (r *browserRegistry) startConnectTrace(vuCtx context.Context, iter int64) c
 }
 
 func (r *browserRegistry) isTracingEnabled() bool {
-	return r.tracingEnabled != nil && r.tracingEnabled()
+	return r.tracingEnabled
 }
 
 func (r *browserRegistry) stopTracesRegistry() {

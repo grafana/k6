@@ -20,6 +20,7 @@ import (
 	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
 
 	k6lib "go.k6.io/k6/v2/lib"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 )
 
 const html = `
@@ -77,8 +78,10 @@ func TestTracing(t *testing.T) {
 	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
 
 	rt := vu.Runtime()
+	tracingSet, err := moduletrace.ParseSet("browser")
+	require.NoError(t, err)
+	vu.InitEnvField.Tracing = tracingSet
 	root := browser.New()
-	root.EnableTracing()
 	mod := root.NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
@@ -205,8 +208,10 @@ func TestNavigationSpanCreation(t *testing.T) {
 		vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
 
 		rt := vu.Runtime()
+		tracingSet, err := moduletrace.ParseSet("browser")
+		require.NoError(t, err)
+		vu.InitEnvField.Tracing = tracingSet
 		root := browser.New()
-		root.EnableTracing()
 		mod := root.NewModuleInstance(vu)
 		jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 		require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)

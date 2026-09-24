@@ -13,6 +13,9 @@ import (
 
 	"go.k6.io/k6/v2/internal/lib/testutils/grpcservice"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
+
+	xk6grpc "go.k6.io/k6/v2/internal/js/modules/k6/grpc"
 )
 
 type operationTraceExporter struct {
@@ -71,8 +74,14 @@ func TestOperationTracing(t *testing.T) {
 	}
 	grpcservice.RegisterFeatureExplorerServer(ts.httpBin.ServerGRPC, stub)
 
-	_, err := ts.Run(`
-		grpc.enableTracing();
+	tracingSet, err := moduletrace.ParseSet("grpc")
+	require.NoError(t, err)
+	ts.VU.InitEnvField.Tracing = tracingSet
+	m, ok := xk6grpc.New().NewModuleInstance(ts.VU).(*xk6grpc.ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, ts.VU.Runtime().Set("grpc", m.Exports().Named))
+
+	_, err = ts.Run(`
 		var client = new grpc.Client();
 		client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");
 		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");

@@ -15,36 +15,29 @@ import (
 	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/js/modulestest"
 	"go.k6.io/k6/v2/lib"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 )
 
-func TestEnableTracing(t *testing.T) {
+func TestModuleInstanceTracingDefault(t *testing.T) {
 	t.Parallel()
 
-	t.Run("init context", func(t *testing.T) {
+	t.Run("enabled via --tracing", func(t *testing.T) {
 		t.Parallel()
 		runtime := modulestest.NewRuntime(t)
-		root := New()
-		module := root.NewModuleInstance(runtime.VU).(*WebSocketsAPI)
-		module.EnableTracing()
-		require.True(t, module.tracingEnabled)
-		require.True(t, root.tracingEnabled.Load())
+		set, err := moduletrace.ParseSet("websockets")
+		require.NoError(t, err)
+		runtime.VU.InitEnvField.Tracing = set
 
-		nextRuntime := modulestest.NewRuntime(t)
-		next := root.NewModuleInstance(nextRuntime.VU).(*WebSocketsAPI)
-		require.True(t, next.tracingEnabled)
+		module := New().NewModuleInstance(runtime.VU).(*WebSocketsAPI)
+		require.True(t, module.tracingEnabled)
 	})
 
-	t.Run("VU context", func(t *testing.T) {
+	t.Run("disabled by default", func(t *testing.T) {
 		t.Parallel()
 		runtime := modulestest.NewRuntime(t)
-		root := New()
-		module := root.NewModuleInstance(runtime.VU).(*WebSocketsAPI)
-		state := &lib.State{}
-		runtime.MoveToVUContext(state)
-		module.EnableTracing()
-		require.True(t, module.tracingEnabled)
-		require.False(t, root.tracingEnabled.Load())
+		module := New().NewModuleInstance(runtime.VU).(*WebSocketsAPI)
+		require.False(t, module.tracingEnabled)
 	})
 }
 
@@ -150,7 +143,7 @@ func TestWebSocketOperationTracing(t *testing.T) {
 	ts.runtime.VU.State().TracerProvider = provider
 	parentCtx, parent := provider.Tracer("test").Start(ts.runtime.VU.Context(), "iteration")
 	ts.runtime.VU.CtxField = parentCtx
-	ts.module.EnableTracing()
+	ts.module.tracingEnabled = true
 
 	err := runOnEventLoopWithTimeout(t, ts.runtime, ts.tb.Replacer.Replace(`
 		const ws = new WebSocket("WSBIN_URL/ws-tracing");

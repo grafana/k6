@@ -210,7 +210,7 @@ func TestBrowserRegistry(t *testing.T) {
 			vu              = k6test.NewVU(t)
 			browserRegistry = newBrowserRegistry(
 				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil,
-				func() bool { return true },
+				true,
 			)
 		)
 
@@ -245,7 +245,7 @@ func TestBrowserRegistry(t *testing.T) {
 		var (
 			vu              = k6test.NewVU(t)
 			browserRegistry = newBrowserRegistry(
-				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, false,
 			)
 		)
 
@@ -277,7 +277,7 @@ func TestBrowserRegistry(t *testing.T) {
 		var (
 			vu              = k6test.NewVU(t)
 			browserRegistry = newBrowserRegistry(
-				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, false,
 			)
 		)
 
@@ -302,7 +302,7 @@ func TestBrowserRegistry(t *testing.T) {
 		var cancel context.CancelFunc
 		vu.CtxField, cancel = context.WithCancel(vu.CtxField)
 		browserRegistry := newBrowserRegistry(
-			context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+			context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, false,
 		)
 
 		vu.ActivateVU()
@@ -342,7 +342,7 @@ func TestBrowserRegistry(t *testing.T) {
 		var (
 			vu              = k6test.NewVU(t)
 			browserRegistry = newBrowserRegistry(
-				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, nil,
+				context.Background(), vu, remoteRegistry, &pidRegistry{}, nil, false,
 			)
 		)
 
@@ -385,7 +385,7 @@ func TestStartConnectTraceAttributes(t *testing.T) {
 		vu:             vu,
 		m:              make(map[int64]*common.Browser),
 		userManaged:    make(map[int64][]*common.Browser),
-		tracingEnabled: func() bool { return true },
+		tracingEnabled: true,
 	}
 	r.startConnectTrace(vu.Context(), vu.State().Iteration)
 

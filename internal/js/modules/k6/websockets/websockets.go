@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -23,24 +22,30 @@ import (
 
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 )
 
 // RootModule is the root module for the websockets API
-type RootModule struct {
-	tracingEnabled atomic.Bool
-}
+type RootModule struct{}
 
 // WebSocketsAPI is the k6 extension implementing the websocket API as defined in https://websockets.spec.whatwg.org
 type WebSocketsAPI struct { //nolint:revive
 	vu                   modules.VU
-	rootModule           *RootModule
 	tracingEnabled       bool
 	blobConstructor      sobek.Value
 	webSocketConstructor sobek.Value
 }
 
 var _ modules.Module = &RootModule{}
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "websockets"
+
+func init() {
+	trace.Register(tracingModuleName)
+}
 
 // New websockets root module
 func New() *RootModule {
@@ -50,9 +55,10 @@ func New() *RootModule {
 // NewModuleInstance returns a new instance of the module
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	api := &WebSocketsAPI{
-		vu:             vu,
-		rootModule:     r,
-		tracingEnabled: r.tracingEnabled.Load(),
+		vu: vu,
+		// Read fresh per instance -- do not cache this on RootModule (see
+		// browser's module.go for why that would silently latch it off).
+		tracingEnabled: vu.InitEnv().Tracing.Enabled(tracingModuleName),
 	}
 
 	rt := vu.Runtime()
@@ -73,18 +79,9 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (r *WebSocketsAPI) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
-			"WebSocket":     r.webSocketConstructor,
-			"Blob":          r.blobConstructor,
-			"enableTracing": r.EnableTracing,
+			"WebSocket": r.webSocketConstructor,
+			"Blob":      r.blobConstructor,
 		},
-	}
-}
-
-// EnableTracing enables native tracing for subsequent WebSocket sessions from this VU.
-func (r *WebSocketsAPI) EnableTracing() {
-	r.tracingEnabled = true
-	if r.vu.State() == nil {
-		r.rootModule.tracingEnabled.Store(true)
 	}
 }
 

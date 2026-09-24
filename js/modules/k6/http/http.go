@@ -3,13 +3,13 @@ package http
 import (
 	"net/http"
 	"net/http/cookiejar"
-	"sync/atomic"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/lib/netext"
 	"go.k6.io/k6/v2/lib/netext/httpext"
+	"go.k6.io/k6/v2/lib/trace"
 )
 
 // RootModule is the global module object type. It is instantiated once per test
@@ -17,17 +17,22 @@ import (
 //
 // TODO: add sync.Once for all of the deprecation warnings we might want to do
 // for the old k6/http APIs here, so they are shown only once in a test run.
-type RootModule struct {
-	tracingEnabled atomic.Bool
-}
+type RootModule struct{}
 
 // ModuleInstance represents an instance of the HTTP module for every VU.
 type ModuleInstance struct {
 	vu             modules.VU
-	rootModule     *RootModule
 	tracingEnabled bool
 	defaultClient  *Client
 	exports        *sobek.Object
+}
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "http"
+
+func init() {
+	trace.Register(tracingModuleName)
 }
 
 var (
@@ -44,9 +49,10 @@ func New() *RootModule {
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	rt := vu.Runtime()
 	mi := &ModuleInstance{
-		vu:             vu,
-		rootModule:     r,
-		tracingEnabled: r.tracingEnabled.Load(),
+		vu: vu,
+		// Read fresh per instance -- do not cache this on RootModule (see
+		// browser's module.go for why that would silently latch it off).
+		tracingEnabled: vu.InitEnv().Tracing.Enabled(tracingModuleName),
 		exports:        rt.NewObject(),
 	}
 	mi.defineConstants()
@@ -119,7 +125,6 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mustExport("request", mi.defaultClient.Request)
 	mustExport("asyncRequest", mi.defaultClient.asyncRequest)
 	mustExport("batch", mi.defaultClient.Batch)
-	mustExport("enableTracing", mi.EnableTracing)
 	mustExport("setResponseCallback", mi.defaultClient.SetResponseCallback)
 
 	mustExport("expectedStatuses", mi.expectedStatuses) // TODO: refactor?
@@ -140,14 +145,6 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 		Default: mi.exports,
 		// TODO: add new HTTP APIs like Client, Request (see above comment in
 		// NewModuleInstance()), etc. as named exports?
-	}
-}
-
-// EnableTracing enables native tracing for subsequent HTTP requests from this VU.
-func (mi *ModuleInstance) EnableTracing() {
-	mi.tracingEnabled = true
-	if mi.vu.State() == nil {
-		mi.rootModule.tracingEnabled.Store(true)
 	}
 }
 

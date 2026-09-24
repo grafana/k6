@@ -4,7 +4,6 @@ package grpc
 import (
 	"errors"
 	"fmt"
-	"sync/atomic"
 
 	"google.golang.org/grpc/codes"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
@@ -15,24 +14,30 @@ import (
 	"go.k6.io/k6/v2/internal/js/taskqueue"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/trace"
 )
 
 type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
-	RootModule struct {
-		tracingEnabled atomic.Bool
-	}
+	RootModule struct{}
 
 	// ModuleInstance represents an instance of the GRPC module for every VU.
 	ModuleInstance struct {
 		vu             modules.VU
 		exports        map[string]any
 		metrics        *instanceMetrics
-		rootModule     *RootModule
 		tracingEnabled bool
 	}
 )
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "grpc"
+
+func init() {
+	trace.Register(tracingModuleName)
+}
 
 var (
 	_ modules.Module   = &RootModule{}
@@ -53,27 +58,19 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	}
 
 	mi := &ModuleInstance{
-		vu:             vu,
-		exports:        make(map[string]any),
-		metrics:        metrics,
-		rootModule:     r,
-		tracingEnabled: r.tracingEnabled.Load(),
+		vu:      vu,
+		exports: make(map[string]any),
+		metrics: metrics,
+		// Read fresh per instance -- do not cache this on RootModule (see
+		// browser's module.go for why that would silently latch it off).
+		tracingEnabled: vu.InitEnv().Tracing.Enabled(tracingModuleName),
 	}
 
 	mi.exports["Client"] = mi.NewClient
-	mi.exports["enableTracing"] = mi.EnableTracing
 	mi.defineConstants()
 	mi.exports["Stream"] = mi.stream
 
 	return mi
-}
-
-// EnableTracing enables native tracing for subsequent gRPC operations from this VU.
-func (mi *ModuleInstance) EnableTracing() {
-	mi.tracingEnabled = true
-	if mi.vu.State() == nil {
-		mi.rootModule.tracingEnabled.Store(true)
-	}
 }
 
 // NewClient is the JS constructor for the grpc Client.

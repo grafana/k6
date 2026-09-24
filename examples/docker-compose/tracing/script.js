@@ -2,8 +2,6 @@ import { check } from 'k6';
 import http from 'k6/http';
 import { currentSpan } from 'k6/experimental/tracing';
 
-http.enableTracing();
-
 export const options = {
   scenarios: {
     tracing: {
