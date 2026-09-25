@@ -28,28 +28,9 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		}),
 		"addInitScript": passiveCall(func(script sobek.Value) *sobek.Promise {
 			return promise(vu, func() (any, error) {
-				if k6common.IsNullish(script) {
+				source := initScriptSource(rt, script)
+				if source == "" {
 					return nil, nil
-				}
-
-				source := ""
-				switch script.ExportType() {
-				case reflect.TypeFor[string]():
-					source = script.String()
-				case reflect.TypeFor[sobek.Object]():
-					opts := script.ToObject(rt)
-					for _, k := range opts.Keys() {
-						if k == "content" {
-							source = opts.Get(k).String()
-						}
-					}
-				default:
-					_, isCallable := sobek.AssertFunction(script)
-					if !isCallable {
-						source = fmt.Sprintf("(%s);", script.ToString().String())
-					} else {
-						source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
-					}
 				}
 
 				return nil, bc.AddInitScript(source) //nolint:wrapcheck
@@ -231,4 +212,32 @@ func parseWaitForEventOptions(
 	}
 
 	return w, nil
+}
+
+// initScriptSource converts the JS addInitScript argument into source evaluated on
+// new documents. Functions are stringified and invoked, matching Playwright. JS
+// functions export as objects, so they must be detected before the {content} option.
+func initScriptSource(rt *sobek.Runtime, script sobek.Value) string {
+	if k6common.IsNullish(script) {
+		return ""
+	}
+
+	if _, isCallable := sobek.AssertFunction(script); isCallable {
+		return fmt.Sprintf("(%s)();", script.ToString().String())
+	}
+
+	switch script.ExportType() {
+	case reflect.TypeFor[string]():
+		return script.String()
+	default:
+		opts := script.ToObject(rt)
+		if opts != nil {
+			for _, k := range opts.Keys() {
+				if k == "content" {
+					return opts.Get(k).String()
+				}
+			}
+		}
+		return fmt.Sprintf("(%s);", script.ToString().String())
+	}
 }

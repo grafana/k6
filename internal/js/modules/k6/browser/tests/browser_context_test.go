@@ -1118,3 +1118,22 @@ func TestChromiumConnectOverCDPUseAfterClose(t *testing.T) {
 	`, tb.wsURL)
 	require.NoError(t, err)
 }
+
+func TestBrowserContextAddInitScriptFunction(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const c = await browser.newContext();
+		await c.addInitScript(() => { Math.random = () => 42; });
+		const p = await c.newPage();
+		await p.goto("about:blank");
+		return await p.evaluate(() => Math.random());
+	`)
+	assert.Equal(t, int64(42), got.Result().ToInteger())
+}
