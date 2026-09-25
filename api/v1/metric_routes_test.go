@@ -18,7 +18,9 @@ import (
 func TestGetMetrics(t *testing.T) {
 	t.Parallel()
 
-	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{})
+	testState := getTestRunState(t, lib.Options{
+		SummaryTrendStats: []string{"avg", "count", "p(99.9)"},
+	}, &minirunner.MiniRunner{})
 	testMetric, err := testState.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
 	cs := getControlSurface(t, testState)
@@ -67,6 +69,12 @@ func TestGetMetrics(t *testing.T) {
 		assert.Equal(t, metrics.Time, metric.Contains.Type)
 		assert.True(t, metric.Tainted.Valid)
 		assert.True(t, metric.Tainted.Bool)
+
+		assert.Contains(t, metric.Sample, "avg")
+		assert.Contains(t, metric.Sample, "count")
+		assert.Contains(t, metric.Sample, "p(99.9)")
+		assert.NotContains(t, metric.Sample, "p(90)")
+		assert.NotContains(t, metric.Sample, "min")
 
 		resMetrics := envelop.Metrics()
 		assert.Len(t, resMetrics, 1)

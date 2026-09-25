@@ -91,7 +91,7 @@ func TestNewMetric(t *testing.T) {
 	old, err := metrics.NewRegistry().NewMetric("test_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
 	old.Tainted = null.BoolFrom(true)
-	m := NewMetric(old, 0)
+	m := NewMetric(old, 0, nil)
 	assert.Equal(t, "test_metric", m.Name)
 	assert.True(t, m.Type.Valid)
 	assert.Equal(t, metrics.Trend, m.Type.Type)
@@ -100,4 +100,22 @@ func TestNewMetric(t *testing.T) {
 	assert.True(t, m.Tainted.Valid)
 	assert.Equal(t, metrics.Time, m.Contains.Type)
 	assert.NotEmpty(t, m.Sample)
+}
+
+func TestNewMetricRespectsSummaryTrendStats(t *testing.T) {
+	t.Parallel()
+
+	old, err := metrics.NewRegistry().NewMetric("test_metric", metrics.Trend, metrics.Time)
+	require.NoError(t, err)
+	for _, v := range []float64{1, 2, 3, 4, 5} {
+		old.Sink.Add(metrics.Sample{Value: v})
+	}
+
+	m := NewMetric(old, 0, []string{"avg", "count", "p(99)"})
+	assert.Equal(t, 3.0, m.Sample["avg"])
+	assert.Equal(t, 5.0, m.Sample["count"])
+	assert.Contains(t, m.Sample, "p(99)")
+	assert.Len(t, m.Sample, 3)
+	assert.NotContains(t, m.Sample, "min")
+	assert.NotContains(t, m.Sample, "p(90)")
 }

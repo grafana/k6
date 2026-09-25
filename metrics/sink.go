@@ -193,9 +193,9 @@ func (t *TrendSink) Total() float64 {
 	return t.sum
 }
 
-// Format trend and return a map
+// Format trend and return a map. REST API trend columns come from
+// summaryTrendStats, not this default set.
 func (t *TrendSink) Format(_ time.Duration) map[string]float64 {
-	// TODO: respect the summaryTrendStats for REST API
 	return map[string]float64{
 		"min":   t.Min(),
 		"max":   t.Max(),

@@ -70,13 +70,30 @@ type Metric struct {
 }
 
 // NewMetric constructs a new v1.Metric struct that is used for
-// a metric representation in a k6 REST API
-func NewMetric(m *metrics.Metric, t time.Duration) Metric {
+// a metric representation in a k6 REST API.
+// summaryTrendStats selects the trend columns; empty uses TrendSink.Format defaults.
+func NewMetric(m *metrics.Metric, t time.Duration, summaryTrendStats []string) Metric {
 	return Metric{
 		Name:     m.Name,
 		Type:     NullMetricType{m.Type, true},
 		Contains: NullValueType{m.Contains, true},
 		Tainted:  m.Tainted,
-		Sample:   m.Sink.Format(t),
+		Sample:   formatSample(m.Sink, t, summaryTrendStats),
 	}
+}
+
+func formatSample(sink metrics.Sink, t time.Duration, summaryTrendStats []string) map[string]float64 {
+	ts, ok := sink.(*metrics.TrendSink)
+	if !ok || len(summaryTrendStats) == 0 {
+		return sink.Format(t)
+	}
+	resolvers, err := metrics.GetResolversForTrendColumns(summaryTrendStats)
+	if err != nil {
+		return sink.Format(t)
+	}
+	sample := make(map[string]float64, len(summaryTrendStats))
+	for _, col := range summaryTrendStats {
+		sample[col] = resolvers[col](ts)
+	}
+	return sample
 }
