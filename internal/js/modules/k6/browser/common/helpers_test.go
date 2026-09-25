@@ -9,6 +9,8 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
+	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
@@ -263,4 +265,28 @@ func TestHasSourceURL(t *testing.T) {
 			require.Equal(t, c.result, hasSourceURL(c.js))
 		})
 	}
+}
+
+func TestRecoverGoroutinePanic(t *testing.T) {
+	t.Parallel()
+
+	logrusLogger, hook := logtest.NewNullLogger()
+	logger := log.New(logrusLogger, "")
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer recoverGoroutinePanic(logger, "test:category")
+		panic("boom")
+	}()
+
+	// If recoverGoroutinePanic didn't stop the panic, this goroutine (and
+	// the whole test binary) would have already crashed by now instead of
+	// reaching this point.
+	<-done
+
+	entry := hook.LastEntry()
+	require.NotNil(t, entry)
+	assert.Equal(t, "test:category", entry.Data["category"])
+	assert.Contains(t, entry.Message, "boom")
 }
