@@ -41,7 +41,6 @@ Earlier work established several important constraints:
 - Automatically tracing every protocol operation.
 - Providing arbitrary script-created span scopes before async context propagation is solved.
 - Defining final sampling, exporter, or distributed-run configuration.
-- Making all iteration spans children of a single long-lived run span.
 
 ## Trace topology
 
@@ -50,34 +49,47 @@ loading, but the initial implementation does not propagate its context into load
 ends after setup, execution, teardown, and output finalization, but before the trace provider shuts
 down.
 
-Every iteration starts an independent root span named `iteration`. The iteration span contains a
-link to the `k6.run` span rather than using it as its parent:
+An earlier revision of this design made every iteration an independent trace, linked to `k6.run`
+by an OpenTelemetry `Link` rather than nested under it, specifically to avoid one enormous trace for
+a long or distributed load test. In practice that left a lone `k6.run` span with nothing under it,
+which was not useful on its own. The default topology now nests a real hierarchy instead, and
+`--traces-split` (see [Runtime configuration](#runtime-configuration)) narrows down to just the
+iteration boundary for anyone who still wants independent iteration traces:
 
 ```text
 k6.run
-  <- link -- iteration trace 1
-  <- link -- iteration trace 2
-  <- link -- iteration trace N
-
-iteration
-  `- http.request
+  `- k6.scenario (one per running scenario)
+      `- k6.vu (one per VU activation)
+          `- iteration
+              `- http.request (and other opted-in protocol spans)
 ```
 
-Independent iteration traces avoid one enormous trace for a long or distributed load test. They
-can be sampled, queried, and retained independently while the link preserves run correlation.
-Child operations, such as an opted-in HTTP request, use the iteration span as their parent.
+`k6.scenario` and `k6.vu` are always built this way, regardless of `--traces-split`. Only `iteration`
+changes: under `--traces-split`, it becomes an independent root trace instead of a child of `k6.vu`,
+carrying a `Link` to that `k6.vu` span (not to `k6.run` directly, though they share the same trace
+ID, since only the split iteration ever gets a new one via `WithNewRoot`). Child operations, such as
+an opted-in HTTP request, always use the iteration span as their parent, in either mode.
 
-The initial iteration attributes are:
+`k6.scenario` carries `test.scenario` and `k6.scenario.executor`. `k6.vu` carries `test.vu`,
+`k6.vu.id_in_instance`, `k6.vu.id_in_test`, and `test.scenario` — the same identifying attributes
+iterations carry, so they're queryable at whichever span level a backend surfaces best.
+
+The iteration attributes are:
 
 - `test.iteration.number`
 - `test.vu`
 - `test.scenario`
-- `k6.run.id`
+- `k6.run.id`, only under `--traces-split`
 - `k6.vu.id_in_instance`
 - `k6.vu.id_in_test`
 - `k6.vu.iteration_in_scenario`
 - `k6.scenario.iteration_in_instance`, when available
 - `k6.scenario.iteration_in_test`, when available
+
+`k6.run.id` is conditional because it would be redundant otherwise: when nested (the default), the
+iteration's own trace ID already equals the run's, so a backend gets it for free. It's only added
+under `--traces-split` because splitting deliberately gives the iteration a different trace ID,
+severing that free correlation.
 
 The first three names remain compatible with the existing browser iteration spans.
 
@@ -120,10 +132,11 @@ k6, which prevents leaked spans and matches the automatic-context direction disc
 
 ## Runtime configuration
 
-Tracing and trace export are separate concerns:
+Tracing, trace export, and topology are separate concerns:
 
 ```text
---tracing[=true|false]
+--tracing <comma-separated modules>|all|none
+--traces-split
 --traces-output none|otel[=host:port]
 --traces-parent <encoded-parent-context>
 --traces-sampler <sampler-name>
@@ -131,25 +144,42 @@ Tracing and trace export are separate concerns:
 --traces-propagator tracecontext|jaeger
 ```
 
-`--tracing` creates real run and iteration span contexts even when `--traces-output=none`; those
-spans simply have no exporter. Configuring an output continues to imply tracing when `--tracing`
-was not explicitly set, preserving the behavior of `--traces-output`. Explicitly disabling tracing
-while configuring an output is an error.
+`--tracing` takes a comma-separated list of protocol module names (`http`, `grpc`, `websockets`,
+`browser`), or the sentinels `all` (every registered module) or `none` (default: nothing enabled).
+Naming a module makes it default-on for every VU; each protocol's per-call `tracing: true/false`
+option (documented in that protocol's section below) always overrides the default in either
+direction. Mixing `all`/`none` with a module name, or naming an unregistered module, is a startup
+error. The module registry is extensible: any module, built-in or from an extension, can register
+its own name as a valid `--tracing` target.
 
-The corresponding environment variables are `K6_TRACING`, `K6_TRACES_OUTPUT`,
+`--tracing` creates real run, scenario, VU, and iteration span contexts even when
+`--traces-output=none`; those spans simply have no exporter. When `--tracing` is left entirely
+unset and an output is configured, the resolved set is `{"browser"}` only — preserving the behavior
+already released before `--tracing` existed, when browser operation tracing was unconditional
+whenever a trace exporter was configured. Any explicit `--tracing` value, including `none`,
+overrides this inference. Explicitly disabling tracing while configuring an output is still an
+error.
+
+`--traces-split` (default off) restores independent iteration traces (see
+[Trace topology](#trace-topology)) for anyone who prefers one trace per iteration over the nested
+default; it does not affect `--tracing`'s module-list semantics.
+
+The corresponding environment variables are `K6_TRACING`, `K6_TRACES_SPLIT`, `K6_TRACES_OUTPUT`,
 `K6_TRACES_PARENT`, `K6_TRACES_SAMPLER`, `K6_TRACES_SAMPLER_ARG`, and
 `K6_TRACES_PROPAGATOR`.
 
 The supported samplers follow the OpenTelemetry names `always_on`, `always_off`, `traceidratio`,
 `parentbased_always_on`, `parentbased_always_off`, and `parentbased_traceidratio`. The default is
-`parentbased_always_on`. Ratio samplers require an argument between zero and one. Because every
-iteration is an independent root, the ratio decision is made once per iteration and inherited by
-its protocol child spans.
+`parentbased_always_on`. Ratio samplers require an argument between zero and one. By default, the
+sampling decision cascades down from `k6.run` through `k6.scenario` and `k6.vu` to `iteration` via
+normal parent-based inheritance. Only under `--traces-split` is the decision made once per
+iteration, independently of the run.
 
 `--traces-parent` accepts the complete primary header value for the selected propagator, rather
 than a bare span ID. For W3C Trace Context this is a `traceparent` value; for Jaeger it is an
-`uber-trace-id` value. The extracted remote context parents `k6.run`. Iterations remain independent
-roots linked to the run span.
+`uber-trace-id` value. The extracted remote context parents `k6.run`. Iterations only remain
+independent roots linked to their VU span under `--traces-split`; otherwise they inherit the
+remote parent through the normal nested hierarchy.
 
 The propagator controls extraction of the configured parent and injection by opted-in HTTP, gRPC,
 and WebSocket instrumentation. It does not change OTLP export. Browser network traffic is owned by
@@ -157,44 +187,25 @@ Chromium and does not currently receive these injected headers.
 
 ## Browser opt-in
 
-Browser operation tracing is disabled by default and enabled through the browser module during the
-init context:
+Enabled via `--tracing=browser` (or `all`); see [Runtime configuration](#runtime-configuration) for
+the module-list mechanism. Unlike the other three protocols, browser has no per-operation override —
+it is a whole-VU on/off switch, since browser contexts and event listeners are connected once at
+`IterStart`.
 
-```javascript
-import { browser } from 'k6/browser';
-
-browser.enableTracing();
-
-export default async function () {
-  const page = await browser.newPage();
-  await page.goto('https://example.test');
-}
-```
-
-Browser instrumentation must be enabled during init because the tracer, browser contexts, and event
-listeners are connected at `IterStart`. Browser network traffic runs inside Chromium and is separate
-from `k6/http`, so `http.enableTracing()` and its request override do not affect browser traffic.
+Browser network traffic runs inside Chromium and is separate from `k6/http`, so enabling `http` does
+not affect browser traffic, and vice versa.
 
 ## HTTP opt-in
 
-HTTP request tracing is disabled by default. A script can enable the default for its VUs during init
-or for the current VU while it is executing:
+Enabled via `--tracing=http` (or `all`); see [Runtime configuration](#runtime-configuration) for
+the module-list mechanism. A request can override the VU default in either direction:
 
 ```javascript
-import http from 'k6/http';
-
-http.enableTracing();
-
 export default function () {
   http.get('https://example.test/default-on');
   http.get('https://example.test/explicitly-off', { tracing: false });
+  http.get('https://example.test/one-request', { tracing: true }); // opts in without --tracing=http
 }
-```
-
-A request can opt in without changing the VU default:
-
-```javascript
-http.get('https://example.test/one-request', { tracing: true });
 ```
 
 The per-request `tracing` boolean always overrides the VU default. The common request path means the
@@ -208,33 +219,26 @@ headers can still be considered in later API work; the k6-owned span is authorit
 
 ## gRPC opt-in
 
-The gRPC module owns tracing for unary requests, health checks, and streams:
+Enabled via `--tracing=grpc` (or `all`); see [Runtime configuration](#runtime-configuration) for
+the module-list mechanism. The gRPC module owns tracing for unary requests, health checks, and
+streams; any of them can override the VU default in either direction:
 
 ```javascript
-import grpc from 'k6/net/grpc';
-
-grpc.enableTracing();
-
 export default function () {
   client.invoke('example.Service/Call', {}, { tracing: false });
 }
 ```
 
-Without module-level enablement, an individual invocation, health check, or stream can use
-`{ tracing: true }`.
 Unary and stream spans inherit the iteration context, inject the configured trace context into gRPC
 metadata, record RPC service, method, and status attributes, and add the trace ID to metric metadata.
 A stream uses one span for its lifetime rather than creating a span for every message.
 
 ## WebSocket opt-in
 
-The `k6/websockets` module owns its enablement and exposes a named module function:
+Enabled via `--tracing=websockets` (or `all`); see [Runtime configuration](#runtime-configuration)
+for the module-list mechanism. A connection can override the VU default in either direction:
 
 ```javascript
-import { WebSocket, enableTracing } from 'k6/websockets';
-
-enableTracing();
-
 export default function () {
   new WebSocket('wss://example.test/socket', null, { tracing: false });
 }
@@ -258,7 +262,9 @@ follows the shutdown concerns documented in [#6298].
 - Define resource attributes for local, cloud, and distributed runs.
 - Stabilize names and attributes against current OpenTelemetry semantic conventions.
 - Add group and user-created child spans after async context propagation is available.
-- Define a supported opt-in contract for extension protocol modules.
+- The `--tracing` module registry now lets any module, built-in or extension, register itself as
+  an opt-in target; still open is a documented, stable contract for what a registered module
+  should do with the resulting default and the `tracing: true/false` per-call convention.
 - Define distributed run identity and cross-instance run correlation.
 - Evaluate additional propagation formats without reviving the removed propagation-only API.
 - Add cardinality and span-volume guardrails before moving the module out of experimental status.
