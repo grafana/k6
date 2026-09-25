@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -140,8 +141,19 @@ func NewBrowserContext(
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
 
-	if len(opts.Permissions) > 0 {
-		err := b.GrantPermissions(opts.Permissions, GrantPermissionsOptions{})
+	if opts.Geolocation != nil {
+		if err := opts.Geolocation.Validate(); err != nil {
+			return nil, fmt.Errorf("validating geo location: %w", err)
+		}
+	}
+	// Playwright grants geolocation when the option is set; otherwise
+	// navigator.geolocation.getCurrentPosition waits on a permission prompt.
+	perms := opts.Permissions
+	if opts.Geolocation != nil && !slices.Contains(perms, "geolocation") {
+		perms = append(append([]string(nil), perms...), "geolocation")
+	}
+	if len(perms) > 0 {
+		err := b.GrantPermissions(perms, GrantPermissionsOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -300,6 +312,13 @@ func (b *BrowserContext) SetGeolocation(g *Geolocation) error {
 	}
 
 	b.opts.Geolocation = g
+	perms := b.opts.Permissions
+	if !slices.Contains(perms, "geolocation") {
+		perms = append(append([]string(nil), perms...), "geolocation")
+	}
+	if err := b.GrantPermissions(perms, GrantPermissionsOptions{}); err != nil {
+		return err
+	}
 	for _, p := range b.browser.getPages() {
 		if err := p.updateGeolocation(); err != nil {
 			return fmt.Errorf("updating geo location in target ID %s: %w", p.targetID, err)
