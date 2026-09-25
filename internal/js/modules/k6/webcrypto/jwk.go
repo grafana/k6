@@ -222,26 +222,37 @@ func exportECJWK(key *CryptoKey) (any, error) {
 func importECDSAJWK(_ EllipticCurveKind, jsonKeyData []byte) (any, CryptoKeyType, error) {
 	var jwkKey ecJWK
 	if err := json.Unmarshal(jsonKeyData, &jwkKey); err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to parse input as EC JWK key: %w", err)
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to parse input as EC JWK key: "+err.Error())
 	}
 
 	if err := jwkKey.validate(); err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("invalid EC JWK key: %w", err)
+		return nil, UnknownCryptoKeyType, NewError(DataError, "invalid EC JWK key: "+err.Error())
 	}
 
 	crv, err := pickEllipticCurve(jwkKey.Crv)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to parse elliptic curve: %w", err)
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to parse elliptic curve: "+err.Error())
 	}
+
+	// Coordinates and the private scalar of an EC JWK key must be exactly the
+	// byte length defined by the curve, as described in RFC 7518, sections 6.2.1.2
+	// and 6.2.2.1.
+	coordinateLen := (crv.Params().BitSize + 7) / 8
 
 	x, err := base64URLDecode(jwkKey.X)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode X coordinate: %w", err)
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode X coordinate: "+err.Error())
 	}
 
 	y, err := base64URLDecode(jwkKey.Y)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode Y coordinate: %w", err)
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode Y coordinate: "+err.Error())
+	}
+
+	if len(x) != coordinateLen || len(y) != coordinateLen {
+		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf(
+			"invalid EC JWK key: the x and y coordinates must be %d bytes long for curve %s", coordinateLen, jwkKey.Crv,
+		))
 	}
 
 	pk := &ecdsa.PublicKey{
@@ -257,7 +268,13 @@ func importECDSAJWK(_ EllipticCurveKind, jsonKeyData []byte) (any, CryptoKeyType
 
 	d, err := base64URLDecode(jwkKey.D)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode D: %w", err)
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode D: "+err.Error())
+	}
+
+	if len(d) != coordinateLen {
+		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf(
+			"invalid EC JWK key: the d parameter must be %d bytes long for curve %s", coordinateLen, jwkKey.Crv,
+		))
 	}
 
 	return &ecdsa.PrivateKey{
@@ -270,26 +287,26 @@ func importECDHJWK(_ EllipticCurveKind, jsonKeyData []byte) (any, CryptoKeyType,
 	// first we do try to parse the key as ECDSA key
 	key, _, err := importECDSAJWK(EllipticCurveKindP256, jsonKeyData)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to parse input as ECDH key: %w", err)
+		return nil, UnknownCryptoKeyType, err
 	}
 
 	switch key := key.(type) {
 	case *ecdsa.PrivateKey:
 		ecdhKey, err := key.ECDH()
 		if err != nil {
-			return nil, UnknownCryptoKeyType, fmt.Errorf("failed to convert ECDSA key to ECDH key: %w", err)
+			return nil, UnknownCryptoKeyType, NewError(DataError, "failed to convert ECDSA key to ECDH key: "+err.Error())
 		}
 
 		return ecdhKey, PrivateCryptoKeyType, nil
 	case *ecdsa.PublicKey:
 		ecdhKey, err := key.ECDH()
 		if err != nil {
-			return nil, UnknownCryptoKeyType, fmt.Errorf("failed to convert ECDSA key to ECDH key: %w", err)
+			return nil, UnknownCryptoKeyType, NewError(DataError, "failed to convert ECDSA key to ECDH key: "+err.Error())
 		}
 
 		return ecdhKey, PublicCryptoKeyType, nil
 	default:
-		return nil, UnknownCryptoKeyType, errors.New("input isn't a valid ECDH key")
+		return nil, UnknownCryptoKeyType, NewError(DataError, "input isn't a valid ECDH key")
 	}
 }
 

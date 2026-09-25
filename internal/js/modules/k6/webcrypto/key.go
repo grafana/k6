@@ -293,6 +293,54 @@ func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value)
 	return ki, nil
 }
 
+// keyUsagesForAlgorithm returns the list of usages that are valid for a key of the
+// given type, for the given algorithm, as defined by the [specification].
+//
+// The second return value reports whether the usages validation is defined for the
+// given combination of algorithm and key type; when it is false, callers should
+// not attempt to validate the usages.
+//
+// [specification]: https://w3c.github.io/webcrypto/#subtlecrypto-interface-importkey
+func keyUsagesForAlgorithm(algorithm string, keyType CryptoKeyType) ([]CryptoKeyUsage, bool) {
+	switch algorithm {
+	case ECDSA:
+		if keyType == PrivateCryptoKeyType {
+			return []CryptoKeyUsage{SignCryptoKeyUsage}, true
+		}
+		if keyType == PublicCryptoKeyType {
+			return []CryptoKeyUsage{VerifyCryptoKeyUsage}, true
+		}
+	case ECDH:
+		if keyType == PrivateCryptoKeyType {
+			return []CryptoKeyUsage{DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage}, true
+		}
+		if keyType == PublicCryptoKeyType {
+			return []CryptoKeyUsage{}, true
+		}
+	}
+
+	return nil, false
+}
+
+// validateKeyUsages returns a SyntaxError if any of the given usages is not
+// valid for a key of the given type and algorithm. It returns nil when all the
+// usages are valid, or when the usages validation is not defined for the given
+// combination of algorithm and key type.
+func validateKeyUsages(algorithm string, keyType CryptoKeyType, keyUsages []CryptoKeyUsage) error {
+	usages, ok := keyUsagesForAlgorithm(algorithm, keyType)
+	if !ok {
+		return nil
+	}
+
+	for _, usage := range keyUsages {
+		if !slices.Contains(usages, usage) {
+			return NewError(SyntaxError, "invalid key usage '"+usage+"' for a "+keyType+" "+algorithm+" key")
+		}
+	}
+
+	return nil
+}
+
 // UsageIntersection returns the intersection of two slices of CryptoKeyUsage.
 //
 // It implements the algorithm described in the [specification] to
