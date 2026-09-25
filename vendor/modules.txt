@@ -14,7 +14,7 @@ github.com/Masterminds/semver/v3
 # github.com/PuerkitoBio/goquery v1.12.0
 ## explicit; go 1.25.0
 github.com/PuerkitoBio/goquery
-# github.com/andybalholm/brotli v1.2.3
+# github.com/andybalholm/brotli v1.2.4
 ## explicit; go 1.22
 github.com/andybalholm/brotli
 github.com/andybalholm/brotli/matchfinder

@@ -63,7 +63,7 @@ func (z *ZDFast) FindMatches(dst []Match, src []byte) []Match {
 		if cap(z.history) == 0 {
 			historySize := max(2*z.MaxDistance, 1<<20, len(src))
 			z.history = make([]byte, 0, historySize)
-		} else {
+		} else if len(z.history) > z.MaxDistance {
 			// Move down
 			offset := len(z.history) - z.MaxDistance
 			copy(z.history[:z.MaxDistance], z.history[offset:])
@@ -132,14 +132,14 @@ mainLoop:
 
 			coffsetL := s - (candidateL.offset - z.current)
 			coffsetS := s - (candidateS.offset - z.current)
-			if coffsetL < int32(z.MaxDistance) && uint32(cv) == candidateL.val {
+			if coffsetL < int32(z.MaxDistance) && uint32(cv) == candidateL.val && candidateL.offset != 0 {
 				t = candidateL.offset - z.current
 				if binary.LittleEndian.Uint32(src[t:]) == uint32(cv) {
 					// found a long match (likely at least 8 bytes)
 					break
 				}
 			}
-			if coffsetS < int32(z.MaxDistance) && uint32(cv) == candidateS.val {
+			if coffsetS < int32(z.MaxDistance) && uint32(cv) == candidateS.val && candidateS.offset != 0 {
 				t = candidateS.offset - z.current
 				if binary.LittleEndian.Uint32(src[t:]) != uint32(cv) {
 					goto noMatch
