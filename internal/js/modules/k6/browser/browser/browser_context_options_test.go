@@ -72,6 +72,7 @@ func TestBrowserContextAllOptions(t *testing.T) {
 	opts, err := vu.Runtime().RunString(`const opts = {
 			acceptDownloads: true,
 			downloadsPath: '/tmp',
+			baseURL: 'http://example.com',
 			bypassCSP: true,
 			colorScheme: 'dark',
 			deviceScaleFactor: 1,
@@ -103,6 +104,7 @@ func TestBrowserContextAllOptions(t *testing.T) {
 	assert.Equal(t, &common.BrowserContextOptions{
 		AcceptDownloads:   true,
 		DownloadsPath:     "/tmp",
+		BaseURL:           "http://example.com",
 		BypassCSP:         true,
 		ColorScheme:       common.ColorSchemeDark,
 		DeviceScaleFactor: 1,
