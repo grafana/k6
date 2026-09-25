@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
@@ -64,7 +65,7 @@ func TestTracingParentAndSamplingConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, provider.Shutdown(context.Background())) })
 
-	runCtx, runSpan := k6trace.StartTestRun(ctx, provider)
+	runCtx, runSpan := k6trace.StartTestRun(ctx, provider, logrus.StandardLogger())
 	require.Equal(t,
 		"4bf92f3577b34da6a3ce929d0e0e4736",
 		runSpan.SpanContext().TraceID().String(),

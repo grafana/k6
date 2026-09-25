@@ -129,10 +129,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// The test run span's lifetime includes test loading. testCtx carries it
 	// through the execution contexts created after loading.
-	testCtx, runSpan := trace.StartTestRun(traceCtx, tracerProvider)
-	endTestRunSpan = func(runErr error) {
-		trace.EndSpan(runSpan, runErr)
-	}
+	testCtx, runSpan := trace.StartTestRun(traceCtx, tracerProvider, logger)
+
+	endTestRunSpan = func(runErr error) { trace.EndSpan(runSpan, runErr) }
 
 	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
 	// k6 was started with the --linger option.

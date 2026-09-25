@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -26,7 +27,7 @@ func TestScenarioSpanLifecycle(t *testing.T) {
 
 	exporter := &recordingExporter{}
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	runCtx, runSpan := StartTestRun(context.Background(), provider)
+	runCtx, runSpan := StartTestRun(context.Background(), provider, logrus.StandardLogger())
 	runSpanContext := runSpan.SpanContext()
 
 	scenarioCtx, scenarioSpan := StartScenario(runCtx, provider, ScenarioInfo{
@@ -57,7 +58,7 @@ func TestVUSpanLifecycle(t *testing.T) {
 
 	exporter := &recordingExporter{}
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	runCtx, runSpan := StartTestRun(context.Background(), provider)
+	runCtx, runSpan := StartTestRun(context.Background(), provider, logrus.StandardLogger())
 	scenarioCtx, scenarioSpan := StartScenario(runCtx, provider, ScenarioInfo{Name: "checkout"})
 	scenarioSpanContext := scenarioSpan.SpanContext()
 
@@ -96,7 +97,7 @@ func TestSplitIterationLinksToVUSpanNotRunSpan(t *testing.T) {
 
 	exporter := &recordingExporter{}
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	runCtx, runSpan := StartTestRun(context.Background(), provider)
+	runCtx, runSpan := StartTestRun(context.Background(), provider, logrus.StandardLogger())
 	runSpanContext := runSpan.SpanContext()
 	scenarioCtx, scenarioSpan := StartScenario(runCtx, provider, ScenarioInfo{Name: "checkout"})
 	vuCtx, vuSpan := StartVU(scenarioCtx, provider, VUInfo{VUID: 2, VUIDGlobal: 7, Scenario: "checkout"})

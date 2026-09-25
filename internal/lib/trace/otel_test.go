@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -28,7 +29,7 @@ func TestNilTracerProviderUsesNoopTracer(t *testing.T) {
 	t.Parallel()
 
 	var provider *TracerProvider
-	runCtx, runSpan := StartTestRun(context.Background(), provider)
+	runCtx, runSpan := StartTestRun(context.Background(), provider, logrus.StandardLogger())
 	require.False(t, runSpan.SpanContext().IsValid())
 
 	iterationCtx, iterationSpan := StartIteration(runCtx, provider, IterationInfo{}, false)
@@ -43,7 +44,7 @@ func TestTestRunSpanLifecycle(t *testing.T) {
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	parentCtx, parent := provider.Tracer("test").Start(context.Background(), "parent")
 	defer parent.End()
-	runCtx, span := StartTestRun(parentCtx, provider)
+	runCtx, span := StartTestRun(parentCtx, provider, logrus.StandardLogger())
 
 	require.True(t, oteltrace.SpanContextFromContext(runCtx).IsValid())
 	require.Empty(t, exporter.spans)
@@ -72,7 +73,7 @@ func TestTestRunUsesRemoteParent(t *testing.T) {
 	})
 	ctx := oteltrace.ContextWithRemoteSpanContext(t.Context(), parent)
 
-	_, runSpan := StartTestRun(ctx, provider)
+	_, runSpan := StartTestRun(ctx, provider, logrus.StandardLogger())
 	EndSpan(runSpan, nil)
 
 	require.Len(t, exporter.spans, 1)
@@ -85,7 +86,7 @@ func TestIterationSpanLifecycleSplit(t *testing.T) {
 
 	exporter := &recordingExporter{}
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	runCtx, runSpan := StartTestRun(context.Background(), provider)
+	runCtx, runSpan := StartTestRun(context.Background(), provider, logrus.StandardLogger())
 	runSpanContext := runSpan.SpanContext()
 	iterationCtx, iterationSpan := StartIteration(runCtx, provider, IterationInfo{
 		Number:                      3,
@@ -129,7 +130,7 @@ func TestIterationSpanLifecycleNested(t *testing.T) {
 
 	exporter := &recordingExporter{}
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
-	runCtx, runSpan := StartTestRun(context.Background(), provider)
+	runCtx, runSpan := StartTestRun(context.Background(), provider, logrus.StandardLogger())
 	runSpanContext := runSpan.SpanContext()
 	iterationCtx, iterationSpan := StartIteration(runCtx, provider, IterationInfo{
 		Number:                      3,

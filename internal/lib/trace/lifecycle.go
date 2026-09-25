@@ -3,6 +3,7 @@ package trace
 import (
 	"context"
 
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -42,13 +43,22 @@ type VUInfo struct {
 
 // StartTestRun starts the span that represents a k6 test run.
 func StartTestRun(
-	ctx context.Context, provider tracerProvider,
+	ctx context.Context, provider tracerProvider, logger logrus.FieldLogger,
 ) (context.Context, oteltrace.Span) {
 	options := make([]oteltrace.SpanStartOption, 0, 1)
 	if !oteltrace.SpanContextFromContext(ctx).IsRemote() {
 		options = append(options, oteltrace.WithNewRoot())
 	}
-	return provider.Tracer(instrumentationName).Start(ctx, "k6.run", options...)
+
+	traceCtx, span := provider.Tracer(instrumentationName).Start(ctx, "k6.run", options...)
+
+	if span.SpanContext().HasTraceID() {
+		logger := logger.WithField("trace_id", span.SpanContext().TraceID())
+		logger.Info("starting trace")
+		context.AfterFunc(traceCtx, func() { logger.Info("stopping trace") })
+	}
+
+	return traceCtx, span
 }
 
 // StartScenario starts a child span representing a single scenario's run,

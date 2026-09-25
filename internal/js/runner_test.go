@@ -126,7 +126,7 @@ func TestRunOnceStartsLinkedIterationTrace(t *testing.T) {
 	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
 	runner.preInitState.TracerProvider = &k6trace.TracerProvider{TracerProvider: provider}
 	runner.preInitState.TracesSplit = true // this test specifically exercises the split/linked behavior
-	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider)
+	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider, logrus.StandardLogger())
 	vuCtx, cancel := context.WithCancel(runCtx)
 
 	initVU, err := runner.NewVU(vuCtx, 2, 7, make(chan metrics.SampleContainer, 10))
@@ -194,7 +194,7 @@ func TestActivateNestsIterationsUnderVUSpan(t *testing.T) {
 	runner.preInitState.TracerProvider = &k6trace.TracerProvider{TracerProvider: provider}
 	// TracesSplit defaults to false: the new nested behavior under test.
 
-	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider)
+	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider, logrus.StandardLogger())
 	vuCtx, cancel := context.WithCancel(runCtx)
 
 	initVU, err := runner.NewVU(vuCtx, 2, 7, make(chan metrics.SampleContainer, 10))
