@@ -32,7 +32,7 @@ var (
 )
 
 type aiaCacheEntry struct {
-	cert     *x509.Certificate
+	certs    []*x509.Certificate
 	storedAt time.Time
 }
 
@@ -212,67 +212,80 @@ func (f *AIAFetcher) fetchAIAIntermediates(
 			}
 			seen[rawURL] = true
 
-			issuer, ok := f.loadCachedAIACert(rawURL)
+			issuers, ok := f.loadCachedAIACerts(rawURL)
 			if !ok {
 				if fetches >= aiaMaxFetchDepth {
 					continue
 				}
 				fetches++
 				var err error
-				issuer, err = f.fetchAndCacheAIACert(rawURL, logger)
+				issuers, err = f.fetchAndCacheAIACerts(rawURL, logger)
 				if err != nil {
 					logger.WithError(err).WithField("url", rawURL).Debug("AIA intermediate certificate fetch failed")
 					continue
 				}
 			}
 
-			fetched = append(fetched, issuer)
-			queue = append(queue, issuer)
+			// AIA endpoints serving PKCS#7 bundles may return several certificates at
+			// once (e.g. intermediate plus cross-signed alternates); all of them join
+			// the pool, and each one's own AIA URLs are followed in turn.
+			fetched = append(fetched, issuers...)
+			queue = append(queue, issuers...)
 		}
 	}
 
 	return fetched
 }
 
-func (f *AIAFetcher) loadCachedAIACert(rawURL string) (*x509.Certificate, bool) {
+// loadCachedAIACerts returns the certificates cached for an AIA URL. The entry is
+// kept as long as any one certificate is still within its validity period — a bundle
+// may pair a still-valid intermediate with an expired cross-sign we don't need.
+func (f *AIAFetcher) loadCachedAIACerts(rawURL string) ([]*x509.Certificate, bool) {
 	raw, ok := f.cache.Load(rawURL)
 	if !ok {
 		return nil, false
 	}
 	entry := raw.(*aiaCacheEntry) //nolint:forcetypeassert
-	// Evict on TTL expiry or when the cert itself is past NotAfter — an expired
-	// intermediate won't validate anyway, and holding it would just waste retries.
-	if time.Since(entry.storedAt) > aiaCacheEntryTTL || time.Now().After(entry.cert.NotAfter) {
+	// Evict on TTL expiry or when every cert is past NotAfter — expired intermediates
+	// won't validate anyway, and holding them would just waste retries.
+	if time.Since(entry.storedAt) > aiaCacheEntryTTL {
 		f.cache.Delete(rawURL)
 		return nil, false
 	}
-	return entry.cert, true
+	now := time.Now()
+	for _, cert := range entry.certs {
+		if now.Before(cert.NotAfter) {
+			return entry.certs, true
+		}
+	}
+	f.cache.Delete(rawURL)
+	return nil, false
 }
 
-func (f *AIAFetcher) fetchAndCacheAIACert(
+func (f *AIAFetcher) fetchAndCacheAIACerts(
 	rawURL string, logger logrus.FieldLogger,
-) (*x509.Certificate, error) {
+) ([]*x509.Certificate, error) {
 	v, err, _ := f.fetchGroup.Do(rawURL, func() (any, error) {
 		// Re-check under the singleflight barrier: an earlier waiter may have populated it.
-		if cert, ok := f.loadCachedAIACert(rawURL); ok {
-			return cert, nil
+		if certs, ok := f.loadCachedAIACerts(rawURL); ok {
+			return certs, nil
 		}
-		cert, err := f.fetchCertFromAIAURL(rawURL, logger)
+		certs, err := f.fetchCertFromAIAURL(rawURL, logger)
 		if err != nil {
 			return nil, err
 		}
-		f.cache.Store(rawURL, &aiaCacheEntry{cert: cert, storedAt: time.Now()})
-		return cert, nil
+		f.cache.Store(rawURL, &aiaCacheEntry{certs: certs, storedAt: time.Now()})
+		return certs, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return v.(*x509.Certificate), nil //nolint:forcetypeassert
+	return v.([]*x509.Certificate), nil //nolint:forcetypeassert
 }
 
 func (f *AIAFetcher) fetchCertFromAIAURL(
 	rawURL string, logger logrus.FieldLogger,
-) (*x509.Certificate, error) {
+) ([]*x509.Certificate, error) {
 	// VerifyPeerCertificate provides no context to thread through; use our own timeout.
 	ctx, cancel := context.WithTimeout(context.Background(), aiaFetchTimeout)
 	defer cancel()
@@ -298,22 +311,39 @@ func (f *AIAFetcher) fetchCertFromAIAURL(
 	}
 
 	if cert, parseErr := x509.ParseCertificate(body); parseErr == nil {
-		return cert, nil
+		return []*x509.Certificate{cert}, nil
 	}
 
 	block, _ := pem.Decode(body)
 	if block == nil {
+		// Neither DER nor PEM: some CAs (Sectigo, legacy Verisign) serve AIA
+		// intermediates as certs-only PKCS#7 bundles — try that before failing.
+		if certs, pkcs7Err := parsePKCS7Certificates(body); pkcs7Err == nil {
+			return certs, nil
+		}
 		if isLikelyPKCS7(resp.Header.Get("Content-Type"), body) {
 			logger.WithField("url", rawURL).WithField("content-type", resp.Header.Get("Content-Type")).
-				Warn("AIA response is PKCS#7 (not currently supported); chain will remain incomplete")
+				Warn("AIA response appears to be PKCS#7 but could not be parsed; chain will remain incomplete")
 		}
-		return nil, errors.New("AIA response is neither valid DER nor PEM")
+		return nil, errors.New("AIA response is neither valid DER, PEM, nor PKCS#7")
 	}
-	cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("parsing PEM certificate from AIA response: %w", err)
+
+	switch block.Type {
+	case "CERTIFICATE", "X509 CERTIFICATE": // RFC 7468 section 4 label
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("parsing PEM certificate from AIA response: %w", err)
+		}
+		return []*x509.Certificate{cert}, nil
+	case "PKCS7", "PKCS #7", "CMS": // RFC 7468 section 6: PEM-armored PKCS#7
+		certs, err := parsePKCS7Certificates(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("parsing PEM-armored PKCS#7 from AIA response: %w", err)
+		}
+		return certs, nil
+	default:
+		return nil, fmt.Errorf("unexpected PEM block type %q in AIA response", block.Type)
 	}
-	return cert, nil
 }
 
 func isLikelyPKCS7(contentType string, body []byte) bool {

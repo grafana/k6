@@ -8,6 +8,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
+	"encoding/base64"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"math/big"
@@ -239,7 +242,10 @@ func TestWrapTLSConfigForAIAFetching_MalformedAIACert(t *testing.T) {
 		"malformed AIA certificate should be silently ignored; original error is returned")
 }
 
-func TestFetchCertFromAIAURL_PKCS7ResponseLogsWarn(t *testing.T) {
+// A response that looks like PKCS#7 (Content-Type or embedded signedData OID)
+// but does not parse must warn — chain stays incomplete — instead of failing
+// silently.
+func TestFetchCertFromAIAURL_InvalidPKCS7ResponseLogsWarn(t *testing.T) {
 	t.Parallel()
 
 	// Body embeds the ASN.1 signedData OID so the heuristic fires without relying on Content-Type.
@@ -253,9 +259,10 @@ func TestFetchCertFromAIAURL_PKCS7ResponseLogsWarn(t *testing.T) {
 	logger, hook := logtest.NewNullLogger()
 	logger.SetLevel(logrus.WarnLevel)
 
-	cert, err := NewAIAFetcher(nil).fetchCertFromAIAURL(srv.URL, logger)
+	certs, err := NewAIAFetcher(nil).fetchCertFromAIAURL(srv.URL, logger)
 	require.Error(t, err)
-	assert.Nil(t, cert)
+	assert.Nil(t, certs)
+	assert.Contains(t, err.Error(), "PKCS#7", "error should mention what was tried")
 
 	var warned bool
 	for _, entry := range hook.AllEntries() {
@@ -264,7 +271,257 @@ func TestFetchCertFromAIAURL_PKCS7ResponseLogsWarn(t *testing.T) {
 			break
 		}
 	}
-	assert.True(t, warned, "expected a Warn log about PKCS#7 not being supported")
+	assert.True(t, warned, "expected a Warn log about the unparseable PKCS#7 response")
+}
+
+// A bare PEM certificate (the plain form most AIA endpoints serve) must keep
+// working through the refactored response parsing.
+func TestFetchCertFromAIAURL_PEMCertificate(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	pemBody := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: chain.IntermediateDER})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-pem-file")
+		_, _ = w.Write(pemBody)
+	}))
+	t.Cleanup(srv.Close)
+
+	certs, err := NewAIAFetcher(nil).fetchCertFromAIAURL(srv.URL, nullLogger())
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+}
+
+// A PEM block that is neither a certificate nor PKCS#7 must fail with a clear
+// error instead of attempting to parse arbitrary payload as a certificate.
+func TestFetchCertFromAIAURL_UnexpectedPEMBlockType(t *testing.T) {
+	t.Parallel()
+
+	pemBody := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: []byte("definitely not a certificate")})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-pem-file")
+		_, _ = w.Write(pemBody)
+	}))
+	t.Cleanup(srv.Close)
+
+	certs, err := NewAIAFetcher(nil).fetchCertFromAIAURL(srv.URL, nullLogger())
+	require.Error(t, err)
+	assert.Nil(t, certs)
+	assert.Contains(t, err.Error(), "unexpected PEM block type")
+}
+
+// The full happy path from the issue: a real certs-only .p7c bundle served from
+// the AIA URL resolves a leaf-only chain (#6146).
+func TestWrapTLSConfigForAIAFetching_PKCS7Bundle(t *testing.T) {
+	t.Parallel()
+
+	h := &tlstest.AIAHandler{}
+	aiaSrv := startAIAServer(t, h)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.p7c")
+	h.SetPKCS7(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert))
+
+	tlsSrv := leafOnlyTLSServer(t, chain)
+
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
+	resp, err := testHTTPClient(t, wrappedCfg).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
+	require.NoError(t, err, "PKCS#7 AIA response should resolve the incomplete chain")
+	_ = resp.Body.Close()
+}
+
+// Real-world bundles often carry more than one certificate; an unrelated extra
+// certificate must not stop the useful intermediate from completing the chain.
+func TestWrapTLSConfigForAIAFetching_PKCS7BundleWithUnrelatedCerts(t *testing.T) {
+	t.Parallel()
+
+	h := &tlstest.AIAHandler{}
+	aiaSrv := startAIAServer(t, h)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.p7c")
+	h.SetPKCS7(tlstest.BuildPKCS7Bundle(t, tlstest.NewChain(t).RootCert, chain.IntermediateCert))
+
+	tlsSrv := leafOnlyTLSServer(t, chain)
+
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
+	resp, err := testHTTPClient(t, wrappedCfg).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
+	require.NoError(t, err, "PKCS#7 bundle with extra unrelated certificate should still resolve the chain")
+	_ = resp.Body.Close()
+}
+
+// Some servers PEM-armor the PKCS#7 bundle instead of serving bare DER.
+func TestFetchCertFromAIAURL_PKCS7PEMArmored(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	pemBody := pem.EncodeToMemory(&pem.Block{
+		Type:  "PKCS7",
+		Bytes: tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert),
+	})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-pem-file")
+		_, _ = w.Write(pemBody)
+	}))
+	t.Cleanup(srv.Close)
+
+	certs, err := NewAIAFetcher(nil).fetchCertFromAIAURL(srv.URL, nullLogger())
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+}
+
+// The PKCS#7 path must feed the URL-keyed cache exactly like the DER path:
+// after the first handshake resolves the chain, later handshakes hit the cache.
+func TestAIAFetcher_PKCS7BundleCachedAcrossHandshakes(t *testing.T) {
+	t.Parallel()
+
+	var aiaHits atomic.Int32
+	handler := &tlstest.AIAHandler{}
+	aiaSrv := startAIAServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		aiaHits.Add(1)
+		handler.ServeHTTP(w, r)
+	}))
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.p7c")
+	handler.SetPKCS7(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert))
+
+	tlsSrv := leafOnlyTLSServer(t, chain)
+
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, nullLogger())
+	client := newBenchClient(wrappedCfg) // fresh handshake per request
+
+	for i := range 2 {
+		resp, err := client.Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
+		require.NoError(t, err, "handshake %d should complete via PKCS#7 AIA fetch", i+1)
+		_ = resp.Body.Close()
+	}
+	assert.EqualValues(t, 1, aiaHits.Load(), "the second handshake must be served from the AIA cache")
+}
+
+func TestParsePKCS7Certificates(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	oidData, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1})
+	require.NoError(t, err)
+	oidSignedData, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2})
+	require.NoError(t, err)
+
+	t.Run("single certificate", func(t *testing.T) {
+		t.Parallel()
+		certs, err := parsePKCS7Certificates(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert))
+		require.NoError(t, err)
+		require.Len(t, certs, 1)
+		assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+	})
+
+	t.Run("multiple certificates preserve bundle order", func(t *testing.T) {
+		t.Parallel()
+		certs, err := parsePKCS7Certificates(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert, chain.RootCert))
+		require.NoError(t, err)
+		require.Len(t, certs, 2)
+		assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+		assert.Equal(t, chain.RootDER, certs[1].Raw)
+	})
+
+	t.Run("non-signedData content type is rejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := parsePKCS7Certificates(testDER(0x30, oidData))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported PKCS#7 content type")
+	})
+
+	t.Run("bundle without certificates is rejected", func(t *testing.T) {
+		t.Parallel()
+		signedData := testDER(0x30,
+			[]byte{asn1.TagInteger, 0x01, 0x01},
+			testDER(0x31),
+			testDER(0x30, oidData),
+		)
+		bundle := testDER(0x30, oidSignedData, testDER(0xA0, signedData))
+		_, err := parsePKCS7Certificates(bundle)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no certificates")
+	})
+
+	t.Run("trailing bytes after content info are rejected", func(t *testing.T) {
+		t.Parallel()
+		bundle := append(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert), 0x00)
+		_, err := parsePKCS7Certificates(bundle)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "trailing")
+	})
+
+	t.Run("garbage input is rejected", func(t *testing.T) {
+		t.Parallel()
+		_, err := parsePKCS7Certificates([]byte("not a bundle"))
+		require.Error(t, err)
+	})
+}
+
+// A bundle produced by a real PKCS#7 implementation must parse, and
+// tlstest.BuildPKCS7Bundle must stay byte-identical to it, so the test fixtures
+// keep exercising the exact wire format production CAs emit.
+//
+// Fixture: `openssl crl2pkcs7 -nocrl -certfile probe.pem -outform DER` over a
+// throwaway self-signed P-256 certificate (CN=probe). The test only parses the
+// bundle, so the fixture certificate's expiry is irrelevant.
+func TestParsePKCS7Certificates_OpensslBundle(t *testing.T) {
+	t.Parallel()
+
+	bundle, err := base64.StdEncoding.DecodeString(
+		"MIIBpAYJKoZIhvcNAQcCoIIBlTCCAZECAQExADALBgkqhkiG9w0BBwGgggF5MIIBdTCCARugAwIBAgIUTvyW" +
+			"dq5FVFR1VRcDQLKalvVEwEEwCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwFcHJvYmUwHhcNMjYwOTIyMTkxNzUz" +
+			"WhcNMjYwOTIzMTkxNzUzWjAQMQ4wDAYDVQQDDAVwcm9iZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABMbd" +
+			"TxvHzs32qCd5sBn4dBAu9OMdgYQ8d/xegeQcWgGMhssrq0Yi7ej9mRi6kCb3KTGoGsgy7x1rnc6VOd43bqaj" +
+			"UzBRMB0GA1UdDgQWBBQUR4wuAnfZbkfqEM09gXBk3zWZpTAfBgNVHSMEGDAWgBQUR4wuAnfZbkfqEM09gXBk" +
+			"3zWZpTAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0gAMEUCIAgwXfBojr06QZRDflPNizEI5pDe4jpR" +
+			"f8FUkqRzFZa2AiEAuSeQdOw0M8cpmkvWUwfSn1JcPhiuUypfVdPtRxe0+RMxAA==")
+	require.NoError(t, err)
+
+	certs, err := parsePKCS7Certificates(bundle)
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	assert.Equal(t, "probe", certs[0].Subject.CommonName)
+	require.NoError(t, certs[0].CheckSignatureFrom(certs[0]), "fixture is a self-signed certificate")
+
+	assert.Equal(t, bundle, tlstest.BuildPKCS7Bundle(t, certs[0]),
+		"tlstest.BuildPKCS7Bundle must be byte-identical to the real openssl bundle")
+}
+
+// Non-certificate CertificateChoices entries (e.g. v2 attribute certificates,
+// context tag [2]) must be skipped without failing the whole bundle.
+func TestParsePKCS7CertificateSet_SkipsAttributeCertEntries(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	attrCert := []byte{0xA2, 0x03, 0x30, 0x01, 0x00} // [2] { SEQUENCE { INTEGER 0 } }
+	set := append(append([]byte{}, attrCert...), chain.IntermediateDER...)
+
+	certs, err := parsePKCS7CertificateSet(set)
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+}
+
+// testDER is a minimal DER tag-length-value builder for hand-crafting negative
+// PKCS#7 structures in tests.
+func testDER(tag byte, parts ...[]byte) []byte {
+	var body []byte
+	for _, part := range parts {
+		body = append(body, part...)
+	}
+	l := len(body)
+	var length []byte
+	switch {
+	case l < 0x80:
+		length = []byte{byte(l)}
+	case l < 0x100:
+		length = []byte{0x81, byte(l)}
+	default:
+		length = []byte{0x82, byte(l >> 8), byte(l)}
+	}
+	out := make([]byte, 0, 1+len(length)+l)
+	out = append(out, tag)
+	out = append(out, length...)
+	return append(out, body...)
 }
 
 func TestWrapTLSConfigForAIAFetching_CircularAIAReferences(t *testing.T) {
