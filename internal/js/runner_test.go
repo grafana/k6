@@ -28,6 +28,7 @@ import (
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/time/rate"
 	"gopkg.in/guregu/null.v3"
 
@@ -41,6 +42,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/v2/internal/lib/testutils/mockoutput"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	k6http "go.k6.io/k6/v2/js/modules/k6/http"
 	"go.k6.io/k6/v2/lib"
 	_ "go.k6.io/k6/v2/lib/executor" // TODO: figure out something better
@@ -49,6 +51,28 @@ import (
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/output"
 )
+
+type runnerTraceExporter struct {
+	spans []sdktrace.ReadOnlySpan
+}
+
+func (e *runnerTraceExporter) ExportSpans(_ context.Context, spans []sdktrace.ReadOnlySpan) error {
+	e.spans = append(e.spans, spans...)
+	return nil
+}
+
+func (*runnerTraceExporter) Shutdown(context.Context) error {
+	return nil
+}
+
+func (e *runnerTraceExporter) findByName(name string) sdktrace.ReadOnlySpan {
+	for _, s := range e.spans {
+		if s.Name() == name {
+			return s
+		}
+	}
+	return nil
+}
 
 func TestRunnerNew(t *testing.T) {
 	t.Parallel()
@@ -85,6 +109,133 @@ func TestRunnerNew(t *testing.T) {
 		_, err := getSimpleRunner(t, "/script.js", `blarg`)
 		assert.EqualError(t, err, "ReferenceError: blarg is not defined\n\tat file:///script.js:1:28(1)\n")
 	})
+}
+
+func TestRunOnceStartsLinkedIterationTrace(t *testing.T) {
+	t.Parallel()
+
+	runner, err := getSimpleRunner(t, "/script.js", `
+		import { currentSpan } from "k6/experimental/tracing";
+		export default function() {
+			currentSpan().setAttribute("script.attribute", "value");
+		}
+	`)
+	require.NoError(t, err)
+
+	exporter := &runnerTraceExporter{}
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	runner.preInitState.TracerProvider = &k6trace.TracerProvider{TracerProvider: provider}
+	runner.preInitState.TracesSplit = true // this test specifically exercises the split/linked behavior
+	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider, logrus.StandardLogger())
+	vuCtx, cancel := context.WithCancel(runCtx)
+
+	initVU, err := runner.NewVU(vuCtx, 2, 7, make(chan metrics.SampleContainer, 10))
+	require.NoError(t, err)
+
+	deactivated := make(chan struct{})
+	activeVU := initVU.Activate(&lib.VUActivationParams{
+		RunContext: vuCtx,
+		Scenario:   "checkout",
+		GetNextIterationCounters: func() (uint64, uint64) {
+			return 8, 13
+		},
+		DeactivateCallback: func(lib.InitializedVU) { close(deactivated) },
+	})
+	require.NoError(t, activeVU.RunOnce())
+	require.NoError(t, activeVU.RunOnce())
+
+	// Tear down this activation so the VU span (ended on deactivation) is
+	// flushed to the exporter before we inspect it.
+	cancel()
+	<-deactivated
+	k6trace.EndSpan(runSpan, nil)
+
+	require.Len(t, exporter.spans, 4) // 2 iterations + 1 VU + 1 run
+
+	vuSpan := exporter.findByName("k6.vu")
+	require.NotNil(t, vuSpan, "expected a k6.vu span to have been exported")
+	require.True(t, vuSpan.Parent().IsValid())
+	require.Equal(t, runSpan.SpanContext().SpanID(), vuSpan.Parent().SpanID(),
+		"the VU span should be a direct child of the run span")
+
+	iterationSpans := make([]sdktrace.ReadOnlySpan, 0, 2)
+	for _, s := range exporter.spans {
+		if s.Name() == "iteration" {
+			iterationSpans = append(iterationSpans, s)
+		}
+	}
+	require.Len(t, iterationSpans, 2)
+	for _, iterationSpan := range iterationSpans {
+		require.False(t, iterationSpan.Parent().IsValid(), "iteration should be an independent root when split")
+		require.Len(t, iterationSpan.Links(), 1)
+		require.Equal(t, vuSpan.SpanContext(), iterationSpan.Links()[0].SpanContext,
+			"the iteration's link should point at the VU span, not the run span")
+	}
+
+	var scriptAttribute string
+	for _, attr := range iterationSpans[0].Attributes() {
+		if string(attr.Key) == "script.attribute" {
+			scriptAttribute = attr.Value.AsString()
+		}
+	}
+	require.Equal(t, "value", scriptAttribute)
+}
+
+func TestActivateNestsIterationsUnderVUSpan(t *testing.T) {
+	t.Parallel()
+
+	runner, err := getSimpleRunner(t, "/script.js", `
+		export default function() {}
+	`)
+	require.NoError(t, err)
+
+	exporter := &runnerTraceExporter{}
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	runner.preInitState.TracerProvider = &k6trace.TracerProvider{TracerProvider: provider}
+	// TracesSplit defaults to false: the new nested behavior under test.
+
+	runCtx, runSpan := k6trace.StartTestRun(t.Context(), runner.preInitState.TracerProvider, logrus.StandardLogger())
+	vuCtx, cancel := context.WithCancel(runCtx)
+
+	initVU, err := runner.NewVU(vuCtx, 2, 7, make(chan metrics.SampleContainer, 10))
+	require.NoError(t, err)
+
+	deactivated := make(chan struct{})
+	activeVU := initVU.Activate(&lib.VUActivationParams{
+		RunContext:         vuCtx,
+		Scenario:           "checkout",
+		DeactivateCallback: func(lib.InitializedVU) { close(deactivated) },
+	})
+	require.NoError(t, activeVU.RunOnce())
+	require.NoError(t, activeVU.RunOnce())
+
+	// Tear down this activation so the VU span (ended on deactivation) is
+	// flushed to the exporter before we inspect it.
+	cancel()
+	<-deactivated
+	k6trace.EndSpan(runSpan, nil)
+
+	require.Len(t, exporter.spans, 4) // 2 iterations + 1 VU + 1 run
+
+	vuSpan := exporter.findByName("k6.vu")
+	require.NotNil(t, vuSpan, "expected a k6.vu span to have been exported")
+	require.True(t, vuSpan.Parent().IsValid())
+	require.Equal(t, runSpan.SpanContext().SpanID(), vuSpan.Parent().SpanID())
+	require.Equal(t, runSpan.SpanContext().TraceID(), vuSpan.SpanContext().TraceID())
+
+	iterationSpans := make([]sdktrace.ReadOnlySpan, 0, 2)
+	for _, s := range exporter.spans {
+		if s.Name() == "iteration" {
+			iterationSpans = append(iterationSpans, s)
+		}
+	}
+	require.Len(t, iterationSpans, 2)
+	for _, iterationSpan := range iterationSpans {
+		require.True(t, iterationSpan.Parent().IsValid())
+		require.Equal(t, vuSpan.SpanContext().SpanID(), iterationSpan.Parent().SpanID())
+		require.Equal(t, runSpan.SpanContext().TraceID(), iterationSpan.SpanContext().TraceID())
+		require.Empty(t, iterationSpan.Links())
+	}
 }
 
 func TestRunnerOptions(t *testing.T) {

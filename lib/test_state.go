@@ -7,10 +7,13 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/propagation"
+
 	"go.k6.io/k6/v2/internal/event"
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/internal/usage"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/secretsource"
 )
@@ -18,14 +21,23 @@ import (
 // TestPreInitState contains all of the state that can be gathered and built
 // before the test run is initialized.
 type TestPreInitState struct {
-	RuntimeOptions RuntimeOptions
-	Registry       *metrics.Registry
-	BuiltinMetrics *metrics.BuiltinMetrics
-	Events         *event.System
-	KeyLogger      io.Writer
-	LookupEnv      func(key string) (val string, ok bool)
-	Logger         logrus.FieldLogger
-	TracerProvider *trace.TracerProvider
+	RuntimeOptions  RuntimeOptions
+	Registry        *metrics.Registry
+	BuiltinMetrics  *metrics.BuiltinMetrics
+	Events          *event.System
+	KeyLogger       io.Writer
+	LookupEnv       func(key string) (val string, ok bool)
+	Logger          logrus.FieldLogger
+	TracerProvider  *trace.TracerProvider
+	TracePropagator propagation.TextMapPropagator
+	// Tracing is the resolved set of modules that default to tracing-enabled
+	// for this run, computed once from RuntimeOptions.Tracing.
+	Tracing moduletrace.Set
+	// TracesSplit mirrors RuntimeOptions.TracesSplit: scenario/VU spans are
+	// always created regardless of this flag; when true, iteration spans
+	// stay independent traces linked to their VU span instead of nesting
+	// under it.
+	TracesSplit    bool
 	Usage          *usage.Usage
 	SecretsManager *secretsource.Manager
 

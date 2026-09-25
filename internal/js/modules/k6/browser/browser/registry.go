@@ -176,6 +176,7 @@ type browserRegistry struct {
 	tr             *tracesRegistry
 	trInit         sync.Once
 	tracesMetadata map[string]string
+	tracingEnabled bool
 
 	mu sync.RWMutex
 	m  map[int64]*common.Browser
@@ -206,6 +207,7 @@ func newBrowserRegistry(
 	remote *remoteRegistry,
 	pids *pidRegistry,
 	tracesMetadata map[string]string,
+	tracingEnabled bool,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
 	builder := func(ctx, vuCtx context.Context) (*common.Browser, error) {
@@ -235,6 +237,7 @@ func newBrowserRegistry(
 	r := &browserRegistry{
 		vu:             vu,
 		tracesMetadata: tracesMetadata,
+		tracingEnabled: tracingEnabled,
 		m:              make(map[int64]*common.Browser),
 		userManaged:    make(map[int64][]*common.Browser),
 		buildFn:        builder,
@@ -308,20 +311,22 @@ func (r *browserRegistry) handleIterEvents(
 				break
 			}
 
-			// Because VU.State is nil when browser registry is initialized,
-			// we have to initialize traces registry on the first VU iteration
-			// so we can get access to the k6 TracerProvider.
-			r.initTracesRegistry()
+			browserCtx := r.vu.Context()
+			if r.isTracingEnabled() {
+				// VU.State is available here, so the registry can use the provider
+				// selected for this test run.
+				r.initTracesRegistry()
 
-			// Wrap the tracer into the VU context to make it accessible for the
-			// other components during the iteration that inherit the VU context.
-			//
-			// All browser APIs should work with the vu context, and allow the
-			// k6 iteration control its lifecycle.
-			tracerCtx := common.WithTracer(r.vu.Context(), r.tr.tracer)
-			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
+				// Wrap the tracer into the VU context to make it accessible for the
+				// other components during the iteration that inherit the VU context.
+				//
+				// All browser APIs should work with the vu context, and allow the
+				// k6 iteration control its lifecycle.
+				tracerCtx := common.WithTracer(browserCtx, r.tr.tracer)
+				browserCtx = r.tr.startIterationTrace(tracerCtx, data)
+			}
 
-			b, err := r.buildFn(ctx, tracedCtx)
+			b, err := r.buildFn(ctx, browserCtx)
 			if err != nil {
 				e.Done()
 				k6ext.Abortf(vuCtx, "error building browser on IterStart: %v", err)
@@ -501,6 +506,9 @@ func (r *browserRegistry) initTracesRegistry() {
 // so browser API calls made over a connectOverCDP browser parent under the
 // iteration trace.
 func (r *browserRegistry) startConnectTrace(vuCtx context.Context, iter int64) context.Context {
+	if !r.isTracingEnabled() {
+		return vuCtx
+	}
 	r.initTracesRegistry()
 
 	tracerCtx := common.WithTracer(vuCtx, r.tr.tracer)
@@ -513,6 +521,10 @@ func (r *browserRegistry) startConnectTrace(vuCtx context.Context, iter int64) c
 		VUID:         r.vu.State().VUID,
 		ScenarioName: k6ext.GetScenarioName(vuCtx),
 	})
+}
+
+func (r *browserRegistry) isTracingEnabled() bool {
+	return r.tracingEnabled
 }
 
 func (r *browserRegistry) stopTracesRegistry() {
@@ -555,6 +567,13 @@ func newTracesRegistry(tracer *browsertrace.Tracer) *tracesRegistry {
 func (r *tracesRegistry) startIterationTrace(ctx context.Context, data k6event.IterData) context.Context {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	// Core k6 owns iteration spans. Reuse one when it is already present, while
+	// retaining the fallback below for callers that only use the browser module.
+	if span := oteltrace.SpanFromContext(ctx); span.SpanContext().IsValid() {
+		r.tracer.ApplyMetadata(span)
+		return ctx
+	}
 
 	if t, ok := r.m[data.Iteration]; ok {
 		return t.ctx

@@ -19,7 +19,16 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
 	k6modules "go.k6.io/k6/v2/js/modules"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 )
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "browser"
+
+func init() {
+	moduletrace.Register(tracingModuleName)
+}
 
 type (
 	// filePersister is the type that all file persisters must implement. It's job is
@@ -87,6 +96,13 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 			m.remoteRegistry,
 			m.PidRegistry,
 			m.tracesMetadata,
+			// Read fresh on every VU's own instantiation, rather than caching
+			// it once alongside the sync.Once-gated fields below: the very
+			// first NewModuleInstance call happens while the script is being
+			// loaded, before the resolved --tracing value has been attached
+			// to the test's TestPreInitState, so caching it here would latch
+			// tracing off for the whole run regardless of the flag.
+			vu.InitEnv().Tracing.Enabled(tracingModuleName),
 		),
 		taskQueueRegistry: newTaskQueueRegistry(vu),
 		filePersister:     m.filePersister,

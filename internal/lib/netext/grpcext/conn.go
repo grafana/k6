@@ -41,6 +41,7 @@ type InvokeRequest struct {
 	DiscardResponseMessage bool
 	Message                []byte
 	Metadata               metadata.MD
+	Tracing                bool
 }
 
 // InvokeResponse represents a gRPC response.

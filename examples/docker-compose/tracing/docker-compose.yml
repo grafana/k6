@@ -1,0 +1,32 @@
+services:
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.21.0
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+
+  target:
+    image: traefik/whoami:v1.12.0
+    ports:
+      - "8080:80"
+
+  k6:
+    build:
+      context: ../../..
+      target: release
+    depends_on:
+      - jaeger
+      - target
+    environment:
+      K6_EXAMPLE_PROPAGATOR: "${K6_TRACES_PROPAGATOR:-jaeger}"
+    volumes:
+      - ./script.js:/scripts/script.js:ro
+    command:
+      - run
+      - --tracing=http
+      - --traces-output=otel=http://jaeger:4318/v1/traces
+      - --traces-sampler=parentbased_traceidratio
+      - "--traces-sampler-arg=${K6_TRACES_SAMPLER_ARG:-1}"
+      - "--traces-propagator=${K6_TRACES_PROPAGATOR:-jaeger}"
+      - "--traces-parent=${K6_TRACES_PARENT:-}"
+      - /scripts/script.js

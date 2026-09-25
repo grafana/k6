@@ -104,9 +104,10 @@ func (c *Client) asyncRequest(method string, url sobek.Value, args ...sobek.Valu
 	}
 
 	callback := c.moduleInstance.vu.RegisterCallback()
+	ctx := c.moduleInstance.vu.Context()
 
 	go func() {
-		resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
+		resp, err := httpext.MakeRequest(ctx, state, req)
 		callback(func() error {
 			if err != nil {
 				return reject(err)
@@ -169,6 +170,7 @@ func (c *Client) parseRequest(
 		Cookies:          make(map[string]*httpext.HTTPRequestCookie),
 		ResponseCallback: c.responseCallback,
 		TagsAndMeta:      c.moduleInstance.vu.State().Tags.GetCurrentValues(),
+		Tracing:          c.moduleInstance.tracingEnabled,
 	}
 
 	if state.Options.DiscardResponseBodies.Bool {
@@ -403,6 +405,12 @@ func (c *Client) parseRequest(
 				result.Timeout = t
 			case "throw":
 				result.Throw = params.Get(k).ToBoolean()
+			case "tracing":
+				tracing, ok := params.Get(k).Export().(bool)
+				if !ok {
+					return nil, errors.New("invalid tracing option: expected a boolean")
+				}
+				result.Tracing = tracing
 			case "responseType":
 				responseType, err := httpext.ResponseTypeString(params.Get(k).String())
 				if err != nil {

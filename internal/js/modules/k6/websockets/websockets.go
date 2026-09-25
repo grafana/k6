@@ -15,12 +15,14 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/grafana/sobek"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/websockets/events"
 	"go.k6.io/k6/v2/internal/js/taskqueue"
 
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -30,11 +32,20 @@ type RootModule struct{}
 // WebSocketsAPI is the k6 extension implementing the websocket API as defined in https://websockets.spec.whatwg.org
 type WebSocketsAPI struct { //nolint:revive
 	vu                   modules.VU
+	tracingEnabled       bool
 	blobConstructor      sobek.Value
 	webSocketConstructor sobek.Value
 }
 
 var _ modules.Module = &RootModule{}
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "websockets"
+
+func init() {
+	trace.Register(tracingModuleName)
+}
 
 // New websockets root module
 func New() *RootModule {
@@ -43,7 +54,12 @@ func New() *RootModule {
 
 // NewModuleInstance returns a new instance of the module
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	api := &WebSocketsAPI{vu: vu}
+	api := &WebSocketsAPI{
+		vu: vu,
+		// Read fresh per instance -- do not cache this on RootModule (see
+		// browser's module.go for why that would silently latch it off).
+		tracingEnabled: vu.InitEnv().Tracing.Enabled(tracingModuleName),
+	}
 
 	rt := vu.Runtime()
 	api.blobConstructor = rt.ToValue(api.blob)
@@ -94,6 +110,9 @@ type webSocket struct {
 	builtinMetrics *metrics.BuiltinMetrics
 	obj            *sobek.Object // the object that is given to js to interact with the WebSocket
 	started        time.Time
+	traceSpan      oteltrace.Span
+	traceEnd       sync.Once
+	traceStatus    int
 
 	done          chan struct{}
 	writeQueueCh  chan message
@@ -133,7 +152,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		common.Throw(rt, err)
 	}
 
-	params, err := buildParams(r.vu.State(), rt, c.Argument(2))
+	params, err := buildParams(r.vu.State(), rt, c.Argument(2), r.tracingEnabled)
 	if err != nil {
 		common.Throw(rt, err)
 	}
@@ -167,6 +186,11 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		tagsAndMeta:     params.tagsAndMeta,
 		sendPings:       ping{timestamps: make(map[string]time.Time)},
 		binaryType:      blobBinaryType,
+	}
+	if params.tracing {
+		connectionCtx, w.traceSpan = startSessionTrace(
+			connectionCtx, r.vu.State(), url, params.headers, params.tagsAndMeta,
+		)
 	}
 
 	// Maybe have this after the goroutine below ?!?
@@ -324,6 +348,7 @@ func (w *webSocket) establishConnection(ctx context.Context, params *wsParams) {
 	}
 
 	if httpResponse != nil {
+		w.traceStatus = httpResponse.StatusCode
 		defer func() {
 			_ = httpResponse.Body.Close()
 		}()
@@ -347,6 +372,7 @@ func (w *webSocket) establishConnection(ctx context.Context, params *wsParams) {
 	//nolint:contextcheck // Handshake cancellation must not suppress connection metrics.
 	w.emitConnectionMetrics(w.vu.Context(), start, connectionDuration)
 	if connErr != nil {
+		w.endTrace(connErr)
 		// Pass the error to the user script before exiting immediately
 		w.tq.Queue(func() error {
 			return w.connectionClosedWithError(connErr)
@@ -939,6 +965,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 		return nil
 	}
 	w.readyState = CLOSED
+	w.endTrace(err)
 	close(w.done)
 
 	if err != nil {
@@ -950,6 +977,12 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 		}
 	}
 	return w.callEventListeners(events.CLOSE)
+}
+
+func (w *webSocket) endTrace(err error) {
+	w.traceEnd.Do(func() {
+		endSessionTrace(w.traceSpan, w.traceStatus, err)
+	})
 }
 
 // newEvent returns an event implementing "implements" https://dom.spec.whatwg.org/#event

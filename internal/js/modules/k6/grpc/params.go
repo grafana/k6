@@ -22,14 +22,16 @@ type callParams struct {
 	TagsAndMeta            metrics.TagsAndMeta
 	Timeout                time.Duration
 	DiscardResponseMessage bool
+	Tracing                bool
 }
 
 // newCallParams constructs the call parameters from the input value.
 // if no input is given, the default values are used.
-func newCallParams(vu modules.VU, input sobek.Value) (*callParams, error) {
+func newCallParams(vu modules.VU, input sobek.Value, tracingEnabled bool) (*callParams, error) {
 	result := &callParams{
 		Metadata:    metadata.New(nil),
 		TagsAndMeta: vu.State().Tags.GetCurrentValues(),
+		Tracing:     tracingEnabled,
 	}
 
 	if common.IsNullish(input) {
@@ -61,6 +63,12 @@ func newCallParams(vu modules.VU, input sobek.Value) (*callParams, error) {
 			}
 		case "discardResponseMessage":
 			result.DiscardResponseMessage = params.Get(k).ToBoolean()
+		case "tracing":
+			tracing, ok := params.Get(k).Export().(bool)
+			if !ok {
+				return result, errors.New("invalid tracing option: expected a boolean")
+			}
+			result.Tracing = tracing
 		default:
 			return result, fmt.Errorf("unknown param: %q", k)
 		}
