@@ -2187,7 +2187,7 @@ func TestPageOnMetric(t *testing.T) {
 		},
 		{
 			// We should get an error back when the method is invalid.
-			name: "with_invalid_name",
+			name: "with_invalid_method",
 			fun: `page.on('metric', (metric) => {
 				metric.tag({
 					name:'ping-1',

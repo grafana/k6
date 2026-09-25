@@ -260,3 +260,44 @@ func TestPageNetworkLoaderContextOutlivesUnrelatedCalls(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "inspection", contextName(tagsAndMeta))
 }
+
+func TestMetricEventTagMethod(t *testing.T) {
+	t.Parallel()
+
+	matchAll := func(string, string) (bool, error) { return true, nil }
+
+	tests := []struct {
+		name        string
+		eventMethod string
+		matchMethod string
+		wantTagged  bool
+		wantErr     string
+	}{
+		{name: "get", eventMethod: "GET", matchMethod: "GET", wantTagged: true},
+		{name: "query", eventMethod: "QUERY", matchMethod: "QUERY", wantTagged: true},
+		{name: "query_lowercase_trimmed", eventMethod: "QUERY", matchMethod: " query ", wantTagged: true},
+		{name: "query_method_mismatch", eventMethod: "GET", matchMethod: "QUERY", wantTagged: false},
+		{name: "invalid_method", eventMethod: "GET", matchMethod: "foo", wantErr: `method "foo" is invalid`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			e := &MetricEvent{url: "http://127.0.0.1/ping", method: tt.eventMethod}
+			err := e.Tag(matchAll, TagMatches{
+				TagName: "ping",
+				Matches: []Match{{URLRegEx: "/ping/", Method: tt.matchMethod}},
+			})
+			if tt.wantErr != "" {
+				require.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantTagged, e.isUserURLTagNameExist)
+			if tt.wantTagged {
+				assert.Equal(t, "ping", e.userProvidedURLTagName)
+			}
+		})
+	}
+}
