@@ -83,6 +83,14 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			},
 		},
 		{
+			catalog: "import_export",
+			files: []string{
+				"ec_importKey_failures_fixtures.js",
+				"importKey_failures.js",
+			},
+			callFn: "run_test",
+		},
+		{
 			catalog: "encrypt_decrypt",
 			files: []string{
 				"aes_cbc_vectors.js",

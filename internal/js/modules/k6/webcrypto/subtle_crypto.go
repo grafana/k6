@@ -830,6 +830,10 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 	var (
 		keyBytes []byte
 		ki       KeyImporter
+
+		// algorithmName is the normalized name of the algorithm, used after the
+		// key import to validate the requested usages for the resulting key.
+		algorithmName string
 	)
 
 	err := func() error {
@@ -855,6 +859,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 		if err != nil {
 			return err
 		}
+		algorithmName = normalized.Name
 
 		ki, err = newKeyImporter(rt, normalized, algorithm)
 		if err != nil {
@@ -875,6 +880,12 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 		result, err := func() (*CryptoKey, error) {
 			result, err := ki.ImportKey(format, keyBytes, extractable, keyUsages)
 			if err != nil {
+				return nil, err
+			}
+
+			// Any requested usage that is not valid for the imported key's algorithm
+			// and type must result in a SyntaxError, as described in the specification.
+			if err := validateKeyUsages(algorithmName, result.Type, keyUsages); err != nil {
 				return nil, err
 			}
 
