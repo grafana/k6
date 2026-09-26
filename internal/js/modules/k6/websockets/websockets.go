@@ -29,8 +29,9 @@ type RootModule struct{}
 
 // WebSocketsAPI is the k6 extension implementing the websocket API as defined in https://websockets.spec.whatwg.org
 type WebSocketsAPI struct { //nolint:revive
-	vu              modules.VU
-	blobConstructor sobek.Value
+	vu                   modules.VU
+	blobConstructor      sobek.Value
+	webSocketConstructor sobek.Value
 }
 
 var _ modules.Module = &RootModule{}
@@ -42,17 +43,27 @@ func New() *RootModule {
 
 // NewModuleInstance returns a new instance of the module
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &WebSocketsAPI{
-		vu: vu,
+	api := &WebSocketsAPI{vu: vu}
+
+	rt := vu.Runtime()
+	api.blobConstructor = rt.ToValue(api.blob)
+
+	wsConstructor, ok := rt.ToValue(api.websocket).(*sobek.Object)
+	if !ok {
+		common.Throw(rt, errors.New("websocket constructor is not a sobek.Object"))
 	}
+
+	defineReadyStateProperties(rt, wsConstructor)
+	api.webSocketConstructor = wsConstructor
+
+	return api
 }
 
 // Exports implements the modules.Instance interface's Exports
 func (r *WebSocketsAPI) Exports() modules.Exports {
-	r.blobConstructor = r.vu.Runtime().ToValue(r.blob)
 	return modules.Exports{
 		Named: map[string]any{
-			"WebSocket": r.websocket,
+			"WebSocket": r.webSocketConstructor,
 			"Blob":      r.blobConstructor,
 		},
 	}
@@ -84,8 +95,14 @@ type webSocket struct {
 	obj            *sobek.Object // the object that is given to js to interact with the WebSocket
 	started        time.Time
 
-	done         chan struct{}
-	writeQueueCh chan message
+	done          chan struct{}
+	writeQueueCh  chan message
+	connectCancel context.CancelFunc
+
+	connectionMu sync.Mutex
+	// pendingConnection and publishing conn are guarded by connectionMu. Once connected, it also
+	// orders successful writes before events for data that the peer can only send after that write.
+	pendingConnection net.Conn
 
 	eventListeners *eventListeners
 
@@ -134,6 +151,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		}
 	}
 
+	connectionCtx, connectCancel := context.WithCancel(r.vu.Context())
 	w := &webSocket{
 		vu:              r.vu,
 		blobConstructor: r.blobConstructor,
@@ -143,6 +161,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		builtinMetrics:  r.vu.State().BuiltinMetrics,
 		done:            make(chan struct{}),
 		writeQueueCh:    make(chan message),
+		connectCancel:   connectCancel,
 		eventListeners:  newEventListeners(),
 		obj:             rt.NewObject(),
 		tagsAndMeta:     params.tagsAndMeta,
@@ -153,7 +172,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 	// Maybe have this after the goroutine below ?!?
 	defineWebsocket(rt, w)
 
-	go w.establishConnection(params)
+	go w.establishConnection(connectionCtx, params)
 	return w.obj
 }
 
@@ -198,7 +217,7 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 		"url", rt.ToValue(w.url.String()), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty( // this needs to be with an accessor as we change the value
 		"readyState", rt.ToValue(func() sobek.Value {
-			return rt.ToValue((uint)(w.readyState))
+			return rt.ToValue(uint(w.readyState))
 		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
 		"bufferedAmount", rt.ToValue(func() sobek.Value { return rt.ToValue(w.bufferedAmount) }), nil,
@@ -244,7 +263,8 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 					common.Throw(rt, fmt.Errorf("a value for '%s' should be callable", property))
 				}
 
-				el.setOn(func(v sobek.Value) (sobek.Value, error) { return fn(sobek.Undefined(), v) })
+				el.setOn(w.wrapUnderCurrentMetricContext(
+					func(v sobek.Value) (sobek.Value, error) { return fn(sobek.Undefined(), v) }))
 
 				return nil
 			}), sobek.FLAG_FALSE, sobek.FLAG_TRUE))
@@ -256,6 +276,20 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 	setOn("onclose", w.eventListeners.getType(events.CLOSE))
 	setOn("onping", w.eventListeners.getType(events.PING))
 	setOn("onpong", w.eventListeners.getType(events.PONG))
+
+	defineReadyStateProperties(rt, w.obj)
+}
+
+// the spec defines constants for the ready state on both the constructor and actual instances
+func defineReadyStateProperties(rt *sobek.Runtime, target *sobek.Object) {
+	must(rt, target.DefineDataProperty(
+		"OPEN", rt.ToValue(uint(OPEN)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty(
+		"CLOSED", rt.ToValue(uint(CLOSED)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty(
+		"CLOSING", rt.ToValue(uint(CLOSING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+	must(rt, target.DefineDataProperty(
+		"CONNECTING", rt.ToValue(uint(CONNECTING)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 }
 
 type message struct {
@@ -265,34 +299,19 @@ type message struct {
 }
 
 // documented https://websockets.spec.whatwg.org/#concept-websocket-establish
-func (w *webSocket) establishConnection(params *wsParams) {
+func (w *webSocket) establishConnection(ctx context.Context, params *wsParams) {
+	defer w.connectCancel()
+
 	state := w.vu.State()
 	w.started = time.Now()
-	var tlsConfig *tls.Config
-	if state.TLSConfig != nil {
-		tlsConfig = state.TLSConfig.Clone()
-		tlsConfig.NextProtos = []string{"http/1.1"}
-	}
-	// technically we have to do a fetch request here, so ... uh do normal one ;)
-	wsd := websocket.Dialer{
-		HandshakeTimeout: time.Second * 60, // TODO configurable
-		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
-		// the underlying net.Conn with our own tracked netext.Conn
-		NetDialContext:    state.Dialer.DialContext,
-		Proxy:             http.ProxyFromEnvironment,
-		TLSClientConfig:   tlsConfig,
-		EnableCompression: params.enableCompression,
-		Subprotocols:      params.subprocotols,
-	}
-
-	// this is needed because of how interfaces work and that wsd.Jar is http.Cookiejar
-	if params.cookieJar != nil {
-		wsd.Jar = params.cookieJar
-	}
-
-	ctx := w.vu.Context()
+	handshakeDone := make(chan struct{})
+	go w.closePendingConnectionOnContextDone(ctx, handshakeDone)
 	start := time.Now()
-	conn, httpResponse, connErr := wsd.DialContext(ctx, w.url.String(), params.headers)
+	conn, httpResponse, connErr := w.dial(ctx, params)
+	w.connectionMu.Lock()
+	w.pendingConnection = nil
+	w.connectionMu.Unlock()
+	close(handshakeDone)
 	connectionEnd := time.Now()
 	connectionDuration := metrics.D(connectionEnd.Sub(start))
 
@@ -316,10 +335,8 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		w.extensions = httpResponse.Header.Values("Sec-WebSocket-Extensions")
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, w.protocol)
 	}
-	w.conn = conn
-
 	nameTagValue, nameTagManuallySet := params.tagsAndMeta.Tags.Get(metrics.TagName.String())
-	// After k6 v0.41.0, the `name` and `url` tags have the exact same values:
+	// After k6 v0.41.0, the name and URL tags have the same values.
 	if nameTagManuallySet {
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagURL, nameTagValue)
 	} else {
@@ -327,7 +344,8 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagName, w.url.String())
 	}
 
-	w.emitConnectionMetrics(ctx, start, connectionDuration)
+	//nolint:contextcheck // Handshake cancellation must not suppress connection metrics.
+	w.emitConnectionMetrics(w.vu.Context(), start, connectionDuration)
 	if connErr != nil {
 		// Pass the error to the user script before exiting immediately
 		w.tq.Queue(func() error {
@@ -336,10 +354,86 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		w.tq.Close()
 		return
 	}
+
+	w.connectionMu.Lock()
+	if ctx.Err() != nil {
+		w.connectionMu.Unlock()
+		_ = conn.Close()
+		w.tq.Queue(func() error {
+			return w.connectionClosedWithError(ctx.Err())
+		})
+		w.tq.Close()
+		return
+	}
+	w.conn = conn
+	//nolint:contextcheck // An established connection is governed by the longer-lived VU context.
 	go w.loop()
+	w.connectionMu.Unlock()
 	w.tq.Queue(func() error {
 		return w.connectionConnected()
 	})
+}
+
+func (w *webSocket) dial(ctx context.Context, params *wsParams) (*websocket.Conn, *http.Response, error) {
+	state := w.vu.State()
+	var tlsConfig *tls.Config
+	if state.TLSConfig != nil {
+		tlsConfig = state.TLSConfig.Clone()
+		tlsConfig.NextProtos = []string{"http/1.1"}
+	}
+	// technically we have to do a fetch request here, so ... uh do normal one ;)
+	wsd := websocket.Dialer{
+		HandshakeTimeout: time.Second * 60, // TODO configurable
+		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
+		// the underlying net.Conn with our own tracked netext.Conn
+		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			conn, err := state.Dialer.DialContext(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+
+			w.connectionMu.Lock()
+			if ctx.Err() != nil {
+				w.connectionMu.Unlock()
+				_ = conn.Close()
+				return nil, ctx.Err()
+			}
+			w.pendingConnection = conn
+			w.connectionMu.Unlock()
+
+			return conn, nil
+		},
+		Proxy:             http.ProxyFromEnvironment,
+		TLSClientConfig:   tlsConfig,
+		EnableCompression: params.enableCompression,
+		Subprotocols:      params.subprocotols,
+	}
+
+	// this is needed because of how interfaces work and that wsd.Jar is http.Cookiejar
+	if params.cookieJar != nil {
+		wsd.Jar = params.cookieJar
+	}
+
+	return wsd.DialContext(ctx, w.url.String(), params.headers)
+}
+
+func (w *webSocket) closePendingConnectionOnContextDone(ctx context.Context, handshakeDone <-chan struct{}) {
+	select {
+	case <-ctx.Done():
+	case <-handshakeDone:
+		return
+	}
+	w.closePendingConnection()
+}
+
+func (w *webSocket) closePendingConnection() {
+	w.connectionMu.Lock()
+	conn := w.pendingConnection
+	w.pendingConnection = nil
+	w.connectionMu.Unlock()
+	if conn != nil {
+		_ = conn.Close()
+	}
 }
 
 // emitConnectionMetrics emits the metrics for a websocket connection.
@@ -392,8 +486,8 @@ func (w *webSocket) loop() {
 		return nil
 	})
 
-	ctx := w.vu.Context()
 	wg := new(sync.WaitGroup)
+	ctx := w.vu.Context()
 
 	defer func() {
 		metrics.PushIfNotDone(ctx, w.vu.State().Samples, metrics.Sample{
@@ -510,18 +604,21 @@ func (w *webSocket) readPump(wg *sync.WaitGroup) {
 	for {
 		messageType, data, err := w.conn.ReadMessage()
 		if err == nil {
+			// An immediate peer response can arrive before WriteMessage() returns. Wait for the
+			// writer to queue its bufferedAmount update before queuing the corresponding event.
+			w.connectionMu.Lock()
 			w.queueMessage(&message{
 				mtype: messageType,
 				data:  data,
 				t:     time.Now(),
 			})
+			w.connectionMu.Unlock()
 			continue
 		}
 
-		var closeErr *websocket.CloseError
 		var code int
 		var reason string
-		if errors.As(err, &closeErr) {
+		if closeErr, ok := errors.AsType[*websocket.CloseError](err); ok {
 			code = closeErr.Code
 			reason = closeErr.Text
 		}
@@ -559,6 +656,10 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 				}
 				size := len(msg.data)
 
+				// Lock before writing because the peer can respond while WriteMessage() is still
+				// returning. Keep the lock through Queue() so readPump cannot queue that response
+				// ahead of the bufferedAmount update on the JavaScript event loop.
+				w.connectionMu.Lock()
 				err := func() error {
 					if msg.mtype != websocket.PingMessage {
 						return w.conn.WriteMessage(msg.mtype, msg.data)
@@ -567,6 +668,15 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 					// WriteControl is concurrently okay
 					return w.conn.WriteControl(msg.mtype, msg.data, msg.t.Add(writeWait))
 				}()
+				if err == nil {
+					// This from the specification needs to happen like that instead of with
+					// atomics or locks outside of the event loop.
+					w.tq.Queue(func() error {
+						w.bufferedAmount -= size
+						return nil
+					})
+				}
+				w.connectionMu.Unlock()
 				if err != nil {
 					w.tq.Queue(func() error {
 						_ = w.conn.Close() // TODO fix
@@ -575,12 +685,6 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 					})
 					return
 				}
-				// This from the specification needs to happen like that instead of with
-				// atomics or locks outside of the event loop
-				w.tq.Queue(func() error {
-					w.bufferedAmount -= size
-					return nil
-				})
 
 				metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
 					TimeSeries: metrics.TimeSeries{
@@ -765,10 +869,6 @@ func isValidCloseReason(reason string) bool {
 }
 
 func (w *webSocket) close(code int, reason string) error {
-	if w.readyState == CLOSED || w.readyState == CLOSING {
-		return nil
-	}
-
 	if code != 0 && !isValidClientCloseCode(code) {
 		return fmt.Errorf(
 			"InvalidAccessError: Failed to execute 'close' on 'WebSocket': "+
@@ -782,13 +882,31 @@ func (w *webSocket) close(code int, reason string) error {
 			`SyntaxError: Failed to execute 'close' on 'WebSocket': The message must not be greater than 123 bytes`,
 		)
 	}
-
+	if w.readyState == CLOSED || w.readyState == CLOSING {
+		return nil
+	}
 	if code == 0 {
 		code = websocket.CloseNormalClosure
 	}
-
-	w.readyState = CLOSING
 	w.closeCode = code
+
+	wasConnecting := w.readyState == CONNECTING
+	w.readyState = CLOSING
+	if wasConnecting {
+		w.connectionMu.Lock()
+		w.connectCancel()
+		pendingConnection := w.pendingConnection
+		w.pendingConnection = nil
+		connectionEstablished := w.conn != nil
+		w.connectionMu.Unlock()
+
+		if pendingConnection != nil {
+			_ = pendingConnection.Close()
+		}
+		if !connectionEstablished {
+			return nil
+		}
+	}
 
 	w.writeQueueCh <- message{
 		mtype: websocket.CloseMessage,
@@ -834,7 +952,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 	return w.callEventListeners(events.CLOSE)
 }
 
-// newEvent return an event implementing "implements" https://dom.spec.whatwg.org/#event
+// newEvent returns an event implementing "implements" https://dom.spec.whatwg.org/#event
 // needs to be called on the event loop
 // TODO: move to events
 func (w *webSocket) newEvent(eventType string, t time.Time, funcOptions ...func(*sobek.Object)) *sobek.Object {
@@ -926,8 +1044,23 @@ func (w *webSocket) addEventListener(event string, handler func(sobek.Value) (so
 		common.Throw(w.vu.Runtime(), fmt.Errorf("handler for event type %q isn't a callable function", event))
 	}
 
-	if err := w.eventListeners.add(event, handler); err != nil {
+	if err := w.eventListeners.add(event, w.wrapUnderCurrentMetricContext(handler)); err != nil {
 		w.vu.State().Logger.Warnf("can't add event handler: %s", err)
+	}
+}
+
+// WebSocket listeners run outside Sobek's promise machinery.
+func (w *webSocket) wrapUnderCurrentMetricContext(
+	fn func(sobek.Value) (sobek.Value, error),
+) func(sobek.Value) (sobek.Value, error) {
+	if !common.AsyncMetricContextEnabled(w.vu.State()) {
+		return fn
+	}
+	captured := common.CaptureMetricContext(w.vu.State())
+	return func(v sobek.Value) (sobek.Value, error) {
+		return common.RunWithMetricContext(captured, func() (sobek.Value, error) {
+			return fn(v)
+		})
 	}
 }
 

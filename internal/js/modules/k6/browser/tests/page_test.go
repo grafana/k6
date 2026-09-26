@@ -32,11 +32,6 @@ import (
 	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
-type jsFrameBaseOpts struct {
-	Timeout string
-	Strict  bool
-}
-
 const sampleHTML = `<div><b>Test</b><ol><li><i>One</i></li></ol></div>`
 
 func TestNestedFrames(t *testing.T) {
@@ -441,7 +436,7 @@ func TestPageInnerHTML(t *testing.T) {
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
 		popts := common.NewFrameInnerHTMLOptions(p.MainFrame().Timeout())
-		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		popts.Timeout = 100 * time.Millisecond
 		_, err = p.InnerHTML("p", popts)
 		require.Error(t, err)
 	})
@@ -479,7 +474,7 @@ func TestPageInnerText(t *testing.T) {
 		require.NoError(t, err)
 
 		popts := common.NewFrameInnerTextOptions(p.MainFrame().Timeout())
-		require.NoError(t, popts.Parse(tb.vu.Context(), tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})))
+		popts.Timeout = 100 * time.Millisecond
 		_, err = p.InnerText("p", popts)
 		require.Error(t, err)
 	})
@@ -679,6 +674,16 @@ func TestPageSetChecked(t *testing.T) {
 	assert.False(t, checked)
 }
 
+type timeoutScreenshotPersister struct {
+	called bool
+}
+
+func (p *timeoutScreenshotPersister) Persist(ctx context.Context, _ string, _ io.Reader) error {
+	p.called = true
+	<-ctx.Done()
+	return ctx.Err()
+}
+
 func TestPageScreenshotFullpage(t *testing.T) {
 	t.Parallel()
 
@@ -698,7 +703,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 
 		const div = document.createElement('div');
 		div.style.width = '1280px';
-		div.style.height = '800px';
+		div.style.height = '1600px';
 		div.style.background = 'linear-gradient(to bottom, red, blue)';
 
 		document.body.appendChild(div);
@@ -715,21 +720,37 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	opts.FullPage = true
 	buf, err := p.Screenshot(opts, &mockPersister{})
 	require.NoError(t, err)
+	assert.Equal(t, map[string]float64{"width": 1280, "height": 800}, p.ViewportSize())
+	viewportRestored, err := p.Evaluate(`() => window.innerWidth === 1280 && window.innerHeight === 800`)
+	require.NoError(t, err)
+	assert.Equal(t, true, viewportRestored)
 
 	reader := bytes.NewReader(buf)
 	img, err := png.Decode(reader)
 	assert.Nil(t, err)
 
 	assert.Equal(t, 1280, img.Bounds().Max.X, "want: screenshot width is 1280px, got: %dpx", img.Bounds().Max.X)
-	assert.Equal(t, 800, img.Bounds().Max.Y, "want: screenshot height is 800px, got: %dpx", img.Bounds().Max.Y)
+	assert.Equal(t, 1600, img.Bounds().Max.Y, "want: screenshot height is 1600px, got: %dpx", img.Bounds().Max.Y)
 
 	// Allow tolerance to account for differences in rendering between
 	// different platforms and browsers. The goal is to ensure that the
 	// screenshot is mostly red at the top and mostly blue at the bottom.
 	r, _, b, _ := img.At(0, 0).RGBA()
 	assert.Truef(t, r > b*2, "want: the top pixel to be dominantly red, got R: %d, B: %d", r, b)
-	r, _, b, _ = img.At(0, 799).RGBA()
+	r, _, b, _ = img.At(0, 1599).RGBA()
 	assert.Truef(t, b > r*2, "want: the bottom pixel to be dominantly blue, got R: %d, B: %d", r, b)
+
+	// A deadline after capture must also restore the enlarged viewport.
+	p.SetDefaultTimeout(2000)
+	opts.Path = "unused.png"
+	persister := &timeoutScreenshotPersister{}
+	_, err = p.Screenshot(opts, persister)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.True(t, persister.called)
+	assert.Equal(t, map[string]float64{"width": 1280, "height": 800}, p.ViewportSize())
+	viewportRestored, err = p.Evaluate(`() => window.innerWidth === 1280 && window.innerHeight === 800`)
+	require.NoError(t, err)
+	assert.Equal(t, true, viewportRestored)
 }
 
 func TestPageTitle(t *testing.T) {
@@ -1478,33 +1499,45 @@ func TestPageWaitForSelector(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name          string
-		url           string
-		opts          map[string]any
-		customTimeout time.Duration
-		selector      string
-		errAssert     func(*testing.T, error)
+		name     string
+		selector string
+		state    common.DOMElementState
+		timeout  time.Duration
+		wantNil  bool
+		wantErr  string
 	}{
 		{
 			name:     "should wait for selector",
-			url:      "wait_for.html",
 			selector: "#my-div",
-			errAssert: func(t *testing.T, e error) {
-				t.Helper()
-				assert.Nil(t, e)
-			},
+			state:    common.DOMElementStateVisible,
+			timeout:  common.DefaultTimeout,
 		},
 		{
-			name: "should TO waiting for selector",
-			url:  "wait_for.html",
-			// set a timeout smaller than the time
-			// it takes the element to show up
-			customTimeout: time.Nanosecond,
-			selector:      "#my-div",
-			errAssert: func(t *testing.T, e error) {
-				t.Helper()
-				assert.ErrorContains(t, e, "timed out after")
-			},
+			name:     "should TO waiting for selector",
+			selector: "#my-div",
+			state:    common.DOMElementStateVisible,
+			timeout:  time.Nanosecond,
+			wantErr:  "timed out after",
+		},
+		{
+			name:     "absent hidden element",
+			selector: "#absent",
+			state:    common.DOMElementStateHidden,
+			timeout:  time.Second,
+			wantNil:  true,
+		},
+		{
+			name:     "absent detached element",
+			selector: "#absent",
+			state:    common.DOMElementStateDetached,
+			timeout:  time.Second,
+			wantNil:  true,
+		},
+		{
+			name:     "existing hidden element",
+			selector: "head",
+			state:    common.DOMElementStateHidden,
+			timeout:  time.Second,
 		},
 	}
 
@@ -1513,24 +1546,25 @@ func TestPageWaitForSelector(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
-
 			page := tb.NewPage(nil)
-			opts := &common.FrameGotoOptions{
+			_, err := page.Goto(tb.staticURL("wait_for.html"), &common.FrameGotoOptions{
 				Timeout: common.DefaultTimeout,
-			}
-			_, err := page.Goto(
-				tb.staticURL(tc.url),
-				opts,
-			)
+			})
 			require.NoError(t, err)
 
-			timeout := page.MainFrame().Timeout()
-			if tc.customTimeout != 0 {
-				timeout = tc.customTimeout
+			opts := common.NewFrameWaitForSelectorOptions(tc.timeout)
+			opts.State = tc.state
+			element, err := page.WaitForSelector(tc.selector, opts)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
 			}
-
-			_, err = page.WaitForSelector(tc.selector, common.NewFrameWaitForSelectorOptions(timeout))
-			tc.errAssert(t, err)
+			require.NoError(t, err)
+			if tc.wantNil {
+				assert.Nil(t, element)
+			} else {
+				assert.NotNil(t, element)
+			}
 		})
 	}
 }

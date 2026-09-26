@@ -62,6 +62,7 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 	rt := vu.Runtime()
 
 	obj := rt.NewObject()
+	// Capture the native predicate before user scripts can replace ArrayBuffer.isView.
 	arrayBufferIsView, err := getArrayBufferIsView(rt)
 	if err != nil {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
@@ -81,11 +82,7 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
 	}
 
-	if err := setReadOnlyPropertyOf(
-		obj,
-		"subtle",
-		rt.ToValue(newSubtleCryptoObject(vu, arrayBufferIsView)),
-	); err != nil {
+	if err := setReadOnlyPropertyOf(obj, "subtle", rt.ToValue(newSubtleCryptoObject(vu, arrayBufferIsView))); err != nil {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
 	}
 

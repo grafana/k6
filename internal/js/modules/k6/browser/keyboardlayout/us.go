@@ -1,3 +1,4 @@
+//nolint:goconst
 package keyboardlayout
 
 //nolint:funlen

@@ -7,7 +7,7 @@ labels: ["release"]
 
 **Release Date**:
 
-22nd June 2026 **<- WRITE HERE THE UPDATED RELEASE DATE**
+21st September 2026 **<- WRITE HERE THE UPDATED RELEASE DATE**
 
 ## Release Activities
 
@@ -15,8 +15,15 @@ labels: ["release"]
 
 - [ ] Create a new `release-v{major}.{minor}.0` branch.
     - [ ] Add a new release notes file using the available [template](https://github.com/grafana/k6/blob/master/release%20notes/template.md) to the [repository's `release notes` folder](https://github.com/grafana/k6/blob/master/release%20notes).
-    - [ ] Go through the potential [dependencies updates](https://github.com/grafana/k6/blob/master/Dependencies.md) and create a dedicated PR if any of them is relevant to this release.
 - [ ] Create a new `release-v{major}.{minor}.0` branch on the [grafana/k6-DefinitelyTyped](https://github.com/grafana/k6-DefinitelyTyped) fork repository.
+    - Branch directly off `upstream/master`, so the branch starts from the latest upstream state. Do **not** use GitHub's "Sync fork" button: repository rules on the fork block it and they cannot be amended.
+
+      ```
+      git remote add upstream https://github.com/DefinitelyTyped/DefinitelyTyped.git  # only once
+      git fetch upstream
+      git checkout -b release-v2.3.0 upstream/master
+      git push -u origin release-v2.3.0
+      ```
     - [ ] Bump the version in [types/k6/package.json](https://github.com/grafana/k6-DefinitelyTyped/blob/master/types/k6/package.json#L4) to the next one.
 - [ ] [Lock the conversation](https://docs.github.com/en/communities/moderating-comments-and-conversations/locking-conversations) of the current issue to prevent any abuse or misuse of the issue. Note, it still allow the maintainers to edit the issue's description and to add comments.
 
@@ -25,7 +32,6 @@ labels: ["release"]
 #### ~ 2 weeks before the release date
 
 - [ ] Ensure that all PRs from a release milestone are merged.
-- [ ] Ensure experimental modules (if needed) have been updated to their latest version.
 
 #### ~ 1 week before the release date
 
@@ -38,7 +44,7 @@ labels: ["release"]
 - [ ] Share the release notes PR with the k6 open-source teams. Request contributions from all affected teams and any other stakeholders involved in the new release.
 - [ ] Open a separate PR for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/internal/build/version.go#L6).
 - [ ] Open a PR in the `DefinitelyTyped/DefinitelyTyped` repository using the release branch created in the grafana/k6-DefinitelyTyped fork to update the k6 type definitions for the new release.
-- [ ] Open a PR to add the new k6 version to the extensions registry (similar to [this one](https://github.com/grafana/k6-extension-registry/pull/104) for v2.1.0).
+- [ ] Open a PR to add the new k6 version to the extensions registry (similar to [this one](https://github.com/grafana/k6-extension-registry/pull/261) for v2.2.0).
 
 #### ~ 1 day before the release date
 
@@ -50,12 +56,14 @@ labels: ["release"]
 
 - [ ] Open and merge a PR from `main` in the `k6-docs` repository:
   - [ ] Creating a new `v{major}.{minor}.0` file in the [next release notes folder](https://github.com/grafana/k6-docs/tree/main/docs/sources/k6/next/release-notes) and copy/paste the main sections of the release notes (new features, deprecations and roadmap).
-  - [ ] Copying the current k6's `next` (including the newly created release note file) to a folder named with the k6 version (e.g., `v2.1.x`).
+    - Include the front matter (`title`, `menuTitle`, `description`, `weight`), or the page won't appear in the release notes index.
+  - [ ] Copying the current k6's `next` (including the newly created release note file) to a folder named with the k6 version (e.g., `v2.2.x`).
+  - [ ] Ensure the file is in `next` and the highest version folder, not only its own. Only the highest tree is published as `latest`, so notes left in an older folder are lost (see [k6-docs#2299](https://github.com/grafana/k6-docs/pull/2299)). Applies to patch releases from maintenance branches too.
 - [ ] Ensure the `k6` repository release notes PR contains the correct links to the docs.
 
 #### In k6 repository
 
-- [ ] Merge the PR bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/lib/consts/consts.go#L11-L12).
+- [ ] Merge the PR bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/internal/build/version.go#L6).
 - [ ] Merge the release notes PR.
 - [ ] Pull locally the previously merged changes.
 - [ ] Create a new long-lived `v{major}.{minor}.x` release branch from the `master` branch.
@@ -64,7 +72,7 @@ labels: ["release"]
 !!! Update the below when making the issue
 
 ```
-git checkout master && git pull && git checkout -b v2.1.x && git tag v2.1.0 -m "v2.1.0" && git push origin v2.1.0
+git checkout master && git pull && git checkout -b v2.3.x && git push -u origin v2.3.x && git tag v2.3.0 -m "v2.3.0" && git push origin v2.3.0
 ```
 
 #### In k6-extension-registry
@@ -80,5 +88,4 @@ git checkout master && git pull && git checkout -b v2.1.x && git tag v2.1.0 -m "
 ## Wrapping Release
 
 - [ ] Ensure the `DefinitelyTyped/DefinitelyTyped` PR(s) are merged.
-- [ ] Ensure to sync `grafana/k6-DefinitelyTyped` fork with the latest changes from the `DefinitelyTyped/DefinitelyTyped` repository.
 - [ ] Update the k6 repository's `.github/ISSUE_TEMPLATE/release.md` in the event steps from this checklist were incorrect or missing.

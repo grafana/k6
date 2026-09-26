@@ -134,6 +134,7 @@ func (o *Output) staleMarkers() []*prompb.TimeSeries {
 	staleMarkers := make([]*prompb.TimeSeries, 0, len(o.tsdb))
 	for _, swm := range o.tsdb {
 		series := swm.MapPrompb()
+		addTimeSeriesLabels(series, o.config.Labels)
 		// series' length is expected to be equal to 1 for most of the cases
 		// the unique exception where more than 1 is expected is when
 		// trend stats have been configured with multiple values.
@@ -300,9 +301,17 @@ func (o *Output) convertToPbSeries(samplesContainers []metrics.SampleContainer) 
 
 	pbseries := make([]*prompb.TimeSeries, 0, len(seen))
 	for s := range seen {
-		pbseries = append(pbseries, o.tsdb[s].MapPrompb()...)
+		series := o.tsdb[s].MapPrompb()
+		addTimeSeriesLabels(series, o.config.Labels)
+		pbseries = append(pbseries, series...)
 	}
 	return pbseries
+}
+
+func addTimeSeriesLabels(series []*prompb.TimeSeries, labels map[string]string) {
+	for _, s := range series {
+		s.Labels = addLabels(s.Labels, labels)
+	}
 }
 
 type seriesWithMeasure struct {

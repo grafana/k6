@@ -56,6 +56,11 @@ var domElementStateToID = map[string]DOMElementState{ //nolint:gochecknoglobals
 	"hidden":   DOMElementStateHidden,
 }
 
+func DOMElementStateIDFromString(format string) (DOMElementState, bool) {
+	id, exists := domElementStateToID[format]
+	return id, exists
+}
+
 // MarshalJSON marshals the enum as a quoted JSON string.
 func (s DOMElementState) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
@@ -496,6 +501,9 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 		return nil, err
 	}
 	if handle == nil {
+		if opts.State == DOMElementStateHidden || opts.State == DOMElementStateDetached {
+			return nil, nil //nolint:nilnil
+		}
 		return nil, fmt.Errorf("waiting for selector %q did not result in any nodes", selector)
 	}
 
@@ -1660,6 +1668,15 @@ func (f *Frame) QueryAll(selector string) ([]*ElementHandle, error) {
 
 // Page returns page that owns frame.
 func (f *Frame) Page() *Page {
+	if f == nil {
+		return nil
+	}
+	if f.page != nil {
+		return f.page
+	}
+	if f.manager == nil {
+		return nil
+	}
 	return f.manager.page
 }
 

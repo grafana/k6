@@ -64,7 +64,7 @@ make grpc-server-run
 
 **JavaScript Runtime**: `internal/js/` and `js/`
 - `internal/js/`: Core JavaScript execution engine using Sobek (Goja fork)
-- `js/modules/`: Built-in k6 modules (http, browser, crypto, etc.)
+- `js/modules/`: Built-in k6 modules (http, html)
 - `js/common/`: Shared JavaScript runtime utilities
 
 **Load Testing Core**: `lib/`
@@ -110,7 +110,7 @@ make grpc-server-run
 
 - `.golangci.yml`: Linter configuration (version pinned at top)
 - `Makefile`: Build targets and development commands
-- `go.mod`: Go module dependencies (use Go 1.23+)
+- `go.mod`: Go module dependencies (see `go.mod` for the minimum required Go version)
 - `Dependencies.md`: Dependency update policy and guidelines
 - `modtools_frozen.yml`: Dependencies that should not be auto-updated
 
@@ -184,7 +184,7 @@ git log
 ## Common File Locations
 
 **CLI Commands**: `internal/cmd/` (run.go, cloud.go, etc.)
-**HTTP Module**: `js/modules/k6/http/` and `internal/js/modules/k6/http/`  
+**HTTP Module**: `js/modules/k6/http/`  
 **Browser Module**: `internal/js/modules/k6/browser/`
 **Metrics**: `metrics/` package for metric definitions
 **Examples**: `examples/` directory with various test script examples

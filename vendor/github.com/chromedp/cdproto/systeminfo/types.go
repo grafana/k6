@@ -122,17 +122,6 @@ func (t *ImageType) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
-// ImageDecodeAcceleratorCapability describes a supported image decoding
-// profile with its associated minimum and maximum resolutions and subsampling.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/SystemInfo#type-ImageDecodeAcceleratorCapability
-type ImageDecodeAcceleratorCapability struct {
-	ImageType     ImageType           `json:"imageType"`     // Image coded, e.g. Jpeg.
-	MaxDimensions *Size               `json:"maxDimensions"` // Maximum supported dimensions of the image in pixels.
-	MinDimensions *Size               `json:"minDimensions"` // Minimum supported dimensions of the image in pixels.
-	Subsamplings  []SubsamplingFormat `json:"subsamplings"`  // Optional array of supported subsampling formats, e.g. 4:2:0, if known.
-}
-
 // GPUInfo provides information about the GPU(s) on the system.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/SystemInfo#type-GPUInfo
@@ -143,7 +132,6 @@ type GPUInfo struct {
 	DriverBugWorkarounds []string                            `json:"driverBugWorkarounds"` // An optional array of GPU driver bug workarounds.
 	VideoDecoding        []*VideoDecodeAcceleratorCapability `json:"videoDecoding"`        // Supported accelerated video decoding capabilities.
 	VideoEncoding        []*VideoEncodeAcceleratorCapability `json:"videoEncoding"`        // Supported accelerated video encoding capabilities.
-	ImageDecoding        []*ImageDecodeAcceleratorCapability `json:"imageDecoding"`        // Supported accelerated image decoding capabilities.
 }
 
 // ProcessInfo represents process info.

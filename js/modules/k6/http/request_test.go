@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -1233,6 +1234,21 @@ func TestRequest(t *testing.T) {
 		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "DELETE", sr("HTTPBIN_URL/delete?test=mest"), 200, "")
 	})
 
+	// http.query() is a convenience wrapper for the HTTP QUERY method
+	// (RFC 10008), which carries a request body like POST but with
+	// GET-like safe, idempotent semantics.
+	t.Run("QUERY", func(t *testing.T) {
+		_, err := rt.RunString(sr(`
+		var res = http.query("HTTPBIN_URL/anything/query", '{"filter": "all"}', {headers: {"Content-Type": "application/json", "X-We-Want-This": "value"}});
+		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+		if (res.json().method != "QUERY") { throw new Error("wrong method: " + res.json().method); }
+		if (res.json().data != '{"filter": "all"}') { throw new Error("wrong body: " + res.json().data); }
+		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
+		`))
+		require.NoError(t, err)
+		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "QUERY", sr("HTTPBIN_URL/anything/query"), 200, "")
+	})
+
 	postMethods := map[string]string{
 		"POST":  "post",
 		"PUT":   "put",
@@ -1311,6 +1327,72 @@ func TestRequest(t *testing.T) {
 				`))
 			assert.NoError(t, err)
 		})
+	})
+}
+
+// TestRequestFormBodyEncoding verifies how JS object bodies that get
+// auto-encoded as application/x-www-form-urlencoded handle null/undefined and
+// nested values. See https://github.com/grafana/k6/issues/1185.
+func TestRequestFormBodyEncoding(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	sr := tb.Replacer.Replace
+
+	// url.Values.Encode sorts keys alphabetically and preserves slice order
+	// within a key, so the encoded body is deterministic and can be asserted
+	// on directly.
+	t.Run("null and undefined are encoded as empty values", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {data: "something", another: null, missing: undefined});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "another=&data=something&missing=") {
+				throw new Error("wrong body: " + res.request.body);
+			}
+		`))
+		require.NoError(t, err)
+		assert.Nil(t, ts.hook.LastEntry())
+	})
+
+	t.Run("null inside an array is encoded as empty", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {c: ["one", null]});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "c=one&c=") { throw new Error("wrong body: " + res.request.body); }
+		`))
+		require.NoError(t, err)
+		assert.Nil(t, ts.hook.LastEntry())
+	})
+
+	t.Run("nested objects are not encoded as map[...] and log a warning", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {a: "x", nested: {inner: 1}});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "a=x&nested=") { throw new Error("wrong body: " + res.request.body); }
+		`))
+		require.NoError(t, err)
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "cannot urlencode a nested")
+	})
+
+	t.Run("arrays of objects are not encoded as map[...] and log a warning", func(t *testing.T) {
+		ts.hook.Reset()
+		_, err := rt.RunString(sr(`
+			var res = http.post("HTTPBIN_URL/post", {items: [{x: 1}, {y: 2}]});
+			if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+			if (res.request.body !== "items=&items=") { throw new Error("wrong body: " + res.request.body); }
+		`))
+		require.NoError(t, err)
+		logEntry := ts.hook.LastEntry()
+		require.NotNil(t, logEntry)
+		assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+		assert.Contains(t, logEntry.Message, "cannot urlencode a nested")
 	})
 }
 
@@ -1447,8 +1529,8 @@ func TestRequestCompression(t *testing.T) {
 		var prev io.Reader = compressedBuf
 
 		if expectedEncoding != "" {
-			for i := len(algos) - 1; i >= 0; i-- {
-				prev = decompress(algos[i], prev)
+			for _, algo := range slices.Backward(algos) {
+				prev = decompress(algo, prev)
 			}
 		}
 
@@ -2274,6 +2356,124 @@ func TestDigestAuthWithBody(t *testing.T) {
 	sampleContainers := metrics.GetBufferedSamples(samples)
 	assertRequestMetricsEmitted(t, sampleContainers[0:1], "POST", urlRaw, 401, "")
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, 200, "")
+}
+
+// A server that answers a digest-authenticated request with a 401 carrying no
+// digest challenge (e.g. "Negotiate, NTLM", as IIS commonly sends) must not
+// crash k6 like the previous digest library did (index out of range panic), and
+// the actual 401 response must be surfaced to the script and the metrics.
+func TestDigestAuthNonDigestChallenge(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(false)
+
+	tb.Mux.HandleFunc("/negotiate-only", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", "Negotiate, NTLM")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("no digest here"))
+	}))
+
+	// A malformed Digest challenge must behave the same way as a missing one:
+	// the 401 response is surfaced instead of a transport error (with a warning
+	// logged by the transport).
+	tb.Mux.HandleFunc("/malformed-challenge", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Digest realm="unclosed, qop="auth"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+
+	for _, path := range []string{"/negotiate-only", "/malformed-challenge"} {
+		urlWithCreds := tb.Replacer.Replace(
+			"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT" + path)
+
+		_, err := rt.RunString(fmt.Sprintf(`
+			var res = http.get(%q, { auth: "digest" });
+			if (res.status !== 401) { throw new Error("wrong status: " + res.status); }
+			if (res.error_code !== 1401) { throw new Error("wrong error code: " + res.error_code); }
+			if (res.body !== "") { throw new Error("expected empty body, got: " + res.body); }
+		`, urlWithCreds))
+		require.NoError(t, err, "path: %s", path)
+	}
+
+	// The non-digest challenge response must keep its WWW-Authenticate header.
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/negotiate-only")
+	_, err := rt.RunString(fmt.Sprintf(`
+		var res = http.get(%q, { auth: "digest" });
+		if (res.headers["Www-Authenticate"] !== "Negotiate, NTLM") {
+			throw new Error("missing WWW-Authenticate header: " + JSON.stringify(res.headers));
+		}
+	`, urlWithCreds))
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace("http://HTTPBIN_IP:HTTPBIN_PORT/negotiate-only")
+	assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", urlRaw, 401, "")
+}
+
+// RFC 7616 digest authentication with the SHA-256 algorithm, which the previous
+// digest library (MD5-only, RFC 2617) could not complete.
+func TestDigestAuthWithSHA256(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd/SHA-256")
+
+	_, err := rt.RunString(fmt.Sprintf(`
+		var res = http.get(%q, { auth: "digest" });
+		if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
+		if (res.error_code !== 0) { throw new Error("wrong error code: " + res.error_code); }
+	`, urlWithCreds))
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace(
+		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd/SHA-256")
+	sampleContainers := metrics.GetBufferedSamples(samples)
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
+}
+
+// A digest-authenticated request to a server that requires no authentication
+// succeeds directly on the first response, and such a response must not be
+// marked as unexpected by the response callback.
+func TestDigestAuthDirectSuccess(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+
+	tb.Mux.HandleFunc("/no-auth-needed", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("come on in"))
+	}))
+
+	_, err := rt.RunString(`
+		http.setResponseCallback(http.expectedStatuses(200));
+	`)
+	require.NoError(t, err)
+
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/no-auth-needed")
+
+	_, err = rt.RunString(fmt.Sprintf(`
+		var res = http.get(%q, { auth: "digest" });
+		if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
+		if (res.body !== "come on in") { throw new Error("wrong body: " + res.body); }
+	`, urlWithCreds))
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace("http://HTTPBIN_IP:HTTPBIN_PORT/no-auth-needed")
+	assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", urlRaw, 200, "")
 }
 
 func TestBinaryResponseWithStatus0(t *testing.T) {

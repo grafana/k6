@@ -75,8 +75,7 @@ func (c *Client) handleParseRequestError(err error) (*Response, error) {
 	state.Logger.WithField("error", err).Warn("Request Failed")
 	r := httpext.NewResponse()
 	r.Error = err.Error()
-	var k6e httpext.K6Error
-	if errors.As(err, &k6e) {
+	if k6e, ok := errors.AsType[httpext.K6Error](err); ok {
 		r.ErrorCode = int(k6e.Code)
 	}
 	return &Response{Response: r, client: c}, nil
@@ -178,9 +177,36 @@ func (c *Client) parseRequest(
 		result.ResponseType = httpext.ResponseTypeText
 	}
 
+	// formatFormVal converts a single value from a JS object body into its
+	// application/x-www-form-urlencoded string representation.
+	//
+	// JavaScript null and undefined are both exported to a nil Go value; they
+	// are encoded as an empty value (e.g. "key=") instead of Go's default
+	// "<nil>" string. This matches how Node's querystring and jQuery.param
+	// serialize null/undefined. See https://github.com/grafana/k6/issues/1185.
+	//
+	// Nested objects and arrays-of-objects cannot be represented in a flat
+	// urlencoded form body. Rather than emitting Go's "map[...]"/"[...]"
+	// representation, they are encoded as an empty value and a warning is
+	// logged. Users who need to send structured data should serialize it
+	// explicitly, e.g. with JSON.stringify().
+	// See https://github.com/grafana/k6/issues/2369.
 	formatFormVal := func(v any) string {
-		// TODO: handle/warn about unsupported/nested values
-		return fmt.Sprintf("%v", v)
+		switch val := v.(type) {
+		case nil:
+			return ""
+		case string:
+			return val
+		case map[string]any, []any:
+			state.Logger.Warnf(
+				"cannot urlencode a nested %T value in a request form body; encoding it "+
+					"as an empty value, use JSON.stringify() to send structured data",
+				val,
+			)
+			return ""
+		default:
+			return fmt.Sprintf("%v", val)
+		}
 	}
 
 	handleObjectBody := func(data map[string]any) error {
@@ -415,8 +441,7 @@ func (c *Client) prepareBatchArray(requests []any) (
 		parsedReq, err := c.parseBatchRequest(i, req)
 		if err != nil {
 			resp.Error = err.Error()
-			var k6e httpext.K6Error
-			if errors.As(err, &k6e) {
+			if k6e, ok := errors.AsType[httpext.K6Error](err); ok {
 				resp.ErrorCode = int(k6e.Code)
 			}
 			results[i] = c.responseFromHTTPext(resp)
@@ -445,8 +470,7 @@ func (c *Client) prepareBatchObject(requests map[string]any) (
 		parsedReq, err := c.parseBatchRequest(key, req)
 		if err != nil {
 			resp.Error = err.Error()
-			var k6e httpext.K6Error
-			if errors.As(err, &k6e) {
+			if k6e, ok := errors.AsType[httpext.K6Error](err); ok {
 				resp.ErrorCode = int(k6e.Code)
 			}
 			results[key] = c.responseFromHTTPext(resp)

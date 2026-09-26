@@ -17,22 +17,27 @@ func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value, arrayBufferIsView sobek
 	}
 
 	if v.ExportType() != reflect.TypeFor[sobek.ArrayBuffer]() {
-		isView, err := isArrayBufferView(v, arrayBufferIsView)
+		if arrayBufferIsView == nil {
+			return nil, NewError(ImplementationError, "ArrayBuffer.isView was not captured")
+		}
+
+		isView, err := arrayBufferIsView(nil, v)
 		if err != nil {
 			return nil, NewError(OperationError, err.Error())
 		}
-		if !isView {
+		if !isView.ToBoolean() {
 			return nil, NewError(OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
 		}
 	}
 
+	// Sobek exports views as bytes within their byteOffset and byteLength.
 	var bytes []byte
 	if err := rt.ExportTo(v, &bytes); err != nil {
 		return nil, NewError(OperationError, err.Error())
 	}
 
 	// Copy the underlying byte slice to avoid the caller modifying it.
-	// Ensures this step complies with the expactations of the
+	// Ensures this step complies with the expectations of the
 	// specification: "Let [...] be the result of getting a copy of the
 	// bytes held by the [...] parameter"
 	bytesCopy := make([]byte, len(bytes))
@@ -54,18 +59,6 @@ func getArrayBufferIsView(rt *sobek.Runtime) (sobek.Callable, error) {
 		return nil, fmt.Errorf("ArrayBuffer.isView is not a function")
 	}
 	return isView, nil
-}
-
-func isArrayBufferView(v sobek.Value, isView sobek.Callable) (bool, error) {
-	if isView == nil {
-		return false, fmt.Errorf("ArrayBuffer.isView was not captured")
-	}
-
-	result, err := isView(nil, v)
-	if err != nil {
-		return false, err
-	}
-	return result.ToBoolean(), nil
 }
 
 // traverseObject traverses the given object using the given fields and returns the value

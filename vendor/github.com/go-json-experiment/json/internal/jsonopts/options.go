@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package jsonopts
 
 import (
@@ -14,6 +16,11 @@ type Options interface {
 	// JSONOptions is exported so related json packages can implement Options.
 	JSONOptions(internal.NotForPublicUse)
 }
+
+// experimentalFormatTagSupporter is a special option method that allows
+// [github.com/go-json-experiment/json.ExperimentalSupportFormatTag]
+// to enable experimental `format` tag functionality at runtime.
+type experimentalFormatTagSupporter interface{ ExperimentalSupportFormatTag() bool }
 
 // Struct is the combination of all options in struct form.
 // This is efficient to pass down the call stack and to query.
@@ -39,42 +46,30 @@ type ArshalValues struct {
 	Marshalers   any // jsonflags.Marshalers
 	Unmarshalers any // jsonflags.Unmarshalers
 
-	Format      string
-	FormatDepth int
+	Format string // valid if jsonflags.FormatTag is set
 }
 
 // DefaultOptionsV2 is the set of all options that define default v2 behavior.
 var DefaultOptionsV2 = Struct{
 	Flags: jsonflags.Flags{
-		Presence: uint64(jsonflags.AllFlags & ^jsonflags.WhitespaceFlags),
-		Values:   uint64(0),
+		Presence: uint64(jsonflags.DefaultV1Flags),
+		Values:   uint64(0), // all flags in DefaultV1Flags are false
 	},
 }
 
 // DefaultOptionsV1 is the set of all options that define default v1 behavior.
 var DefaultOptionsV1 = Struct{
 	Flags: jsonflags.Flags{
-		Presence: uint64(jsonflags.AllFlags & ^jsonflags.WhitespaceFlags),
-		Values:   uint64(jsonflags.DefaultV1Flags),
+		Presence: uint64(jsonflags.DefaultV1Flags),
+		Values:   uint64(jsonflags.DefaultV1Flags), // all flags in DefaultV1Flags are true
 	},
-}
-
-// CopyCoderOptions copies coder-specific options from src to dst.
-// This is used by json.MarshalEncode and json.UnmarshalDecode since those
-// functions ignore any coder-specific options and uses the options from the
-// Encoder or Decoder that is passed in.
-func (dst *Struct) CopyCoderOptions(src *Struct) {
-	srcFlags := src.Flags
-	srcFlags.Clear(^jsonflags.AllCoderFlags)
-	dst.Flags.Join(srcFlags)
-	dst.CoderValues = src.CoderValues
 }
 
 func (*Struct) JSONOptions(internal.NotForPublicUse) {}
 
 // GetUnknownOption is injected by the "json" package to handle Options
 // declared in that package so that "jsonopts" can handle them.
-var GetUnknownOption = func(*Struct, Options) (any, bool) { panic("unknown option") }
+var GetUnknownOption = func(Struct, Options) (any, bool) { panic("unknown option") }
 
 func GetOption[T any](opts Options, setter func(T) Options) (T, bool) {
 	// Collapse the options to *Struct to simplify lookup.
@@ -91,6 +86,13 @@ func GetOption[T any](opts Options, setter func(T) Options) (T, bool) {
 	case jsonflags.Bools:
 		v := structOpts.Flags.Get(opt)
 		ok := structOpts.Flags.Has(opt)
+		if !ok && opt == jsonflags.StringifyNumbers && structOpts.Flags.Get(jsonflags.StringTag) {
+			return any(true).(T), true // check also whether the option is specified via a `string` tag
+		}
+		return any(v).(T), ok
+	case experimentalFormatTagSupporter:
+		v := structOpts.Flags.Get(jsonflags.FormatTagSupported)
+		ok := structOpts.Flags.Has(jsonflags.FormatTagSupported)
 		return any(v).(T), ok
 	case Indent:
 		if !structOpts.Flags.Has(jsonflags.Indent) {
@@ -113,14 +115,14 @@ func GetOption[T any](opts Options, setter func(T) Options) (T, bool) {
 		}
 		return any(structOpts.DepthLimit).(T), true
 	default:
-		v, ok := GetUnknownOption(structOpts, opt)
+		v, ok := GetUnknownOption(*structOpts, opt)
 		return v.(T), ok
 	}
 }
 
 // JoinUnknownOption is injected by the "json" package to handle Options
 // declared in that package so that "jsonopts" can handle them.
-var JoinUnknownOption = func(*Struct, Options) { panic("unknown option") }
+var JoinUnknownOption = func(Struct, Options) Struct { panic("unknown option") }
 
 func (dst *Struct) Join(srcs ...Options) {
 	for _, src := range srcs {
@@ -129,6 +131,12 @@ func (dst *Struct) Join(srcs ...Options) {
 			continue
 		case jsonflags.Bools:
 			dst.Flags.Set(src)
+		case experimentalFormatTagSupporter:
+			if src.ExperimentalSupportFormatTag() {
+				dst.Flags.Set(jsonflags.FormatTagSupported | 1)
+			} else {
+				dst.Flags.Set(jsonflags.FormatTagSupported | 0)
+			}
 		case Indent:
 			dst.Flags.Set(jsonflags.Multiline | jsonflags.Indent | 1)
 			dst.Indent = string(src)
@@ -162,15 +170,36 @@ func (dst *Struct) Join(srcs ...Options) {
 				if src.Flags.Has(jsonflags.Unmarshalers) {
 					dst.Unmarshalers = src.Unmarshalers
 				}
-			}
-			if src.Format != "" {
-				dst.Format = src.Format
-				dst.FormatDepth = src.FormatDepth
+				if src.Flags.Has(jsonflags.FormatTag) {
+					dst.Format = src.Format
+				}
 			}
 		default:
-			JoinUnknownOption(dst, src)
+			*dst = JoinUnknownOption(*dst, src)
 		}
 	}
+}
+
+// InitializeMultiline sets default options implied by Multiline.
+func (s *Struct) InitializeMultiline() {
+	if !s.Flags.Has(jsonflags.SpaceAfterColon) {
+		s.Flags.Set(jsonflags.SpaceAfterColon | 1)
+	}
+	if !s.Flags.Has(jsonflags.SpaceAfterComma) {
+		s.Flags.Set(jsonflags.SpaceAfterComma | 0)
+	}
+	if !s.Flags.Has(jsonflags.Indent) {
+		s.Flags.Set(jsonflags.Indent | 1)
+		s.Indent = "\t"
+	}
+}
+
+// ChangedWhitespace reports whether whitespace values have changed.
+func ChangedWhitespace(s1, s2 Struct) bool {
+	return s1.Flags.Get(jsonflags.Multiline) != s2.Flags.Get(jsonflags.Multiline) ||
+		s1.Flags.Get(jsonflags.SpaceAfterColon) != s2.Flags.Get(jsonflags.SpaceAfterColon) ||
+		s1.Flags.Get(jsonflags.SpaceAfterComma) != s2.Flags.Get(jsonflags.SpaceAfterComma) ||
+		(s2.Flags.Get(jsonflags.Multiline) && (s1.Indent != s2.Indent || s1.IndentPrefix != s2.IndentPrefix))
 }
 
 type (

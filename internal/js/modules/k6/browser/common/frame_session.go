@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 	k6metrics "go.k6.io/k6/v2/metrics"
 
@@ -40,6 +41,25 @@ const utilityWorldName = "__k6_browser_utility_world__"
 type CPUProfile struct {
 	// rate as a slowdown factor (1 is no throttle, 2 is 2x slowdown, etc).
 	Rate float64
+}
+
+// webVitalKey identifies a buffered web vital by the URL of the page it was
+// measured on and the metric name. Keying by URL keeps distinct pages (and
+// subframes) as separate series, while repeated reports for the same page and
+// metric collapse onto a single buffered entry.
+type webVitalKey struct {
+	url  string
+	name string
+}
+
+// webVitalSample is a buffered web vital metric sample together with the
+// attributes needed to emit its web_vital trace span when the buffer is
+// flushed.
+type webVitalSample struct {
+	sample k6metrics.Sample
+	name   string
+	spanID string
+	rating string
 }
 
 /*
@@ -87,6 +107,15 @@ type FrameSession struct {
 	// onFrameNavigated, but subsequent calls to onFrameNavigated in the same
 	// mainframe never again create a navigation span.
 	initialNavDone bool
+
+	// Web vital metrics are buffered per (url, metric name) and flushed once
+	// per page: at each main-frame navigation boundary and at page close. This
+	// keeps a single sample per page and metric even when a page reports a
+	// vital more than once. The mutex guards against the initial navigation's
+	// flush, which runs on the page-construction goroutine rather than the
+	// event-loop goroutine.
+	bufferedWebVitalsMu sync.Mutex
+	bufferedWebVitals   map[webVitalKey]webVitalSample
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
@@ -119,6 +148,7 @@ func NewFrameSession(
 		isolatedWorlds:       make(map[string]bool),
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
+		bufferedWebVitals:    make(map[webVitalKey]webVitalSample),
 		vu:                   k6ext.GetVU(ctx),
 		k6Metrics:            k6Metrics,
 		logger:               l,
@@ -235,7 +265,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,funlen
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -255,6 +285,8 @@ func (fs *FrameSession) initEvents() {
 			// If there is an active span for main frame,
 			// end it before exiting so it can be flushed
 			if fs.mainFrameSpan != nil {
+				// Flush the last page's buffered web vitals while its span is live.
+				fs.flushWebVitals()
 				// The url needs to be added here instead of at the start of the span
 				// because at the start of the span we don't know the correct url for
 				// the page we're navigating to. At the end of the span we do have this
@@ -366,33 +398,65 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	}
 
 	state := fs.vu.State()
-	tags := state.Tags.GetCurrentValues().Tags
+	// Web Vitals are reported asynchronously through a CDP binding, long after the navigation that
+	// produced them. Reading live tags here would attribute the sample to whatever group/tags happen
+	// to be active at report time. When async metric context is enabled, prefer the context captured
+	// by the navigation operation instead, mirroring how NetworkManager attributes delayed requests.
+	tagsAndMeta := state.Tags.GetCurrentValues()
+	if k6common.AsyncMetricContextEnabled(state) {
+		if captured, ok := fs.page.getNetworkTagsAndMeta(); ok {
+			tagsAndMeta = captured
+		}
+	}
+	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags = handleURLTag(fs.page, wv.URL, http.MethodGet, tags)
 	}
 
 	tags = tags.With("rating", wv.Rating)
 
-	now := time.Now()
-	pushIfNotDone(fs.vu.Context(), fs.logger, state.Samples, k6metrics.ConnectedSamples{
-		Samples: []k6metrics.Sample{
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
-				Value:      value,
-				Time:       now,
-			},
+	// Buffer the latest value for this page and metric instead of emitting it
+	// immediately. The buffer is flushed once per page so each page contributes
+	// a single sample per metric.
+	fs.bufferedWebVitalsMu.Lock()
+	fs.bufferedWebVitals[webVitalKey{url: wv.URL, name: wv.Name}] = webVitalSample{
+		sample: k6metrics.Sample{
+			TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
+			Value:      value,
+			Time:       time.Now(),
 		},
-	})
-
-	_, span := TraceEvent(
-		fs.ctx, fs.targetID.String(), "web_vital", wv.SpanID, trace.WithAttributes(
-			attribute.String("web_vital.name", wv.Name),
-			attribute.Float64("web_vital.value", value),
-			attribute.String("web_vital.rating", wv.Rating),
-		))
-	defer span.End()
+		name:   wv.Name,
+		spanID: wv.SpanID,
+		rating: wv.Rating,
+	}
+	fs.bufferedWebVitalsMu.Unlock()
 
 	return nil
+}
+
+// flushWebVitals emits every buffered web vital metric sample and its
+// web_vital trace span, then clears the buffer. Clearing makes the flush
+// idempotent, so a page is emitted exactly once even when flushed at both a
+// navigation boundary and at teardown.
+func (fs *FrameSession) flushWebVitals() {
+	fs.bufferedWebVitalsMu.Lock()
+	defer fs.bufferedWebVitalsMu.Unlock()
+
+	for key, wv := range fs.bufferedWebVitals {
+		pushIfNotDone(fs.vu.Context(), fs.logger, fs.vu.State().Samples, k6metrics.ConnectedSamples{
+			Samples: []k6metrics.Sample{wv.sample},
+		})
+
+		_, span := TraceEvent(
+			fs.ctx, fs.targetID.String(), "web_vital", wv.spanID, trace.WithAttributes(
+				attribute.String("web_vital.name", wv.name),
+				attribute.Float64("web_vital.value", wv.sample.Value),
+				attribute.String("web_vital.rating", wv.rating),
+			))
+		span.End()
+
+		delete(fs.bufferedWebVitals, key)
+	}
 }
 
 func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavascriptDialogOpening) {
@@ -510,7 +574,7 @@ func (fs *FrameSession) initOptions() error {
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
-		if err := fs.updateViewport(); err != nil {
+		if err := fs.updateViewport(fs.ctx, fs.page.emulatedSize); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
 				fs.session.ID(), fs.targetID, err)
@@ -822,6 +886,11 @@ func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
 		return
 	}
 
+	// Flush the outgoing page's buffered web vitals while its navigation span
+	// is still live. This must run after the main-frame guard above so that a
+	// subframe load does not drain the main page's buffer.
+	fs.flushWebVitals()
+
 	// End the navigation span if it is non-nil
 	if fs.mainFrameSpan != nil {
 		// The url needs to be added here instead of at the start of the span
@@ -969,7 +1038,7 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 	default:
 		fs.logger.Debugf("FrameSession:onAttachedToTarget",
 			"unsupported target type %q sid:%v", ti.Type, session.ID())
-		detachSession(fs.teardownCtx, session)
+		detachSession(session)
 	}
 	if err == nil {
 		return
@@ -1020,7 +1089,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 	if fs.page.isClosing() {
 		fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 			"rejected frame; page is closing: tid=%v", ti.TargetID)
-		detachSession(fs.teardownCtx, session)
+		detachSession(session)
 		return nil
 	}
 
@@ -1059,7 +1128,7 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, session *Session) 
 		if errors.Is(err, errPageClosing) {
 			fs.logger.Debugf("FrameSession:attachIFrameToTarget",
 				"rejected frame; page is closing: tid=%v", ti.TargetID)
-			detachSession(fs.teardownCtx, session)
+			detachSession(session)
 			return nil
 		}
 		return err
@@ -1073,7 +1142,7 @@ func (fs *FrameSession) attachWorkerToTarget(ti *target.Info, session *Session) 
 	if fs.page.isClosing() {
 		fs.logger.Debugf("FrameSession:attachWorkerToTarget",
 			"rejected worker; page is closing: tid=%v", ti.TargetID)
-		detachSession(fs.teardownCtx, session)
+		detachSession(session)
 		return nil
 	}
 
@@ -1221,7 +1290,7 @@ func (fs *FrameSession) updateRequestInterception(enable bool) error {
 	return fs.networkManager.setRequestInterception(enable)
 }
 
-func (fs *FrameSession) updateViewport() error {
+func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *EmulatedSize) error {
 	fs.logger.Debugf("NewFrameSession:updateViewport", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// other frames don't have viewports and,
@@ -1234,7 +1303,6 @@ func (fs *FrameSession) updateViewport() error {
 	}
 
 	opts := fs.page.browserCtx.opts
-	emulatedSize := fs.page.emulatedSize
 	if emulatedSize == nil {
 		return nil
 	}
@@ -1253,7 +1321,7 @@ func (fs *FrameSession) updateViewport() error {
 		WithScreenOrientation(&orientation).
 		WithScreenWidth(screen.Width).
 		WithScreenHeight(screen.Height)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	if err := action.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
@@ -1268,7 +1336,7 @@ func (fs *FrameSession) updateViewport() error {
 			Width:  viewport.Width,
 			Height: viewport.Height,
 		})
-		if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		if err := action2.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 			return fmt.Errorf("setting window bounds: %w", err)
 		}
 	}
@@ -1287,12 +1355,4 @@ func (fs *FrameSession) executionContextForID(
 	}
 
 	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
-}
-
-// detachSession unblocks a target waiting for debugger and detaches from it.
-// Prevents the browser from hanging on rejected targets during close
-func detachSession(ctx context.Context, session *Session) {
-	_ = session.ExecuteWithoutExpectationOnReply(ctx, cdpruntime.CommandRunIfWaitingForDebugger, nil, nil)
-	_ = session.ExecuteWithoutExpectationOnReply(ctx, target.CommandDetachFromTarget,
-		&target.DetachFromTargetParams{SessionID: session.id}, nil)
 }

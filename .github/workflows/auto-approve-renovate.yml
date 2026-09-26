@@ -11,4 +11,4 @@ permissions:
   id-token: write
 jobs:
   approve:
-    uses: grafana/k6-ci/.github/workflows/auto-approve-renovate.yml@9477260e6838640d56c28aa95bcbf9a884ab21f3 # k6-ci#44 merge commit
+    uses: grafana/k6-ci/.github/workflows/auto-approve-renovate.yml@03469f9ae7aad25369827832c456e8f8b7b8c1c2 # v0.5.0
