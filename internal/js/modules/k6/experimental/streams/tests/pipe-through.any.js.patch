@@ -1,0 +1,28 @@
+diff --git a/streams/piping/pipe-through.any.js b/streams/piping/pipe-through.any.js
+index 339cee199..5b6bfd5e0 100644
+--- a/streams/piping/pipe-through.any.js
++++ b/streams/piping/pipe-through.any.js
+@@ -173,21 +173,8 @@ test(t => {
+ 
+ }, 'pipeThrough should rethrow errors from accessing readable or writable');
+ 
+-const badSignals = [null, 0, NaN, true, 'AbortSignal', Object.create(AbortSignal.prototype)];
+-for (const signal of badSignals) {
+-  test(() => {
+-    const rs = new ReadableStream();
+-    assert_throws_js(TypeError, () => rs.pipeThrough(uninterestingReadableWritablePair(), { signal }),
+-                     'pipeThrough should throw');
+-  }, `invalid values of signal should throw; specifically '${signal}'`);
+-}
+-
+-test(() => {
+-  const rs = new ReadableStream();
+-  const controller = new AbortController();
+-  const signal = controller.signal;
+-  rs.pipeThrough(uninterestingReadableWritablePair(), { signal });
+-}, 'pipeThrough should accept a real AbortSignal');
++// FIXME: k6 does not expose AbortController or AbortSignal yet. A defined signal is explicitly
++// rejected by the streams implementation until those Web APIs are available.
+ 
+ test(() => {
+   const rs = new ReadableStream();
