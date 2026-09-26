@@ -88,6 +88,20 @@ func TestResolve(t *testing.T) {
 		require.Equal(t, "https://example.com/path/to/something", moduleURL.String())
 		require.Equal(t, "https://example.com/path/to", pwdURL.String())
 	})
+
+	t.Run("Windows abs path", func(t *testing.T) {
+		t.Parallel()
+		root, err := url.Parse("file:///")
+		require.NoError(t, err)
+
+		u, err := loader.Resolve(root, "C:/somewhere/test.js")
+		require.NoError(t, err)
+		require.Equal(t, "file:///C:/somewhere/test.js", u.String())
+
+		u, err = loader.Resolve(root, `c:\somewhere\test.js`)
+		require.NoError(t, err)
+		require.Equal(t, "file:///c:/somewhere/test.js", u.String())
+	})
 }
 
 //nolint:tparallel // this touch the global http.DefaultTransport

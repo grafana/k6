@@ -50,7 +50,8 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 		return nil, errors.New("local or remote path required")
 	}
 
-	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' || filepath.IsAbs(moduleSpecifier) {
+	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' ||
+		filepath.IsAbs(moduleSpecifier) || isWindowsAbsPath(moduleSpecifier) {
 		return resolveFilePath(pwd, moduleSpecifier)
 	}
 
@@ -81,6 +82,20 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 	return nil, unresolvableURLError(moduleSpecifier)
 }
 
+// isWindowsAbsPath reports a Windows drive path such as C:/foo or C:\foo.
+// filepath.IsAbs is OS-specific, so archives built on Windows with those
+// paths would fail to resolve on Unix without this check.
+func isWindowsAbsPath(p string) bool {
+	if len(p) < 3 || p[1] != ':' {
+		return false
+	}
+	drive := p[0]
+	if (drive < 'A' || drive > 'Z') && (drive < 'a' || drive > 'z') {
+		return false
+	}
+	return p[2] == '/' || p[2] == '\\'
+}
+
 func resolveFilePath(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 	if pwd.Opaque != "" { // this is a loader reference
 		base, dir, _ := strings.Cut(pwd.Opaque, "/")
@@ -92,8 +107,8 @@ func resolveFilePath(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 
 	// The file is in format like C:/something/path.js. But this will be decoded as scheme `C`
 	// ... which is not what we want, we want it to be decoded as file:///C:/something/path.js
-	if filepath.VolumeName(moduleSpecifier) != "" {
-		moduleSpecifier = "/" + moduleSpecifier
+	if filepath.VolumeName(moduleSpecifier) != "" || isWindowsAbsPath(moduleSpecifier) {
+		moduleSpecifier = "/" + strings.ReplaceAll(moduleSpecifier, `\`, `/`)
 	}
 
 	// we always want for the pwd to end in a slash, but filepath/path.Clean strips it so we read
