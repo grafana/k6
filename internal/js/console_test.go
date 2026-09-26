@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -17,11 +18,13 @@ import (
 
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/loader"
+	"go.k6.io/k6/v2/internal/secretsource/mock"
 	"go.k6.io/k6/v2/internal/usage"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/fsext"
 	"go.k6.io/k6/v2/metrics"
+	"go.k6.io/k6/v2/secretsource"
 )
 
 func TestConsoleContext(t *testing.T) {
@@ -489,6 +492,61 @@ func TestConsoleLevels(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestFileConsoleRedactsSecrets ensures --console-output / options.ConsoleOutput
+// cannot bypass secretsource redaction by using a separate logrus.Logger.
+func TestFileConsoleRedactsSecrets(t *testing.T) {
+	t.Parallel()
+
+	const secret = "super-secret-value-XYZ"
+	manager, _, err := secretsource.NewManager(map[string]secretsource.Source{
+		secretsource.DefaultSourceName: mock.NewMockSecretSource(map[string]string{
+			"api_key": secret,
+		}),
+	})
+	require.NoError(t, err)
+
+	got, err := manager.Get(secretsource.DefaultSourceName, "api_key")
+	require.NoError(t, err)
+	require.Equal(t, secret, got)
+
+	logFilename := filepath.Join(t.TempDir(), "console.log")
+	r, err := getSimpleRunner(t, "/script.js", `
+		exports.default = function() {
+			console.log("secret value is", "super-secret-value-XYZ");
+		}`)
+	require.NoError(t, err)
+	r.preInitState.SecretsManager = manager
+
+	require.NoError(t, r.SetOptions(lib.Options{
+		ConsoleOutput: null.StringFrom(logFilename),
+	}))
+
+	ctx := t.Context()
+	samples := make(chan metrics.SampleContainer, 100)
+	initVU, err := r.newVU(ctx, 1, 1, samples)
+	require.NoError(t, err)
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+
+	logger := extractLogger(vu)
+	t.Cleanup(func() {
+		if loggerOut, canBeClosed := logger.Out.(io.Closer); canBeClosed {
+			require.NoError(t, loggerOut.Close())
+		}
+	})
+
+	require.NoError(t, vu.RunOnce())
+
+	fileContent, err := os.ReadFile(logFilename) //nolint:forbidigo // test asserts file console output
+	require.NoError(t, err)
+	require.NotContains(t, string(fileContent), secret)
+	require.Contains(t, string(fileContent), "***SECRET_REDACTED***")
+
+	info, err := os.Stat(logFilename) //nolint:forbidigo
+	require.NoError(t, err)
+	// Ignore umask; the security property is that group/other cannot read the file.
+	require.Zero(t, info.Mode().Perm()&0o044)
 }
 
 func TestFileConsole(t *testing.T) {

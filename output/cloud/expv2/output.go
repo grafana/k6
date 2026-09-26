@@ -68,6 +68,26 @@ type Output struct {
 
 // New creates a new cloud output.
 func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*Output, error) {
+	// Reject non-positive ticker intervals before Start() can panic inside
+	// time.NewTicker. Users can set these via env (e.g. K6_CLOUD_METRIC_PUSH_INTERVAL=0s)
+	// or a backend config override / provisioning runtime_config.
+	if conf.MetricPushInterval.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("metrics push interval must be a positive duration but is %s",
+			conf.MetricPushInterval)
+	}
+	if conf.AggregationPeriod.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("aggregation period must be a positive duration but is %s",
+			conf.AggregationPeriod)
+	}
+	if conf.AggregationWaitPeriod.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("aggregation wait period must be a positive duration but is %s",
+			conf.AggregationWaitPeriod)
+	}
+	if insightsOutput.Enabled(conf) && conf.TracesPushInterval.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("traces push interval must be a positive duration but is %s",
+			conf.TracesPushInterval)
+	}
+
 	// TODO: move this creation operation to the centralized output. Reducing the probability to
 	// break the logic for the config overwriting.
 	//
