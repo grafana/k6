@@ -168,7 +168,7 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, _ []string) error {
 
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
-		return err
+		return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
 	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
