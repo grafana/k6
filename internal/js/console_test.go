@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/grafana/sobek"
@@ -526,18 +525,10 @@ func TestFileConsole(t *testing.T) {
 					for msg, deleteFile := range preExisting {
 						t.Run(msg, func(t *testing.T) {
 							t.Parallel()
-							f, err := os.CreateTemp(t.TempDir(), "") //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
-							require.NoError(t, err)
-							logFilename := f.Name()
-							// close it as we will want to reopen it and maybe remove it
-							if deleteFile {
-								require.NoError(t, f.Close())
-								require.NoError(t, os.Remove(logFilename)) //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
-							} else {
-								// TODO: handle case where the string was no written in full ?
-								_, err = f.WriteString(preExistingText)
-								assert.NoError(t, f.Close())
-								require.NoError(t, err)
+							fs := fsext.NewMemMapFs()
+							logFilename := "/k6-console.log"
+							if !deleteFile {
+								require.NoError(t, fsext.WriteFile(fs, logFilename, []byte(preExistingText), 0o644))
 							}
 							r, err := getSimpleRunner(t, "/script",
 								fmt.Sprintf(
@@ -546,6 +537,7 @@ func TestFileConsole(t *testing.T) {
 								))
 							require.NoError(t, err)
 
+							r.consoleFS = fs
 							err = r.SetOptions(lib.Options{
 								ConsoleOutput: null.StringFrom(logFilename),
 							})
@@ -572,7 +564,7 @@ func TestFileConsole(t *testing.T) {
 							require.NoError(t, err)
 
 							// Test if the file was created.
-							_, err = os.Stat(logFilename) //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
+							_, err = fs.Stat(logFilename)
 							require.NoError(t, err)
 
 							entry := hook.LastEntry()
@@ -591,7 +583,7 @@ func TestFileConsole(t *testing.T) {
 							entryStr, err := entry.String()
 							require.NoError(t, err)
 
-							f, err = os.Open(logFilename) //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
+							f, err := fs.Open(logFilename)
 							require.NoError(t, err)
 
 							fileContent, err := io.ReadAll(f)

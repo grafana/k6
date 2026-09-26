@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/lib/fsext"
 )
 
 // console represents a JS console implemented as a logrus.FieldLogger.
@@ -24,9 +25,8 @@ func newConsole(logger logrus.FieldLogger) *console {
 }
 
 // Creates a console logger with its output set to the file at the provided `filepath`.
-func newFileConsole(filepath string, formatter logrus.Formatter, level logrus.Level) (*console, error) {
-	//nolint:gosec,forbidigo // see https://github.com/grafana/k6/issues/2565
-	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+func newFileConsole(fs fsext.Fs, filepath string, formatter logrus.Formatter, level logrus.Level) (*console, error) {
+	f, err := fs.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
 	if err != nil {
 		return nil, err
 	}

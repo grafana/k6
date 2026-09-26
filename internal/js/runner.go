@@ -62,6 +62,7 @@ type Runner struct {
 	aiaFetcher *netext.AIAFetcher
 
 	console    *console
+	consoleFS  fsext.Fs
 	setupData  []byte
 	BufferPool *lib.BufferPool
 }
@@ -98,7 +99,8 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 		},
-		console: newConsole(piState.Logger),
+		console:   newConsole(piState.Logger),
+		consoleFS: fsext.NewOsFs(),
 		Resolver: netext.NewResolver(
 			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
 		ActualResolver: net.LookupIP,
@@ -564,7 +566,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 			formatter = l.Formatter
 			level = l.Level
 		}
-		c, err := newFileConsole(opts.ConsoleOutput.String, formatter, level)
+		c, err := newFileConsole(r.consoleFS, opts.ConsoleOutput.String, formatter, level)
 		if err != nil {
 			return err
 		}
