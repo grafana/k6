@@ -36,6 +36,17 @@ const testGetFormHTML = `
 </body>
 `
 
+const testFormActionHTML = `
+<html>
+<body>
+	<form action="/formPost" method="post">
+		<input name="custname" value="smurf">
+		<input type="submit" value="save" formaction="/post" />
+		<input type="submit" value="next" formaction="/anything/next" />
+	</form>
+</body>
+`
+
 const jsonData = `{"glossary": {
     "friends": [
       {"first": "Dale", "last": "Murphy", "age": 44},
@@ -83,6 +94,14 @@ func myFormHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		body = []byte(testGetFormHTML)
 	}
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}
+
+func formActionHandler(w http.ResponseWriter, _ *http.Request) {
+	body := []byte(testFormActionHTML)
+	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
@@ -162,6 +181,7 @@ func TestResponse(t *testing.T) {
 	sr := tb.Replacer.Replace
 
 	tb.Mux.HandleFunc("/myforms/get", myFormHandler)
+	tb.Mux.HandleFunc("/myforms/formaction", formActionHandler)
 	tb.Mux.HandleFunc("/json", jsonHandler)
 	tb.Mux.HandleFunc("/invalidjson", invalidJSONHandler)
 
@@ -390,6 +410,20 @@ func TestResponse(t *testing.T) {
 			`))
 			require.NoError(t, err)
 			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "GET", sr("HTTPBIN_URL/myforms/get"), 200, "")
+		})
+
+		t.Run("withFormAction", func(t *testing.T) {
+			_, err := rt.RunString(sr(`
+				var res = http.request("GET", "HTTPBIN_URL/myforms/formaction");
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				res = res.submitForm({ submitSelector: '[value="save"]' })
+				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+				if (res.url.indexOf("/post") == -1) { throw new Error("expected formaction /post, got: " + res.url); }
+				var data = res.json().form
+				if (data.custname[0] !== "smurf") { throw new Error("incorrect body: " + JSON.stringify(data, null, 4) ); }
+			`))
+			require.NoError(t, err)
+			assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "POST", sr("HTTPBIN_URL/post"), 200, "")
 		})
 	})
 
