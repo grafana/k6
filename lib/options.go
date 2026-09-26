@@ -552,6 +552,15 @@ func (o Options) Validate() []error {
 	}
 	validationErrors = append(validationErrors, o.Scenarios.Validate()...)
 
+	for name, value := range o.RunTags {
+		if name == "" {
+			validationErrors = append(validationErrors, errors.New("invalid tag, empty name"))
+		}
+		if value == "" {
+			validationErrors = append(validationErrors, fmt.Errorf("invalid tag %q, empty value", name))
+		}
+	}
+
 	// Duration
 	if o.SetupTimeout.Valid && o.SetupTimeout.Duration <= 0 {
 		validationErrors = append(validationErrors, errors.New("setupTimeout must be positive"))
