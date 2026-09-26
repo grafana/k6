@@ -83,6 +83,31 @@ func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
+const defaultAssertMsg = "Assertion failed"
+
+// Assert logs an error if the assertion is falsy, following the WHATWG Console Standard.
+// https://console.spec.whatwg.org/#assert
+func (c console) Assert(condition bool, data ...sobek.Value) {
+	if condition {
+		return
+	}
+
+	var b strings.Builder
+	b.WriteString(defaultAssertMsg)
+	if len(data) > 0 {
+		if sobek.IsString(data[0]) {
+			b.WriteString(": ")
+			b.WriteString(data[0].String())
+			data = data[1:]
+		}
+		for _, v := range data {
+			b.WriteByte(' ')
+			b.WriteString(c.valueString(v))
+		}
+	}
+	c.logger.Error(b.String())
+}
+
 const (
 	functionLog = "[object Function]"
 	circularLog = "[Circular]"
