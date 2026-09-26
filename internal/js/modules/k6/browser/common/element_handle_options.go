@@ -304,6 +304,7 @@ func (o *ElementHandleClickOptions) ToMouseClickOptions() *MouseClickOptions {
 	o2.Button = o.Button
 	o2.ClickCount = o.ClickCount
 	o2.Delay = o.Delay
+	o2.Modifiers = o.Modifiers
 	return o2
 }
 
@@ -347,6 +348,7 @@ func (o *ElementHandleDblclickOptions) ToMouseClickOptions() *MouseClickOptions 
 	o2.Button = o.Button
 	o2.ClickCount = 2
 	o2.Delay = o.Delay
+	o2.Modifiers = o.Modifiers
 	return o2
 }
 
