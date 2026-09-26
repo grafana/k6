@@ -122,8 +122,14 @@ func (hkgp *HMACKeyGenParams) GenerateKey(
 		hkgp.Length = null.IntFrom(int64(length))
 	}
 
-	if hkgp.Length.Int64 == 0 {
-		return nil, NewError(OperationError, "algorithm's length cannot be 0")
+	// Web Crypto: length must be present and positive; non-multiples of 8 throw
+	// OperationError. Rejecting <= 0 also prevents make([]byte, negative) panics
+	// when asByteLength() truncates a negative bit length (e.g. length: -8).
+	if hkgp.Length.Int64 <= 0 {
+		return nil, NewError(OperationError, "algorithm's length must be a positive number")
+	}
+	if hkgp.Length.Int64%8 != 0 {
+		return nil, NewError(OperationError, "algorithm's length must be a multiple of 8")
 	}
 
 	// 3.
