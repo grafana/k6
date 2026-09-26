@@ -8,13 +8,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/cmd"
 	k6Tests "go.k6.io/k6/v2/internal/cmd/tests"
 	"go.k6.io/k6/v2/lib/fsext"
 )
 
-func getSingleFileTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *k6Tests.GlobalTestState {
+func getSingleFileTestState(tb testing.TB, script string, cliFlags []string) *k6Tests.GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
@@ -22,7 +21,7 @@ func getSingleFileTestState(tb testing.TB, script string, cliFlags []string, exp
 	ts := k6Tests.NewGlobalTestState(tb)
 	require.NoError(tb, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "run"}, cliFlags...), "test.js")
-	ts.ExpectedExitCode = int(expExitCode)
+	ts.ExpectedExitCode = 0
 
 	return ts
 }
@@ -80,7 +79,7 @@ func TestExamplesInputOutput(t *testing.T) {
 				script, err := os.ReadFile(filepath.Clean(file)) //nolint:forbidigo // we read an example directly
 				require.NoError(t, err)
 
-				ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout"}, 0)
+				ts := getSingleFileTestState(t, string(script), []string{"-v", "--log-output=stdout"})
 
 				cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -167,7 +166,7 @@ export default async function () {
         if (error.message === "constructor-spoofed input was accepted") {
             throw error;
         }
-        if (error.name !== "OperationError") {
+        if (error.name !== "TypeError") {
             throw new Error("constructor-spoofed input rejected with " + error.name);
         }
     }
@@ -188,11 +187,78 @@ export default async function () {
 }
 `
 
-	ts := getSingleFileTestState(t, script, []string{"--quiet", "--no-color", "--log-output=stdout"}, 0)
+	ts := getSingleFileTestState(t, script, []string{"--quiet", "--no-color", "--log-output=stdout"})
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
 	require.Contains(t, stdout, "digest BufferSource checks passed")
+	assert.NotContains(t, stdout, "Uncaught")
+	assert.Empty(t, ts.Stderr.String())
+}
+
+func TestSubtleCryptoRejectsInvalidBufferSources(t *testing.T) {
+	t.Parallel()
+
+	const script = `
+async function expectTypeError(label, operation) {
+    const pending = operation();
+    if (!pending || typeof pending.then !== "function") {
+        throw new Error(label + " did not return a Promise");
+    }
+    try {
+        await pending;
+    } catch (error) {
+        if (error.name === "TypeError") {
+            return;
+        }
+        throw new Error(label + " rejected with " + error.name + " instead of TypeError");
+    }
+    throw new Error(label + " was accepted");
+}
+
+export default async function () {
+    const data = new Uint8Array([1, 2, 3, 4]);
+    const hmacKey = await crypto.subtle.importKey(
+        "raw", data, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+    const aesKey = await crypto.subtle.importKey(
+        "raw", new Uint8Array(16), "AES-GCM", false, ["encrypt", "decrypt"]);
+    const iv = new Uint8Array(12);
+    const signature = new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, data));
+    const ciphertext = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, data));
+    const operations = [
+        ["digest", data, input => crypto.subtle.digest("SHA-256", input)],
+        ["importKey", data, input => crypto.subtle.importKey(
+            "raw", input, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])],
+        ["encrypt", data, input => crypto.subtle.encrypt({ name: "AES-GCM", iv }, aesKey, input)],
+        ["decrypt", ciphertext, input => crypto.subtle.decrypt({ name: "AES-GCM", iv }, aesKey, input)],
+        ["sign", data, input => crypto.subtle.sign("HMAC", hmacKey, input)],
+        ["verify signature", signature, input => crypto.subtle.verify("HMAC", hmacKey, input, data)],
+        ["verify data", data, input => crypto.subtle.verify("HMAC", hmacKey, signature, input)],
+    ];
+    const invalidInputs = [
+        ["plain object", {}],
+        ["constructor spoof", { constructor: Uint8Array, buffer: data.buffer }],
+        ["invalid buffer spoof", { constructor: Uint8Array, buffer: 42 }],
+        ["missing buffer spoof", { constructor: Uint8Array }],
+        ["null", null],
+        ["undefined", undefined],
+    ];
+
+    for (const [name, validInput, operation] of operations) {
+        await operation(validInput);
+        for (const [label, input] of invalidInputs) {
+            await expectTypeError(name + " / " + label, () => operation(input));
+        }
+    }
+    console.log("invalid BufferSource checks passed");
+}
+`
+
+	ts := getSingleFileTestState(t, script, []string{"--quiet", "--no-color", "--log-output=stdout"})
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	require.Contains(t, stdout, "invalid BufferSource checks passed")
 	assert.NotContains(t, stdout, "Uncaught")
 	assert.Empty(t, ts.Stderr.String())
 }
@@ -228,7 +294,7 @@ export default async function () {
 }
 `
 
-	ts := getSingleFileTestState(t, script, []string{"--quiet", "--no-color", "--log-output=stdout"}, 0)
+	ts := getSingleFileTestState(t, script, []string{"--quiet", "--no-color", "--log-output=stdout"})
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()

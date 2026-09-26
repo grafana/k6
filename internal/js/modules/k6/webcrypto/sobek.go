@@ -26,7 +26,7 @@ func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value, arrayBufferIsView sobek
 			return nil, NewError(OperationError, err.Error())
 		}
 		if !isView.ToBoolean() {
-			return nil, NewError(OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
+			return nil, NewError(TypeError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
 		}
 	}
 
