@@ -120,6 +120,36 @@ func TestHTTPClient_NoRetryOn4xx(t *testing.T) {
 	assert.Equal(t, int32(1), hits.Load())
 }
 
+// TestHTTPClient_RetriesOn429 verifies transient rate limiting is retried,
+// matching the legacy cloudapi client. Metrics flushes discard queued
+// buckets before the push, so skipping 429 retries permanently loses samples.
+func TestHTTPClient_RetriesOn429(t *testing.T) {
+	t.Parallel()
+
+	var hits atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if hits.Add(1) == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":"rate limited"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := NewHTTPClient(srv.Client(), "tok", "v0.1.0", testutils.NewLogger(t))
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL, bytes.NewReader([]byte(`{"metrics":[1]}`)))
+	require.NoError(t, err)
+
+	err = c.Do(req, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, int32(2), hits.Load())
+}
+
 func TestHTTPClient_ContextCancelStopsRetryWait(t *testing.T) {
 	t.Parallel()
 

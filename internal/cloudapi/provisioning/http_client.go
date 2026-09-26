@@ -14,11 +14,12 @@ import (
 // HTTPClient is the scoped-token Bearer HTTP layer injected into the
 // cloud Output's expv2 metrics push (and the notify call) when running
 // in provisioning mode. It signs requests with the scoped
-// test_run_token, retries on 5xx and transport errors via the shared
-// doWithRetry helper, and decodes JSON responses into a caller-provided
-// struct. Unlike Client, it drives no provisioning/v6 orchestration and
-// implements only Do — not BaseURL — because the metrics URL is set
-// explicitly by the caller (no client-side derivation).
+// test_run_token, retries on 5xx, HTTP 429, and transport errors via the
+// shared doWithRetry helper, and decodes JSON responses into a
+// caller-provided struct. Unlike Client, it drives no
+// provisioning/v6 orchestration and implements only Do — not BaseURL —
+// because the metrics URL is set explicitly by the caller (no
+// client-side derivation).
 type HTTPClient struct {
 	httpClient *http.Client
 	token      string // scoped test_run_token
@@ -33,8 +34,8 @@ func NewHTTPClient(httpClient *http.Client, token, version string, logger logrus
 	return &HTTPClient{httpClient: httpClient, token: token, version: version, logger: logger}
 }
 
-// Do executes the request with Bearer auth, retries on 5xx and
-// transport errors, and decodes the response body into v if non-nil.
+// Do executes the request with Bearer auth, retries on 5xx, HTTP 429,
+// and transport errors, and decodes the response body into v if non-nil.
 func (p *HTTPClient) Do(req *http.Request, v any) error {
 	// Ensure GetBody is set so the body can be replayed on retries.
 	if req.Body != nil && req.GetBody == nil {
