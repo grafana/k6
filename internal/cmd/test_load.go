@@ -77,7 +77,7 @@ func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args 
 	gs.Logger.Debugf("Gathering k6 runtime options...")
 	runtimeOptions, err := getRuntimeOptions(cmd.Flags(), gs.Env)
 	if err != nil {
-		return nil, err
+		return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
 	if runtimeOptions.CompatibilityMode.String == lib.CompatibilityModeExperimentalEnhanced.String() {

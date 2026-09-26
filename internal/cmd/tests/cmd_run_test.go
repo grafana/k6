@@ -3255,8 +3255,8 @@ func TestInvalidSummaryModeAbortsTheExecution(t *testing.T) {
 	ts.Stdin = bytes.NewBufferString(`export default function() {};`)
 
 	// We expect the execution to be aborted by the invalid summary
-	// mode and the exit code to be non-zero.
-	ts.ExpectedExitCode = -1
+	// mode and the exit code to be InvalidConfig.
+	ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	// And the error to be shown on stderr.
