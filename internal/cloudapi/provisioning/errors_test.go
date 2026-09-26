@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 func TestCheckResponse(t *testing.T) {
@@ -19,10 +21,13 @@ func TestCheckResponse(t *testing.T) {
 		body       string
 		wantErr    bool
 		wantStatus int
+		wantIs     error
 	}{
-		{"2xx returns nil", 200, "{}", false, 0},
-		{"4xx wraps as ResponseError", 400, `{"error":"bad"}`, true, 400},
-		{"5xx wraps as ResponseError", 500, `{"error":"oops"}`, true, 500},
+		{"2xx returns nil", 200, "{}", false, 0, nil},
+		{"4xx wraps as ResponseError", 400, `{"error":"bad"}`, true, 400, nil},
+		{"5xx wraps as ResponseError", 500, `{"error":"oops"}`, true, 500, nil},
+		{"401 retains body and classification", 401, `{"error":"unauthenticated"}`, true, 401, httperr.ErrNotAuthenticated},
+		{"403 retains body and classification", 403, `{"error":{"code":4}}`, true, 403, httperr.ErrNotAuthorized},
 	}
 
 	for _, tc := range cases {
@@ -44,6 +49,10 @@ func TestCheckResponse(t *testing.T) {
 			var respErr *ResponseError
 			require.ErrorAs(t, err, &respErr)
 			assert.Equal(t, tc.wantStatus, respErr.StatusCode)
+			assert.Equal(t, tc.body, respErr.Body)
+			if tc.wantIs != nil {
+				assert.ErrorIs(t, err, tc.wantIs)
+			}
 		})
 	}
 }
