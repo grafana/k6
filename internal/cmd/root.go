@@ -245,8 +245,9 @@ func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCod
 	deps := unsatisfiedDependenciesErr.deps
 	c.globalState.Logger.
 		WithField("deps", deps).
-		Info("Automatic extension resolution is enabled. The current k6 binary doesn't satisfy all dependencies," +
-			" it's required to provision a custom binary.")
+		Info("Automatic extension resolution is enabled. This k6 binary is missing required dependencies; " +
+			"k6 will build a custom binary.")
+	c.globalState.Logger.Info("Building a custom k6 binary with the required extensions...")
 	provisioner := newBuildProvisioner(c.globalState)
 	var customBinary commandExecutor
 	customBinary, err = provisioner.provision(c.globalState.Ctx, constraintsMapToProvisionDependency(deps))
