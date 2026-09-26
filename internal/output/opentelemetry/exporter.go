@@ -39,16 +39,18 @@ func getExporter(cfg Config) (metric.Exporter, error) {
 		}
 	}
 
-	// if at least valid user was configured, use basic auth
-	if cfg.HTTPUsername.Valid {
-		auth := []byte(cfg.HTTPUsername.String + ":" + cfg.HTTPPassword.String)
-		headers["Authorization"] = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(auth))
-	}
-
 	switch cfg.ExporterProtocol.String {
 	case grpcExporterProtocol:
 		return buildGRPCExporter(ctx, cfg, tlsConfig, headers)
 	case httpExporterProtocol:
+		// If at least a valid HTTP user was configured, use basic auth.
+		if cfg.HTTPUsername.Valid {
+			if headers == nil {
+				headers = make(map[string]string)
+			}
+			auth := []byte(cfg.HTTPUsername.String + ":" + cfg.HTTPPassword.String)
+			headers["Authorization"] = fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(auth))
+		}
 		return buildHTTPExporter(ctx, cfg, tlsConfig, headers)
 	default:
 		return nil, errors.New("unsupported exporter protocol " + cfg.ExporterProtocol.String)
