@@ -133,6 +133,64 @@ func (stream *ReadableStream) initialize() {
 	stream.disturbed = false
 }
 
+// createReadableStream implements the [specification]'s CreateReadableStream abstract operation.
+//
+// It creates a new [ReadableStream] backed by the given algorithms, rather than by an
+// underlying source object. It is used by the [TransformStream] to build its readable side.
+//
+// [specification]: https://streams.spec.whatwg.org/#create-readable-stream
+func createReadableStream(
+	vu modules.VU,
+	startAlgorithm UnderlyingSourceStartCallback,
+	pullAlgorithm UnderlyingSourcePullCallback,
+	cancelAlgorithm UnderlyingSourceCancelCallback,
+	highWaterMark float64,
+	sizeAlgorithm SizeAlgorithm,
+) *ReadableStream {
+	// 1. If highWaterMark was not passed, set it to 1.
+	// 2. If sizeAlgorithm was not passed, set it to an algorithm that returns 1.
+	// (Both are always passed by callers.)
+
+	// 3. Assert: ! IsNonNegativeNumber(highWaterMark) is true.
+	// (Guaranteed by callers.)
+
+	// 4. Let stream be a new ReadableStream.
+	// 5. Perform ! InitializeReadableStream(stream).
+	stream := &ReadableStream{runtime: vu.Runtime(), vu: vu}
+	stream.initialize()
+
+	// 6. Let controller be a new ReadableStreamDefaultController.
+	controller := &ReadableStreamDefaultController{}
+
+	// 7. Perform ? SetUpReadableStreamDefaultController(...).
+	stream.setupDefaultController(controller, startAlgorithm, pullAlgorithm, cancelAlgorithm, highWaterMark, sizeAlgorithm)
+
+	// 8. Return stream.
+	return stream
+}
+
+// toObject builds the stream's JavaScript object, using the given proto as its prototype and
+// installing the `locked` brand-check getter on it (once).
+func (stream *ReadableStream) toObject(proto *sobek.Object) *sobek.Object {
+	rt := stream.runtime
+	streamObj := rt.ToValue(stream).ToObject(rt)
+
+	if proto.Get("locked") == nil {
+		err := proto.DefineAccessorProperty("locked", rt.ToValue(func() sobek.Value {
+			return rt.ToValue(stream.Locked)
+		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
+		if err != nil {
+			common.Throw(rt, newError(RuntimeError, err.Error()))
+		}
+	}
+
+	if err := streamObj.SetPrototype(proto); err != nil {
+		common.Throw(rt, newError(RuntimeError, err.Error()))
+	}
+
+	return streamObj
+}
+
 // setupReadableStreamDefaultControllerFromUnderlyingSource implements the [specification]'s
 // SetUpReadableStreamDefaultController abstract operation.
 //
