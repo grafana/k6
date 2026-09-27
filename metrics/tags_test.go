@@ -3,6 +3,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -119,25 +120,25 @@ func BenchmarkTagSetIteration(b *testing.B) {
 	}
 
 	b.Run("Map", func(b *testing.B) {
+		var consumed int
 		for b.Loop() {
 			for name, value := range tags.Map() {
-				benchmarkTagName = name
-				benchmarkTagValue = value
+				consumed += len(name) + len(value)
 			}
 		}
+		runtime.KeepAlive(consumed)
 	})
 
 	b.Run("Iterate", func(b *testing.B) {
+		var consumed int
 		for b.Loop() {
 			tags.Iterate(func(name, value string) {
-				benchmarkTagName = name
-				benchmarkTagValue = value
+				consumed += len(name) + len(value)
 			})
 		}
+		runtime.KeepAlive(consumed)
 	})
 }
-
-var benchmarkTagName, benchmarkTagValue string
 
 func TestBigTagSetMarshalJSON(t *testing.T) {
 	t.Parallel()
