@@ -67,6 +67,21 @@ func (ts *TagSet) IsEmpty() bool {
 	return (*atlas.Node)(ts).IsRoot()
 }
 
+// Len returns the number of tags in the set.
+func (ts *TagSet) Len() int {
+	return (*atlas.Node)(ts).Len()
+}
+
+// Iterate calls fn for each tag in the set without allocating a map. The
+// iteration order is unspecified.
+func (ts *TagSet) Iterate(fn func(name, value string)) {
+	for node := (*atlas.Node)(ts); !node.IsRoot(); {
+		previous, name, value := node.Data()
+		fn(name, value)
+		node = previous
+	}
+}
+
 // Map returns a {key: value} string map with all of the tags in the set.
 func (ts *TagSet) Map() map[string]string {
 	return (*atlas.Node)(ts).Path()
