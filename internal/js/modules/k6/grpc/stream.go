@@ -308,8 +308,23 @@ func (s *stream) on(event string, handler func(sobek.Value, sobek.Value) (sobek.
 		common.Throw(s.vu.Runtime(), fmt.Errorf("handler for %q event isn't a callable function", event))
 	}
 
-	if err := s.eventListeners.add(event, handler); err != nil {
+	if err := s.eventListeners.add(event, s.wrapUnderCurrentMetricContext(handler)); err != nil {
 		s.vu.State().Logger.Warnf("can't register %s event handler: %s", event, err)
+	}
+}
+
+// Stream listeners run outside Sobek's promise machinery.
+func (s *stream) wrapUnderCurrentMetricContext(
+	fn func(sobek.Value, sobek.Value) (sobek.Value, error),
+) func(sobek.Value, sobek.Value) (sobek.Value, error) {
+	if !common.AsyncMetricContextEnabled(s.vu.State()) {
+		return fn
+	}
+	captured := common.CaptureMetricContext(s.vu.State())
+	return func(v, metadata sobek.Value) (sobek.Value, error) {
+		return common.RunWithMetricContext(captured, func() (sobek.Value, error) {
+			return fn(v, metadata)
+		})
 	}
 }
 

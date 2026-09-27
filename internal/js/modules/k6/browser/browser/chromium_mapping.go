@@ -12,8 +12,8 @@ import (
 
 // mapChromium maps the Chromium browser type API to the JS module.
 func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
-	return mapping{
-		"connectOverCDP": func(endpoint string, opts sobek.Value) (*sobek.Promise, error) {
+	return finishMapping(mapping{
+		"connectOverCDP": passiveCall(func(endpoint string, opts sobek.Value) (*sobek.Promise, error) {
 			// Parse the optional options argument on the JS thread, before the
 			// promise callback runs on a background goroutine.
 			cdpOpts, err := parseConnectOverCDPOptions(vu.Runtime(), opts)
@@ -43,8 +43,8 @@ func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
 					return b, nil
 				}), nil
 			}), nil
-		},
-	}
+		}),
+	})
 }
 
 // parseConnectOverCDPOptions parses the optional trailing options argument of

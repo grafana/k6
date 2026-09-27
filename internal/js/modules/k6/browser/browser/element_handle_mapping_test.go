@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -673,4 +674,12 @@ func TestParseElementHandleScreenshotOptions(t *testing.T) {
 			assert.Equal(t, tt.want, opts)
 		})
 	}
+}
+
+func TestMapElementHandleNil(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	value := vu.Runtime().ToValue(mapElementHandle(moduleVU{VU: vu}, nil))
+	assert.True(t, sobek.IsNull(value))
 }

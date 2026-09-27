@@ -219,35 +219,39 @@ func (b *BrowserContext) Close() error {
 func (b *BrowserContext) GrantPermissions(permissions []string, opts GrantPermissionsOptions) error {
 	b.logger.Debugf("BrowserContext:GrantPermissions", "bctxid:%v", b.id)
 
-	permsToProtocol := map[string]cdpbrowser.PermissionType{
-		"geolocation":          cdpbrowser.PermissionTypeGeolocation,
-		"midi":                 cdpbrowser.PermissionTypeMidi,
-		"midi-sysex":           cdpbrowser.PermissionTypeMidiSysex,
-		"notifications":        cdpbrowser.PermissionTypeNotifications,
-		"camera":               cdpbrowser.PermissionTypeVideoCapture,
-		"microphone":           cdpbrowser.PermissionTypeAudioCapture,
-		"background-sync":      cdpbrowser.PermissionTypeBackgroundSync,
-		"ambient-light-sensor": cdpbrowser.PermissionTypeSensors,
-		"accelerometer":        cdpbrowser.PermissionTypeSensors,
-		"gyroscope":            cdpbrowser.PermissionTypeSensors,
-		"magnetometer":         cdpbrowser.PermissionTypeSensors,
-		"clipboard-read":       cdpbrowser.PermissionTypeClipboardReadWrite,
-		"clipboard-write":      cdpbrowser.PermissionTypeClipboardSanitizedWrite,
-		"payment-handler":      cdpbrowser.PermissionTypePaymentHandler,
+	permsToDescriptor := map[string]*cdpbrowser.PermissionDescriptor{
+		"geolocation":          {Name: "geolocation"},
+		"midi":                 {Name: "midi"},
+		"midi-sysex":           {Name: "midi", Sysex: true},
+		"notifications":        {Name: "notifications"},
+		"camera":               {Name: "camera"},
+		"microphone":           {Name: "microphone"},
+		"background-sync":      {Name: "background-sync"},
+		"ambient-light-sensor": {Name: "ambient-light-sensor"},
+		"accelerometer":        {Name: "accelerometer"},
+		"gyroscope":            {Name: "gyroscope"},
+		"magnetometer":         {Name: "magnetometer"},
+		"clipboard-read":       {Name: "clipboard-read"},
+		"clipboard-write":      {Name: "clipboard-write"},
+		"payment-handler":      {Name: "payment-handler"},
 	}
 
-	perms := make([]cdpbrowser.PermissionType, 0, len(permissions))
+	descriptors := make([]*cdpbrowser.PermissionDescriptor, 0, len(permissions))
 	for _, p := range permissions {
-		proto, ok := permsToProtocol[p]
+		d, ok := permsToDescriptor[p]
 		if !ok {
 			return fmt.Errorf("%q is an invalid permission", p)
 		}
-		perms = append(perms, proto)
+		descriptors = append(descriptors, d)
 	}
 
-	action := cdpbrowser.GrantPermissions(perms).WithOrigin(opts.Origin).WithBrowserContextID(b.id)
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
-		return fmt.Errorf("granting browser permissions: %w", err)
+	for _, d := range descriptors {
+		action := cdpbrowser.SetPermission(d, cdpbrowser.PermissionSettingGranted).
+			WithOrigin(opts.Origin).
+			WithBrowserContextID(b.id)
+		if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+			return fmt.Errorf("granting browser permission %q: %w", d.Name, err)
+		}
 	}
 
 	return nil

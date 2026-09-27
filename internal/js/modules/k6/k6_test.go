@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modulestest"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
@@ -87,6 +90,20 @@ func TestRandSeed(t *testing.T) {
 func TestGroup(t *testing.T) {
 	t.Parallel()
 
+	t.Run("init context", func(t *testing.T) {
+		t.Parallel()
+		rt := sobek.New()
+		vu := &modulestest.VU{
+			RuntimeField: rt,
+			InitEnvField: &common.InitEnvironment{},
+		}
+		mi, ok := New().NewModuleInstance(vu).(*K6)
+		require.True(t, ok)
+
+		_, err := mi.Group("group", rt.ToValue(func() {}))
+		require.ErrorIs(t, err, ErrGroupInInitContext)
+	})
+
 	t.Run("Valid", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
@@ -113,15 +130,32 @@ func TestGroup(t *testing.T) {
 	t.Run("async function", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
-		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("something", async function() { })`)
-		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
+		state := tc.testRuntime.VU.State()
+		require.NoError(t, tc.testRuntime.VU.Runtime().Set("fn", func() {
+			groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
+			require.True(t, ok)
+			assert.Equal(t, "::something", groupTag)
+		}))
+		_, err := tc.testRuntime.RunOnEventLoop(
+			`k6.group("something", async function() { fn(); await Promise.resolve(); })`)
+		assert.NoError(t, err)
+		groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
+		require.True(t, ok)
+		assert.Equal(t, "", groupTag)
 	})
 
 	t.Run("async lambda", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
 		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("something", async () => { })`)
-		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
+		assert.NoError(t, err)
+	})
+
+	t.Run("async function disabled", func(t *testing.T) {
+		t.Parallel()
+		tc := testCaseRuntimeWithAsyncMetricContext(t, false)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("something", async () => {})`)
+		assert.ErrorContains(t, err, "group() does not support async functions")
 	})
 }
 
@@ -372,7 +406,13 @@ type testCase struct {
 }
 
 func testCaseRuntime(t testing.TB) *testCase {
+	return testCaseRuntimeWithAsyncMetricContext(t, true)
+}
+
+func testCaseRuntimeWithAsyncMetricContext(t testing.TB, enabled bool) *testCase {
 	testRuntime := modulestest.NewRuntime(t)
+	featureFlags := &features.Flags{AsyncMetricContext: enabled}
+	testRuntime.VU.InitEnvField.FeatureFlags = featureFlags
 	m, ok := New().NewModuleInstance(testRuntime.VU).(*K6)
 	require.True(t, ok)
 	require.NoError(t, testRuntime.VU.RuntimeField.Set("k6", m.Exports().Named))
@@ -380,6 +420,7 @@ func testCaseRuntime(t testing.TB) *testCase {
 	registry := metrics.NewRegistry()
 	samples := make(chan metrics.SampleContainer, 1000)
 	state := &lib.State{
+		FeatureFlags: featureFlags,
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
@@ -388,6 +429,11 @@ func testCaseRuntime(t testing.TB) *testCase {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 	testRuntime.MoveToVUContext(state)
+	if enabled {
+		testRuntime.VU.RuntimeField.SetAsyncContextTracker(
+			common.NewMetricContextTracker(testRuntime.VU.State),
+		)
+	}
 
 	return &testCase{
 		samples:     samples,

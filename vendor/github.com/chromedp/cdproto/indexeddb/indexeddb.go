@@ -198,7 +198,7 @@ type RequestDataParams struct {
 	StorageBucket   *storage.Bucket `json:"storageBucket,omitempty,omitzero"`  // Storage bucket. If not specified, it uses the default bucket.
 	DatabaseName    string          `json:"databaseName"`                      // Database name.
 	ObjectStoreName string          `json:"objectStoreName"`                   // Object store name.
-	IndexName       string          `json:"indexName"`                         // Index name, empty string for object store data requests.
+	IndexName       string          `json:"indexName,omitempty,omitzero"`      // Index name. If not specified, it performs an object store data request.
 	SkipCount       int64           `json:"skipCount"`                         // Number of records to skip.
 	PageSize        int64           `json:"pageSize"`                          // Number of records to fetch.
 	KeyRange        *KeyRange       `json:"keyRange,omitempty,omitzero"`       // Key range.
@@ -212,14 +212,12 @@ type RequestDataParams struct {
 //
 //	databaseName - Database name.
 //	objectStoreName - Object store name.
-//	indexName - Index name, empty string for object store data requests.
 //	skipCount - Number of records to skip.
 //	pageSize - Number of records to fetch.
-func RequestData(databaseName string, objectStoreName string, indexName string, skipCount int64, pageSize int64) *RequestDataParams {
+func RequestData(databaseName string, objectStoreName string, skipCount int64, pageSize int64) *RequestDataParams {
 	return &RequestDataParams{
 		DatabaseName:    databaseName,
 		ObjectStoreName: objectStoreName,
-		IndexName:       indexName,
 		SkipCount:       skipCount,
 		PageSize:        pageSize,
 	}
@@ -242,6 +240,13 @@ func (p RequestDataParams) WithStorageKey(storageKey string) *RequestDataParams 
 // bucket.
 func (p RequestDataParams) WithStorageBucket(storageBucket *storage.Bucket) *RequestDataParams {
 	p.StorageBucket = storageBucket
+	return &p
+}
+
+// WithIndexName index name. If not specified, it performs an object store
+// data request.
+func (p RequestDataParams) WithIndexName(indexName string) *RequestDataParams {
+	p.IndexName = indexName
 	return &p
 }
 
