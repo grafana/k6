@@ -100,9 +100,16 @@ type webSocket struct {
 	connectCancel context.CancelFunc
 
 	connectionMu sync.Mutex
-	// pendingConnection and publishing conn are guarded by connectionMu. Once connected, it also
-	// orders successful writes before events for data that the peer can only send after that write.
+	// pendingConnection and publishing conn are guarded by connectionMu.
 	pendingConnection net.Conn
+	// writeInProgress is true while a socket write is in progress. Incoming
+	// messages read in that window are parked on pendingIncoming so their JS
+	// events stay ordered after the bufferedAmount update. connectionMu must
+	// not be held across the write itself: readPump has to keep draining the
+	// socket, or a peer that is also writing fills the TCP window and both
+	// sides block.
+	writeInProgress bool
+	pendingIncoming []*message
 
 	eventListeners *eventListeners
 
@@ -543,6 +550,39 @@ func (w *webSocket) loop() {
 	}
 }
 
+// deliverIncoming queues msg on the event loop, or parks it while a write is in
+// flight so the bufferedAmount update is queued first.
+func (w *webSocket) deliverIncoming(msg *message) {
+	w.connectionMu.Lock()
+	defer w.connectionMu.Unlock()
+	if w.writeInProgress {
+		w.pendingIncoming = append(w.pendingIncoming, msg)
+		return
+	}
+	w.queueMessage(msg)
+}
+
+// finishWrite queues the bufferedAmount update for a successful write and then
+// releases any messages that arrived while the write was on the socket.
+func (w *webSocket) finishWrite(wrote bool, size int) {
+	w.connectionMu.Lock()
+	defer w.connectionMu.Unlock()
+	if wrote {
+		// This from the specification needs to happen like that instead of with
+		// atomics or locks outside of the event loop.
+		w.tq.Queue(func() error {
+			w.bufferedAmount -= size
+			return nil
+		})
+	}
+	w.writeInProgress = false
+	pending := w.pendingIncoming
+	w.pendingIncoming = nil
+	for _, msg := range pending {
+		w.queueMessage(msg)
+	}
+}
+
 func (w *webSocket) queueMessage(msg *message) {
 	w.tq.Queue(func() error {
 		if w.readyState != OPEN {
@@ -604,15 +644,14 @@ func (w *webSocket) readPump(wg *sync.WaitGroup) {
 	for {
 		messageType, data, err := w.conn.ReadMessage()
 		if err == nil {
-			// An immediate peer response can arrive before WriteMessage() returns. Wait for the
-			// writer to queue its bufferedAmount update before queuing the corresponding event.
-			w.connectionMu.Lock()
-			w.queueMessage(&message{
+			// A peer can respond before WriteMessage returns. Park that message until the
+			// writer queues its bufferedAmount update, but keep reading so the TCP window
+			// cannot fill while the write is still on the socket.
+			w.deliverIncoming(&message{
 				mtype: messageType,
 				data:  data,
 				t:     time.Now(),
 			})
-			w.connectionMu.Unlock()
 			continue
 		}
 
@@ -656,10 +695,14 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 				}
 				size := len(msg.data)
 
-				// Lock before writing because the peer can respond while WriteMessage() is still
-				// returning. Keep the lock through Queue() so readPump cannot queue that response
-				// ahead of the bufferedAmount update on the JavaScript event loop.
+				// Publish the in-flight write before touching the socket so a response that
+				// arrives mid-write is parked instead of emitted first. Release the lock for
+				// the write itself; holding it there stalls readPump and deadlocks when the
+				// peer is also blocked writing to us.
 				w.connectionMu.Lock()
+				w.writeInProgress = true
+				w.connectionMu.Unlock()
+
 				err := func() error {
 					if msg.mtype != websocket.PingMessage {
 						return w.conn.WriteMessage(msg.mtype, msg.data)
@@ -668,15 +711,7 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 					// WriteControl is concurrently okay
 					return w.conn.WriteControl(msg.mtype, msg.data, msg.t.Add(writeWait))
 				}()
-				if err == nil {
-					// This from the specification needs to happen like that instead of with
-					// atomics or locks outside of the event loop.
-					w.tq.Queue(func() error {
-						w.bufferedAmount -= size
-						return nil
-					})
-				}
-				w.connectionMu.Unlock()
+				w.finishWrite(err == nil, size)
 				if err != nil {
 					w.tq.Queue(func() error {
 						_ = w.conn.Close() // TODO fix
