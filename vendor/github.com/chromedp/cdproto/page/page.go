@@ -239,9 +239,10 @@ func (p *CaptureSnapshotParams) Do(ctx context.Context) (data string, err error)
 
 // CreateIsolatedWorldParams creates an isolated world for the given frame.
 type CreateIsolatedWorldParams struct {
-	FrameID             cdp.FrameID `json:"frameId"`                      // Id of the frame in which the isolated world should be created.
-	WorldName           string      `json:"worldName,omitempty,omitzero"` // An optional name which is reported in the Execution Context.
-	GrantUniveralAccess bool        `json:"grantUniveralAccess"`          // Whether or not universal access should be granted to the isolated world. This is a powerful option, use with caution.
+	FrameID               cdp.FrameID `json:"frameId"`                                  // Id of the frame in which the isolated world should be created.
+	WorldName             string      `json:"worldName,omitempty,omitzero"`             // An optional name which is reported in the Execution Context.
+	GrantUniveralAccess   bool        `json:"grantUniveralAccess"`                      // Whether or not universal access should be granted to the isolated world. This is a powerful option, use with caution.
+	ContentSecurityPolicy string      `json:"contentSecurityPolicy,omitempty,omitzero"` // An optional content security policy to set for the isolated world. If omitted, any existing CSP for the world will be cleared. Note that clearing or updating the CSP does not immediately affect the active context in the same document because LocalDOMWindow caches the ContentSecurityPolicy object. The change takes effect on subsequent navigations when a new window context is created.
 }
 
 // CreateIsolatedWorld creates an isolated world for the given frame.
@@ -268,6 +269,17 @@ func (p CreateIsolatedWorldParams) WithWorldName(worldName string) *CreateIsolat
 // to the isolated world. This is a powerful option, use with caution.
 func (p CreateIsolatedWorldParams) WithGrantUniveralAccess(grantUniveralAccess bool) *CreateIsolatedWorldParams {
 	p.GrantUniveralAccess = grantUniveralAccess
+	return &p
+}
+
+// WithContentSecurityPolicy an optional content security policy to set for
+// the isolated world. If omitted, any existing CSP for the world will be
+// cleared. Note that clearing or updating the CSP does not immediately affect
+// the active context in the same document because LocalDOMWindow caches the
+// ContentSecurityPolicy object. The change takes effect on subsequent
+// navigations when a new window context is created.
+func (p CreateIsolatedWorldParams) WithContentSecurityPolicy(contentSecurityPolicy string) *CreateIsolatedWorldParams {
+	p.ContentSecurityPolicy = contentSecurityPolicy
 	return &p
 }
 
@@ -476,7 +488,7 @@ func GetAdScriptAncestry(frameID cdp.FrameID) *GetAdScriptAncestryParams {
 
 // GetAdScriptAncestryReturns return values.
 type GetAdScriptAncestryReturns struct {
-	AdScriptAncestry *AdScriptAncestry `json:"adScriptAncestry,omitempty,omitzero"` // The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
+	AdScriptAncestry *cdp.AdAncestry `json:"adScriptAncestry,omitempty,omitzero"` // The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
 }
 
 // Do executes Page.getAdScriptAncestry against the provided context.
@@ -484,7 +496,7 @@ type GetAdScriptAncestryReturns struct {
 // returns:
 //
 //	adScriptAncestry - The ancestry chain of ad script identifiers leading to this frame's creation, along with the root script's filterlist rule. The ancestry chain is ordered from the most immediate script (in the frame creation stack) to more distant ancestors (that created the immediately preceding script). Only sent if frame is labelled as an ad and ids are available.
-func (p *GetAdScriptAncestryParams) Do(ctx context.Context) (adScriptAncestry *AdScriptAncestry, err error) {
+func (p *GetAdScriptAncestryParams) Do(ctx context.Context) (adScriptAncestry *cdp.AdAncestry, err error) {
 	// execute
 	var res GetAdScriptAncestryReturns
 	err = cdp.Execute(ctx, CommandGetAdScriptAncestry, p, &res)
@@ -1407,11 +1419,13 @@ func (p *SetLifecycleEventsEnabledParams) Do(ctx context.Context) (err error) {
 // StartScreencastParams starts sending each frame using the screencastFrame
 // event.
 type StartScreencastParams struct {
-	Format        ScreencastFormat `json:"format,omitempty,omitzero"`        // Image compression format.
-	Quality       int64            `json:"quality,omitempty,omitzero"`       // Compression quality from range [0..100].
-	MaxWidth      int64            `json:"maxWidth,omitempty,omitzero"`      // Maximum screenshot width.
-	MaxHeight     int64            `json:"maxHeight,omitempty,omitzero"`     // Maximum screenshot height.
-	EveryNthFrame int64            `json:"everyNthFrame,omitempty,omitzero"` // Send every n-th frame.
+	Format            ScreencastFormat `json:"format,omitempty,omitzero"`            // Image compression format.
+	Quality           int64            `json:"quality,omitempty,omitzero"`           // Compression quality from range [0..100].
+	MaxWidth          int64            `json:"maxWidth,omitempty,omitzero"`          // Maximum screenshot width.
+	MaxHeight         int64            `json:"maxHeight,omitempty,omitzero"`         // Maximum screenshot height.
+	EveryNthFrame     int64            `json:"everyNthFrame,omitempty,omitzero"`     // Send every n-th frame. Must be a positive integer.
+	MaxFramesInFlight int64            `json:"maxFramesInFlight,omitempty,omitzero"` // Maximum number of frames sent until screencastFrameAck is required. Defaults to 3. Must be a positive integer.
+	SendLastFrame     bool             `json:"sendLastFrame"`                        // By default, after screencastFrameAck arrives, the next produced frame is sent. Passing this flag enables storing the last produced frame in memory, which is immediately sent upon screencastFrameAck. This way, overall performance is traded for a better latency.
 }
 
 // StartScreencast starts sending each frame using the screencastFrame event.
@@ -1420,7 +1434,9 @@ type StartScreencastParams struct {
 //
 // parameters:
 func StartScreencast() *StartScreencastParams {
-	return &StartScreencastParams{}
+	return &StartScreencastParams{
+		SendLastFrame: false,
+	}
 }
 
 // WithFormat image compression format.
@@ -1447,15 +1463,126 @@ func (p StartScreencastParams) WithMaxHeight(maxHeight int64) *StartScreencastPa
 	return &p
 }
 
-// WithEveryNthFrame send every n-th frame.
+// WithEveryNthFrame send every n-th frame. Must be a positive integer.
 func (p StartScreencastParams) WithEveryNthFrame(everyNthFrame int64) *StartScreencastParams {
 	p.EveryNthFrame = everyNthFrame
+	return &p
+}
+
+// WithMaxFramesInFlight maximum number of frames sent until
+// screencastFrameAck is required. Defaults to 3. Must be a positive integer.
+func (p StartScreencastParams) WithMaxFramesInFlight(maxFramesInFlight int64) *StartScreencastParams {
+	p.MaxFramesInFlight = maxFramesInFlight
+	return &p
+}
+
+// WithSendLastFrame by default, after screencastFrameAck arrives, the next
+// produced frame is sent. Passing this flag enables storing the last produced
+// frame in memory, which is immediately sent upon screencastFrameAck. This way,
+// overall performance is traded for a better latency.
+func (p StartScreencastParams) WithSendLastFrame(sendLastFrame bool) *StartScreencastParams {
+	p.SendLastFrame = sendLastFrame
 	return &p
 }
 
 // Do executes Page.startScreencast against the provided context.
 func (p *StartScreencastParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandStartScreencast, p, nil)
+}
+
+// StartScreenRecordingParams starts screencast video recording.
+type StartScreenRecordingParams struct {
+	Audio     bool  `json:"audio"`
+	MaxWidth  int64 `json:"maxWidth,omitempty,omitzero"`  // Maximum frame width in pixels.
+	MaxHeight int64 `json:"maxHeight,omitempty,omitzero"` // Maximum frame height in pixels.
+	FrameRate int64 `json:"frameRate,omitempty,omitzero"` // Maximum frame rate in frames per second.
+}
+
+// StartScreenRecording starts screencast video recording.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-startScreenRecording
+//
+// parameters:
+func StartScreenRecording() *StartScreenRecordingParams {
+	return &StartScreenRecordingParams{
+		Audio: false,
+	}
+}
+
+// WithAudio [no description].
+func (p StartScreenRecordingParams) WithAudio(audio bool) *StartScreenRecordingParams {
+	p.Audio = audio
+	return &p
+}
+
+// WithMaxWidth maximum frame width in pixels.
+func (p StartScreenRecordingParams) WithMaxWidth(maxWidth int64) *StartScreenRecordingParams {
+	p.MaxWidth = maxWidth
+	return &p
+}
+
+// WithMaxHeight maximum frame height in pixels.
+func (p StartScreenRecordingParams) WithMaxHeight(maxHeight int64) *StartScreenRecordingParams {
+	p.MaxHeight = maxHeight
+	return &p
+}
+
+// WithFrameRate maximum frame rate in frames per second.
+func (p StartScreenRecordingParams) WithFrameRate(frameRate int64) *StartScreenRecordingParams {
+	p.FrameRate = frameRate
+	return &p
+}
+
+// StartScreenRecordingReturns return values.
+type StartScreenRecordingReturns struct {
+	Stream io.StreamHandle `json:"stream,omitempty,omitzero"` // A handle of the stream that holds resulting screencast data.
+}
+
+// Do executes Page.startScreenRecording against the provided context.
+//
+// returns:
+//
+//	stream - A handle of the stream that holds resulting screencast data.
+func (p *StartScreenRecordingParams) Do(ctx context.Context) (stream io.StreamHandle, err error) {
+	// execute
+	var res StartScreenRecordingReturns
+	err = cdp.Execute(ctx, CommandStartScreenRecording, p, &res)
+	if err != nil {
+		return "", err
+	}
+
+	return res.Stream, nil
+}
+
+// StopScreenRecordingParams stops screencast video recording.
+type StopScreenRecordingParams struct{}
+
+// StopScreenRecording stops screencast video recording.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-stopScreenRecording
+func StopScreenRecording() *StopScreenRecordingParams {
+	return &StopScreenRecordingParams{}
+}
+
+// StopScreenRecordingReturns return values.
+type StopScreenRecordingReturns struct {
+	Stream io.StreamHandle `json:"stream,omitempty,omitzero"` // A handle of the stream that holds resulting screencast data.
+}
+
+// Do executes Page.stopScreenRecording against the provided context.
+//
+// returns:
+//
+//	stream - A handle of the stream that holds resulting screencast data.
+func (p *StopScreenRecordingParams) Do(ctx context.Context) (stream io.StreamHandle, err error) {
+	// execute
+	var res StopScreenRecordingReturns
+	err = cdp.Execute(ctx, CommandStopScreenRecording, nil, &res)
+	if err != nil {
+		return "", err
+	}
+
+	return res.Stream, nil
 }
 
 // StopLoadingParams force the page stop all navigations and pending resource
@@ -1792,6 +1919,58 @@ func (p *SetPrerenderingAllowedParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetPrerenderingAllowed, p, nil)
 }
 
+// GetAnnotatedPageContentParams get the annotated page content for the main
+// frame. This is an experimental command that is subject to change.
+type GetAnnotatedPageContentParams struct {
+	IncludeActionableInformation bool `json:"includeActionableInformation"` // Whether to include actionable information. Defaults to true.
+}
+
+// GetAnnotatedPageContent get the annotated page content for the main frame.
+// This is an experimental command that is subject to change.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-getAnnotatedPageContent
+//
+// parameters:
+func GetAnnotatedPageContent() *GetAnnotatedPageContentParams {
+	return &GetAnnotatedPageContentParams{
+		IncludeActionableInformation: true,
+	}
+}
+
+// WithIncludeActionableInformation whether to include actionable
+// information. Defaults to true.
+func (p GetAnnotatedPageContentParams) WithIncludeActionableInformation(includeActionableInformation bool) *GetAnnotatedPageContentParams {
+	p.IncludeActionableInformation = includeActionableInformation
+	return &p
+}
+
+// GetAnnotatedPageContentReturns return values.
+type GetAnnotatedPageContentReturns struct {
+	Content string `json:"content,omitempty,omitzero"` // The annotated page content as a base64 encoded protobuf. The format is defined by the AnnotatedPageContent message in components/optimization_guide/proto/features/common_quality_data.proto
+}
+
+// Do executes Page.getAnnotatedPageContent against the provided context.
+//
+// returns:
+//
+//	content - The annotated page content as a base64 encoded protobuf. The format is defined by the AnnotatedPageContent message in components/optimization_guide/proto/features/common_quality_data.proto
+func (p *GetAnnotatedPageContentParams) Do(ctx context.Context) (content []byte, err error) {
+	// execute
+	var res GetAnnotatedPageContentReturns
+	err = cdp.Execute(ctx, CommandGetAnnotatedPageContent, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	// decode
+	var dec []byte
+	dec, err = base64.StdEncoding.DecodeString(res.Content)
+	if err != nil {
+		return nil, err
+	}
+	return dec, nil
+}
+
 // Command names.
 const (
 	CommandAddScriptToEvaluateOnNewDocument    = "Page.addScriptToEvaluateOnNewDocument"
@@ -1828,6 +2007,8 @@ const (
 	CommandSetDocumentContent                  = "Page.setDocumentContent"
 	CommandSetLifecycleEventsEnabled           = "Page.setLifecycleEventsEnabled"
 	CommandStartScreencast                     = "Page.startScreencast"
+	CommandStartScreenRecording                = "Page.startScreenRecording"
+	CommandStopScreenRecording                 = "Page.stopScreenRecording"
 	CommandStopLoading                         = "Page.stopLoading"
 	CommandCrash                               = "Page.crash"
 	CommandClose                               = "Page.close"
@@ -1842,4 +2023,5 @@ const (
 	CommandWaitForDebugger                     = "Page.waitForDebugger"
 	CommandSetInterceptFileChooserDialog       = "Page.setInterceptFileChooserDialog"
 	CommandSetPrerenderingAllowed              = "Page.setPrerenderingAllowed"
+	CommandGetAnnotatedPageContent             = "Page.getAnnotatedPageContent"
 )

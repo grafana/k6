@@ -15,20 +15,43 @@ import (
 	"github.com/go-json-experiment/json/jsontext"
 )
 
+// TriggerActionParams runs an extension default action.
+type TriggerActionParams struct {
+	ID       string `json:"id"`       // Extension id.
+	TargetID string `json:"targetId"` // A tab target ID to trigger the default extension action on.
+}
+
+// TriggerAction runs an extension default action.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Extensions#method-triggerAction
+//
+// parameters:
+//
+//	id - Extension id.
+//	targetID - A tab target ID to trigger the default extension action on.
+func TriggerAction(id string, targetID string) *TriggerActionParams {
+	return &TriggerActionParams{
+		ID:       id,
+		TargetID: targetID,
+	}
+}
+
+// Do executes Extensions.triggerAction against the provided context.
+func (p *TriggerActionParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandTriggerAction, p, nil)
+}
+
 // LoadUnpackedParams installs an unpacked extension from the filesystem
 // similar to --load-extension CLI flags. Returns extension ID once the
-// extension has been installed. Available if the client is connected using the
-// --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging flag
-// is set.
+// extension has been installed.
 type LoadUnpackedParams struct {
-	Path string `json:"path"` // Absolute file path.
+	Path              string `json:"path"`              // Absolute file path.
+	EnableInIncognito bool   `json:"enableInIncognito"` // Enable the extension in incognito
 }
 
 // LoadUnpacked installs an unpacked extension from the filesystem similar to
 // --load-extension CLI flags. Returns extension ID once the extension has been
-// installed. Available if the client is connected using the
-// --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging flag
-// is set.
+// installed.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Extensions#method-loadUnpacked
 //
@@ -37,8 +60,15 @@ type LoadUnpackedParams struct {
 //	path - Absolute file path.
 func LoadUnpacked(path string) *LoadUnpackedParams {
 	return &LoadUnpackedParams{
-		Path: path,
+		Path:              path,
+		EnableInIncognito: false,
 	}
+}
+
+// WithEnableInIncognito enable the extension in incognito.
+func (p LoadUnpackedParams) WithEnableInIncognito(enableInIncognito bool) *LoadUnpackedParams {
+	p.EnableInIncognito = enableInIncognito
+	return &p
 }
 
 // LoadUnpackedReturns return values.
@@ -62,16 +92,45 @@ func (p *LoadUnpackedParams) Do(ctx context.Context) (id string, err error) {
 	return res.ID, nil
 }
 
+// GetExtensionsParams gets a list of all unpacked extensions.
+type GetExtensionsParams struct{}
+
+// GetExtensions gets a list of all unpacked extensions.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Extensions#method-getExtensions
+func GetExtensions() *GetExtensionsParams {
+	return &GetExtensionsParams{}
+}
+
+// GetExtensionsReturns return values.
+type GetExtensionsReturns struct {
+	Extensions []*ExtensionInfo `json:"extensions,omitempty,omitzero"`
+}
+
+// Do executes Extensions.getExtensions against the provided context.
+//
+// returns:
+//
+//	extensions
+func (p *GetExtensionsParams) Do(ctx context.Context) (extensions []*ExtensionInfo, err error) {
+	// execute
+	var res GetExtensionsReturns
+	err = cdp.Execute(ctx, CommandGetExtensions, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Extensions, nil
+}
+
 // UninstallParams uninstalls an unpacked extension (others not supported)
-// from the profile. Available if the client is connected using the
-// --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging.
+// from the profile.
 type UninstallParams struct {
 	ID string `json:"id"` // Extension id.
 }
 
 // Uninstall uninstalls an unpacked extension (others not supported) from the
-// profile. Available if the client is connected using the
-// --remote-debugging-pipe flag and the --enable-unsafe-extension-debugging.
+// profile.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Extensions#method-uninstall
 //
@@ -231,7 +290,9 @@ func (p *SetStorageItemsParams) Do(ctx context.Context) (err error) {
 
 // Command names.
 const (
+	CommandTriggerAction      = "Extensions.triggerAction"
 	CommandLoadUnpacked       = "Extensions.loadUnpacked"
+	CommandGetExtensions      = "Extensions.getExtensions"
 	CommandUninstall          = "Extensions.uninstall"
 	CommandGetStorageItems    = "Extensions.getStorageItems"
 	CommandRemoveStorageItems = "Extensions.removeStorageItems"

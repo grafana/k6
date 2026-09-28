@@ -2597,7 +2597,7 @@ class InjectedScript {
         case "visible":
           return visible ? element : continuePolling;
         case "hidden":
-          return !visible ? element : continuePolling;
+          return !visible ? element || true : continuePolling;
       }
     };
 

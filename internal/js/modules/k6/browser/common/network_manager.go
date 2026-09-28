@@ -17,6 +17,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 	k6lib "go.k6.io/k6/v2/lib"
 	k6netext "go.k6.io/k6/v2/lib/netext"
@@ -210,10 +211,61 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 	delete(m.reqIDToRequest, reqID)
 }
 
+func (m *NetworkManager) networkTagsAndMeta(
+	state *k6lib.State,
+	event *network.EventRequestWillBeSent,
+	redirectChain []*Request,
+) (k6metrics.TagsAndMeta, *networkOperationContext) {
+	if !k6common.AsyncMetricContextEnabled(state) {
+		return k6metrics.TagsAndMeta{}, nil
+	}
+	if len(redirectChain) > 0 {
+		previous := redirectChain[len(redirectChain)-1]
+		operation := previous.networkOperation
+		if m.frameManager != nil && m.frameManager.page != nil {
+			_, bindLoaderContext := requestLoaderContext(event)
+			if bindLoaderContext {
+				m.frameManager.page.bindNetworkLoaderOperation(event.FrameID, event.LoaderID, operation)
+			}
+		}
+		return previous.tagsAndMeta, operation
+	}
+	if m.frameManager != nil && m.frameManager.page != nil {
+		preferLoaderContext, bindLoaderContext := requestLoaderContext(event)
+		if tagsAndMeta, operation, ok := m.frameManager.page.getNetworkTagsAndMetaForRequest(
+			event.FrameID, event.LoaderID, preferLoaderContext, bindLoaderContext,
+		); ok {
+			return tagsAndMeta, operation
+		}
+	}
+	return state.Tags.GetCurrentValues(), nil
+}
+
+func requestLoaderContext(event *network.EventRequestWillBeSent) (prefer, bind bool) {
+	bind = event.Type == network.ResourceTypeDocument
+	initiatorType := network.InitiatorTypeOther
+	if event.Initiator != nil {
+		initiatorType = event.Initiator.Type
+	}
+	// A loader identifies navigation and parser-driven resource traffic, but it is also shared by
+	// unrelated fetches later in the document. Keep script traffic on the operation fallback.
+	prefer = bind || initiatorType == network.InitiatorTypeParser ||
+		initiatorType == network.InitiatorTypePreload ||
+		initiatorType == network.InitiatorTypeSignedExchange
+	return prefer, bind
+}
+
 func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	state := m.vu.State()
+	if state == nil {
+		return // CDP events can arrive after iteration teardown.
+	}
 
-	tags := state.Tags.GetCurrentValues().Tags
+	tagsAndMeta := req.tagsAndMeta
+	if tagsAndMeta.Tags == nil {
+		tagsAndMeta = state.Tags.GetCurrentValues()
+	}
+	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags = tags.With("method", req.method)
 	}
@@ -228,13 +280,17 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataSent, Tags: tags},
 				Value:      float64(req.Size().Total()),
 				Time:       req.wallTime,
+				Metadata:   tagsAndMeta.Metadata,
 			},
 		},
 	})
 }
 
-func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
+func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //nolint:funlen
 	state := m.vu.State()
+	if state == nil {
+		return // CDP events can arrive after iteration teardown.
+	}
 
 	// In some scenarios we might not receive a ResponseReceived CDP event, in
 	// which case the response won't be created. So to emit as much metric data
@@ -267,7 +323,11 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 			"response is nil url:%s method:%s", req.url, req.method)
 	}
 
-	tags := state.Tags.GetCurrentValues().Tags
+	tagsAndMeta := req.tagsAndMeta
+	if tagsAndMeta.Tags == nil {
+		tagsAndMeta = state.Tags.GetCurrentValues()
+	}
+	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
 		tags = tags.With("method", req.method)
 	}
@@ -295,11 +355,13 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
 				Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
 				Time:       wallTime,
+				Metadata:   tagsAndMeta.Metadata,
 			},
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataReceived, Tags: tags},
 				Value:      float64(bodySize),
 				Time:       wallTime,
+				Metadata:   tagsAndMeta.Metadata,
 			},
 		},
 	})
@@ -311,6 +373,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
 					Value:      failed,
 					Time:       wallTime,
+					Metadata:   tagsAndMeta.Metadata,
 				},
 			},
 		})
@@ -541,6 +604,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	} else {
 		redirectChain = make([]*Request, 0)
 	}
+	tagsAndMeta, networkOperation := m.networkTagsAndMeta(m.vu.State(), event, redirectChain)
 
 	var frame *Frame = nil
 	var ok bool
@@ -577,6 +641,8 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		redirectChain:     redirectChain,
 		interceptionID:    interceptionID,
 		allowInterception: m.userReqInterceptionEnabled,
+		tagsAndMeta:       tagsAndMeta,
+		networkOperation:  networkOperation,
 	})
 	if err != nil {
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
@@ -1044,6 +1110,37 @@ func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) error {
 	return nil
 }
 
+// emulateNetworkConditions applies the current offline/networkProfile state
+// to the browser. emulateNetworkConditionsByRule throttles actual traffic,
+// and overrideNetworkState updates the navigator.onLine/navigator.connection
+// state exposed to page JS.
+func (m *NetworkManager) emulateNetworkConditions() error {
+	byRule := network.EmulateNetworkConditionsByRule([]*network.Conditions{
+		{
+			// Empty URLPattern applies these as global conditions.
+			Offline:            m.offline,
+			Latency:            m.networkProfile.Latency,
+			DownloadThroughput: m.networkProfile.Download,
+			UploadThroughput:   m.networkProfile.Upload,
+		},
+	})
+	if _, err := byRule.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("emulating network conditions by rule: %w", err)
+	}
+
+	override := network.OverrideNetworkState(
+		m.offline,
+		m.networkProfile.Latency,
+		m.networkProfile.Download,
+		m.networkProfile.Upload,
+	)
+	if err := override.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("overriding network state: %w", err)
+	}
+
+	return nil
+}
+
 // SetOfflineMode toggles offline mode on/off.
 func (m *NetworkManager) SetOfflineMode(offline bool) error {
 	if m.offline == offline {
@@ -1051,13 +1148,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) error {
 	}
 	m.offline = offline
 
-	action := network.EmulateNetworkConditions(
-		m.offline,
-		m.networkProfile.Latency,
-		m.networkProfile.Download,
-		m.networkProfile.Upload,
-	)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := m.emulateNetworkConditions(); err != nil {
 		return fmt.Errorf("emulating network conditions: %w", err)
 	}
 
@@ -1072,13 +1163,7 @@ func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
 	}
 	m.networkProfile = networkProfile
 
-	action := network.EmulateNetworkConditions(
-		m.offline,
-		m.networkProfile.Latency,
-		m.networkProfile.Download,
-		m.networkProfile.Upload,
-	)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := m.emulateNetworkConditions(); err != nil {
 		return fmt.Errorf("throttling network: %w", err)
 	}
 

@@ -206,16 +206,24 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 
 	switch preq.Auth {
 	case "digest":
-		// Until digest authentication is refactored, the first response will always
-		// be a 401 error, so we expect that.
+		// The first request may be answered with a 401 challenge before the
+		// authenticated retry, so we expect that as a possible outcome.
 		if tracerTransport.responseCallback != nil {
 			originalResponseCallback := tracerTransport.responseCallback
 			tracerTransport.responseCallback = func(status int) bool {
 				tracerTransport.responseCallback = originalResponseCallback
-				return status == 401
+				return status == 401 || originalResponseCallback(status)
 			}
 		}
-		transport = digestTransport{originalTransport: transport}
+
+		username := preq.URL.GetURL().User.Username()
+		password, _ := preq.URL.GetURL().User.Password()
+
+		// Remove the user data from the URL to avoid sending the Authorization
+		// header for basic auth
+		preq.URL.GetURL().User = nil
+
+		transport = newDigestTransport(transport, username, password, state.Logger)
 	case "ntlm":
 		// The first response of NTLM auth may be a 401 error.
 		if tracerTransport.responseCallback != nil {
