@@ -18,6 +18,7 @@ const (
 	p256Canonical = "P-256"
 	p384Canonical = "P-384"
 	p521Canonical = "P-521"
+	x25519        = "X25519"
 )
 
 // EcKeyAlgorithm is the algorithm for elliptic curve keys as defined in the [specification].
@@ -396,6 +397,8 @@ func pickECDHCurve(k string) (ecdh.Curve, error) {
 		return ecdh.P384(), nil
 	case p521Canonical:
 		return ecdh.P521(), nil
+	case x25519:
+		return ecdh.X25519(), nil
 	default:
 		return nil, errors.New("invalid ECDH curve")
 	}
@@ -548,8 +551,12 @@ func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length in
 		return nil, NewError(InvalidAccessError, "provided baseKey does not contain the 'deriveBits' usage")
 	}
 
-	if err := ensureKeysUseSameCurve(*privateKey, *keyParams.Public); err != nil {
-		return nil, NewError(InvalidAccessError, err.Error())
+	// X25519 is a standalone algorithm rather than an ECDH named curve, so its keys carry a plain
+	// Algorithm instead of an EcKeyAlgorithm and always share the same curve by definition.
+	if keyParams.Name == ECDH {
+		if err := ensureKeysUseSameCurve(*privateKey, *keyParams.Public); err != nil {
+			return nil, NewError(InvalidAccessError, err.Error())
+		}
 	}
 
 	pk, ok := privateKey.handle.(*ecdh.PrivateKey)

@@ -55,6 +55,12 @@ const (
 
 	// PBKDF2 represents the PBKDF2 algorithm
 	PBKDF2 = "PBKDF2"
+
+	// Ed25519 represents the Ed25519 algorithm.
+	Ed25519 = "Ed25519"
+
+	// X25519 represents the X25519 algorithm.
+	X25519 = "X25519"
 )
 
 // HashAlgorithmIdentifier represents the name of a hash algorithm.
@@ -175,6 +181,11 @@ func normalizeAlgorithmName(name string) string {
 		return RSASsaPkcs1v15
 	}
 
+	// exception is made for Ed25519
+	if name == strings.ToUpper(Ed25519) {
+		return Ed25519
+	}
+
 	return name
 }
 
@@ -193,22 +204,30 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 			isHashAlgorithm(algorithmName) ||
 			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
-			isRSAAlgorithm(algorithmName)
+			isRSAAlgorithm(algorithmName) ||
+			algorithmName == Ed25519 ||
+			algorithmName == X25519
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesAlgorithm(algorithmName) ||
 			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName) ||
-			isPBKDF2Algorithm(algorithmName)
+			isPBKDF2Algorithm(algorithmName) ||
+			algorithmName == Ed25519 ||
+			algorithmName == X25519
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:
 		return isHMACAlgorithm(algorithmName) ||
 			algorithmName == ECDSA ||
 			algorithmName == RSAPss ||
-			algorithmName == RSASsaPkcs1v15
+			algorithmName == RSASsaPkcs1v15 ||
+			algorithmName == Ed25519
 	case OperationIdentifierDeriveBits:
-		return isHashAlgorithm(algorithmName) || isPBKDF2Algorithm(algorithmName) || isECDHAlgorithm(algorithmName)
+		return isHashAlgorithm(algorithmName) ||
+			isPBKDF2Algorithm(algorithmName) ||
+			isECDHAlgorithm(algorithmName) ||
+			algorithmName == X25519
 	case OperationIdentifierDeriveKey:
 		return isHashAlgorithm(algorithmName) || isPBKDF2Algorithm(algorithmName)
 	case OperationIdentifierGetKeyLength:
