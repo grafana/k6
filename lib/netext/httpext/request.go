@@ -3,6 +3,7 @@ package httpext
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -51,6 +52,9 @@ type ParsedHTTPRequest struct {
 	ActiveJar        *cookiejar.Jar
 	Cookies          map[string]*HTTPRequestCookie
 	TagsAndMeta      metrics.TagsAndMeta
+	// TLSClientCerts, when set, overrides the VU's global client certificates
+	// for this request only (see params.tlsAuth).
+	TLSClientCerts []tls.Certificate
 }
 
 // ncloser matches non-compliant io.Closer implementations (e.g. zstd.Decoder).
@@ -180,6 +184,13 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 			return nil, err
 		}
 	}
+
+	reqState, cleanup, err := withTLSClientCertificates(state, preq.TLSClientCerts)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+	state = reqState
 
 	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
