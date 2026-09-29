@@ -17,8 +17,8 @@ import (
 
 // SubtleCrypto represents the SubtleCrypto interface of the Web Crypto API.
 type SubtleCrypto struct {
-	vu                modules.VU
-	arrayBufferIsView sobek.Callable
+	vu           modules.VU
+	bufferSource bufferSourceAccessors
 }
 
 // Encrypt encrypts data.
@@ -51,7 +51,7 @@ func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
 	err := func() error {
 		var err error
 
-		plaintext, err = exportArrayBuffer(rt, data, sc.arrayBufferIsView)
+		plaintext, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -141,7 +141,7 @@ func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
 
 	err := func() error {
 		var err error
-		ciphertext, err = exportArrayBuffer(rt, data, sc.arrayBufferIsView)
+		ciphertext, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -231,7 +231,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data sobek.Value) (*sobek.Promise, 
 		var err error
 		// 2.
 		// We obtain a copy of the key data, because we might need to modify it.
-		dataToSign, err = exportArrayBuffer(rt, data, sc.arrayBufferIsView)
+		dataToSign, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -326,12 +326,12 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data sobek.Value) (*so
 	err := func() error {
 		var err error
 
-		signatureData, err = exportArrayBuffer(sc.vu.Runtime(), signature, sc.arrayBufferIsView)
+		signatureData, err = exportArrayBuffer(sc.vu.Runtime(), signature, sc.bufferSource)
 		if err != nil {
 			return err
 		}
 
-		signedData, err = exportArrayBuffer(sc.vu.Runtime(), data, sc.arrayBufferIsView)
+		signedData, err = exportArrayBuffer(sc.vu.Runtime(), data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -417,7 +417,7 @@ func (sc *SubtleCrypto) Digest(algorithm sobek.Value, data sobek.Value) (*sobek.
 	err := func() error {
 		var err error
 
-		bytes, err = exportArrayBuffer(rt, data, sc.arrayBufferIsView)
+		bytes, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -829,7 +829,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 	err := func() error {
 		switch format {
 		case Pkcs8KeyFormat, RawKeyFormat, SpkiKeyFormat:
-			ab, err := exportArrayBuffer(rt, keyData, sc.arrayBufferIsView)
+			ab, err := exportArrayBuffer(rt, keyData, sc.bufferSource)
 			if err != nil {
 				return err
 			}

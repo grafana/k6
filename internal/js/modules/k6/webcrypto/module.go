@@ -62,15 +62,15 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 	rt := vu.Runtime()
 
 	obj := rt.NewObject()
-	// Capture the native predicate before user scripts can replace ArrayBuffer.isView.
-	arrayBufferIsView, err := getArrayBufferIsView(rt)
+	// Capture native BufferSource accessors before user scripts can replace them.
+	bufferSource, err := getBufferSourceAccessors(rt)
 	if err != nil {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
 	}
 
 	crypto := &Crypto{
 		vu:        vu,
-		Subtle:    &SubtleCrypto{vu: vu, arrayBufferIsView: arrayBufferIsView},
+		Subtle:    &SubtleCrypto{vu: vu, bufferSource: bufferSource},
 		CryptoKey: &CryptoKey{},
 	}
 
@@ -82,7 +82,7 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
 	}
 
-	if err := setReadOnlyPropertyOf(obj, "subtle", rt.ToValue(newSubtleCryptoObject(vu, arrayBufferIsView))); err != nil {
+	if err := setReadOnlyPropertyOf(obj, "subtle", rt.ToValue(newSubtleCryptoObject(vu, bufferSource))); err != nil {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
 	}
 
@@ -93,12 +93,12 @@ func newCryptoObject(vu modules.VU) *sobek.Object {
 	return obj
 }
 
-func newSubtleCryptoObject(vu modules.VU, arrayBufferIsView sobek.Callable) *sobek.Object {
+func newSubtleCryptoObject(vu modules.VU, bufferSource bufferSourceAccessors) *sobek.Object {
 	rt := vu.Runtime()
 
 	obj := rt.NewObject()
 
-	subtleCrypto := &SubtleCrypto{vu: vu, arrayBufferIsView: arrayBufferIsView}
+	subtleCrypto := &SubtleCrypto{vu: vu, bufferSource: bufferSource}
 
 	if err := setReadOnlyPropertyOf(obj, "decrypt", rt.ToValue(subtleCrypto.Decrypt)); err != nil {
 		common.Throw(rt, NewError(ImplementationError, err.Error()))
