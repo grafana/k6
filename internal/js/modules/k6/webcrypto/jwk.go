@@ -466,7 +466,8 @@ func exportAlg25519JWK(key *CryptoKey) (*JsonWebKey, error) {
 		}
 
 		exported.Set("x", base64URLEncode([]byte(pubKey)))
-		exported.Set("d", base64URLEncode([]byte(alg25519Key)))
+		// RFC 8037 defines 'd' as the 32 bytes private key, which Go calls the seed.
+		exported.Set("d", base64URLEncode(alg25519Key.Seed()))
 	case *ecdh.PublicKey:
 		exported.Set("x", base64URLEncode(alg25519Key.Bytes()))
 	case *ecdh.PrivateKey:
@@ -663,10 +664,16 @@ func (jwk *alg25519JWK) validateAlg25519JWK(keyUsages []CryptoKeyUsage, algorith
 		return NewError(DataError, fmt.Sprintf("invalid 'd': d field is required for private %s keys", algorithm))
 	}
 
-	if len(keyUsages) != 0 && jwk.Use != "" && jwk.Use != "sig" {
+	// Ed25519 keys are used for signatures, X25519 keys for key agreement (encryption).
+	expectedUse := "sig"
+	if algorithm == X25519 {
+		expectedUse = "enc"
+	}
+
+	if len(keyUsages) != 0 && jwk.Use != "" && jwk.Use != expectedUse {
 		return NewError(
 			DataError,
-			fmt.Sprintf("invalid 'use': %s. use field must be 'sig' in the JWK if usages are supplied ", jwk.Use),
+			fmt.Sprintf("invalid 'use': %s. use field must be '%s' in the JWK if usages are supplied", jwk.Use, expectedUse),
 		)
 	}
 

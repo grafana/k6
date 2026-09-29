@@ -11,7 +11,7 @@ export default async function () {
         "kty": "OKP", 
         crv: "Ed25519", 
         x: "o7RbBVJW_6Ua3h5J3MCEGAeXRC6xHvtotIiAadK-xbM", 
-        d: "lHnUA3j3VmVOCYuF4nzEgbQ9QnaBNXXTLIK45adoyEmjtFsFUlb_pRreHkncwIQYB5dELrEe-2i0iIBp0r7Fsw", 
+        d: "lHnUA3j3VmVOCYuF4nzEgbQ9QnaBNXXTLIK45adoyEk", 
         key_ops: ["sign"], 
         ext: true 
     }

@@ -1,11 +1,14 @@
 package webcrypto
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
 // Ed25519KeyGenParams represents the object that should be passed as the algorithm
@@ -110,7 +113,47 @@ func (ed25519SignerVerifier) Verify(key CryptoKey, signature, data []byte) (bool
 		return false, NewError(InvalidAccessError, "Key handle is not an Ed25519 public key")
 	}
 
+	// The specification requires the verification to fail if either the public key or the R
+	// component of the signature (its first half) is a small-order point. Go's ed25519.Verify
+	// doesn't perform this check, so we do it here.
+	if len(signature) != ed25519.SignatureSize {
+		return false, nil
+	}
+
+	if isEd25519SmallOrderPoint(keyHandle) || isEd25519SmallOrderPoint(signature[:ed25519.PublicKeySize]) {
+		return false, nil
+	}
+
 	return ed25519.Verify(keyHandle, data, signature), nil
+}
+
+// isEd25519SmallOrderPoint returns true if the given encoded point is of small order.
+//
+// It compares the point against every encoding, canonical or not, of the eight points of small
+// order on the Ed25519 curve, as listed in table 3 of "Taming the many EdDSAs" by Chalkias et al.
+// (https://eprint.iacr.org/2020/1244). Keeping an exhaustive list avoids having to decode points,
+// which Go's standard library doesn't expose outside of its internal packages.
+func isEd25519SmallOrderPoint(point []byte) bool {
+	smallOrderPoints := [...]string{
+		// Canonical encodings
+		"0100000000000000000000000000000000000000000000000000000000000000", // order 1
+		"ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", // order 2
+		"0000000000000000000000000000000000000000000000000000000000000080", // order 4
+		"0000000000000000000000000000000000000000000000000000000000000000", // order 4
+		"c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a", // order 8
+		"c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa", // order 8
+		"26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05", // order 8
+		"26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85", // order 8
+		// Non-canonical encodings
+		"0100000000000000000000000000000000000000000000000000000000000080", // order 1
+		"ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // order 2
+		"eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", // order 1
+		"eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // order 1
+		"edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", // order 4
+		"edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f", // order 4
+	}
+
+	return slices.Contains(smallOrderPoints[:], hex.EncodeToString(point))
 }
 
 // Ed25519ImportParams is an internal placeholder struct for Ed25519 import parameters.
@@ -146,7 +189,7 @@ func (eip *Ed25519ImportParams) ImportKey(
 	case RawKeyFormat:
 		importFn = importEd25519Raw
 	default:
-		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+eip.Algorithm.Name)
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+eip.Name)
 	}
 
 	handle, keyType, err := importFn(keyData, keyUsages)
@@ -221,48 +264,40 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 		return nil, UnknownCryptoKeyType, err
 	}
 
+	x, err := base64URLDecode(jwkKey.X)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode public key: "+err.Error())
+	}
+
+	if len(x) != ed25519.PublicKeySize {
+		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf(
+			"invalid Ed25519 public key length: got %d, want %d", len(x), ed25519.PublicKeySize,
+		))
+	}
+
 	// If the 'd' field is not present, the key is public, so return the public key
 	if jwkKey.D == "" {
-		xBytes, err := base64URLDecode(jwkKey.X)
-		if err != nil {
-			return nil,
-				UnknownCryptoKeyType,
-				NewError(DataError, "failed to decode public key: "+err.Error())
-		}
-
-		if len(xBytes) != ed25519.PublicKeySize {
-			return nil,
-				UnknownCryptoKeyType,
-				NewError(DataError,
-					fmt.Sprintf("invalid Ed25519 public key length: got %d, want %d",
-						len(xBytes),
-						ed25519.PublicKeySize),
-				)
-		}
-
-		publicKey := ed25519.PublicKey(xBytes)
-		return publicKey, PublicCryptoKeyType, nil
+		return ed25519.PublicKey(x), PublicCryptoKeyType, nil
 	}
 
-	dBytes, err := base64URLDecode(jwkKey.D)
+	// As defined in RFC 8037, section 2, the 'd' field holds the 32 bytes private key (the seed
+	// in Go's terminology), not the 64 bytes expanded form used by Go's ed25519.PrivateKey.
+	d, err := base64URLDecode(jwkKey.D)
 	if err != nil {
-		return nil,
-			UnknownCryptoKeyType,
-			NewError(DataError, "failed to decode private key: "+err.Error())
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode private key: "+err.Error())
 	}
 
-	if len(dBytes) != ed25519.PrivateKeySize {
-		return nil,
-			UnknownCryptoKeyType,
-			NewError(DataError,
-				fmt.Sprintf("invalid Ed25519 private key length: got %d, want %d",
-					len(dBytes),
-					ed25519.PrivateKeySize,
-				),
-			)
+	if len(d) != ed25519.SeedSize {
+		return nil, UnknownCryptoKeyType, NewError(DataError, fmt.Sprintf(
+			"invalid Ed25519 private key length: got %d, want %d", len(d), ed25519.SeedSize,
+		))
 	}
 
-	privateKey := ed25519.PrivateKey(dBytes)
+	privateKey := ed25519.NewKeyFromSeed(d)
+	if !bytes.Equal(privateKey[ed25519.SeedSize:], x) {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "the 'x' field does not match the private key 'd'")
+	}
+
 	return privateKey, PrivateCryptoKeyType, nil
 }
 

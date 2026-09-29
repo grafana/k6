@@ -94,7 +94,7 @@ func (p *X25519ImportParams) ImportKey(
 	case RawKeyFormat:
 		importFn = importX25519Raw
 	default:
-		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+p.Algorithm.Name)
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+p.Name)
 	}
 
 	handle, keyType, err := importFn(keyData, keyUsages)
@@ -122,11 +122,11 @@ func importX25519Spki(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 	}
 
 	handle, ok := parsedKey.(*ecdh.PublicKey)
-	if !ok {
+	if !ok || handle.Curve() != ecdh.X25519() {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "given key is not an X25519 key")
 	}
 
-	return &handle, PublicCryptoKeyType, nil
+	return handle, PublicCryptoKeyType, nil
 }
 
 func importX25519Pkcs8(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
@@ -145,11 +145,11 @@ func importX25519Pkcs8(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoK
 	}
 
 	handle, ok := parsedKey.(*ecdh.PrivateKey)
-	if !ok {
+	if !ok || handle.Curve() != ecdh.X25519() {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "given key is not an X25519 key")
 	}
 
-	return &handle, PrivateCryptoKeyType, nil
+	return handle, PrivateCryptoKeyType, nil
 }
 
 func importX25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
@@ -162,29 +162,35 @@ func importX25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKey
 		return nil, UnknownCryptoKeyType, err
 	}
 
+	x, err := base64URLDecode(jwkKey.X)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode public key: "+err.Error())
+	}
+
+	publicKey, err := ecdh.X25519().NewPublicKey(x)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to create X25519 public key: "+err.Error())
+	}
+
 	// If the 'd' field is not present, the key is public, so return the public key
 	if jwkKey.D == "" {
-		xBytes, err := base64URLDecode(jwkKey.X)
-		if err != nil {
-			return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode public key: "+err.Error())
-		}
-
-		publicKey, err := ecdh.X25519().NewPublicKey(xBytes)
-		if err != nil {
-			return nil, UnknownCryptoKeyType, NewError(DataError, "failed to create X25519 public key: "+err.Error())
-		}
 		return publicKey, PublicCryptoKeyType, nil
 	}
 
-	dBytes, err := base64URLDecode(jwkKey.D)
+	d, err := base64URLDecode(jwkKey.D)
 	if err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode private key: "+err.Error())
 	}
 
-	privateKey, err := ecdh.X25519().NewPrivateKey(dBytes)
+	privateKey, err := ecdh.X25519().NewPrivateKey(d)
 	if err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to create X25519 private key: "+err.Error())
 	}
+
+	if !privateKey.PublicKey().Equal(publicKey) {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "the 'x' field does not match the private key 'd'")
+	}
+
 	return privateKey, PrivateCryptoKeyType, nil
 }
 
@@ -193,7 +199,12 @@ func importX25519Raw(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKey
 		return nil, UnknownCryptoKeyType, NewError(SyntaxError, "usages must be empty for X25519 in raw format")
 	}
 
-	return keyData, PublicCryptoKeyType, nil
+	handle, err := ecdh.X25519().NewPublicKey(keyData)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to create X25519 public key: "+err.Error())
+	}
+
+	return handle, PublicCryptoKeyType, nil
 }
 
 func exportX25519Key(key *CryptoKey, format KeyFormat) (any, error) {

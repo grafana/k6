@@ -205,29 +205,20 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName) ||
-			algorithmName == Ed25519 ||
-			algorithmName == X25519
+			isOKPAlgorithm(algorithmName)
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesAlgorithm(algorithmName) ||
 			isHMACAlgorithm(algorithmName) ||
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName) ||
 			isPBKDF2Algorithm(algorithmName) ||
-			algorithmName == Ed25519 ||
-			algorithmName == X25519
+			isOKPAlgorithm(algorithmName)
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:
-		return isHMACAlgorithm(algorithmName) ||
-			algorithmName == ECDSA ||
-			algorithmName == RSAPss ||
-			algorithmName == RSASsaPkcs1v15 ||
-			algorithmName == Ed25519
+		return isSignVerifyAlgorithm(algorithmName)
 	case OperationIdentifierDeriveBits:
-		return isHashAlgorithm(algorithmName) ||
-			isPBKDF2Algorithm(algorithmName) ||
-			isECDHAlgorithm(algorithmName) ||
-			algorithmName == X25519
+		return isDeriveBitsAlgorithm(algorithmName)
 	case OperationIdentifierDeriveKey:
 		return isHashAlgorithm(algorithmName) || isPBKDF2Algorithm(algorithmName)
 	case OperationIdentifierGetKeyLength:
@@ -265,6 +256,27 @@ func isHMACAlgorithm(algorithmName string) bool {
 // if a given object has an algorithm method.
 type hasAlg interface {
 	alg() string
+}
+
+// isOKPAlgorithm returns true for the algorithms using Octet Key Pair (OKP) keys, as defined
+// in RFC 8037.
+func isOKPAlgorithm(algorithmName string) bool {
+	return algorithmName == Ed25519 || algorithmName == X25519
+}
+
+func isSignVerifyAlgorithm(algorithmName string) bool {
+	return isHMACAlgorithm(algorithmName) ||
+		algorithmName == ECDSA ||
+		algorithmName == RSAPss ||
+		algorithmName == RSASsaPkcs1v15 ||
+		algorithmName == Ed25519
+}
+
+func isDeriveBitsAlgorithm(algorithmName string) bool {
+	return isHashAlgorithm(algorithmName) ||
+		isPBKDF2Algorithm(algorithmName) ||
+		isECDHAlgorithm(algorithmName) ||
+		algorithmName == X25519
 }
 
 func isEllipticCurve(algorithmName string) bool {
