@@ -441,8 +441,8 @@ type alg25519JWK struct {
 	KeyOps []CryptoKeyUsage `json:"key_ops"`
 	// Public key
 	X string `json:"x"`
-	// Private key
-	D string `json:"d"`
+	// Private key, a pointer to tell an absent field apart from an empty one
+	D *string `json:"d"`
 	// Extractable
 	Ext *bool `json:"ext"`
 }
@@ -491,7 +491,9 @@ func exportAlg25519JWK(key *CryptoKey) (*JsonWebKey, error) {
 // with the given usages according to the JWK specification
 // [specification]: https://www.rfc-editor.org/rfc/rfc7517#section-4.3
 func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
-	if len(keyOps) == 0 {
+	// A nil slice means the field is absent, whereas an empty key_ops array is present and
+	// doesn't contain any of the requested usages.
+	if keyOps == nil {
 		return nil
 	}
 
@@ -501,7 +503,7 @@ func validateKeyOps(keyOps []CryptoKeyUsage, keyUsages []CryptoKeyUsage) error {
 
 	opFlags := getOperationFlags(keyOps)
 
-	if !isValidOperationCombination(opFlags) {
+	if len(keyOps) != 0 && !isValidOperationCombination(opFlags) {
 		return NewError(
 			DataError,
 			"invalid combination of key operations. Only sign/verify, encrypt/decrypt, "+
@@ -634,8 +636,12 @@ func validateX25519Usages(keyUsages []CryptoKeyUsage, private bool) error {
 	return nil
 }
 
-func (jwk *alg25519JWK) validateAlg25519JWK(keyUsages []CryptoKeyUsage, algorithm string) error {
-	private := jwk.D != ""
+func (jwk *alg25519JWK) validateAlg25519JWK(
+	keyUsages []CryptoKeyUsage,
+	extractable bool,
+	algorithm string,
+) error {
+	private := jwk.D != nil
 	if algorithm == "Ed25519" {
 		err := validateEd25519Usages(keyUsages, private)
 		if err != nil {
@@ -660,10 +666,6 @@ func (jwk *alg25519JWK) validateAlg25519JWK(keyUsages []CryptoKeyUsage, algorith
 		return NewError(DataError, fmt.Sprintf("invalid 'x': x field is required for all %s keys", algorithm))
 	}
 
-	if private && jwk.D == "" {
-		return NewError(DataError, fmt.Sprintf("invalid 'd': d field is required for private %s keys", algorithm))
-	}
-
 	// Ed25519 keys are used for signatures, X25519 keys for key agreement (encryption).
 	expectedUse := "sig"
 	if algorithm == X25519 {
@@ -679,6 +681,10 @@ func (jwk *alg25519JWK) validateAlg25519JWK(keyUsages []CryptoKeyUsage, algorith
 
 	if err := validateKeyOps(jwk.KeyOps, keyUsages); err != nil {
 		return err
+	}
+
+	if jwk.Ext != nil && !*jwk.Ext && extractable {
+		return NewError(DataError, "the JWK is marked as non-extractable ('ext' is false), but extractable is true")
 	}
 
 	return nil

@@ -177,33 +177,12 @@ func (eip *Ed25519ImportParams) ImportKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
-	var importFn func(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error)
-
-	switch format {
-	case SpkiKeyFormat:
-		importFn = importEd25519Spki
-	case Pkcs8KeyFormat:
-		importFn = importEd25519Pkcs8
-	case JwkKeyFormat:
-		importFn = importEd25519Jwk
-	case RawKeyFormat:
-		importFn = importEd25519Raw
-	default:
-		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+eip.Name)
-	}
-
-	handle, keyType, err := importFn(keyData, keyUsages)
-	if err != nil {
-		return nil, err
-	}
-
-	return &CryptoKey{
-		Algorithm:   eip.Algorithm,
-		Extractable: extractable,
-		Usages:      keyUsages,
-		handle:      handle,
-		Type:        keyType,
-	}, nil
+	return importOKPKey(eip.Algorithm, okpKeyImporters{
+		spki:  importEd25519Spki,
+		pkcs8: importEd25519Pkcs8,
+		jwk:   importEd25519Jwk,
+		raw:   importEd25519Raw,
+	}, format, keyData, extractable, keyUsages)
 }
 
 func importEd25519Spki(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
@@ -252,7 +231,7 @@ func importEd25519Pkcs8(keyData []byte, keyUsages []CryptoKeyUsage) (any, Crypto
 	return handle, PrivateCryptoKeyType, nil
 }
 
-func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
+func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage, extractable bool) (any, CryptoKeyType, error) {
 	var jwkKey alg25519JWK
 	if err := json.Unmarshal(keyData, &jwkKey); err != nil {
 		return nil,
@@ -260,7 +239,7 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 			NewError(DataError, "failed to parse input as Ed25519 JWK key: "+err.Error())
 	}
 
-	if err := jwkKey.validateAlg25519JWK(keyUsages, "Ed25519"); err != nil {
+	if err := jwkKey.validateAlg25519JWK(keyUsages, extractable, "Ed25519"); err != nil {
 		return nil, UnknownCryptoKeyType, err
 	}
 
@@ -276,13 +255,13 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKe
 	}
 
 	// If the 'd' field is not present, the key is public, so return the public key
-	if jwkKey.D == "" {
+	if jwkKey.D == nil {
 		return ed25519.PublicKey(x), PublicCryptoKeyType, nil
 	}
 
 	// As defined in RFC 8037, section 2, the 'd' field holds the 32 bytes private key (the seed
 	// in Go's terminology), not the 64 bytes expanded form used by Go's ed25519.PrivateKey.
-	d, err := base64URLDecode(jwkKey.D)
+	d, err := base64URLDecode(*jwkKey.D)
 	if err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode private key: "+err.Error())
 	}
@@ -401,5 +380,6 @@ func exportEd25519Raw(key *CryptoKey) ([]byte, error) {
 		return nil, NewError(InvalidAccessError, "Key handle is not an Ed25519 public key")
 	}
 
-	return handle, nil
+	// The exported buffer is handed to the script, so it must not share memory with the key.
+	return bytes.Clone(handle), nil
 }

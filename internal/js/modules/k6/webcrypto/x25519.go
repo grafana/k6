@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"crypto/ecdh"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
 )
@@ -34,9 +35,18 @@ func (p *X25519KeyGenParams) GenerateKey(
 		return nil, NewError(SyntaxError, "Invalid key usage: no key usages provided")
 	}
 
-	privateHandle, publicHandle, err := generateECDHKeyPair(X25519, keyUsages)
+	for _, usage := range keyUsages {
+		switch usage {
+		case DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage:
+			continue
+		default:
+			return nil, NewError(SyntaxError, "invalid key usage: "+usage)
+		}
+	}
+
+	privateHandle, err := ecdh.X25519().GenerateKey(rand.Reader)
 	if err != nil {
-		return nil, err
+		return nil, NewError(OperationError, "unable to generate an X25519 key pair: "+err.Error())
 	}
 
 	private := &CryptoKey{
@@ -52,7 +62,7 @@ func (p *X25519KeyGenParams) GenerateKey(
 		Extractable: true,
 		Algorithm:   p.Algorithm,
 		Usages:      []CryptoKeyUsage{},
-		handle:      publicHandle,
+		handle:      privateHandle.PublicKey(),
 	}
 
 	return &CryptoKeyPair{
@@ -82,33 +92,12 @@ func (p *X25519ImportParams) ImportKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
-	var importFn func(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error)
-
-	switch format {
-	case SpkiKeyFormat:
-		importFn = importX25519Spki
-	case Pkcs8KeyFormat:
-		importFn = importX25519Pkcs8
-	case JwkKeyFormat:
-		importFn = importX25519Jwk
-	case RawKeyFormat:
-		importFn = importX25519Raw
-	default:
-		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+p.Name)
-	}
-
-	handle, keyType, err := importFn(keyData, keyUsages)
-	if err != nil {
-		return nil, err
-	}
-
-	return &CryptoKey{
-		Algorithm:   p.Algorithm,
-		Extractable: extractable,
-		Usages:      keyUsages,
-		handle:      handle,
-		Type:        keyType,
-	}, nil
+	return importOKPKey(p.Algorithm, okpKeyImporters{
+		spki:  importX25519Spki,
+		pkcs8: importX25519Pkcs8,
+		jwk:   importX25519Jwk,
+		raw:   importX25519Raw,
+	}, format, keyData, extractable, keyUsages)
 }
 
 func importX25519Spki(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
@@ -152,13 +141,13 @@ func importX25519Pkcs8(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoK
 	return handle, PrivateCryptoKeyType, nil
 }
 
-func importX25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKeyType, error) {
+func importX25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage, extractable bool) (any, CryptoKeyType, error) {
 	var jwkKey alg25519JWK
 	if err := json.Unmarshal(keyData, &jwkKey); err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to parse input as X25519 JWK key: "+err.Error())
 	}
 
-	if err := jwkKey.validateAlg25519JWK(keyUsages, "X25519"); err != nil {
+	if err := jwkKey.validateAlg25519JWK(keyUsages, extractable, "X25519"); err != nil {
 		return nil, UnknownCryptoKeyType, err
 	}
 
@@ -173,11 +162,11 @@ func importX25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage) (any, CryptoKey
 	}
 
 	// If the 'd' field is not present, the key is public, so return the public key
-	if jwkKey.D == "" {
+	if jwkKey.D == nil {
 		return publicKey, PublicCryptoKeyType, nil
 	}
 
-	d, err := base64URLDecode(jwkKey.D)
+	d, err := base64URLDecode(*jwkKey.D)
 	if err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode private key: "+err.Error())
 	}
