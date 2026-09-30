@@ -208,10 +208,13 @@ async function expectTypeError(label, operation) {
     try {
         await pending;
     } catch (error) {
-        if (error.name === "TypeError") {
-            return;
+        if (error.name !== "TypeError") {
+            throw new Error(label + " rejected with " + error.name + " instead of TypeError");
         }
-        throw new Error(label + " rejected with " + error.name + " instead of TypeError");
+        if (!(error instanceof TypeError) || error.constructor !== TypeError) {
+            throw new Error(label + " rejected with a non-native TypeError");
+        }
+        return;
     }
     throw new Error(label + " was accepted");
 }

@@ -21,6 +21,14 @@ type SubtleCrypto struct {
 	bufferSource bufferSourceAccessors
 }
 
+func (sc *SubtleCrypto) rejectBufferSourceError(reject func(any) error, err error) error {
+	var bufferErr *bufferSourceTypeError
+	if errors.As(err, &bufferErr) {
+		return reject(sc.vu.Runtime().NewTypeError(bufferErr.cause.Message))
+	}
+	return reject(err)
+}
+
 // Encrypt encrypts data.
 //
 // It takes as its arguments a key to encrypt with, some algorithm-specific
@@ -88,7 +96,7 @@ func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -178,7 +186,7 @@ func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -271,7 +279,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data sobek.Value) (*sobek.Promise, 
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -368,7 +376,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data sobek.Value) (*so
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -442,7 +450,7 @@ func (sc *SubtleCrypto) Digest(algorithm sobek.Value, data sobek.Value) (*sobek.
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -860,7 +868,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 

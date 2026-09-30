@@ -13,7 +13,7 @@ import (
 // and returns a copy of the underlying byte slice.
 func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value, accessors bufferSourceAccessors) ([]byte, error) {
 	if common.IsNullish(v) {
-		return nil, NewError(TypeError, "data is null or undefined")
+		return nil, &bufferSourceTypeError{cause: NewError(TypeError, "data is null or undefined")}
 	}
 
 	buffer, err := accessors.backingBuffer(v)
@@ -43,6 +43,19 @@ func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value, accessors bufferSourceA
 	return bytesCopy, nil
 }
 
+// bufferSourceTypeError marks validation failures that need a native JS TypeError rejection.
+type bufferSourceTypeError struct {
+	cause *Error
+}
+
+func (e *bufferSourceTypeError) Error() string {
+	return e.cause.Error()
+}
+
+func (e *bufferSourceTypeError) Unwrap() error {
+	return e.cause
+}
+
 type bufferSourceAccessors struct {
 	isView           sobek.Callable
 	typedArrayBuffer sobek.Callable
@@ -65,7 +78,9 @@ func (a bufferSourceAccessors) backingBuffer(v sobek.Value) (sobek.ArrayBuffer, 
 		return sobek.ArrayBuffer{}, NewError(OperationError, err.Error())
 	}
 	if !isView.ToBoolean() {
-		return sobek.ArrayBuffer{}, NewError(TypeError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
+		return sobek.ArrayBuffer{}, &bufferSourceTypeError{
+			cause: NewError(TypeError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView"),
+		}
 	}
 	buffer, err := a.viewBuffer(v)
 	if err != nil {
