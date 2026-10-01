@@ -47,7 +47,7 @@ func TestIpBlock(t *testing.T) {
 			b, err := getIPBlock(name)
 			require.NoError(t, err)
 			assert.Equal(t, data.count, b.count)
-			pb := ipPoolBlock{firstIP: b.firstIP}
+			pb := ipPoolBlock{firstIP: b.firstIP, ipv6: b.ipv6}
 			idx := big.NewInt(0)
 			assert.Equal(t, data.firstIP.To16(), pb.getIP(idx).To16())
 			idx.Sub(idx.Add(idx, b.count), big.NewInt(1))
@@ -73,6 +73,13 @@ func TestIPPool(t *testing.T) {
 				1:  net.ParseIP("192.168.0.102"),
 				12: net.ParseIP("192.168.0.101"),
 				13: net.ParseIP("192.168.0.102"),
+			},
+		},
+		"::1-::3": {
+			count: new(big.Int).SetInt64(3),
+			queries: map[uint64]net.IP{
+				0: net.ParseIP("::1"),
+				2: net.ParseIP("::3"),
 			},
 		},
 		"192.168.0.101-192.168.0.105,fd00::2/112": {
