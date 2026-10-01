@@ -21,6 +21,7 @@ import (
 
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -329,11 +330,23 @@ func (w *webSocket) establishConnection(ctx context.Context, params *wsParams) {
 		}()
 
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagStatus, strconv.Itoa(httpResponse.StatusCode))
+		if httpResponse.StatusCode >= 400 {
+			// The same code the HTTP module uses for an error status: 1000 + the status.
+			errorCode := strconv.Itoa(1000 + httpResponse.StatusCode)
+			w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagErrorCode, errorCode)
+		}
 		if conn != nil {
 			w.protocol = conn.Subprotocol()
 		}
 		w.extensions = httpResponse.Header.Values("Sec-WebSocket-Extensions")
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, w.protocol)
+	} else if connErr != nil {
+		// No response at all (a refused connection, a timeout, a DNS or TLS failure): tag it
+		// like the HTTP module tags a request that never got a response.
+		errorCode, errorMsg := httpext.ErrorCodeAndMessage(connErr)
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagError, errorMsg)
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagErrorCode, strconv.Itoa(errorCode))
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagStatus, "0")
 	}
 	nameTagValue, nameTagManuallySet := params.tagsAndMeta.Tags.Get(metrics.TagName.String())
 	// After k6 v0.41.0, the name and URL tags have the same values.
