@@ -219,13 +219,10 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		username := preq.URL.GetURL().User.Username()
 		password, _ := preq.URL.GetURL().User.Password()
 
-		// The user info must not be sent to the server as implicit basic auth,
-		// but the *url.URL can be shared between requests when a script reuses
-		// an http.url object, so clone it and clear the user info on the copy
-		// instead of mutating the shared URL (#6397).
-		requestURL := *preq.URL.GetURL()
-		requestURL.User = nil
-		preq.Req.URL = &requestURL
+		// Remove the user data from the URL to avoid sending the Authorization
+		// header for basic auth. ToURL always hands out a per-request copy of the
+		// *url.URL, so this cannot mutate a URL shared via http.url (#6397).
+		preq.URL.GetURL().User = nil
 
 		transport = newDigestTransport(transport, username, password, state.Logger)
 	case "ntlm":

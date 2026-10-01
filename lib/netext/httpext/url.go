@@ -53,11 +53,20 @@ func (u URL) GetURL() *url.URL {
 	return u.u
 }
 
-// ToURL tries to convert anything passed to it to a k6 URL struct
+// ToURL tries to convert anything passed to it to a k6 URL struct.
+//
+// The returned URL always owns its underlying *url.URL: values coming from
+// http.url are reused by every request that references them, so the struct is
+// copied here and callers may freely mutate their copy (e.g. to clear the user
+// info for digest auth, #6397) without affecting the shared object.
 func ToURL(u any) (URL, error) {
 	switch tu := u.(type) {
 	case URL:
 		// Handling of http.url`http://example.com/{$id}`
+		if tu.u != nil {
+			requestURL := *tu.u
+			tu.u = &requestURL
+		}
 		return tu, nil
 	case string:
 		// Handling of "http://example.com/"
