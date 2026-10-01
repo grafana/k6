@@ -32,6 +32,22 @@ type EventScreenshotRequested struct {
 	Viewport *page.Viewport `json:"viewport"` // Viewport to capture, in device independent pixels (dip).
 }
 
+// EventInspectPanelShowRequested fired when user asks to show the Inspect
+// panel.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#event-inspectPanelShowRequested
+type EventInspectPanelShowRequested struct {
+	BackendNodeID cdp.BackendNodeID `json:"backendNodeId"` // Id of the node to show in the panel.
+}
+
+// EventInspectedElementWindowRestored fired when user asks to restore the
+// Inspected Element floating window.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#event-inspectedElementWindowRestored
+type EventInspectedElementWindowRestored struct {
+	BackendNodeID cdp.BackendNodeID `json:"backendNodeId"` // Id of the node to restore the floating window for.
+}
+
 // EventInspectModeCanceled fired when user cancels the inspect mode.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#event-inspectModeCanceled

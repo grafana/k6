@@ -85,7 +85,7 @@ type EventListener struct {
 	UseCapture      bool                  `json:"useCapture"`                         // EventListener's useCapture.
 	Passive         bool                  `json:"passive"`                            // EventListener's passive flag.
 	Once            bool                  `json:"once"`                               // EventListener's once flag.
-	ScriptID        runtime.ScriptID      `json:"scriptId"`                           // Script id of the handler code.
+	ScriptID        cdp.ScriptID          `json:"scriptId"`                           // Script id of the handler code.
 	LineNumber      int64                 `json:"lineNumber"`                         // Line number in the script (0-based).
 	ColumnNumber    int64                 `json:"columnNumber"`                       // Column number in the script (0-based).
 	Handler         *runtime.RemoteObject `json:"handler,omitempty,omitzero"`         // Event handler function value.
