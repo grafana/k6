@@ -948,6 +948,16 @@ type WebAppManifest struct {
 	ThemeColor                string                `json:"themeColor,omitempty,omitzero"`
 }
 
+// SubApp [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#type-SubApp
+type SubApp struct {
+	Name       string `json:"name"`       // Display name of the sub-app.
+	Scope      string `json:"scope"`      // Scope of the sub-app.
+	ManifestID string `json:"manifestId"` // Manifest id of the sub-app.
+	StartURL   string `json:"startUrl"`   // Start URL of the sub-app.
+}
+
 // NavigationType the type of a frameNavigated event.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#type-NavigationType
