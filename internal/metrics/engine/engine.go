@@ -29,7 +29,7 @@ type MetricsEngine struct {
 
 	// These can be both top-level metrics or sub-metrics
 	metricsWithThresholds   []*metrics.Metric
-	breachedThresholdsCount uint32
+	breachedThresholdsCount atomic.Uint32
 
 	// TODO: completely refactor:
 	//   - make these private, add a method to export the raw data
@@ -249,7 +249,7 @@ func (me *MetricsEngine) evaluateThresholds(
 		sort.Strings(breachedThresholds)
 		me.logger.Debugf("Thresholds on %d metrics crossed: %v", len(breachedThresholds), breachedThresholds)
 	}
-	atomic.StoreUint32(&me.breachedThresholdsCount, uint32(len(breachedThresholds))) //nolint:gosec
+	me.breachedThresholdsCount.Store(uint32(len(breachedThresholds))) //nolint:gosec
 	return breachedThresholds, shouldAbort
 }
 
@@ -257,5 +257,5 @@ func (me *MetricsEngine) evaluateThresholds(
 // the thresholds were breached (failed) during the last processing phase. This
 // API is safe to use concurrently.
 func (me *MetricsEngine) GetMetricsWithBreachedThresholdsCount() uint32 {
-	return atomic.LoadUint32(&me.breachedThresholdsCount)
+	return me.breachedThresholdsCount.Load()
 }

@@ -60,9 +60,7 @@ func (emitter *eventEmitter) onStart() error {
 }
 
 func (emitter *eventEmitter) onStop(reason error) error {
-	var err errext.HasAbortReason
-
-	if !errors.As(reason, &err) {
+	if _, ok := errors.AsType[errext.HasAbortReason](reason); !ok {
 		emitter.wait.Wait()
 	}
 
@@ -80,7 +78,7 @@ func (emitter *eventEmitter) onEvent(name string, data any) {
 	var retry []byte
 
 	if name == stopEvent {
-		retry = []byte(strconv.Itoa(maxSafeInteger))
+		retry = []byte(strconv.FormatInt(int64(maxSafeInteger), 10))
 	}
 
 	id := strconv.FormatInt(emitter.id.Add(1), 10)

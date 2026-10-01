@@ -1194,8 +1194,8 @@ func (r *Runtime) arrayproto_flat(call FunctionCall) Value {
 	o := call.This.ToObject(r)
 	l := toLength(o.self.getStr("length", nil))
 	depthNum := int64(1)
-	if len(call.Arguments) > 0 {
-		depthNum = call.Argument(0).ToInteger()
+	if arg := call.Argument(0); arg != _undefined {
+		depthNum = arg.ToInteger()
 	}
 	a := arraySpeciesCreate(o, 0)
 	r.flattenIntoArray(a, o, l, 0, depthNum, nil, nil)

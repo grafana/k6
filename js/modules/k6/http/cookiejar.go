@@ -50,7 +50,7 @@ func (j CookieJar) Set(url, name, value string, opts sobek.Value) (bool, error) 
 		return false, err
 	}
 
-	c := http.Cookie{Name: name, Value: value}
+	c := http.Cookie{Name: name, Value: value} //nolint:gosec // outgoing request cookie, not a Set-Cookie response
 	paramsV := opts
 	if !common.IsNullish(paramsV) {
 		params := paramsV.ToObject(rt)
@@ -110,7 +110,7 @@ func (j CookieJar) Delete(url, name string) error {
 		return err
 	}
 
-	c := http.Cookie{Name: name, MaxAge: -1}
+	c := http.Cookie{Name: name, MaxAge: -1} //nolint:gosec // outgoing request cookie, not a Set-Cookie response
 	j.Jar.SetCookies(u, []*http.Cookie{&c})
 
 	return nil

@@ -4,7 +4,7 @@ package bundle
 
 var unparsedCertificates = []unparsedCertificate{
 	{
-		cn:           "CN=AC RAIZ FNMT-RCM SERVIDORES SEGUROS,OU=Ceres,O=FNMT-RCM,C=ES,2.5.4.97=#130f56415445532d51323832363030344a",
+		cn:           "CN=AC RAIZ FNMT-RCM SERVIDORES SEGUROS,OU=Ceres,O=FNMT-RCM,C=ES,2.5.4.97=VATES-Q2826004J",
 		sha256Hash:   "554153b13d2cf9ddb753bfbe1a4e0ae08d0aa4187058fe60a2b862b2e4b87bcb",
 		certStartOff: 0,
 		certLength:   626,
@@ -358,13 +358,14 @@ var unparsedCertificates = []unparsedCertificate{
 		certLength:   1386,
 	},
 	{
-		cn:           "CN=Izenpe.com,O=IZENPE S.A.,C=ES",
-		sha256Hash:   "2530cc8e98321502bad96f9b1fba1b099e2d299e0f4548bb914f363bc0d4531f",
-		certStartOff: 63236,
-		certLength:   1525,
+		cn:            "CN=Izenpe.com,O=IZENPE S.A.,C=ES",
+		sha256Hash:    "2530cc8e98321502bad96f9b1fba1b099e2d299e0f4548bb914f363bc0d4531f",
+		certStartOff:  63236,
+		certLength:    1525,
+		distrustAfter: "2026-04-15T23:59:59Z",
 	},
 	{
-		cn:           "CN=Microsec e-Szigno Root CA 2009,O=Microsec Ltd.,L=Budapest,C=HU,1.2.840.113549.1.9.1=#0c10696e666f40652d737a69676e6f2e6875",
+		cn:           "CN=Microsec e-Szigno Root CA 2009,O=Microsec Ltd.,L=Budapest,C=HU,1.2.840.113549.1.9.1=info@e-szigno.hu",
 		sha256Hash:   "3c5f81fea5fab82c64bfa2eaecafcde8e077fc8620a7cae537163df36edbf378",
 		certStartOff: 64761,
 		certLength:   1038,
@@ -652,13 +653,13 @@ var unparsedCertificates = []unparsedCertificate{
 		certLength:   1506,
 	},
 	{
-		cn:           "CN=e-Szigno Root CA 2017,O=Microsec Ltd.,L=Budapest,C=HU,2.5.4.97=#130e56415448552d3233353834343937",
+		cn:           "CN=e-Szigno Root CA 2017,O=Microsec Ltd.,L=Budapest,C=HU,2.5.4.97=VATHU-23584497",
 		sha256Hash:   "beb00b30839b9bc32c32e4447905950641f26421b15ed089198b518ae2ea1b99",
 		certStartOff: 116668,
 		certLength:   580,
 	},
 	{
-		cn:           "CN=e-Szigno TLS Root CA 2023,O=Microsec Ltd.,L=Budapest,C=HU,2.5.4.97=#130e56415448552d3233353834343937",
+		cn:           "CN=e-Szigno TLS Root CA 2023,O=Microsec Ltd.,L=Budapest,C=HU,2.5.4.97=VATHU-23584497",
 		sha256Hash:   "b49141502d00663d740f2e7ec340c52800962666121a36d09cf7dd2b90384fb4",
 		certStartOff: 117248,
 		certLength:   723,

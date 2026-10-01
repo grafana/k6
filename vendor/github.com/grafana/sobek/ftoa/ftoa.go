@@ -536,7 +536,6 @@ func ftoa(d float64, mode int, biasUp bool, ndigits int, buf []byte) ([]byte, in
 					b.Lsh(b, 1)
 					j1 = b.Cmp(S)
 					if (j1 > 0) || (j1 == 0 && (((dig & 1) == 1) || biasUp)) {
-						dig++
 						if dig == '9' {
 							buf = append(buf, '9')
 							buf, flag := roundOff(buf, startPos)
@@ -546,6 +545,7 @@ func ftoa(d float64, mode int, biasUp bool, ndigits int, buf []byte) ([]byte, in
 							}
 							return buf, k + 1
 						}
+						dig++
 					}
 				}
 				buf = append(buf, dig)

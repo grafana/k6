@@ -244,8 +244,10 @@ type Value struct {
 // 'roledescription': states which apply to every AX node - from 'live' to
 // 'root': attributes which apply to nodes in live regions - from 'autocomplete'
 // to 'valuetext': attributes which apply to widgets - from 'checked' to
-// 'selected': states which apply to widgets - from 'activedescendant' to 'owns'
-// - relationships between elements other than parent/child/sibling.
+// 'selected': states which apply to widgets - from 'activedescendant' to
+// 'owns': relationships between elements other than parent/child/sibling - from
+// 'activeFullscreenElement' to 'uninteresting': reasons why this noode is
+// hidden.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Accessibility#type-AXPropertyName
 type PropertyName string
@@ -257,47 +259,64 @@ func (t PropertyName) String() string {
 
 // PropertyName values.
 const (
-	PropertyNameActions          PropertyName = "actions"
-	PropertyNameBusy             PropertyName = "busy"
-	PropertyNameDisabled         PropertyName = "disabled"
-	PropertyNameEditable         PropertyName = "editable"
-	PropertyNameFocusable        PropertyName = "focusable"
-	PropertyNameFocused          PropertyName = "focused"
-	PropertyNameHidden           PropertyName = "hidden"
-	PropertyNameHiddenRoot       PropertyName = "hiddenRoot"
-	PropertyNameInvalid          PropertyName = "invalid"
-	PropertyNameKeyshortcuts     PropertyName = "keyshortcuts"
-	PropertyNameSettable         PropertyName = "settable"
-	PropertyNameRoledescription  PropertyName = "roledescription"
-	PropertyNameLive             PropertyName = "live"
-	PropertyNameAtomic           PropertyName = "atomic"
-	PropertyNameRelevant         PropertyName = "relevant"
-	PropertyNameRoot             PropertyName = "root"
-	PropertyNameAutocomplete     PropertyName = "autocomplete"
-	PropertyNameHasPopup         PropertyName = "hasPopup"
-	PropertyNameLevel            PropertyName = "level"
-	PropertyNameMultiselectable  PropertyName = "multiselectable"
-	PropertyNameOrientation      PropertyName = "orientation"
-	PropertyNameMultiline        PropertyName = "multiline"
-	PropertyNameReadonly         PropertyName = "readonly"
-	PropertyNameRequired         PropertyName = "required"
-	PropertyNameValuemin         PropertyName = "valuemin"
-	PropertyNameValuemax         PropertyName = "valuemax"
-	PropertyNameValuetext        PropertyName = "valuetext"
-	PropertyNameChecked          PropertyName = "checked"
-	PropertyNameExpanded         PropertyName = "expanded"
-	PropertyNameModal            PropertyName = "modal"
-	PropertyNamePressed          PropertyName = "pressed"
-	PropertyNameSelected         PropertyName = "selected"
-	PropertyNameActivedescendant PropertyName = "activedescendant"
-	PropertyNameControls         PropertyName = "controls"
-	PropertyNameDescribedby      PropertyName = "describedby"
-	PropertyNameDetails          PropertyName = "details"
-	PropertyNameErrormessage     PropertyName = "errormessage"
-	PropertyNameFlowto           PropertyName = "flowto"
-	PropertyNameLabelledby       PropertyName = "labelledby"
-	PropertyNameOwns             PropertyName = "owns"
-	PropertyNameURL              PropertyName = "url"
+	PropertyNameActions                    PropertyName = "actions"
+	PropertyNameBusy                       PropertyName = "busy"
+	PropertyNameDisabled                   PropertyName = "disabled"
+	PropertyNameEditable                   PropertyName = "editable"
+	PropertyNameFocusable                  PropertyName = "focusable"
+	PropertyNameFocused                    PropertyName = "focused"
+	PropertyNameHidden                     PropertyName = "hidden"
+	PropertyNameHiddenRoot                 PropertyName = "hiddenRoot"
+	PropertyNameInvalid                    PropertyName = "invalid"
+	PropertyNameKeyshortcuts               PropertyName = "keyshortcuts"
+	PropertyNameSettable                   PropertyName = "settable"
+	PropertyNameRoledescription            PropertyName = "roledescription"
+	PropertyNameLive                       PropertyName = "live"
+	PropertyNameAtomic                     PropertyName = "atomic"
+	PropertyNameRelevant                   PropertyName = "relevant"
+	PropertyNameRoot                       PropertyName = "root"
+	PropertyNameAutocomplete               PropertyName = "autocomplete"
+	PropertyNameHasPopup                   PropertyName = "hasPopup"
+	PropertyNameLevel                      PropertyName = "level"
+	PropertyNameMultiselectable            PropertyName = "multiselectable"
+	PropertyNameOrientation                PropertyName = "orientation"
+	PropertyNameMultiline                  PropertyName = "multiline"
+	PropertyNameReadonly                   PropertyName = "readonly"
+	PropertyNameRequired                   PropertyName = "required"
+	PropertyNameValuemin                   PropertyName = "valuemin"
+	PropertyNameValuemax                   PropertyName = "valuemax"
+	PropertyNameValuetext                  PropertyName = "valuetext"
+	PropertyNameChecked                    PropertyName = "checked"
+	PropertyNameExpanded                   PropertyName = "expanded"
+	PropertyNameModal                      PropertyName = "modal"
+	PropertyNamePressed                    PropertyName = "pressed"
+	PropertyNameSelected                   PropertyName = "selected"
+	PropertyNameActivedescendant           PropertyName = "activedescendant"
+	PropertyNameControls                   PropertyName = "controls"
+	PropertyNameDescribedby                PropertyName = "describedby"
+	PropertyNameDetails                    PropertyName = "details"
+	PropertyNameErrormessage               PropertyName = "errormessage"
+	PropertyNameFlowto                     PropertyName = "flowto"
+	PropertyNameLabelledby                 PropertyName = "labelledby"
+	PropertyNameOwns                       PropertyName = "owns"
+	PropertyNameURL                        PropertyName = "url"
+	PropertyNameActiveFullscreenElement    PropertyName = "activeFullscreenElement"
+	PropertyNameActiveModalDialog          PropertyName = "activeModalDialog"
+	PropertyNameActiveAriaModalDialog      PropertyName = "activeAriaModalDialog"
+	PropertyNameAriaHiddenElement          PropertyName = "ariaHiddenElement"
+	PropertyNameAriaHiddenSubtree          PropertyName = "ariaHiddenSubtree"
+	PropertyNameEmptyAlt                   PropertyName = "emptyAlt"
+	PropertyNameEmptyText                  PropertyName = "emptyText"
+	PropertyNameInertElement               PropertyName = "inertElement"
+	PropertyNameInertSubtree               PropertyName = "inertSubtree"
+	PropertyNameLabelContainer             PropertyName = "labelContainer"
+	PropertyNameLabelFor                   PropertyName = "labelFor"
+	PropertyNameNotRendered                PropertyName = "notRendered"
+	PropertyNameNotVisible                 PropertyName = "notVisible"
+	PropertyNamePresentationalRole         PropertyName = "presentationalRole"
+	PropertyNameProbablyPresentational     PropertyName = "probablyPresentational"
+	PropertyNameInactiveCarouselTabContent PropertyName = "inactiveCarouselTabContent"
+	PropertyNameUninteresting              PropertyName = "uninteresting"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -388,6 +407,40 @@ func (t *PropertyName) UnmarshalJSON(buf []byte) error {
 		*t = PropertyNameOwns
 	case PropertyNameURL:
 		*t = PropertyNameURL
+	case PropertyNameActiveFullscreenElement:
+		*t = PropertyNameActiveFullscreenElement
+	case PropertyNameActiveModalDialog:
+		*t = PropertyNameActiveModalDialog
+	case PropertyNameActiveAriaModalDialog:
+		*t = PropertyNameActiveAriaModalDialog
+	case PropertyNameAriaHiddenElement:
+		*t = PropertyNameAriaHiddenElement
+	case PropertyNameAriaHiddenSubtree:
+		*t = PropertyNameAriaHiddenSubtree
+	case PropertyNameEmptyAlt:
+		*t = PropertyNameEmptyAlt
+	case PropertyNameEmptyText:
+		*t = PropertyNameEmptyText
+	case PropertyNameInertElement:
+		*t = PropertyNameInertElement
+	case PropertyNameInertSubtree:
+		*t = PropertyNameInertSubtree
+	case PropertyNameLabelContainer:
+		*t = PropertyNameLabelContainer
+	case PropertyNameLabelFor:
+		*t = PropertyNameLabelFor
+	case PropertyNameNotRendered:
+		*t = PropertyNameNotRendered
+	case PropertyNameNotVisible:
+		*t = PropertyNameNotVisible
+	case PropertyNamePresentationalRole:
+		*t = PropertyNamePresentationalRole
+	case PropertyNameProbablyPresentational:
+		*t = PropertyNameProbablyPresentational
+	case PropertyNameInactiveCarouselTabContent:
+		*t = PropertyNameInactiveCarouselTabContent
+	case PropertyNameUninteresting:
+		*t = PropertyNameUninteresting
 	default:
 		return fmt.Errorf("unknown PropertyName value: %v", s)
 	}

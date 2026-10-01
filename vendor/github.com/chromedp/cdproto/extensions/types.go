@@ -44,3 +44,14 @@ func (t *StorageArea) UnmarshalJSON(buf []byte) error {
 	}
 	return nil
 }
+
+// ExtensionInfo detailed information about an extension.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Extensions#type-ExtensionInfo
+type ExtensionInfo struct {
+	ID      string `json:"id"`      // Extension id.
+	Name    string `json:"name"`    // Extension name.
+	Version string `json:"version"` // Extension version.
+	Path    string `json:"path"`    // The path from which the extension was loaded.
+	Enabled bool   `json:"enabled"` // Extension enabled status.
+}

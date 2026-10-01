@@ -30,7 +30,7 @@ type HTTPConfig struct {
 
 // BasicAuth holds the config for basic authentication.
 type BasicAuth struct {
-	Username, Password string //nolint:gosec
+	Username, Password string
 }
 
 // WriteClient is a client implementation of the Prometheus remote write protocol.
@@ -100,7 +100,7 @@ func (c *WriteClient) Store(ctx context.Context, series []*prompb.TimeSeries) er
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
 
-	resp, err := c.hc.Do(req) //nolint:gosec
+	resp, err := c.hc.Do(req)
 	if err != nil {
 		return fmt.Errorf("HTTP POST request failed: %w", err)
 	}
@@ -128,7 +128,7 @@ func newWriteRequestBody(series []*prompb.TimeSeries) ([]byte, error) {
 	}
 	if snappy.MaxEncodedLen(len(b)) < 0 {
 		return nil, fmt.Errorf("the protobuf message is too large to be handled by Snappy encoder; "+
-			"size: %d, limit: %d", len(b), math.MaxUint32)
+			"size: %d, limit: %d", len(b), uint64(math.MaxUint32))
 	}
 	return snappy.Encode(nil, b), nil
 }

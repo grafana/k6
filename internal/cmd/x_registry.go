@@ -110,7 +110,7 @@ func fetchCatalog(ctx context.Context, url string) (registrySubcommands, []byte,
 	}
 	// The URL can be overridden via env for tests and development; that is the
 	// intended behaviour of the catalog override, not an SSRF vector.
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching extensions catalog: %w", err)
 	}

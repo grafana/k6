@@ -1,6 +1,9 @@
 package types
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 type trieNode struct {
 	isLeaf   bool
@@ -15,12 +18,12 @@ func (t *trieNode) insert(s string) {
 	}
 
 	ptr := t
-	for i := len(runes) - 1; i >= 0; i-- {
-		c, ok := ptr.children[runes[i]]
+	for _, rune0 := range slices.Backward(runes) {
+		c, ok := ptr.children[rune0]
 
 		if !ok {
-			ptr.children[runes[i]] = &trieNode{children: map[rune]*trieNode{}}
-			c = ptr.children[runes[i]]
+			ptr.children[rune0] = &trieNode{children: map[rune]*trieNode{}}
+			c = ptr.children[rune0]
 		}
 
 		ptr = c
@@ -36,8 +39,8 @@ func (t *trieNode) contains(s string) (string, bool) {
 	found := true
 
 	ptr := t
-	for i := len(rs) - 1; i >= 0; i-- {
-		child, ok := ptr.children[rs[i]]
+	for _, r := range slices.Backward(rs) {
+		child, ok := ptr.children[r]
 
 		if _, wOk := ptr.children['*']; wOk {
 			wMatch = builder.String() + string('*')
@@ -48,7 +51,7 @@ func (t *trieNode) contains(s string) (string, bool) {
 			break
 		}
 
-		builder.WriteRune(rs[i])
+		builder.WriteRune(r)
 		ptr = child
 	}
 

@@ -236,8 +236,30 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 		trail.SaveSamples(builtinMetrics, &metrics.TagsAndMeta{Tags: registry.RootTagSet()})
 
-		require.True(t, trail.Sending > 0)
+		require.GreaterOrEqual(t, trail.Sending, time.Duration(0))
 	}
+}
+
+func TestTracerSendingStartsAtGotConn(t *testing.T) {
+	t.Parallel()
+
+	const interval = time.Millisecond
+	getConn := time.Now().Add(-5 * interval).UnixNano()
+	// With an HTTPS proxy and target, k6 keeps the first TLS handshake completion,
+	// which occurs before the target connection is available and GotConn() is called.
+	firstTLSHandshakeDone := getConn + int64(interval)
+	tracer := &Tracer{
+		getConn:              getConn,
+		tlsHandshakeDone:     firstTLSHandshakeDone,
+		gotConn:              firstTLSHandshakeDone + int64(2*interval),
+		wroteRequest:         firstTLSHandshakeDone + int64(3*interval),
+		gotFirstResponseByte: firstTLSHandshakeDone + int64(4*interval),
+	}
+
+	trail := tracer.Done()
+	assert.Equal(t, 3*interval, trail.Blocked)
+	assert.Equal(t, interval, trail.Sending)
+	assert.Equal(t, trail.EndTime.Sub(time.Unix(0, getConn)), trail.Blocked+trail.Duration)
 }
 
 func TestTracerError(t *testing.T) {

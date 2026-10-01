@@ -1187,6 +1187,40 @@ func runTestWithLinger(t *testing.T, ts *GlobalTestState) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
+func TestExecutionResultWithLinger(t *testing.T) {
+	t.Parallel()
+
+	addr := getFreeBindAddr(t)
+	script := `
+		import exec from 'k6/execution';
+		export default function () { exec.test.abort('foo'); }
+	`
+	ts := getSingleFileTestState(t, script,
+		[]string{"-v", "--log-output=stdout", "--linger", "--address", addr}, exitcodes.ScriptAborted)
+	ts.Flags.Address = addr
+
+	sendSignal := injectMockSignalNotifier(ts)
+	asyncWaitForStdoutAndRun(t, ts, 15, time.Second, "waiting for Ctrl+C to continue", func() {
+		defer func() {
+			sendSignal <- syscall.SIGINT
+			<-sendSignal
+		}()
+
+		req, err := http.NewRequestWithContext(ts.Ctx, http.MethodGet, fmt.Sprintf("http://%s/v1/status", addr), nil)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer func() { assert.NoError(t, resp.Body.Close()) }()
+
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		assert.Equal(t, int64(exitcodes.ScriptAborted),
+			gjson.GetBytes(body, "data.attributes.execution_result.exit_code").Int())
+	})
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+}
+
 func TestAbortedByScriptSetupError(t *testing.T) {
 	t.Parallel()
 	script := `
@@ -1603,14 +1637,23 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 }
 
 func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[string]string) []float64 {
+	return getSampleValuesWithMetadata(t, jsonOutput, metric, tags, nil)
+}
+
+func getSampleValuesWithMetadata(
+	t *testing.T, jsonOutput []byte, metric string, tags, metadata map[string]string,
+) []float64 {
 	jsonLines := bytes.Split(jsonOutput, []byte("\n"))
 	result := []float64{}
 
-	tagsMatch := func(rawTags any) bool {
-		sampleTags, ok := rawTags.(map[string]any)
+	valuesMatch := func(rawValues any, expected map[string]string) bool {
+		if len(expected) == 0 {
+			return true
+		}
+		sampleValues, ok := rawValues.(map[string]any)
 		require.True(t, ok)
-		for k, v := range tags {
-			rv, sok := sampleTags[k]
+		for k, v := range expected {
+			rv, sok := sampleValues[k]
 			if !sok {
 				return false
 			}
@@ -1642,7 +1685,7 @@ func getSampleValues(t *testing.T, jsonOutput []byte, metric string, tags map[st
 		sampleData, ok := line["data"].(map[string]any)
 		require.True(t, ok)
 
-		if !tagsMatch(sampleData["tags"]) {
+		if !valuesMatch(sampleData["tags"], tags) || !valuesMatch(sampleData["metadata"], metadata) {
 			continue
 		}
 
@@ -2177,7 +2220,7 @@ func TestBadLogOutput(t *testing.T) {
 }
 
 // HACK: We need this so multiple tests can register differently named modules.
-var uniqueModuleNumber uint64 //nolint:gochecknoglobals
+var uniqueModuleNumber atomic.Uint64 //nolint:gochecknoglobals
 
 // Tests that the appropriate events are emitted in the correct order.
 func TestEventSystemOK(t *testing.T) {
@@ -2185,7 +2228,7 @@ func TestEventSystemOK(t *testing.T) {
 
 	ts := NewGlobalTestState(t)
 
-	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+	moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 	mod := events.New(event.GlobalEvents, event.VUEvents)
 	modules.Register(moduleName, mod)
 
@@ -2311,7 +2354,7 @@ func TestEventSystemError(t *testing.T) {
 			t.Parallel()
 			ts := NewGlobalTestState(t)
 
-			moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+			moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 			mod := events.New(event.GlobalEvents, event.VUEvents)
 			modules.Register(moduleName, mod)
 
@@ -2368,7 +2411,7 @@ func BenchmarkRunEvents(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		ts := NewGlobalTestState(b)
 
-		moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+		moduleName := fmt.Sprintf("k6/x/testevents-%d", uniqueModuleNumber.Add(1))
 		mod := events.New(event.GlobalEvents, event.VUEvents)
 		modules.Register(moduleName, mod)
 

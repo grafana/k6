@@ -109,7 +109,7 @@ func doWithRetry(httpClient *http.Client, req *http.Request) (*http.Response, er
 			req.Body = body
 		}
 
-		lastResp, lastErr = httpClient.Do(req) //nolint:gosec
+		lastResp, lastErr = httpClient.Do(req)
 		if lastErr != nil {
 			if attempt < clientcfg.MaxRetries {
 				select {

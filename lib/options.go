@@ -586,7 +586,7 @@ func (o Options) ForEachSpecified(structTag string, callback func(key string, va
 			shouldCall = fieldVal.Len() > 0
 		case reflect.Map:
 			shouldCall = fieldVal.Len() > 0
-		case reflect.Ptr:
+		case reflect.Pointer:
 			shouldCall = !fieldVal.IsNil()
 		default:
 			panic(fmt.Sprintf("Unknown Options field %#v", fieldType))

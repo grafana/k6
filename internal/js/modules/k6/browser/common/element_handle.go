@@ -50,6 +50,14 @@ type ElementHandle struct {
 	frame *Frame
 }
 
+// Page returns the page that owns the element handle.
+func (h *ElementHandle) Page() *Page {
+	if h == nil || h.frame == nil {
+		return nil
+	}
+	return h.frame.Page()
+}
+
 // String returns a string representation of ElementHandle.
 // It exists mostly for debugging where we don't want fmt.Sprintf to just
 // go through a complex object and try to stringify it.
@@ -1391,9 +1399,13 @@ func (h *ElementHandle) Screenshot(
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp, h.logger)
+	s, cancel := newScreenshotter(spanCtx, opts.Timeout, sp, h.logger)
+	defer cancel()
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
+		if errors.Is(s.ctx.Err(), context.DeadlineExceeded) && h.ctx.Err() == nil {
+			err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
+		}
 		return nil, spanRecordErrorf(span, "taking screenshot of elementHandle: %w", err)
 	}
 
@@ -1868,8 +1880,7 @@ func errorFromDOMError(v any) error {
 	default:
 		return fmt.Errorf("unexpected DOM error type %T", v)
 	}
-	var uerr *k6ext.UserFriendlyError
-	if errors.As(err, &uerr) {
+	if _, ok := errors.AsType[*k6ext.UserFriendlyError](err); ok {
 		return err
 	}
 	if strings.Contains(serr, "timed out") {
