@@ -953,13 +953,12 @@ func (r *Route) Continue(opts ContinueOptions) error {
 		return err
 	}
 
-	if err := r.networkManager.ContinueRequest(r.request.interceptionID, opts, r.request.HeadersArray()); err != nil {
-		return err
-	}
-
+	// Apply the overrides before continuing, as Playwright does, so the
+	// request already reflects what is sent when events about it fire.
+	originalHeaders := r.request.HeadersArray()
 	r.request.applyContinueOverrides(opts)
 
-	return nil
+	return r.networkManager.ContinueRequest(r.request.interceptionID, opts, originalHeaders)
 }
 
 // Fulfill fulfills the request with the given options for the response.
