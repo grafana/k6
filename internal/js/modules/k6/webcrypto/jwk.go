@@ -437,7 +437,7 @@ type alg25519JWK struct {
 	Crv string `json:"crv"`
 	// Public Key Use
 	Use string `json:"use"`
-	// Private scalar
+	// Key operations
 	KeyOps []CryptoKeyUsage `json:"key_ops"`
 	// Public key
 	X string `json:"x"`
@@ -466,7 +466,7 @@ func exportAlg25519JWK(key *CryptoKey) (*JsonWebKey, error) {
 		}
 
 		exported.Set("x", base64URLEncode([]byte(pubKey)))
-		// RFC 8037 defines 'd' as the 32 bytes private key, which Go calls the seed.
+		// RFC 8037 defines 'd' as the 32-byte private key, which Go calls the seed.
 		exported.Set("d", base64URLEncode(alg25519Key.Seed()))
 	case *ecdh.PublicKey:
 		exported.Set("x", base64URLEncode(alg25519Key.Bytes()))

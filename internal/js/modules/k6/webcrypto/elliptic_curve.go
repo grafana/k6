@@ -549,7 +549,8 @@ func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length in
 	}
 
 	// X25519 is a standalone algorithm rather than an ECDH named curve, so its keys carry a plain
-	// Algorithm instead of an EcKeyAlgorithm, and there is no curve to compare.
+	// Algorithm instead of an EcKeyAlgorithm. There is no curve to compare, so we only check that
+	// the base key belongs to the same algorithm.
 	if keyParams.Name == ECDH {
 		if err := ensureKeysUseSameCurve(*privateKey, *keyParams.Public); err != nil {
 			return nil, NewError(InvalidAccessError, err.Error())

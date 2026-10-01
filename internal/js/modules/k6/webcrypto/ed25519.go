@@ -169,8 +169,9 @@ func newEd25519ImportParams(normalized Algorithm) *Ed25519ImportParams {
 	}
 }
 
-// ImportKey imports a key according to the algorithm described in the specification.
-// [specification]:https://wicg.github.io/webcrypto-secure-curves/#ed25519-operations
+// ImportKey imports a key according to the algorithm described in the [specification].
+//
+// [specification]: https://wicg.github.io/webcrypto-secure-curves/#ed25519-operations
 func (eip *Ed25519ImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
@@ -259,8 +260,8 @@ func importEd25519Jwk(keyData []byte, keyUsages []CryptoKeyUsage, extractable bo
 		return ed25519.PublicKey(x), PublicCryptoKeyType, nil
 	}
 
-	// As defined in RFC 8037, section 2, the 'd' field holds the 32 bytes private key (the seed
-	// in Go's terminology), not the 64 bytes expanded form used by Go's ed25519.PrivateKey.
+	// As defined in RFC 8037, section 2, the 'd' field holds the 32-byte private key (the seed
+	// in Go's terminology), not the 64-byte expanded form used by Go's ed25519.PrivateKey.
 	d, err := base64URLDecode(*jwkKey.D)
 	if err != nil {
 		return nil, UnknownCryptoKeyType, NewError(DataError, "failed to decode private key: "+err.Error())

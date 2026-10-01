@@ -84,7 +84,8 @@ func newX25519ImportParams(normalized Algorithm) *X25519ImportParams {
 	}
 }
 
-// ImportKey imports a key according to the algorithm described in the specification.
+// ImportKey imports a key according to the algorithm described in the [specification].
+//
 // [specification]: https://wicg.github.io/webcrypto-secure-curves/#x25519-operations
 func (p *X25519ImportParams) ImportKey(
 	format KeyFormat,
