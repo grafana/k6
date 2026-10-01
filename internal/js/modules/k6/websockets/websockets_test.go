@@ -19,6 +19,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
+	"go.k6.io/k6/v2/js/modules"
 	httpModule "go.k6.io/k6/v2/js/modules/k6/http"
 	"go.k6.io/k6/v2/js/modulestest"
 	"go.k6.io/k6/v2/lib"
@@ -1179,7 +1180,10 @@ func TestCookies(t *testing.T) {
 		}
 	}))
 
-	err := ts.runtime.VU.RuntimeField.Set("http", httpModule.New().NewModuleInstance(ts.runtime.VU).Exports().Default)
+	httpInstance := modulestest.WithInitContext(ts.runtime.VU, func() modules.Instance {
+		return httpModule.New().NewModuleInstance(ts.runtime.VU)
+	})
+	err := ts.runtime.VU.RuntimeField.Set("http", httpInstance.Exports().Default)
 	require.NoError(t, err)
 
 	ts.runtime.VU.StateField.CookieJar, _ = cookiejar.New(nil)
@@ -1233,7 +1237,10 @@ func TestCookiesDefaultJar(t *testing.T) {
 		}
 	}))
 
-	err := ts.runtime.VU.RuntimeField.Set("http", httpModule.New().NewModuleInstance(ts.runtime.VU).Exports().Default)
+	httpInstance := modulestest.WithInitContext(ts.runtime.VU, func() modules.Instance {
+		return httpModule.New().NewModuleInstance(ts.runtime.VU)
+	})
+	err := ts.runtime.VU.RuntimeField.Set("http", httpInstance.Exports().Default)
 	require.NoError(t, err)
 
 	ts.runtime.VU.StateField.CookieJar, _ = cookiejar.New(nil)

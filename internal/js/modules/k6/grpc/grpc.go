@@ -14,6 +14,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/taskqueue"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/trace"
 )
 
 type (
@@ -23,11 +24,20 @@ type (
 
 	// ModuleInstance represents an instance of the GRPC module for every VU.
 	ModuleInstance struct {
-		vu      modules.VU
-		exports map[string]any
-		metrics *instanceMetrics
+		vu             modules.VU
+		exports        map[string]any
+		metrics        *instanceMetrics
+		tracingEnabled bool
 	}
 )
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "grpc"
+
+func init() {
+	trace.Register(tracingModuleName)
+}
 
 var (
 	_ modules.Module   = &RootModule{}
@@ -51,6 +61,9 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		vu:      vu,
 		exports: make(map[string]any),
 		metrics: metrics,
+		// Read fresh per instance -- do not cache this on RootModule (see
+		// browser's module.go for why that would silently latch it off).
+		tracingEnabled: vu.InitEnv().Tracing.Enabled(tracingModuleName),
 	}
 
 	mi.exports["Client"] = mi.NewClient
@@ -63,7 +76,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 // NewClient is the JS constructor for the grpc Client.
 func (mi *ModuleInstance) NewClient(_ sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
-	return rt.ToValue(&Client{vu: mi.vu, types: new(protoregistry.Types)}).ToObject(rt)
+	return rt.ToValue(&Client{vu: mi.vu, moduleInstance: mi, types: new(protoregistry.Types)}).ToObject(rt)
 }
 
 // defineConstants defines the constant variables of the module.
@@ -123,7 +136,7 @@ func (mi *ModuleInstance) stream(c sobek.ConstructorCall) *sobek.Object {
 		common.Throw(rt, fmt.Errorf("invalid GRPC Stream's method: %w", err))
 	}
 
-	p, err := newCallParams(mi.vu, c.Argument(2))
+	p, err := newCallParams(mi.vu, c.Argument(2), mi.tracingEnabled)
 	if err != nil {
 		common.Throw(rt, fmt.Errorf("invalid GRPC Stream's parameters: %w", err))
 	}

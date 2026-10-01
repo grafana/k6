@@ -9,6 +9,7 @@ import (
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/lib/netext"
 	"go.k6.io/k6/v2/lib/netext/httpext"
+	"go.k6.io/k6/v2/lib/trace"
 )
 
 // RootModule is the global module object type. It is instantiated once per test
@@ -20,10 +21,18 @@ type RootModule struct{}
 
 // ModuleInstance represents an instance of the HTTP module for every VU.
 type ModuleInstance struct {
-	vu            modules.VU
-	rootModule    *RootModule
-	defaultClient *Client
-	exports       *sobek.Object
+	vu             modules.VU
+	tracingEnabled bool
+	defaultClient  *Client
+	exports        *sobek.Object
+}
+
+// tracingModuleName is this module's --tracing identifier. Defined once and
+// reused below so the Register and Enabled calls can never drift apart.
+const tracingModuleName = "http"
+
+func init() {
+	trace.Register(tracingModuleName)
 }
 
 var (
@@ -40,9 +49,11 @@ func New() *RootModule {
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	rt := vu.Runtime()
 	mi := &ModuleInstance{
-		vu:         vu,
-		rootModule: r,
-		exports:    rt.NewObject(),
+		vu: vu,
+		// Read fresh per instance -- do not cache this on RootModule (see
+		// browser's module.go for why that would silently latch it off).
+		tracingEnabled: vu.InitEnv().Tracing.Enabled(tracingModuleName),
+		exports:        rt.NewObject(),
 	}
 	mi.defineConstants()
 

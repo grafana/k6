@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/csv"
 	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/streams"
+	"go.k6.io/k6/v2/internal/js/modules/k6/experimental/tracing"
 	"go.k6.io/k6/v2/internal/js/modules/k6/grpc"
 	"go.k6.io/k6/v2/internal/js/modules/k6/metrics"
 	"go.k6.io/k6/v2/internal/js/modules/k6/secrets"
@@ -50,6 +51,7 @@ func getInternalJSModules() map[string]any {
 		"k6/experimental/csv":     csv.New(),
 		"k6/experimental/fs":      fs.New(),
 		"k6/experimental/streams": streams.New(),
+		"k6/experimental/tracing": tracing.New(),
 
 		// Deprecated modules
 		"k6/experimental/websockets": newWarnExperimentalModule(websockets.New(),
@@ -73,10 +75,6 @@ func getInternalJSModules() map[string]any {
 		"k6/experimental/timers": newRemovedModule(
 			"k6/experimental/timers has been graduated, and it's now globally available as defined by standard WebAPIs." +
 				" You just need to remove the import."),
-		"k6/experimental/tracing": newRemovedModule(
-			"k6/experimental/tracing has been removed. All of it functionality is available as pure JavaScript module." +
-				" More info available at the docs:" +
-				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"),
 		"k6/experimental/webcrypto": newRemovedModule(
 			"k6/experimental/webcrypto has been graduated and it's now globally available as defined by standard WebAPIs." +
 				" You just need to remove the import."),

@@ -43,6 +43,14 @@ extended: base + sets "global" as alias for "globalThis"
 		"which is used for summary exports and as handleSummary() argument")
 	flags.String("traces-output", "none",
 		"set the output for k6 traces, possible values are none,otel[=host:port]")
+	flags.String("tracing", "none",
+		`enable native tracing by default for a comma-separated list of modules, "all", or "none" (default)`)
+	flags.String("traces-parent", "", "set the encoded remote parent context for the test run")
+	flags.String("traces-sampler", "parentbased_always_on", "set the trace sampler")
+	flags.String("traces-sampler-arg", "", "set the trace sampler argument")
+	flags.String("traces-propagator", "tracecontext", "set the trace propagator, tracecontext or jaeger")
+	flags.Bool("traces-split", false,
+		"keep iteration traces independent, linked to their VU span, instead of nesting under it")
 	return flags
 }
 
@@ -83,7 +91,13 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		SummaryMode:               getNullString(flags, "summary-mode"),
 		SummaryExport:             getNullString(flags, "summary-export"),
 		NewMachineReadableSummary: getNullBool(flags, "new-machine-readable-summary"),
+		Tracing:                   getNullString(flags, "tracing"),
 		TracesOutput:              getNullString(flags, "traces-output"),
+		TracesParent:              getOptionalNullString(flags, "traces-parent"),
+		TracesSampler:             getOptionalNullString(flags, "traces-sampler"),
+		TracesSamplerArg:          getOptionalNullString(flags, "traces-sampler-arg"),
+		TracesPropagator:          getOptionalNullString(flags, "traces-propagator"),
+		TracesSplit:               getNullBool(flags, "traces-split"),
 		Env:                       make(map[string]string),
 	}
 	return opts
@@ -140,6 +154,22 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	if envVar, ok := environment["K6_TRACES_OUTPUT"]; !opts.TracesOutput.Valid && ok {
 		opts.TracesOutput = null.StringFrom(envVar)
 	}
+	if envVar, ok := environment["K6_TRACING"]; !opts.Tracing.Valid && ok {
+		opts.Tracing = null.StringFrom(envVar)
+	}
+	for envName, option := range map[string]*null.String{
+		"K6_TRACES_PARENT":      &opts.TracesParent,
+		"K6_TRACES_SAMPLER":     &opts.TracesSampler,
+		"K6_TRACES_SAMPLER_ARG": &opts.TracesSamplerArg,
+		"K6_TRACES_PROPAGATOR":  &opts.TracesPropagator,
+	} {
+		if envVar, ok := environment[envName]; !option.Valid && ok {
+			*option = null.StringFrom(envVar)
+		}
+	}
+	if err := saveBoolFromEnv(environment, "K6_TRACES_SPLIT", &opts.TracesSplit); err != nil {
+		return opts, err
+	}
 
 	// If enabled, gather the actual system environment variables
 	if opts.IncludeSystemEnvVars.Bool {
@@ -147,6 +177,13 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 	}
 
 	return opts, nil
+}
+
+func getOptionalNullString(flags *pflag.FlagSet, key string) null.String {
+	if !flags.Changed(key) {
+		return null.String{}
+	}
+	return getNullString(flags, key)
 }
 
 func saveBoolFromEnv(env map[string]string, varName string, placeholder *null.Bool) error {

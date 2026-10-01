@@ -24,9 +24,11 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -37,10 +39,11 @@ import (
 
 // Client represents a gRPC client that can be used to make RPC requests
 type Client struct {
-	mds  map[string]protoreflect.MethodDescriptor
-	conn *grpcext.Conn
-	vu   modules.VU
-	addr string
+	mds            map[string]protoreflect.MethodDescriptor
+	conn           *grpcext.Conn
+	vu             modules.VU
+	addr           string
+	moduleInstance *ModuleInstance
 
 	types    *protoregistry.Types
 	typesMtx sync.Mutex
@@ -319,13 +322,57 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	return true, err
 }
 
-// HealthCheck checks if the server side is up and ready to serve responses
-func (c *Client) HealthCheck(svc *string) (*grpcext.HealthCheckResponse, error) {
+// HealthCheck checks if the server side is up and ready to serve responses.
+func (c *Client) HealthCheck(
+	svc *string, params ...sobek.Value,
+) (response *grpcext.HealthCheckResponse, err error) {
+	state := c.vu.State()
+	if state == nil {
+		return nil, common.NewInitContextError("checking gRPC health in the init context is not supported")
+	}
+	if c.conn == nil {
+		return nil, errors.New("no gRPC connection, you must call connect first")
+	}
+	if len(params) > 1 {
+		return nil, errors.New("grpc.Client.healthCheck accepts at most one params argument")
+	}
+
 	var service string
 	if svc != nil {
 		service = *svc
 	}
-	return c.conn.HealthCheck(c.vu.Context(), service)
+	input := sobek.Undefined()
+	if len(params) == 1 {
+		input = params[0]
+	}
+	p, err := newCallParams(c.vu, input, c.moduleInstance.tracingEnabled)
+	if err != nil {
+		return nil, fmt.Errorf("invalid GRPC's client.healthCheck() parameters: %w", err)
+	}
+
+	const method = "/grpc.health.v1.Health/Check"
+	p.SetSystemTags(state, c.addr, method)
+	ctx := c.vu.Context()
+	if p.Timeout != 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, p.Timeout)
+		defer cancel()
+	}
+	if !p.Tracing {
+		ctx = metadata.NewOutgoingContext(ctx, p.Metadata)
+		return c.conn.HealthCheck(ctx, service)
+	}
+
+	ctx, span := startGRPCTrace(ctx, state, c.addr, method, p.Metadata, &p.TagsAndMeta)
+	defer func() {
+		code := grpcCodes.OK
+		if err != nil {
+			code = status.Code(err)
+		}
+		endGRPCTrace(span, &grpcext.InvokeResponse{Status: code}, err)
+	}()
+	ctx = metadata.NewOutgoingContext(ctx, p.Metadata)
+	return c.conn.HealthCheck(ctx, service)
 }
 
 // Invoke creates and calls a unary RPC by fully qualified method name
@@ -339,7 +386,7 @@ func (c *Client) Invoke(
 		return nil, err
 	}
 
-	return c.conn.Invoke(c.vu.Context(), grpcReq)
+	return c.invoke(c.vu.Context(), c.vu.State(), grpcReq)
 }
 
 // AsyncInvoke creates and calls a unary RPC by fully qualified method name asynchronously
@@ -357,8 +404,10 @@ func (c *Client) AsyncInvoke(
 	}
 
 	callback := c.vu.RegisterCallback()
+	ctx := c.vu.Context()
+	state := c.vu.State()
 	go func() {
-		res, err := c.conn.Invoke(c.vu.Context(), grpcReq)
+		res, err := c.invoke(ctx, state, grpcReq)
 
 		callback(func() error {
 			if err != nil {
@@ -369,6 +418,20 @@ func (c *Client) AsyncInvoke(
 	}()
 
 	return promise, nil
+}
+
+func (c *Client) invoke(
+	ctx context.Context, state *lib.State, req grpcext.InvokeRequest,
+) (response *grpcext.InvokeResponse, err error) {
+	if !req.Tracing {
+		return c.conn.Invoke(ctx, req)
+	}
+
+	ctx, span := startGRPCTrace(ctx, state, c.addr, req.Method, req.Metadata, req.TagsAndMeta)
+	defer func() {
+		endGRPCTrace(span, response, err)
+	}()
+	return c.conn.Invoke(ctx, req)
 }
 
 // buildInvokeRequest creates a new InvokeRequest from the given method name, request object and parameters
@@ -397,7 +460,7 @@ func (c *Client) buildInvokeRequest(
 		return grpcReq, fmt.Errorf("method %q not found in file descriptors", method)
 	}
 
-	p, err := newCallParams(c.vu, params)
+	p, err := newCallParams(c.vu, params, c.moduleInstance.tracingEnabled)
 	if err != nil {
 		return grpcReq, fmt.Errorf("invalid GRPC's client.invoke() parameters: %w", err)
 	}
@@ -434,6 +497,7 @@ func (c *Client) buildInvokeRequest(
 		Message:                b,
 		TagsAndMeta:            &p.TagsAndMeta,
 		Metadata:               p.Metadata,
+		Tracing:                p.Tracing,
 	}, nil
 }
 

@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 )
 
 func TestBrowserTypeConnect(t *testing.T) {
@@ -95,7 +96,11 @@ func setupChromiumVU(t *testing.T, opts ...any) *k6test.VU {
 	t.Helper()
 
 	vu := k6test.NewVU(t, opts...)
-	mod := browser.New().NewModuleInstance(vu)
+	tracingSet, err := moduletrace.ParseSet("browser")
+	require.NoError(t, err)
+	vu.InitEnvField.Tracing = tracingSet
+	root := browser.New()
+	mod := root.NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 

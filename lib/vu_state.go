@@ -9,11 +9,13 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/usage"
+	moduletrace "go.k6.io/k6/v2/lib/trace"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -93,7 +95,13 @@ type State struct {
 	GetScenarioGlobalVUIter func() uint64
 
 	// Tracing instrumentation.
-	TracerProvider TracerProvider
+	TracerProvider  TracerProvider
+	TracePropagator propagation.TextMapPropagator
+	// Tracing is the resolved set of modules with tracing enabled by
+	// default, copied once from TestPreInitState at VU construction.
+	Tracing moduletrace.Set
+	// TracesSplit mirrors TestPreInitState.TracesSplit.
+	TracesSplit bool
 
 	// Usage is a way to report usage statistics
 	Usage *usage.Usage

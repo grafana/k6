@@ -45,6 +45,11 @@ func TestCallParamsInvalidInput(t *testing.T) {
 			JSON:        `{ metadata: "lorem" }`,
 			ErrContains: `invalid metadata param: must be an object with key-value pairs`,
 		},
+		{
+			Name:        "InvalidTracing",
+			JSON:        `{ tracing: "yes" }`,
+			ErrContains: `invalid tracing option: expected a boolean`,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -53,11 +58,25 @@ func TestCallParamsInvalidInput(t *testing.T) {
 
 			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
 
-			_, err := newCallParams(testRuntime.VU, params)
+			_, err := newCallParams(testRuntime.VU, params, false)
 
 			assert.ErrorContains(t, err, tc.ErrContains)
 		})
 	}
+}
+
+func TestCallParamsTracing(t *testing.T) {
+	t.Parallel()
+
+	testRuntime, params := newParamsTestRuntime(t, `{ tracing: false }`)
+	p, err := newCallParams(testRuntime.VU, params, true)
+	require.NoError(t, err)
+	require.False(t, p.Tracing, "the call option should override module enablement")
+
+	testRuntime, params = newParamsTestRuntime(t, `{}`)
+	p, err = newCallParams(testRuntime.VU, params, true)
+	require.NoError(t, err)
+	require.True(t, p.Tracing)
 }
 
 func TestCallParamsMetadata(t *testing.T) {
@@ -86,7 +105,7 @@ func TestCallParamsMetadata(t *testing.T) {
 
 			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
 
-			p, err := newCallParams(testRuntime.VU, params)
+			p, err := newCallParams(testRuntime.VU, params, false)
 
 			require.NoError(t, err)
 			assert.Equal(t, tc.ExpectedMetadata, p.Metadata)
@@ -125,7 +144,7 @@ func TestCallParamsTimeOutParse(t *testing.T) {
 
 			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
 
-			p, err := newCallParams(testRuntime.VU, params)
+			p, err := newCallParams(testRuntime.VU, params, false)
 			require.NoError(t, err)
 
 			assert.Equal(t, tc.Timeout, p.Timeout)
@@ -164,7 +183,7 @@ func TestCallParamsDiscardResponseMessageParse(t *testing.T) {
 
 			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
 
-			p, err := newCallParams(testRuntime.VU, params)
+			p, err := newCallParams(testRuntime.VU, params, false)
 			require.NoError(t, err)
 
 			assert.Equal(t, tc.DiscardResponseMessage, p.DiscardResponseMessage)

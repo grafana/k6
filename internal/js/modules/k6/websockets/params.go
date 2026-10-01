@@ -21,16 +21,18 @@ type wsParams struct {
 	tagsAndMeta       *metrics.TagsAndMeta
 	enableCompression bool
 	subprocotols      []string
+	tracing           bool
 }
 
 // buildParams builds WebSocket params and configure some of them
-func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value) (*wsParams, error) {
+func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value, tracingEnabled bool) (*wsParams, error) {
 	tagsAndMeta := state.Tags.GetCurrentValues()
 
 	parsed := &wsParams{
 		headers:     make(http.Header),
 		cookieJar:   state.CookieJar,
 		tagsAndMeta: &tagsAndMeta,
+		tracing:     tracingEnabled,
 	}
 
 	parsed.headers.Set("User-Agent", state.Options.UserAgent.String)
@@ -78,6 +80,12 @@ func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value) (*wsParam
 			}
 
 			parsed.enableCompression = true
+		case "tracing":
+			tracing, ok := params.Get(k).Export().(bool)
+			if !ok {
+				return nil, fmt.Errorf("invalid tracing option: expected a boolean")
+			}
+			parsed.tracing = tracing
 		default:
 			return nil, fmt.Errorf("unknown WebSocket's option %s", k)
 		}

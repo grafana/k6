@@ -11,6 +11,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.k6.io/k6/v2/internal/js/taskqueue"
 	"go.k6.io/k6/v2/internal/lib/netext/grpcext"
@@ -64,6 +65,8 @@ type stream struct {
 	eventListeners *eventListeners
 
 	timeoutCancel context.CancelFunc
+	traceSpan     oteltrace.Span
+	traceEnd      sync.Once
 }
 
 // defineStream defines the sobek.Object that is given to js to interact with the Stream
@@ -88,6 +91,11 @@ func (s *stream) beginStream(p *callParams) error {
 	}
 
 	ctx := s.vu.Context()
+	if p.Tracing {
+		ctx, s.traceSpan = startGRPCTrace(
+			ctx, s.vu.State(), s.client.addr, s.method, p.Metadata, &p.TagsAndMeta,
+		)
+	}
 	var cancel context.CancelFunc
 
 	if p.Timeout != time.Duration(0) {
@@ -98,6 +106,7 @@ func (s *stream) beginStream(p *callParams) error {
 
 	stream, err := s.client.conn.NewStream(ctx, *req)
 	if err != nil {
+		s.endTrace(err)
 		return fmt.Errorf("failed to create a new stream: %w", err)
 	}
 	s.stream = stream
@@ -123,6 +132,7 @@ func (s *stream) loop() {
 	defer func() {
 		wg.Wait()
 		s.tq.Close()
+		s.endTrace(nil)
 	}()
 
 	// read & write data from/to the stream
@@ -382,6 +392,7 @@ func (s *stream) close(err error) {
 	}
 
 	s.logger.Debugf("stream %s is closing", s.method)
+	s.endTrace(err)
 	close(s.done)
 
 	s.tq.Queue(func() error {
@@ -391,6 +402,19 @@ func (s *stream) close(err error) {
 	if s.timeoutCancel != nil {
 		s.timeoutCancel()
 	}
+}
+
+func (s *stream) endTrace(err error) {
+	if s.traceSpan == nil {
+		return
+	}
+	s.traceEnd.Do(func() {
+		if isRegularClosing(err) {
+			err = nil
+		}
+		response := &grpcext.InvokeResponse{Status: status.Code(err)}
+		endGRPCTrace(s.traceSpan, response, err)
+	})
 }
 
 func (s *stream) callErrorListeners(e error) error {
