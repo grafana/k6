@@ -60,23 +60,17 @@ func TestPageRouteContinueOverridesRequest(t *testing.T) {
 			});
 		});
 
-		let resolveRequest;
-		const requestSeen = new Promise((resolve) => { resolveRequest = resolve; });
-		page.on('response', async (response) => {
-			if (!response.url().endsWith('/api/pizza')) {
-				return;
-			}
-			resolveRequest({
-				url: response.request().url(),
-				method: response.request().method(),
-				headers: response.request().headers(),
-				allHeaders: await response.request().allHeaders(),
-				postData: response.request().postData(),
-			});
-		});
-
+		const responsePromise = page.waitForResponse(/\/api\/pizza$/);
 		await page.goto('%s', {waitUntil: 'networkidle'});
-		const request = await requestSeen;
+		const response = await responsePromise;
+		const req = response.request();
+		const request = {
+			url: req.url(),
+			method: req.method(),
+			headers: req.headers(),
+			allHeaders: await req.allHeaders(),
+			postData: req.postData(),
+		};
 		await page.close();
 
 		return JSON.stringify(request);
@@ -139,23 +133,16 @@ func TestPageRouteFulfillResponse(t *testing.T) {
 			});
 		});
 
-		let resolveResponse;
-		const responseSeen = new Promise((resolve) => { resolveResponse = resolve; });
-		page.on('response', async (res) => {
-			if (!res.url().endsWith('/api/pizza')) {
-				return;
-			}
-			resolveResponse({
-				status: res.status(),
-				headers: await res.allHeaders(),
-				body: await res.text(),
-				requestMethod: res.request().method(),
-				requestPostData: res.request().postData(),
-			});
-		});
-
+		const responsePromise = page.waitForResponse(/\/api\/pizza$/);
 		await page.goto('%s', {waitUntil: 'networkidle'});
-		const response = await responseSeen;
+		const res = await responsePromise;
+		const response = {
+			status: res.status(),
+			headers: await res.allHeaders(),
+			body: await res.text(),
+			requestMethod: res.request().method(),
+			requestPostData: res.request().postData(),
+		};
 		await page.close();
 
 		return JSON.stringify(response);
