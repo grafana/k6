@@ -433,12 +433,14 @@ func (p *GetInstallabilityErrorsParams) Do(ctx context.Context) (installabilityE
 	return res.InstallabilityErrors, nil
 }
 
-// GetAppIDParams returns the unique (PWA) app id. Only returns values if the
-// feature flag 'WebAppEnableManifestId' is enabled.
+// GetAppIDParams returns the unique (PWA) app id, along with IWA bundle ID
+// and parent app info. Only returns values if the feature flag
+// 'WebAppEnableManifestId' is enabled.
 type GetAppIDParams struct{}
 
-// GetAppID returns the unique (PWA) app id. Only returns values if the
-// feature flag 'WebAppEnableManifestId' is enabled.
+// GetAppID returns the unique (PWA) app id, along with IWA bundle ID and
+// parent app info. Only returns values if the feature flag
+// 'WebAppEnableManifestId' is enabled.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-getAppId
 func GetAppID() *GetAppIDParams {
@@ -449,6 +451,8 @@ func GetAppID() *GetAppIDParams {
 type GetAppIDReturns struct {
 	AppID         string `json:"appId,omitempty,omitzero"`         // App id, either from manifest's id attribute or computed from start_url
 	RecommendedID string `json:"recommendedId,omitempty,omitzero"` // Recommendation for manifest's id attribute to match current id computed from start_url
+	BundleID      string `json:"bundleId,omitempty,omitzero"`      // The bundle ID for an Isolated Web App (IWA)
+	ParentAppName string `json:"parentAppName,omitempty,omitzero"` // The name of the parent app if this app is a Sub-App
 }
 
 // Do executes Page.getAppId against the provided context.
@@ -457,15 +461,83 @@ type GetAppIDReturns struct {
 //
 //	appID - App id, either from manifest's id attribute or computed from start_url
 //	recommendedID - Recommendation for manifest's id attribute to match current id computed from start_url
-func (p *GetAppIDParams) Do(ctx context.Context) (appID string, recommendedID string, err error) {
+//	bundleID - The bundle ID for an Isolated Web App (IWA)
+//	parentAppName - The name of the parent app if this app is a Sub-App
+func (p *GetAppIDParams) Do(ctx context.Context) (appID string, recommendedID string, bundleID string, parentAppName string, err error) {
 	// execute
 	var res GetAppIDReturns
 	err = cdp.Execute(ctx, CommandGetAppID, nil, &res)
 	if err != nil {
-		return "", "", err
+		return "", "", "", "", err
 	}
 
-	return res.AppID, res.RecommendedID, nil
+	return res.AppID, res.RecommendedID, res.BundleID, res.ParentAppName, nil
+}
+
+// GetSubAppsParams returns the list of installed child Sub-Apps for the
+// inspected parent app.
+type GetSubAppsParams struct{}
+
+// GetSubApps returns the list of installed child Sub-Apps for the inspected
+// parent app.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-getSubApps
+func GetSubApps() *GetSubAppsParams {
+	return &GetSubAppsParams{}
+}
+
+// GetSubAppsReturns return values.
+type GetSubAppsReturns struct {
+	SubApps []*SubApp `json:"subApps,omitempty,omitzero"`
+}
+
+// Do executes Page.getSubApps against the provided context.
+//
+// returns:
+//
+//	subApps
+func (p *GetSubAppsParams) Do(ctx context.Context) (subApps []*SubApp, err error) {
+	// execute
+	var res GetSubAppsReturns
+	err = cdp.Execute(ctx, CommandGetSubApps, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.SubApps, nil
+}
+
+// GetSiblingSubAppsParams returns the list of sibling Sub-Apps sharing the
+// same parent app if the inspected context is a Sub-App.
+type GetSiblingSubAppsParams struct{}
+
+// GetSiblingSubApps returns the list of sibling Sub-Apps sharing the same
+// parent app if the inspected context is a Sub-App.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-getSiblingSubApps
+func GetSiblingSubApps() *GetSiblingSubAppsParams {
+	return &GetSiblingSubAppsParams{}
+}
+
+// GetSiblingSubAppsReturns return values.
+type GetSiblingSubAppsReturns struct {
+	SubApps []*SubApp `json:"subApps,omitempty,omitzero"`
+}
+
+// Do executes Page.getSiblingSubApps against the provided context.
+//
+// returns:
+//
+//	subApps
+func (p *GetSiblingSubAppsParams) Do(ctx context.Context) (subApps []*SubApp, err error) {
+	// execute
+	var res GetSiblingSubAppsReturns
+	err = cdp.Execute(ctx, CommandGetSiblingSubApps, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.SubApps, nil
 }
 
 // GetAdScriptAncestryParams [no description].
@@ -1983,6 +2055,8 @@ const (
 	CommandGetAppManifest                      = "Page.getAppManifest"
 	CommandGetInstallabilityErrors             = "Page.getInstallabilityErrors"
 	CommandGetAppID                            = "Page.getAppId"
+	CommandGetSubApps                          = "Page.getSubApps"
+	CommandGetSiblingSubApps                   = "Page.getSiblingSubApps"
 	CommandGetAdScriptAncestry                 = "Page.getAdScriptAncestry"
 	CommandGetFrameTree                        = "Page.getFrameTree"
 	CommandGetLayoutMetrics                    = "Page.getLayoutMetrics"
