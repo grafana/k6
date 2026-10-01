@@ -246,7 +246,7 @@ func beautifyOptionsJSONUnmarshalError(data []byte, err error) error {
 	if errors.As(err, &unmarshalTypError) {
 		e := unmarshalTypError
 		previousNewLineIndex := max(bytes.LastIndexByte(data[:e.Offset], '\n'), 0)
-		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), (int)(e.Offset))
+		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), int(e.Offset))
 
 		info := strings.TrimSpace(string(data[previousNewLineIndex:nextNewLineIndex]))
 		err = fmt.Errorf("parsing options from script got error while parsing %q: %w", info, e)
@@ -265,6 +265,9 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 			global: b.preInitState.Events,
 			local:  event.NewEventSystem(100, b.preInitState.Logger),
 		},
+	}
+	if b.preInitState.FeatureFlags != nil && b.preInitState.FeatureFlags.AsyncMetricContext {
+		vuImpl.runtime.SetAsyncContextTracker(common.NewMetricContextTracker(vuImpl.State))
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	bi, err := b.instantiate(vuImpl, vuID)
@@ -374,8 +377,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	}
 
 	if err != nil {
-		var exception *sobek.Exception
-		if errors.As(err, &exception) {
+		if exception, ok := errors.AsType[*sobek.Exception](err); ok {
 			err = &scriptExceptionError{inner: exception}
 		}
 		return nil, err

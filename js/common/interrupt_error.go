@@ -8,8 +8,7 @@ import (
 
 // UnwrapSobekInterruptedError returns the internal error handled by Sobek.
 func UnwrapSobekInterruptedError(err error) error {
-	var sobekErr *sobek.InterruptedError
-	if errors.As(err, &sobekErr) {
+	if sobekErr, ok := errors.AsType[*sobek.InterruptedError](err); ok {
 		if e, ok := sobekErr.Value().(error); ok {
 			return e
 		}

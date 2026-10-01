@@ -503,9 +503,7 @@ func (r *Runtime) promise_any(call FunctionCall) Value {
 				errors[index] = call.Argument(0)
 				remainingElementsCount--
 				if remainingElementsCount == 0 {
-					_error := r.builtin_new(r.getAggregateError(), nil)
-					_error.self._putProp("errors", r.newArrayValues(errors), true, false, true)
-					pcap.reject(_error)
+					pcap.reject(r.newAggregateErrorErrors(errors))
 				}
 				return _undefined
 			}, "", 1)
@@ -515,9 +513,7 @@ func (r *Runtime) promise_any(call FunctionCall) Value {
 		})
 		remainingElementsCount--
 		if remainingElementsCount == 0 {
-			_error := r.builtin_new(r.getAggregateError(), nil)
-			_error.self._putProp("errors", r.newArrayValues(errors), true, false, true)
-			pcap.reject(_error)
+			pcap.reject(r.newAggregateErrorErrors(errors))
 		}
 	})
 	return pcap.promise

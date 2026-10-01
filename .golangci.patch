@@ -1,0 +1,32 @@
+--- a/.golangci.yml
++++ b/.golangci.yml
+@@ -99,8 +99,29 @@
+           - gocognit
+           - lll
+           - gosec
++          - goconst
++          - prealloc
+         path: _(test|gen)\.go
+       - linters:
++          - contextcheck
++          - revive
++        path: js\/modules\/k6\/browser\/.*\.go
++      - linters:
++          - goconst
++        path: js\/modules\/k6\/browser\/.*mapping\.go
++      - linters:
++          - revive
++        path: js\/modules\/k6\/html\/.*\.go
++        text: 'exported: exported '
++      - linters:
++          - paralleltest
++          - tparallel
++        path: js\/modules\/k6\/html\/.*\.go
++      - linters:
++          - paralleltest
++          - tparallel
++        path: js\/modules\/k6\/http\/.*_test\.go
++      - linters:
+           - forbidigo
+         text: use of `os\.(SyscallError|Signal|Interrupt)` forbidden
+       - linters:

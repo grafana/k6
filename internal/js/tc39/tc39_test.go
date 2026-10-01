@@ -54,15 +54,13 @@ var (
 		false)
 
 	featuresBlockList = []string{
-		"IsHTMLDDA",                   // not supported at all
-		"async-iteration",             // not supported at all
-		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
-		"dynamic-import",              // not support in k6
+		"IsHTMLDDA",       // not supported at all
+		"async-iteration", // not supported at all
+		"dynamic-import",  // not support in k6
 
 		// from Sobek
 		"Symbol.asyncIterator",
 		"resizable-arraybuffer",
-		"regexp-named-groups",
 		"regexp-duplicate-named-groups",
 		"regexp-unicode-property-escapes",
 		"regexp-match-indices",
@@ -72,7 +70,6 @@ var (
 		"tail-call-optimization",
 		"Temporal",
 		"import-assertions",
-		"logical-assignment-operators",
 		"Atomics",
 		"Atomics.waitAsync",
 		"Atomics.pause",
@@ -88,10 +85,8 @@ var (
 		"regexp-v-flag",
 		"iterator-helpers",
 		"symbols-as-weakmap-keys",
-		"uint8array-base64",
 		"String.prototype.toWellFormed",
 		"explicit-resource-management",
-		"set-methods",
 		"promise-try",
 		"promise-with-resolvers",
 		"array-grouping",

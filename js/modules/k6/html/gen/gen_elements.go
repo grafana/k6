@@ -1,4 +1,6 @@
 // Package main - this package generates some of the code for k6/html
+//
+//nolint:goconst
 package main
 
 import (

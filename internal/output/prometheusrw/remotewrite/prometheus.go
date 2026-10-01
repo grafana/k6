@@ -51,3 +51,29 @@ func MapSeries(series metrics.TimeSeries, suffix string) []*prompb.Label {
 	})
 	return lbls
 }
+
+func addLabels(labels []*prompb.Label, extra map[string]string) []*prompb.Label {
+	if len(extra) == 0 {
+		return labels
+	}
+
+	existing := make(map[string]struct{}, len(labels))
+	for _, label := range labels {
+		existing[label.Name] = struct{}{}
+	}
+
+	for key, value := range extra {
+		if key == "" || value == "" || key == namelbl {
+			continue
+		}
+		if _, ok := existing[key]; ok {
+			continue
+		}
+		labels = append(labels, &prompb.Label{Name: key, Value: value})
+	}
+
+	slices.SortStableFunc(labels, func(i, j *prompb.Label) int {
+		return cmp.Compare(i.Name, j.Name)
+	})
+	return labels
+}

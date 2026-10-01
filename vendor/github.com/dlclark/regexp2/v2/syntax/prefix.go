@@ -245,6 +245,9 @@ func (s *regexFcd) calculateFC(nt NodeType, node *RegexNode, CurIndex int) {
 	case NtSetloop, NtSetlazy, NtSetloopatomic:
 		s.pushFC(regexFc{cc: node.Set.Copy(), nullable: node.M == 0, caseInsensitive: ci})
 
+	case NtGrapheme:
+		s.pushFC(regexFc{cc: *AnyClass(), nullable: false})
+
 	case NtRef:
 		s.pushFC(regexFc{cc: *AnyClass(), nullable: true, caseInsensitive: false})
 

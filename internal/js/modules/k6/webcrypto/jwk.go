@@ -1,3 +1,4 @@
+//nolint:staticcheck //a bunch of deprecated logic is used in this package. Needs to be fixed.
 package webcrypto
 
 import (
@@ -161,8 +162,8 @@ func encodeCurveBigInt(data *big.Int, curveBits int) string {
 
 // padLeft pads the byte slice with zeros to the left to ensure it has a specific length.
 func padLeft(bytes []byte, size int) []byte {
-	padding := make([]byte, size-len(bytes))
-	return append(padding, bytes...) //nolint:makezero // we need to pad with zeros
+	padding := make([]byte, size-len(bytes), size)
+	return append(padding, bytes...)
 }
 
 func exportECJWK(key *CryptoKey) (any, error) {

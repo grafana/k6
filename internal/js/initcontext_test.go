@@ -346,13 +346,13 @@ func TestRequestWithBinaryFile(t *testing.T) {
 		Options: lib.Options{},
 		Logger:  logger,
 		Transport: &http.Transport{
-			DialContext: (netext.NewDialer(
+			DialContext: netext.NewDialer(
 				net.Dialer{
 					Timeout:   10 * time.Second,
 					KeepAlive: 60 * time.Second,
 				},
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
-			)).DialContext,
+			).DialContext,
 		},
 		BufferPool:     lib.NewBufferPool(),
 		Samples:        make(chan metrics.SampleContainer, 500),
@@ -487,13 +487,13 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 		Options: lib.Options{},
 		Logger:  logger,
 		Transport: &http.Transport{
-			DialContext: (netext.NewDialer(
+			DialContext: netext.NewDialer(
 				net.Dialer{
 					Timeout:   10 * time.Second,
 					KeepAlive: 60 * time.Second,
 				},
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
-			)).DialContext,
+			).DialContext,
 		},
 		BufferPool:     lib.NewBufferPool(),
 		Samples:        make(chan metrics.SampleContainer, 500),

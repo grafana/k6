@@ -271,7 +271,7 @@ func (b *BrowserType) Launch(ctx, vuCtx context.Context) (_ *common.Browser, bro
 func (b *BrowserType) launch(
 	ctx, vuCtx context.Context, opts *common.BrowserOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
-	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
+	flags, err := prepareFlags(opts, &b.vu.State().Options)
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}

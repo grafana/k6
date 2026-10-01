@@ -170,6 +170,45 @@ func TestOutputConvertToPbSeries(t *testing.T) {
 	assert.Equal(t, exp, pbseries)
 }
 
+func TestOutputConvertToPbSeriesWithLabels(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	metric := registry.MustNewMetric("metric1", metrics.Counter)
+	tagset := registry.RootTagSet().With("environment", "script")
+
+	o := Output{
+		config: Config{
+			Labels: map[string]string{
+				"__name__":      "ignored",
+				"environment":   "config",
+				"server":        "srv1",
+				"empty_value":   "",
+				"ignored_empty": "",
+			},
+		},
+		tsdb: make(map[metrics.TimeSeries]*seriesWithMeasure),
+	}
+
+	pbseries := o.convertToPbSeries([]metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: metric,
+				Tags:   tagset,
+			},
+			Time:  time.Unix(1, 0),
+			Value: 1,
+		},
+	})
+
+	require.Len(t, pbseries, 1)
+	assert.Equal(t, []*prompb.Label{
+		{Name: "__name__", Value: "k6_metric1_total"},
+		{Name: "environment", Value: "script"},
+		{Name: "server", Value: "srv1"},
+	}, pbseries[0].Labels)
+}
+
 //nolint:paralleltest,tparallel
 func TestOutputConvertToPbSeries_WithPreviousState(t *testing.T) {
 	t.Parallel()
@@ -376,6 +415,9 @@ func TestOutputStaleMarkers(t *testing.T) {
 	}
 
 	o := Output{
+		config: Config{
+			Labels: map[string]string{"server": "srv1"},
+		},
 		now: func() time.Time {
 			return time.Unix(1, 0)
 		},
@@ -406,6 +448,7 @@ func TestOutputStaleMarkers(t *testing.T) {
 	expTimestamp := time.Unix(1, int64(1*time.Millisecond)).UnixMilli()
 	for i, expName := range expNameLabels {
 		assert.Equal(t, expName, markers[i].Labels[0].Value)
+		assert.Equal(t, "srv1", findLabelValue(markers[i].Labels, "server"))
 		assert.Equal(t, expTimestamp, markers[i].Samples[0].Timestamp)
 		assert.True(t, math.IsNaN(markers[i].Samples[0].Value), "it isn't a StaleNaN value")
 	}

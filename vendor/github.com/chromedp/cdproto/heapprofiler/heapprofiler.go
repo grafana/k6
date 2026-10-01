@@ -203,6 +203,7 @@ func (p *GetSamplingProfileParams) Do(ctx context.Context) (profile *SamplingHea
 // StartSamplingParams [no description].
 type StartSamplingParams struct {
 	SamplingInterval                 float64 `json:"samplingInterval,omitempty,omitzero"` // Average sample interval in bytes. Poisson distribution is used for the intervals. The default value is 32768 bytes.
+	StackDepth                       float64 `json:"stackDepth,omitempty,omitzero"`       // Maximum stack depth. The default value is 128.
 	IncludeObjectsCollectedByMajorGC bool    `json:"includeObjectsCollectedByMajorGC"`    // By default, the sampling heap profiler reports only objects which are still alive when the profile is returned via getSamplingProfile or stopSampling, which is useful for determining what functions contribute the most to steady-state memory usage. This flag instructs the sampling heap profiler to also include information about objects discarded by major GC, which will show which functions cause large temporary memory usage or long GC pauses.
 	IncludeObjectsCollectedByMinorGC bool    `json:"includeObjectsCollectedByMinorGC"`    // By default, the sampling heap profiler reports only objects which are still alive when the profile is returned via getSamplingProfile or stopSampling, which is useful for determining what functions contribute the most to steady-state memory usage. This flag instructs the sampling heap profiler to also include information about objects discarded by minor GC, which is useful when tuning a latency-sensitive application for minimal GC activity.
 }
@@ -223,6 +224,12 @@ func StartSampling() *StartSamplingParams {
 // distribution is used for the intervals. The default value is 32768 bytes.
 func (p StartSamplingParams) WithSamplingInterval(samplingInterval float64) *StartSamplingParams {
 	p.SamplingInterval = samplingInterval
+	return &p
+}
+
+// WithStackDepth maximum stack depth. The default value is 128.
+func (p StartSamplingParams) WithStackDepth(stackDepth float64) *StartSamplingParams {
+	p.StackDepth = stackDepth
 	return &p
 }
 

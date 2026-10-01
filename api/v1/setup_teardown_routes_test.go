@@ -166,7 +166,7 @@ func TestSetupData(t *testing.T) {
 
 			checkSetup := func(method, body, expResult string) {
 				rw := httptest.NewRecorder()
-				handler.ServeHTTP(rw, httptest.NewRequest(method, "/v1/setup", bytes.NewBufferString(body)))
+				handler.ServeHTTP(rw, httptest.NewRequestWithContext(t.Context(), method, "/v1/setup", bytes.NewBufferString(body)))
 				res := rw.Result()
 				t.Cleanup(func() {
 					assert.NoError(t, res.Body.Close())

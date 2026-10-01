@@ -41,7 +41,7 @@ type unresolvableURLError string
 
 func (u unresolvableURLError) Error() string {
 	// TODO potentially add more things about what k6 supports if users report being confused.
-	return fmt.Sprintf(`The moduleSpecifier %q couldn't be recognised as something k6 supports.`, (string)(u))
+	return fmt.Sprintf(`The moduleSpecifier %q couldn't be recognised as something k6 supports.`, string(u))
 }
 
 // Resolve a relative path to an absolute one.
@@ -210,7 +210,7 @@ func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := http.DefaultClient.Do(req) //nolint:gosec
+	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

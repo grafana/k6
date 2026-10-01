@@ -302,7 +302,7 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 func (r *Runtime) _newRegExp(patternStr String, flags string, proto *Object) *regexpObject {
 	pattern, err := compileRegexpFromValueString(patternStr, flags)
 	if err != nil {
-		panic(r.newSyntaxError(err.Error(), -1))
+		panic(r.newSyntaxError(err.Error()))
 	}
 	return r.newRegExpp(pattern, patternStr, proto)
 }
@@ -400,7 +400,7 @@ func (r *Runtime) regexpproto_compile(call FunctionCall) Value {
 		}
 		pattern, err = compileRegexpFromValueString(source, flags)
 		if err != nil {
-			panic(r.newSyntaxError(err.Error(), -1))
+			panic(r.newSyntaxError(err.Error()))
 		}
 		this.pattern = pattern
 		this.source = source

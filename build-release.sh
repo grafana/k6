@@ -15,7 +15,9 @@ build() {
     local ALIAS="$1" SUFFIX="${2}"  # Any other arguments are passed to the go build command as env vars
     local NAME="k6-${VERSION}-${ALIAS}"
 
-    local BUILD_ARGS=(-o "${OUT_DIR}/${NAME}/k6${SUFFIX}" -trimpath)
+    # -X marks the binary, and so the packages built from it, as an official build.
+    local BUILD_ARGS=(-o "${OUT_DIR}/${NAME}/k6${SUFFIX}" -trimpath
+        -ldflags "-X go.k6.io/k6/v2/internal/build.BuildOrigin=release")
 
     local PACKAGE_FORMATS
     IFS="," read -ra PACKAGE_FORMATS <<< "${3}"
