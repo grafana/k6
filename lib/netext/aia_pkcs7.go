@@ -48,36 +48,38 @@ type pkcs7SignedData struct {
 // cryptographic checks — an attacker-controlled AIA response gains nothing
 // unless the certificates it carries actually validate against the trusted
 // roots. Non-certificate entries of the CertificateSet (attribute
-// certificates, other formats) are skipped, and any entry that does not parse
-// as an X.509 certificate makes the whole bundle fail, keeping the parser
-// strict about what it accepts.
-func parsePKCS7Certificates(der []byte) ([]*x509.Certificate, error) {
+// certificates, other formats) are skipped, as are entries that fail X.509
+// parsing — mirroring x509.CertPool.AppendCertsFromPEM, one unusable entry
+// must not discard the usable chain material around it. The bundle only
+// fails when it contains no parseable certificate at all.
+func parsePKCS7Certificates(der []byte) ([]*x509.Certificate, int, error) {
 	var info pkcs7ContentInfo
 	rest, err := asn1.Unmarshal(der, &info)
 	if err != nil {
-		return nil, fmt.Errorf("parsing PKCS#7 content info: %w", err)
+		return nil, 0, fmt.Errorf("parsing PKCS#7 content info: %w", err)
 	}
 	if len(rest) != 0 {
-		return nil, fmt.Errorf("%d trailing bytes after PKCS#7 content info", len(rest))
+		return nil, 0, fmt.Errorf("%d trailing bytes after PKCS#7 content info", len(rest))
 	}
 	if !info.ContentType.Equal(oidSignedData) {
-		return nil, fmt.Errorf("unsupported PKCS#7 content type %v, want signedData", info.ContentType)
+		return nil, 0, fmt.Errorf("unsupported PKCS#7 content type %v, want signedData", info.ContentType)
 	}
 
 	var signedData pkcs7SignedData
 	// Content is [0] EXPLICIT, so its Bytes field is the content of the [0]
 	// wrapper: the complete SignedData SEQUENCE, header included.
 	if _, err = asn1.Unmarshal(info.Content.Bytes, &signedData); err != nil {
-		return nil, fmt.Errorf("parsing PKCS#7 signedData: %w", err)
+		return nil, 0, fmt.Errorf("parsing PKCS#7 signedData: %w", err)
 	}
 	if len(signedData.Certificates.Bytes) == 0 {
-		return nil, fmt.Errorf("PKCS#7 bundle contains no certificates")
+		return nil, 0, fmt.Errorf("PKCS#7 bundle contains no certificates")
 	}
 	return parsePKCS7CertificateSet(signedData.Certificates.Bytes)
 }
 
 // parsePKCS7CertificateSet walks a CertificateSet (SET OF CertificateChoices)
-// and returns the X.509 certificates it contains:
+// and returns the X.509 certificates it contains, plus how many entries were
+// skipped as unusable:
 //
 //	CertificateChoices ::= CHOICE {
 //	  certificate             Certificate,          -- universal SEQUENCE
@@ -85,25 +87,33 @@ func parsePKCS7Certificates(der []byte) ([]*x509.Certificate, error) {
 //	  v2AttrCert          [2] ...,                  -- not chain material
 //	  other           [3] ...
 //	}
-func parsePKCS7CertificateSet(set []byte) ([]*x509.Certificate, error) {
+//
+// The structural walk stays strict — a broken set boundary means the response
+// is not the format we think it is. An individual entry failing X.509
+// parsing, however, only costs that entry: the parser is not a trust boundary
+// (chain verification is), and skipping the bad entry keeps the usable chain
+// material in the same bundle available.
+func parsePKCS7CertificateSet(set []byte) ([]*x509.Certificate, int, error) {
 	certs := []*x509.Certificate{}
+	skipped := 0
 	for len(set) > 0 {
 		var choice asn1.RawValue
 		var err error
 		if set, err = asn1.Unmarshal(set, &choice); err != nil {
-			return nil, fmt.Errorf("parsing PKCS#7 certificate set entry: %w", err)
+			return nil, 0, fmt.Errorf("parsing PKCS#7 certificate set entry: %w", err)
 		}
 		if choice.Class != asn1.ClassUniversal || choice.Tag != asn1.TagSequence {
 			continue // attribute certificates and other non-chain formats
 		}
 		cert, err := x509.ParseCertificate(choice.FullBytes)
 		if err != nil {
-			return nil, fmt.Errorf("parsing X.509 certificate from PKCS#7 bundle: %w", err)
+			skipped++
+			continue
 		}
 		certs = append(certs, cert)
 	}
 	if len(certs) == 0 {
-		return nil, fmt.Errorf("PKCS#7 bundle contains no X.509 certificates")
+		return nil, skipped, fmt.Errorf("PKCS#7 bundle contains no X.509 certificates")
 	}
-	return certs, nil
+	return certs, skipped, nil
 }

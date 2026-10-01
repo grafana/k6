@@ -318,7 +318,8 @@ func (f *AIAFetcher) fetchCertFromAIAURL(
 	if block == nil {
 		// Neither DER nor PEM: some CAs (Sectigo, legacy Verisign) serve AIA
 		// intermediates as certs-only PKCS#7 bundles — try that before failing.
-		if certs, pkcs7Err := parsePKCS7Certificates(body); pkcs7Err == nil {
+		if certs, skipped, pkcs7Err := parsePKCS7Certificates(body); pkcs7Err == nil {
+			logSkippedPKCS7Entries(logger, rawURL, skipped, len(certs))
 			return certs, nil
 		}
 		if isLikelyPKCS7(resp.Header.Get("Content-Type"), body) {
@@ -336,10 +337,11 @@ func (f *AIAFetcher) fetchCertFromAIAURL(
 		}
 		return []*x509.Certificate{cert}, nil
 	case "PKCS7", "PKCS #7", "CMS": // RFC 7468 section 6: PEM-armored PKCS#7
-		certs, err := parsePKCS7Certificates(block.Bytes)
+		certs, skipped, err := parsePKCS7Certificates(block.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("parsing PEM-armored PKCS#7 from AIA response: %w", err)
 		}
+		logSkippedPKCS7Entries(logger, rawURL, skipped, len(certs))
 		return certs, nil
 	default:
 		return nil, fmt.Errorf("unexpected PEM block type %q in AIA response", block.Type)
@@ -353,4 +355,15 @@ func isLikelyPKCS7(contentType string, body []byte) bool {
 	}
 	// ASN.1 encoding of OID 1.2.840.113549.1.7.2 (id-signedData).
 	return bytes.Contains(body, []byte{0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02})
+}
+
+// logSkippedPKCS7Entries reports bundle entries that looked like certificates
+// but failed X.509 parsing. The remaining certificates are still used, so this
+// is only a warning: the anomaly is worth surfacing, but the fetch succeeded.
+func logSkippedPKCS7Entries(logger logrus.FieldLogger, rawURL string, skipped, used int) {
+	if skipped == 0 {
+		return
+	}
+	logger.WithField("url", rawURL).
+		Warnf("AIA PKCS#7 bundle contained %d unparseable certificate entries; using %d certificates", skipped, used)
 }

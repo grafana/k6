@@ -347,6 +347,50 @@ func TestWrapTLSConfigForAIAFetching_PKCS7BundleWithUnrelatedCerts(t *testing.T)
 	_ = resp.Body.Close()
 }
 
+// A malformed entry inside an otherwise valid bundle must not discard the
+// usable intermediate: the chain still completes, and the skipped entry is
+// surfaced as a warning instead of failing the fetch (#6483 review).
+func TestWrapTLSConfigForAIAFetching_PKCS7BundleWithMalformedEntry(t *testing.T) {
+	t.Parallel()
+
+	oidData, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1})
+	require.NoError(t, err)
+	oidSignedData, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2})
+	require.NoError(t, err)
+	malformed := testDER(0x30, []byte{asn1.TagInteger, 0x01, 0x2A}) // SEQUENCE { INTEGER 42 }
+
+	h := &tlstest.AIAHandler{}
+	aiaSrv := startAIAServer(t, h)
+	chain := buildChainWithAIA(t, aiaSrv.URL+"/ca.p7c")
+	// A bundle whose usable entry is the chain's intermediate, with a
+	// malformed certificate-looking entry in front of it.
+	signedData := testDER(0x30,
+		[]byte{asn1.TagInteger, 0x01, 0x01},             // version
+		testDER(0x31),                                   // empty SET OF digest algorithms
+		testDER(0x30, oidData),                          // encapContentInfo: id-data
+		testDER(0xA0, malformed, chain.IntermediateDER), // certificate set
+	)
+	h.SetBody("application/pkcs7-mime", testDER(0x30, oidSignedData, testDER(0xA0, signedData)))
+
+	tlsSrv := leafOnlyTLSServer(t, chain)
+
+	logger, hook := logtest.NewNullLogger()
+	logger.SetLevel(logrus.DebugLevel)
+	wrappedCfg := NewAIAFetcher(nil).Wrap(&tls.Config{RootCAs: chain.RootPool}, logger)
+	resp, err := testHTTPClient(t, wrappedCfg).Get(leafOnlyTLSServerURL(tlsSrv)) //nolint:noctx
+	require.NoError(t, err, "bundle with one malformed entry should still resolve the chain")
+	_ = resp.Body.Close()
+
+	var warned bool
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel && strings.Contains(entry.Message, "unparseable certificate entries") {
+			warned = true
+			break
+		}
+	}
+	assert.True(t, warned, "the skipped bundle entry should be surfaced as a warning")
+}
+
 // Some servers PEM-armor the PKCS#7 bundle instead of serving bare DER.
 func TestFetchCertFromAIAURL_PKCS7PEMArmored(t *testing.T) {
 	t.Parallel()
@@ -366,6 +410,50 @@ func TestFetchCertFromAIAURL_PKCS7PEMArmored(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, certs, 1)
 	assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+}
+
+// The PEM-armored PKCS#7 path shares the skip-don't-fail semantics: a
+// malformed entry is skipped and logged, the usable certificates returned.
+func TestFetchCertFromAIAURL_PKCS7PEMArmoredWithMalformedEntry(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	oidData, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 1})
+	require.NoError(t, err)
+	oidSignedData, err := asn1.Marshal(asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 7, 2})
+	require.NoError(t, err)
+	malformed := testDER(0x30, []byte{asn1.TagInteger, 0x01, 0x2A})
+
+	signedData := testDER(0x30,
+		[]byte{asn1.TagInteger, 0x01, 0x01},
+		testDER(0x31),
+		testDER(0x30, oidData),
+		testDER(0xA0, malformed, chain.IntermediateDER),
+	)
+	bundle := testDER(0x30, oidSignedData, testDER(0xA0, signedData))
+	mixedPemBody := pem.EncodeToMemory(&pem.Block{Type: "PKCS7", Bytes: bundle})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/x-pem-file")
+		_, _ = w.Write(mixedPemBody)
+	}))
+	t.Cleanup(srv.Close)
+
+	logger, hook := logtest.NewNullLogger()
+	logger.SetLevel(logrus.DebugLevel)
+	certs, err := NewAIAFetcher(nil).fetchCertFromAIAURL(srv.URL, logger)
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+
+	var warned bool
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == logrus.WarnLevel && strings.Contains(entry.Message, "unparseable certificate entries") {
+			warned = true
+			break
+		}
+	}
+	assert.True(t, warned, "the skipped bundle entry should be surfaced as a warning")
 }
 
 // The PKCS#7 path must feed the URL-keyed cache exactly like the DER path:
@@ -406,7 +494,7 @@ func TestParsePKCS7Certificates(t *testing.T) {
 
 	t.Run("single certificate", func(t *testing.T) {
 		t.Parallel()
-		certs, err := parsePKCS7Certificates(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert))
+		certs, _, err := parsePKCS7Certificates(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert))
 		require.NoError(t, err)
 		require.Len(t, certs, 1)
 		assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
@@ -414,7 +502,7 @@ func TestParsePKCS7Certificates(t *testing.T) {
 
 	t.Run("multiple certificates preserve bundle order", func(t *testing.T) {
 		t.Parallel()
-		certs, err := parsePKCS7Certificates(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert, chain.RootCert))
+		certs, _, err := parsePKCS7Certificates(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert, chain.RootCert))
 		require.NoError(t, err)
 		require.Len(t, certs, 2)
 		assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
@@ -423,7 +511,7 @@ func TestParsePKCS7Certificates(t *testing.T) {
 
 	t.Run("non-signedData content type is rejected", func(t *testing.T) {
 		t.Parallel()
-		_, err := parsePKCS7Certificates(testDER(0x30, oidData))
+		_, _, err := parsePKCS7Certificates(testDER(0x30, oidData))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported PKCS#7 content type")
 	})
@@ -436,7 +524,7 @@ func TestParsePKCS7Certificates(t *testing.T) {
 			testDER(0x30, oidData),
 		)
 		bundle := testDER(0x30, oidSignedData, testDER(0xA0, signedData))
-		_, err := parsePKCS7Certificates(bundle)
+		_, _, err := parsePKCS7Certificates(bundle)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no certificates")
 	})
@@ -444,14 +532,14 @@ func TestParsePKCS7Certificates(t *testing.T) {
 	t.Run("trailing bytes after content info are rejected", func(t *testing.T) {
 		t.Parallel()
 		bundle := append(tlstest.BuildPKCS7Bundle(t, chain.IntermediateCert), 0x00)
-		_, err := parsePKCS7Certificates(bundle)
+		_, _, err := parsePKCS7Certificates(bundle)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "trailing")
 	})
 
 	t.Run("garbage input is rejected", func(t *testing.T) {
 		t.Parallel()
-		_, err := parsePKCS7Certificates([]byte("not a bundle"))
+		_, _, err := parsePKCS7Certificates([]byte("not a bundle"))
 		require.Error(t, err)
 	})
 }
@@ -476,7 +564,7 @@ func TestParsePKCS7Certificates_OpensslBundle(t *testing.T) {
 			"f8FUkqRzFZa2AiEAuSeQdOw0M8cpmkvWUwfSn1JcPhiuUypfVdPtRxe0+RMxAA==")
 	require.NoError(t, err)
 
-	certs, err := parsePKCS7Certificates(bundle)
+	certs, _, err := parsePKCS7Certificates(bundle)
 	require.NoError(t, err)
 	require.Len(t, certs, 1)
 	assert.Equal(t, "probe", certs[0].Subject.CommonName)
@@ -495,10 +583,46 @@ func TestParsePKCS7CertificateSet_SkipsAttributeCertEntries(t *testing.T) {
 	attrCert := []byte{0xA2, 0x03, 0x30, 0x01, 0x00} // [2] { SEQUENCE { INTEGER 0 } }
 	set := append(append([]byte{}, attrCert...), chain.IntermediateDER...)
 
-	certs, err := parsePKCS7CertificateSet(set)
+	certs, skipped, err := parsePKCS7CertificateSet(set)
 	require.NoError(t, err)
 	require.Len(t, certs, 1)
 	assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+	// Tagged non-certificate choices are structural non-chain formats, not
+	// parse failures — they must not be counted as skipped certificates.
+	assert.Zero(t, skipped)
+}
+
+// An entry that looks like a certificate (universal SEQUENCE) but fails X.509
+// parsing must not discard the usable certificates in the same bundle: it is
+// skipped, mirroring x509.CertPool.AppendCertsFromPEM, and the bundle only
+// fails when nothing usable remains (#6483 review).
+func TestParsePKCS7CertificateSet_SkipsMalformedCertEntries(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	malformed := testDER(0x30, []byte{asn1.TagInteger, 0x01, 0x2A}) // SEQUENCE { INTEGER 42 }
+	set := append(append(append([]byte{}, malformed...), chain.IntermediateDER...), malformed...)
+
+	certs, skipped, err := parsePKCS7CertificateSet(set)
+	require.NoError(t, err)
+	require.Len(t, certs, 1)
+	assert.Equal(t, chain.IntermediateDER, certs[0].Raw)
+	assert.Equal(t, 2, skipped)
+}
+
+// When every certificate-looking entry fails X.509 parsing there is no chain
+// material at all — the bundle fails, like a bundle without certificates.
+func TestParsePKCS7CertificateSet_AllEntriesMalformedFails(t *testing.T) {
+	t.Parallel()
+
+	malformed := testDER(0x30, []byte{asn1.TagInteger, 0x01, 0x2A})
+	set := append(append([]byte{}, malformed...), malformed...)
+
+	certs, skipped, err := parsePKCS7CertificateSet(set)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no X.509 certificates")
+	assert.Empty(t, certs)
+	assert.Equal(t, 2, skipped)
 }
 
 // testDER is a minimal DER tag-length-value builder for hand-crafting negative
