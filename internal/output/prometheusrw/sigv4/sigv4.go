@@ -59,6 +59,13 @@ func (d *defaultSigner) sign(req *http.Request) error {
 	req.Header.Set(amzDateKey, iSO8601Date)
 	req.Header.Set(contentSHAKey, payloadHash)
 
+	// The session token must be part of the signed headers, so it is set
+	// before the canonical headers are built. buildCanonicalHeaders signs
+	// every header that is not ignored.
+	if d.config.AwsSessionToken != "" {
+		req.Header.Set(securityTokenKey, d.config.AwsSessionToken)
+	}
+
 	signedHeadersStr, canonicalHeaderStr := buildCanonicalHeaders(req, d.ignoredHeaders)
 
 	canonicalQueryString := getCanonicalQueryString(req.URL)

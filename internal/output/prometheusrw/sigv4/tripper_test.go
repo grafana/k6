@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTripper_request_includes_required_headers(t *testing.T) {
@@ -44,6 +45,39 @@ func TestTripper_request_includes_required_headers(t *testing.T) {
 	}
 
 	response, _ := client.Do(req)
+	_ = response.Body.Close()
+}
+
+func TestTripper_request_includes_session_token_header(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// the session token must reach the wire and be part of the signed
+		// headers, otherwise AWS rejects temporary credentials with a 403
+		assert.Equal(t, "mock-session-token", r.Header.Get(securityTokenKey))
+		authorization := r.Header.Get(authorizationHeaderKey)
+		assert.Contains(t, authorization, "SignedHeaders=")
+		assert.Contains(t, authorization, "x-amz-security-token")
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	client := http.Client{}
+	tripper, err := NewRoundTripper(&Config{
+		Region:             "us-east1",
+		AwsSecretAccessKey: "xyz",
+		AwsAccessKeyID:     "abc",
+		AwsSessionToken:    "mock-session-token",
+	}, http.DefaultTransport)
+	require.NoError(t, err)
+	client.Transport = tripper
+
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL, nil)
+	require.NoError(t, err)
+
+	response, err := client.Do(req)
+	require.NoError(t, err)
 	_ = response.Body.Close()
 }
 
