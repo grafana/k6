@@ -3,6 +3,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -89,6 +90,54 @@ func TestTagSets(t *testing.T) {
 	assert.False(t, tags4.Contains(tags2))
 	assert.True(t, tags4.Contains(tags3))
 	assert.True(t, tags4.Contains(tags4))
+}
+
+func TestTagSetIterate(t *testing.T) {
+	t.Parallel()
+
+	root := NewRegistry().RootTagSet()
+	assert.Zero(t, root.Len())
+
+	root.Iterate(func(_, _ string) {
+		t.Fatal("empty tag set invoked callback")
+	})
+
+	tags := root.With("tag1", "value1").With("tag2", "value2").With("tag3", "value3")
+	assert.Equal(t, 3, tags.Len())
+
+	got := make(map[string]string, tags.Len())
+	tags.Iterate(func(name, value string) {
+		got[name] = value
+	})
+
+	assert.Equal(t, tags.Map(), got)
+}
+
+func BenchmarkTagSetIteration(b *testing.B) {
+	tags := NewRegistry().RootTagSet()
+	for i := range 10 {
+		tags = tags.With(fmt.Sprintf("tag%d", i), fmt.Sprintf("value%d", i))
+	}
+
+	b.Run("Map", func(b *testing.B) {
+		var consumed int
+		for b.Loop() {
+			for name, value := range tags.Map() {
+				consumed += len(name) + len(value)
+			}
+		}
+		runtime.KeepAlive(consumed)
+	})
+
+	b.Run("Iterate", func(b *testing.B) {
+		var consumed int
+		for b.Loop() {
+			tags.Iterate(func(name, value string) {
+				consumed += len(name) + len(value)
+			})
+		}
+		runtime.KeepAlive(consumed)
+	})
 }
 
 func TestBigTagSetMarshalJSON(t *testing.T) {
