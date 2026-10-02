@@ -565,6 +565,114 @@ func (p *ClearTrustTokensParams) Do(ctx context.Context) (didDeleteTokens bool, 
 	return res.DidDeleteTokens, nil
 }
 
+// GetPrivateVerificationTokensParams returns all stored Private Verification
+// Tokens for the current browsing context.
+type GetPrivateVerificationTokensParams struct{}
+
+// GetPrivateVerificationTokens returns all stored Private Verification
+// Tokens for the current browsing context.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-getPrivateVerificationTokens
+func GetPrivateVerificationTokens() *GetPrivateVerificationTokensParams {
+	return &GetPrivateVerificationTokensParams{}
+}
+
+// GetPrivateVerificationTokensReturns return values.
+type GetPrivateVerificationTokensReturns struct {
+	Tokens []*PrivateVerificationToken `json:"tokens,omitempty,omitzero"`
+}
+
+// Do executes Storage.getPrivateVerificationTokens against the provided context.
+//
+// returns:
+//
+//	tokens
+func (p *GetPrivateVerificationTokensParams) Do(ctx context.Context) (tokens []*PrivateVerificationToken, err error) {
+	// execute
+	var res GetPrivateVerificationTokensReturns
+	err = cdp.Execute(ctx, CommandGetPrivateVerificationTokens, nil, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Tokens, nil
+}
+
+// ClearPrivateVerificationTokensParams removes all Private Verification
+// Tokens issued by the provided issuerOrigin.
+type ClearPrivateVerificationTokensParams struct {
+	IssuerOrigin string `json:"issuerOrigin"`
+}
+
+// ClearPrivateVerificationTokens removes all Private Verification Tokens
+// issued by the provided issuerOrigin.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-clearPrivateVerificationTokens
+//
+// parameters:
+//
+//	issuerOrigin
+func ClearPrivateVerificationTokens(issuerOrigin string) *ClearPrivateVerificationTokensParams {
+	return &ClearPrivateVerificationTokensParams{
+		IssuerOrigin: issuerOrigin,
+	}
+}
+
+// Do executes Storage.clearPrivateVerificationTokens against the provided context.
+func (p *ClearPrivateVerificationTokensParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandClearPrivateVerificationTokens, p, nil)
+}
+
+// DeletePrivateVerificationTokenParams removes a specific Private
+// Verification Token by its ID.
+type DeletePrivateVerificationTokenParams struct {
+	TokenID string `json:"tokenId"`
+}
+
+// DeletePrivateVerificationToken removes a specific Private Verification
+// Token by its ID.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-deletePrivateVerificationToken
+//
+// parameters:
+//
+//	tokenID
+func DeletePrivateVerificationToken(tokenID string) *DeletePrivateVerificationTokenParams {
+	return &DeletePrivateVerificationTokenParams{
+		TokenID: tokenID,
+	}
+}
+
+// Do executes Storage.deletePrivateVerificationToken against the provided context.
+func (p *DeletePrivateVerificationTokenParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandDeletePrivateVerificationToken, p, nil)
+}
+
+// SetPrivateVerificationTokensTrackingParams set tracking for Private
+// Verification Tokens.
+type SetPrivateVerificationTokensTrackingParams struct {
+	Enable bool `json:"enable"`
+}
+
+// SetPrivateVerificationTokensTracking set tracking for Private Verification
+// Tokens.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-setPrivateVerificationTokensTracking
+//
+// parameters:
+//
+//	enable
+func SetPrivateVerificationTokensTracking(enable bool) *SetPrivateVerificationTokensTrackingParams {
+	return &SetPrivateVerificationTokensTrackingParams{
+		Enable: enable,
+	}
+}
+
+// Do executes Storage.setPrivateVerificationTokensTracking against the provided context.
+func (p *SetPrivateVerificationTokensTrackingParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetPrivateVerificationTokensTracking, p, nil)
+}
+
 // SetStorageBucketTrackingParams set tracking for a storage key's buckets.
 type SetStorageBucketTrackingParams struct {
 	StorageKey string `json:"storageKey"`
@@ -649,63 +757,31 @@ func (p *RunBounceTrackingMitigationsParams) Do(ctx context.Context) (deletedSit
 	return res.DeletedSites, nil
 }
 
-// GetRelatedWebsiteSetsParams returns the effective Related Website Sets in
-// use by this profile for the browser session. The effective Related Website
-// Sets will not change during a browser session.
-type GetRelatedWebsiteSetsParams struct{}
-
-// GetRelatedWebsiteSets returns the effective Related Website Sets in use by
-// this profile for the browser session. The effective Related Website Sets will
-// not change during a browser session.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#method-getRelatedWebsiteSets
-func GetRelatedWebsiteSets() *GetRelatedWebsiteSetsParams {
-	return &GetRelatedWebsiteSetsParams{}
-}
-
-// GetRelatedWebsiteSetsReturns return values.
-type GetRelatedWebsiteSetsReturns struct {
-	Sets []*RelatedWebsiteSet `json:"sets,omitempty,omitzero"`
-}
-
-// Do executes Storage.getRelatedWebsiteSets against the provided context.
-//
-// returns:
-//
-//	sets
-func (p *GetRelatedWebsiteSetsParams) Do(ctx context.Context) (sets []*RelatedWebsiteSet, err error) {
-	// execute
-	var res GetRelatedWebsiteSetsReturns
-	err = cdp.Execute(ctx, CommandGetRelatedWebsiteSets, nil, &res)
-	if err != nil {
-		return nil, err
-	}
-
-	return res.Sets, nil
-}
-
 // Command names.
 const (
-	CommandGetStorageKey                    = "Storage.getStorageKey"
-	CommandClearDataForOrigin               = "Storage.clearDataForOrigin"
-	CommandClearDataForStorageKey           = "Storage.clearDataForStorageKey"
-	CommandGetCookies                       = "Storage.getCookies"
-	CommandSetCookies                       = "Storage.setCookies"
-	CommandClearCookies                     = "Storage.clearCookies"
-	CommandGetUsageAndQuota                 = "Storage.getUsageAndQuota"
-	CommandOverrideQuotaForOrigin           = "Storage.overrideQuotaForOrigin"
-	CommandTrackCacheStorageForOrigin       = "Storage.trackCacheStorageForOrigin"
-	CommandTrackCacheStorageForStorageKey   = "Storage.trackCacheStorageForStorageKey"
-	CommandTrackIndexedDBForOrigin          = "Storage.trackIndexedDBForOrigin"
-	CommandTrackIndexedDBForStorageKey      = "Storage.trackIndexedDBForStorageKey"
-	CommandUntrackCacheStorageForOrigin     = "Storage.untrackCacheStorageForOrigin"
-	CommandUntrackCacheStorageForStorageKey = "Storage.untrackCacheStorageForStorageKey"
-	CommandUntrackIndexedDBForOrigin        = "Storage.untrackIndexedDBForOrigin"
-	CommandUntrackIndexedDBForStorageKey    = "Storage.untrackIndexedDBForStorageKey"
-	CommandGetTrustTokens                   = "Storage.getTrustTokens"
-	CommandClearTrustTokens                 = "Storage.clearTrustTokens"
-	CommandSetStorageBucketTracking         = "Storage.setStorageBucketTracking"
-	CommandDeleteStorageBucket              = "Storage.deleteStorageBucket"
-	CommandRunBounceTrackingMitigations     = "Storage.runBounceTrackingMitigations"
-	CommandGetRelatedWebsiteSets            = "Storage.getRelatedWebsiteSets"
+	CommandGetStorageKey                        = "Storage.getStorageKey"
+	CommandClearDataForOrigin                   = "Storage.clearDataForOrigin"
+	CommandClearDataForStorageKey               = "Storage.clearDataForStorageKey"
+	CommandGetCookies                           = "Storage.getCookies"
+	CommandSetCookies                           = "Storage.setCookies"
+	CommandClearCookies                         = "Storage.clearCookies"
+	CommandGetUsageAndQuota                     = "Storage.getUsageAndQuota"
+	CommandOverrideQuotaForOrigin               = "Storage.overrideQuotaForOrigin"
+	CommandTrackCacheStorageForOrigin           = "Storage.trackCacheStorageForOrigin"
+	CommandTrackCacheStorageForStorageKey       = "Storage.trackCacheStorageForStorageKey"
+	CommandTrackIndexedDBForOrigin              = "Storage.trackIndexedDBForOrigin"
+	CommandTrackIndexedDBForStorageKey          = "Storage.trackIndexedDBForStorageKey"
+	CommandUntrackCacheStorageForOrigin         = "Storage.untrackCacheStorageForOrigin"
+	CommandUntrackCacheStorageForStorageKey     = "Storage.untrackCacheStorageForStorageKey"
+	CommandUntrackIndexedDBForOrigin            = "Storage.untrackIndexedDBForOrigin"
+	CommandUntrackIndexedDBForStorageKey        = "Storage.untrackIndexedDBForStorageKey"
+	CommandGetTrustTokens                       = "Storage.getTrustTokens"
+	CommandClearTrustTokens                     = "Storage.clearTrustTokens"
+	CommandGetPrivateVerificationTokens         = "Storage.getPrivateVerificationTokens"
+	CommandClearPrivateVerificationTokens       = "Storage.clearPrivateVerificationTokens"
+	CommandDeletePrivateVerificationToken       = "Storage.deletePrivateVerificationToken"
+	CommandSetPrivateVerificationTokensTracking = "Storage.setPrivateVerificationTokensTracking"
+	CommandSetStorageBucketTracking             = "Storage.setStorageBucketTracking"
+	CommandDeleteStorageBucket                  = "Storage.deleteStorageBucket"
+	CommandRunBounceTrackingMitigations         = "Storage.runBounceTrackingMitigations"
 )
