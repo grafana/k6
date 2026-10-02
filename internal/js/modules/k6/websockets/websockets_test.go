@@ -3,6 +3,7 @@ package websockets
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"strconv"
@@ -1355,6 +1356,69 @@ func TestSystemTags(t *testing.T) {
 					require.NotEmpty(t, dataToCheck)
 					for emittedTag := range dataToCheck {
 						assert.Equal(t, expectedTagStr, emittedTag)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestConnectionErrorTags(t *testing.T) {
+	t.Parallel()
+
+	// A port nothing listens on any more, so the dial is refused the same way on every platform.
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	closedPortURL := "ws://" + listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	tests := []struct {
+		name          string
+		url           string
+		wantStatus    string
+		wantErrorCode string
+		wantError     bool
+	}{
+		{
+			name:          "no response",
+			url:           closedPortURL,
+			wantStatus:    "0",
+			wantErrorCode: "1212",
+			wantError:     true,
+		},
+		{
+			name:          "error response",
+			url:           "WSBIN_URL/status/404",
+			wantStatus:    "404",
+			wantErrorCode: "1404",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := newTestState(t)
+			sr := ts.tb.Replacer.Replace
+			ts.runtime.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet(
+				[]string{"status", "error", "error_code"})
+
+			_, err := ts.runtime.RunOnEventLoop(sr(`
+				var ws = new WebSocket("` + tc.url + `");
+				ws.onerror = () => {};
+			`))
+			require.NoError(t, err)
+
+			containers := metrics.GetBufferedSamples(ts.samples)
+			require.NotEmpty(t, containers)
+			for _, sampleContainer := range containers {
+				for _, sample := range sampleContainer.GetSamples() {
+					tags := sample.Tags.Map()
+					assert.Equal(t, tc.wantStatus, tags["status"])
+					assert.Equal(t, tc.wantErrorCode, tags["error_code"])
+					if tc.wantError {
+						assert.NotEmpty(t, tags["error"])
+					} else {
+						assert.NotContains(t, tags, "error")
 					}
 				}
 			}
