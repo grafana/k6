@@ -10,6 +10,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/internal/js/eventloop"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modulestest"
@@ -185,6 +186,54 @@ func TestEventLoopRejectString(t *testing.T) {
 	})
 	loop.WaitOnRegistered()
 	require.EqualError(t, err, "Uncaught (in promise) some string")
+}
+
+// An unhandled rejection is a script error that happens to have been raised
+// asynchronously, so it is reported the same way a synchronous throw is. Before
+// this was an errext.Exception, errext.Format gave the log line no `source`
+// field at all and nothing reading the logs could tell it apart from a failure
+// inside k6 itself. See https://github.com/grafana/k6/issues/3842.
+func TestEventLoopRejectIsException(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
+	loop := eventloop.New(vu)
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString("Promise.reject(new Error('some error'))")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.Error(t, err)
+
+	var xerr errext.Exception
+	require.ErrorAs(t, err, &xerr)
+	require.Equal(t, errext.AbortedByScriptError, xerr.AbortReason())
+	require.Contains(t, xerr.StackTrace(), "Uncaught (in promise) Error: some error")
+	require.Contains(t, xerr.StackTrace(), "at <eval>", "the stack trace should be carried, not just the message")
+
+	msg, fields := errext.Format(err)
+	require.Equal(t, "stacktrace", fields["source"])
+	require.Equal(t, xerr.StackTrace(), msg)
+
+	// the hint distinguishes this from the "script exception" a synchronous
+	// throw reports, so the two are still told apart in the log line
+	require.Equal(t, "unhandled script exception", fields["hint"])
+}
+
+// A rejected value with no stack of its own still identifies as a script error,
+// since where it came from does not change what it is.
+func TestEventLoopRejectWithoutStackIsException(t *testing.T) {
+	t.Parallel()
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
+	loop := eventloop.New(vu)
+	err := loop.Start(func() error {
+		_, err := vu.Runtime().RunString("Promise.reject('some string')")
+		return err
+	})
+	loop.WaitOnRegistered()
+	require.EqualError(t, err, "Uncaught (in promise) some string")
+
+	_, fields := errext.Format(err)
+	require.Equal(t, "stacktrace", fields["source"])
 }
 
 func TestEventLoopRejectSyntaxError(t *testing.T) {

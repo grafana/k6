@@ -34,7 +34,7 @@ type EventStyleSheetAdded struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/CSS#event-styleSheetChanged
 type EventStyleSheetChanged struct {
-	StyleSheetID StyleSheetID `json:"styleSheetId"`
+	StyleSheetID cdp.StyleSheetID `json:"styleSheetId"`
 }
 
 // EventStyleSheetRemoved fired whenever an active document stylesheet is
@@ -42,7 +42,7 @@ type EventStyleSheetChanged struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/CSS#event-styleSheetRemoved
 type EventStyleSheetRemoved struct {
-	StyleSheetID StyleSheetID `json:"styleSheetId"` // Identifier of the removed stylesheet.
+	StyleSheetID cdp.StyleSheetID `json:"styleSheetId"` // Identifier of the removed stylesheet.
 }
 
 // EventComputedStyleUpdated [no description].

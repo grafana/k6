@@ -91,7 +91,7 @@ func (p EnableParams) WithMaxScriptsCacheSize(maxScriptsCacheSize float64) *Enab
 
 // EnableReturns return values.
 type EnableReturns struct {
-	DebuggerID runtime.UniqueDebuggerID `json:"debuggerId,omitempty,omitzero"` // Unique identifier of the debugger.
+	DebuggerID cdp.UniqueDebuggerID `json:"debuggerId,omitempty,omitzero"` // Unique identifier of the debugger.
 }
 
 // Do executes Debugger.enable against the provided context.
@@ -99,7 +99,7 @@ type EnableReturns struct {
 // returns:
 //
 //	debuggerID - Unique identifier of the debugger.
-func (p *EnableParams) Do(ctx context.Context) (debuggerID runtime.UniqueDebuggerID, err error) {
+func (p *EnableParams) Do(ctx context.Context) (debuggerID cdp.UniqueDebuggerID, err error) {
 	// execute
 	var res EnableReturns
 	err = cdp.Execute(ctx, CommandEnable, p, &res)
@@ -121,6 +121,7 @@ type EvaluateOnCallFrameParams struct {
 	GeneratePreview       bool              `json:"generatePreview"`                // Whether preview should be generated for the result.
 	ThrowOnSideEffect     bool              `json:"throwOnSideEffect"`              // Whether to throw an exception if side effect cannot be ruled out during evaluation.
 	Timeout               runtime.TimeDelta `json:"timeout,omitempty,omitzero"`     // Terminate execution after timing out (number of milliseconds).
+	ScopeNumber           int64             `json:"scopeNumber,omitempty,omitzero"` // Specifies the scope number to evaluate the expression in (default: 0, innermost scope).
 }
 
 // EvaluateOnCallFrame evaluates expression on a given call frame.
@@ -187,6 +188,13 @@ func (p EvaluateOnCallFrameParams) WithThrowOnSideEffect(throwOnSideEffect bool)
 // WithTimeout terminate execution after timing out (number of milliseconds).
 func (p EvaluateOnCallFrameParams) WithTimeout(timeout runtime.TimeDelta) *EvaluateOnCallFrameParams {
 	p.Timeout = timeout
+	return &p
+}
+
+// WithScopeNumber specifies the scope number to evaluate the expression in
+// (default: 0, innermost scope).
+func (p EvaluateOnCallFrameParams) WithScopeNumber(scopeNumber int64) *EvaluateOnCallFrameParams {
+	p.ScopeNumber = scopeNumber
 	return &p
 }
 
@@ -273,7 +281,7 @@ func (p *GetPossibleBreakpointsParams) Do(ctx context.Context) (locations []*Bre
 
 // GetScriptSourceParams returns source for the script with given id.
 type GetScriptSourceParams struct {
-	ScriptID runtime.ScriptID `json:"scriptId"` // Id of the script to get source for.
+	ScriptID cdp.ScriptID `json:"scriptId"` // Id of the script to get source for.
 }
 
 // GetScriptSource returns source for the script with given id.
@@ -283,7 +291,7 @@ type GetScriptSourceParams struct {
 // parameters:
 //
 //	scriptID - Id of the script to get source for.
-func GetScriptSource(scriptID runtime.ScriptID) *GetScriptSourceParams {
+func GetScriptSource(scriptID cdp.ScriptID) *GetScriptSourceParams {
 	return &GetScriptSourceParams{
 		ScriptID: scriptID,
 	}
@@ -320,7 +328,7 @@ func (p *GetScriptSourceParams) Do(ctx context.Context) (scriptSource string, by
 
 // DisassembleWasmModuleParams [no description].
 type DisassembleWasmModuleParams struct {
-	ScriptID runtime.ScriptID `json:"scriptId"` // Id of the script to disassemble
+	ScriptID cdp.ScriptID `json:"scriptId"` // Id of the script to disassemble
 }
 
 // DisassembleWasmModule [no description].
@@ -330,7 +338,7 @@ type DisassembleWasmModuleParams struct {
 // parameters:
 //
 //	scriptID - Id of the script to disassemble
-func DisassembleWasmModule(scriptID runtime.ScriptID) *DisassembleWasmModuleParams {
+func DisassembleWasmModule(scriptID cdp.ScriptID) *DisassembleWasmModuleParams {
 	return &DisassembleWasmModuleParams{
 		ScriptID: scriptID,
 	}
@@ -567,10 +575,10 @@ func (p *ResumeParams) Do(ctx context.Context) (err error) {
 
 // SearchInContentParams searches for given string in script content.
 type SearchInContentParams struct {
-	ScriptID      runtime.ScriptID `json:"scriptId"`      // Id of the script to search in.
-	Query         string           `json:"query"`         // String to search for.
-	CaseSensitive bool             `json:"caseSensitive"` // If true, search is case sensitive.
-	IsRegex       bool             `json:"isRegex"`       // If true, treats string parameter as regex.
+	ScriptID      cdp.ScriptID `json:"scriptId"`      // Id of the script to search in.
+	Query         string       `json:"query"`         // String to search for.
+	CaseSensitive bool         `json:"caseSensitive"` // If true, search is case sensitive.
+	IsRegex       bool         `json:"isRegex"`       // If true, treats string parameter as regex.
 }
 
 // SearchInContent searches for given string in script content.
@@ -581,7 +589,7 @@ type SearchInContentParams struct {
 //
 //	scriptID - Id of the script to search in.
 //	query - String to search for.
-func SearchInContent(scriptID runtime.ScriptID, query string) *SearchInContentParams {
+func SearchInContent(scriptID cdp.ScriptID, query string) *SearchInContentParams {
 	return &SearchInContentParams{
 		ScriptID:      scriptID,
 		Query:         query,
@@ -720,7 +728,7 @@ func (p *SetBlackboxPatternsParams) Do(ctx context.Context) (err error) {
 // array contains positions where blackbox state is changed. First interval
 // isn't blackboxed. Array should be sorted.
 type SetBlackboxedRangesParams struct {
-	ScriptID  runtime.ScriptID  `json:"scriptId"` // Id of the script.
+	ScriptID  cdp.ScriptID      `json:"scriptId"` // Id of the script.
 	Positions []*ScriptPosition `json:"positions"`
 }
 
@@ -736,7 +744,7 @@ type SetBlackboxedRangesParams struct {
 //
 //	scriptID - Id of the script.
 //	positions
-func SetBlackboxedRanges(scriptID runtime.ScriptID, positions []*ScriptPosition) *SetBlackboxedRangesParams {
+func SetBlackboxedRanges(scriptID cdp.ScriptID, positions []*ScriptPosition) *SetBlackboxedRangesParams {
 	return &SetBlackboxedRangesParams{
 		ScriptID:  scriptID,
 		Positions: positions,
@@ -1052,79 +1060,6 @@ func (p *SetReturnValueParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetReturnValue, p, nil)
 }
 
-// SetScriptSourceParams edits JavaScript source live. In general, functions
-// that are currently on the stack can not be edited with a single exception: If
-// the edited function is the top-most stack frame and that is the only
-// activation of that function on the stack. In this case the live edit will be
-// successful and a Debugger.restartFrame for the top-most function is
-// automatically triggered.
-type SetScriptSourceParams struct {
-	ScriptID             runtime.ScriptID `json:"scriptId"`             // Id of the script to edit.
-	ScriptSource         string           `json:"scriptSource"`         // New content of the script.
-	DryRun               bool             `json:"dryRun"`               // If true the change will not actually be applied. Dry run may be used to get result description without actually modifying the code.
-	AllowTopFrameEditing bool             `json:"allowTopFrameEditing"` // If true, then scriptSource is allowed to change the function on top of the stack as long as the top-most stack frame is the only activation of that function.
-}
-
-// SetScriptSource edits JavaScript source live. In general, functions that
-// are currently on the stack can not be edited with a single exception: If the
-// edited function is the top-most stack frame and that is the only activation
-// of that function on the stack. In this case the live edit will be successful
-// and a Debugger.restartFrame for the top-most function is automatically
-// triggered.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#method-setScriptSource
-//
-// parameters:
-//
-//	scriptID - Id of the script to edit.
-//	scriptSource - New content of the script.
-func SetScriptSource(scriptID runtime.ScriptID, scriptSource string) *SetScriptSourceParams {
-	return &SetScriptSourceParams{
-		ScriptID:             scriptID,
-		ScriptSource:         scriptSource,
-		DryRun:               false,
-		AllowTopFrameEditing: false,
-	}
-}
-
-// WithDryRun if true the change will not actually be applied. Dry run may be
-// used to get result description without actually modifying the code.
-func (p SetScriptSourceParams) WithDryRun(dryRun bool) *SetScriptSourceParams {
-	p.DryRun = dryRun
-	return &p
-}
-
-// WithAllowTopFrameEditing if true, then scriptSource is allowed to change
-// the function on top of the stack as long as the top-most stack frame is the
-// only activation of that function.
-func (p SetScriptSourceParams) WithAllowTopFrameEditing(allowTopFrameEditing bool) *SetScriptSourceParams {
-	p.AllowTopFrameEditing = allowTopFrameEditing
-	return &p
-}
-
-// SetScriptSourceReturns return values.
-type SetScriptSourceReturns struct {
-	Status           SetScriptSourceStatus     `json:"status,omitempty,omitzero"`           // Whether the operation was successful or not. Only Ok denotes a successful live edit while the other enum variants denote why the live edit failed.
-	ExceptionDetails *runtime.ExceptionDetails `json:"exceptionDetails,omitempty,omitzero"` // Exception details if any. Only present when status is CompileError.
-}
-
-// Do executes Debugger.setScriptSource against the provided context.
-//
-// returns:
-//
-//	status - Whether the operation was successful or not. Only Ok denotes a successful live edit while the other enum variants denote why the live edit failed.
-//	exceptionDetails - Exception details if any. Only present when status is CompileError.
-func (p *SetScriptSourceParams) Do(ctx context.Context) (status SetScriptSourceStatus, exceptionDetails *runtime.ExceptionDetails, err error) {
-	// execute
-	var res SetScriptSourceReturns
-	err = cdp.Execute(ctx, CommandSetScriptSource, p, &res)
-	if err != nil {
-		return "", nil, err
-	}
-
-	return res.Status, res.ExceptionDetails, nil
-}
-
 // SetSkipAllPausesParams makes page not interrupt on any pauses (breakpoint,
 // exception, dom exception etc).
 type SetSkipAllPausesParams struct {
@@ -1288,7 +1223,6 @@ const (
 	CommandSetBreakpointsActive         = "Debugger.setBreakpointsActive"
 	CommandSetPauseOnExceptions         = "Debugger.setPauseOnExceptions"
 	CommandSetReturnValue               = "Debugger.setReturnValue"
-	CommandSetScriptSource              = "Debugger.setScriptSource"
 	CommandSetSkipAllPauses             = "Debugger.setSkipAllPauses"
 	CommandSetVariableValue             = "Debugger.setVariableValue"
 	CommandStepInto                     = "Debugger.stepInto"
