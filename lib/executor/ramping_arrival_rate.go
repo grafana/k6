@@ -310,7 +310,7 @@ func noNegativeSqrt(f float64) float64 {
 // This will allow us to implement https://github.com/k6io/k6/issues/1386
 // and things like all of the TODOs below in one place only.
 //
-//nolint:funlen
+//nolint:funlen,gocognit
 func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics.SampleContainer) (err error) {
 	segment := varr.executionState.ExecutionTuple.Segment
 	gracefulStop := varr.config.GetGracefulStop()
@@ -356,6 +356,13 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s"
 
+	// The number of iterations that fit in the stages usually isn't a whole number, so the last
+	// one can be scheduled well before the total duration of the stages has elapsed. When that
+	// happens, and the iterations are fast, the executor finishes early since there is nothing
+	// left for it to start. This flag lets the progress bar tell that apart from an actual
+	// interruption, see https://github.com/grafana/k6/issues/2951
+	var allIterationsScheduled atomic.Bool
+
 	progressFn := func() (float64, []string) {
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
 		currentTickerPeriod := atomic.LoadInt64(&tickerPeriod)
@@ -378,6 +385,11 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		spentDuration := pb.GetFixedLengthDuration(spent, duration)
 		progDur := fmt.Sprintf("%s/%s", spentDuration, duration)
 		right[1] = progDur
+
+		if allIterationsScheduled.Load() {
+			// Nothing else is going to be started, regardless of how much time is left
+			return 1, right
+		}
 
 		return math.Min(1, float64(spent)/float64(duration)), right
 	}
@@ -502,6 +514,11 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		default: // we're already allocating a new VU
 		}
 	}
+
+	// cal() closed the channel, so every iteration that fits in the stages has been scheduled.
+	// If that was because the context was done instead, the progress bar status is going to be
+	// determined by the context anyway, so it is safe to set this either way.
+	allIterationsScheduled.Store(true)
 	return nil
 }
 

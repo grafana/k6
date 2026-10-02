@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/ui/pb"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
 	"go.k6.io/k6/v2/metrics"
@@ -835,4 +836,47 @@ func TestRampingArrivalRateActiveVUs_GetExecutionRequirements(t *testing.T) {
 			require.Equal(t, exp, config.GetExecutionRequirements(et))
 		})
 	}
+}
+
+func TestRampingArrivalRateProgressWhenAllIterationsAreScheduledEarly(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		// Only 2 iterations fit in a single 2.5s stage at 1 iter/s, so the executor has nothing
+		// left to start after 2s and finishes before its full duration. This is a normal end of
+		// the scenario, so the progress bar must be marked as done instead of interrupted, see
+		// https://github.com/grafana/k6/issues/2951
+		config := &RampingArrivalRateConfig{
+			BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0)},
+			TimeUnit:   types.NullDurationFrom(time.Second),
+			StartRate:  null.IntFrom(1),
+			Stages: []Stage{
+				{Duration: types.NullDurationFrom(2500 * time.Millisecond), Target: null.IntFrom(1)},
+			},
+			PreAllocatedVUs: null.IntFrom(1),
+			MaxVUs:          null.IntFrom(1),
+		}
+
+		var count atomic.Int64
+		runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+			count.Add(1)
+			return nil
+		})
+
+		test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+		defer test.cancel()
+
+		engineOut := make(chan metrics.SampleContainer, 100)
+		start := time.Now()
+		require.NoError(t, test.executor.Run(test.ctx, engineOut))
+		assert.Less(t, time.Since(start), 2500*time.Millisecond)
+		assert.Equal(t, int64(2), count.Load())
+
+		render := test.executor.GetProgress().Render(0, 0)
+		fullRender := pb.New(pb.WithConstProgress(1)).Render(0, 0)
+		assert.Equal(t, string(pb.Done), render.Status())
+		assert.Equal(t, fullRender.Progress(), render.Progress())
+		require.Len(t, render.Right, 3)
+		assert.Equal(t, "2.0s/2.5s", render.Right[1])
+	})
 }
