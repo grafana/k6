@@ -1,4 +1,4 @@
-name: Close stale PRs
+name: Close stale issues and PRs
 
 on:
   schedule:
@@ -6,6 +6,7 @@ on:
 
 permissions:
   pull-requests: write
+  issues: write
 
 jobs:
   stale:
@@ -16,14 +17,25 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           operations-per-run: 50
-          ascending: true # process oldest PRs first
+          ascending: true # process oldest issues/PRs first
+
+          days-before-issue-stale: 365
+          days-before-issue-close: 30
+          stale-issue-label: stale
+          exempt-issue-labels: keep,epic
+          stale-issue-message: >
+            This issue has been automatically marked as stale because it has not had
+            activity in the last year. It will be closed in 30 days if no further activity occurs. Please
+            feel free to leave a comment if you believe the issue is still relevant.
+            Thank you for your contributions!
+          close-issue-message: >
+            This issue has been automatically closed because it has not had any further
+            activity in the last 30 days. Thank you for your contributions!
 
           days-before-pr-stale: 61
           days-before-pr-close: 7
-
           stale-pr-label: stale
-          exempt-pr-labels: "wip"
-
+          exempt-pr-labels: keep,wip
           stale-pr-message: |
             This pull request has been automatically marked as stale because it has not had
             activity in the last two months. It will be closed in one week if no further activity occurs. Please
