@@ -55,8 +55,12 @@ func (o *Output) StopWithTestError(_ error) error {
 	defer o.logger.Debug("Stopped!")
 
 	o.periodicFlusher.Stop()
+	ctx := context.Background()
+	if err := o.meterProvider.ForceFlush(ctx); err != nil {
+		o.logger.WithError(err).Error("can't flush OpenTelemetry metric provider")
+	}
 
-	if err := o.meterProvider.Shutdown(context.Background()); err != nil {
+	if err := o.meterProvider.Shutdown(ctx); err != nil {
 		o.logger.WithError(err).Error("can't shutdown OpenTelemetry metric provider")
 	}
 
