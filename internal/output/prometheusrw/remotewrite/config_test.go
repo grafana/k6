@@ -151,11 +151,11 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "false",
 				"K6_PROMETHEUS_RW_USERNAME":                 "u",
 			},
-			// arg: "username=user",
+			arg: "username=user",
 			config: Config{
 				ServerURL:             null.StringFrom(u.String()),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
-				Username:              null.NewString("u", true),
+				Username:              null.NewString("user", true),
 				Password:              null.NewString("", false),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
@@ -169,12 +169,12 @@ func TestGetConsolidatedConfig(t *testing.T) {
 				"K6_PROMETHEUS_RW_USERNAME": "env",
 				"K6_PROMETHEUS_RW_PASSWORD": "env",
 			},
-			// arg: "password=arg",
+			arg: "password=arg",
 			config: Config{
 				ServerURL:             null.StringFrom("http://json:9090"),
 				InsecureSkipTLSVerify: null.BoolFrom(false),
 				Username:              null.StringFrom("env"),
-				Password:              null.StringFrom("env"),
+				Password:              null.StringFrom("arg"),
 				PushInterval:          types.NullDurationFrom(defaultPushInterval),
 				Headers:               make(map[string]string),
 				TrendStats:            []string{"p(99)"},
@@ -189,11 +189,10 @@ func TestGetConsolidatedConfig(t *testing.T) {
 			env:       map[string]string{"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "d"},
 			errString: "parse environment variables options failed",
 		},
-		//nolint:gocritic
-		//"InvalidArg": {
-		//arg:       "insecureSkipTLSVerify=wrongtime",
-		//errString: "parse argument string options failed",
-		//},
+		"InvalidArg": {
+			arg:       "insecureSkipTLSVerify=wrongtime",
+			errString: "parse argument string options failed",
+		},
 	}
 
 	for name, testCase := range testCases {
@@ -242,8 +241,7 @@ func TestOptionServerURL(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"url":"http://prometheus:9090/api/v1/write"}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_SERVER_URL": "http://prometheus:9090/api/v1/write"}},
-		//nolint:gocritic
-		//"Arg":  {arg: "url=http://prometheus:9090/api/v1/write"},
+		"Arg":  {arg: "url=http://prometheus:9090/api/v1/write"},
 	}
 
 	expconfig := Config{
@@ -284,8 +282,8 @@ func TestOptionHeaders(t *testing.T) {
 			"K6_PROMETHEUS_RW_HEADERS_X-Scope-OrgID": "my-org-id-old-method",
 			"K6_PROMETHEUS_RW_HTTP_HEADERS":          "X-Scope-OrgID:my-org-id,another-header:true,empty:",
 		}},
-		//nolint:gocritic
-		//"Arg":  {arg: "headers.X-MY-HEADER1=hval1,headers.X-MY-HEADER2=hval2"},
+		"Arg": {arg: "headers.X-MY-HEADER1=hval1,headers.X-MY-HEADER2=hval2," +
+			"headers.X-Scope-OrgID=my-org-id,headers.another-header=true,headers.empty="},
 	}
 
 	expconfig := Config{
@@ -323,8 +321,7 @@ func TestOptionLabels(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"labels":{"environment":"production","server":"srv1"}}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_LABELS": "environment=production,server=srv1"}},
-		//nolint:gocritic
-		//"Arg":  {arg: "labels.environment=production,labels.server=srv1"},
+		"Arg":  {arg: "labels.environment=production,labels.server=srv1"},
 	}
 
 	expconfig := Config{
@@ -360,8 +357,7 @@ func TestOptionInsecureSkipTLSVerify(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"insecureSkipTLSVerify":true}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY": "true"}},
-		//nolint:gocritic
-		//"Arg":  {arg: "insecureSkipTLSVerify=false"},
+		"Arg":  {arg: "insecureSkipTLSVerify=true"},
 	}
 
 	expconfig := Config{
@@ -491,8 +487,7 @@ func TestOptionBasicAuth(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"username":"user1","password":"pass1"}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_USERNAME": "user1", "K6_PROMETHEUS_RW_PASSWORD": "pass1"}},
-		//nolint:gocritic
-		//"Arg":  {arg: "username=user1,password=pass1"},
+		"Arg":  {arg: "username=user1,password=pass1"},
 	}
 
 	expconfig := Config{
@@ -593,8 +588,7 @@ func TestOptionTrendAsNativeHistogram(t *testing.T) {
 		jsonRaw json.RawMessage
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"trendAsNativeHistogram":true}`)},
-		//nolint:gocritic
-		//"Arg":  {arg: "trendAsNativeHistogram=true"},
+		"Arg":  {arg: "trendAsNativeHistogram=true"},
 	}
 
 	expconfig := Config{

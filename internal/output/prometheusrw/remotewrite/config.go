@@ -253,7 +253,16 @@ func (conf Config) Apply(applied Config) Config {
 // GetConsolidatedConfig combines the options' values from the different sources
 // and returns the merged options. The Order of precedence used is documented
 // in the k6 Documentation https://k6.io/docs/using-k6/k6-options/how-to/#order-of-precedence.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _ string) (Config, error) {
+//
+// arg is the part after `experimental-prometheus-rw=` in `--out`, a comma-separated list of
+// key=value options (see parseArg). It is applied last, like any other command-line option, and it
+// is the only source that belongs to a single output instance: the JSON config and the environment
+// variables are shared by every instance of this output type. That makes it possible to write the
+// same results to more than one endpoint, for example to each replica of a Prometheus HA pair:
+//
+//	k6 run --out experimental-prometheus-rw=url=http://prometheus-0:9090/api/v1/write \
+//	       --out experimental-prometheus-rw=url=http://prometheus-1:9090/api/v1/write script.js
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, arg string) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf, err := parseJSON(jsonRawConf)
@@ -271,18 +280,13 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _
 		result = result.Apply(envConf)
 	}
 
-	// TODO: define a way for defining Output's options
-	// then support them.
-	// url is the third GetConsolidatedConfig's argument which is omitted for now
-	//nolint:gocritic
-	//
-	//if url != "" {
-	//urlConf, err := parseArg(url)
-	//if err != nil {
-	//return result, fmt.Errorf("parse argument string options failed: %w", err)
-	//}
-	//result = result.Apply(urlConf)
-	//}
+	if arg != "" {
+		argConf, err := parseArg(arg)
+		if err != nil {
+			return result, fmt.Errorf("parse argument string options failed: %w", err)
+		}
+		result = result.Apply(argConf)
+	}
 
 	return result, nil
 }
@@ -347,7 +351,12 @@ func parseJSON(data json.RawMessage) (Config, error) {
 	return c, err
 }
 
-// parseArg parses the supplied string of arguments into a Config.
+// parseArg parses the supplied string of arguments into a Config. The string is a comma-separated
+// list of key=value options, for example:
+//
+//	url=http://localhost:9090/api/v1/write,pushInterval=2s,headers.X-Scope-OrgID=k6,labels.env=staging
+//
+// A value cannot contain a comma, which is why trendStats is not supported here.
 func parseArg(text string) (Config, error) {
 	var c Config
 	opts := strings.SplitSeq(text, ",")
@@ -396,13 +405,21 @@ func parseArg(text string) (Config, error) {
 			c.ClientCertificateKey = null.StringFrom(v)
 
 		default:
-			if !strings.HasPrefix(key, "headers.") {
-				return c, fmt.Errorf("%q is an unknown option's key", r[0])
+			if name, ok := strings.CutPrefix(key, "headers."); ok {
+				if c.Headers == nil {
+					c.Headers = make(map[string]string)
+				}
+				c.Headers[name] = v
+				continue
 			}
-			if c.Headers == nil {
-				c.Headers = make(map[string]string)
+			if name, ok := strings.CutPrefix(key, "labels."); ok {
+				if c.Labels == nil {
+					c.Labels = make(map[string]string)
+				}
+				c.Labels[name] = v
+				continue
 			}
-			c.Headers[strings.TrimPrefix(key, "headers.")] = v
+			return c, fmt.Errorf("%q is an unknown option's key", r[0])
 		}
 	}
 
