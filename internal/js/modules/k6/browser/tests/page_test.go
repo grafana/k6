@@ -2046,6 +2046,7 @@ func TestPageOnMetric(t *testing.T) {
 	tests := []struct {
 		name      string
 		fun       string
+		method    string // HTTP method used by the page's fetch calls; defaults to GET.
 		want      string
 		wantRegex string
 		wantErr   string
@@ -2144,6 +2145,21 @@ func TestPageOnMetric(t *testing.T) {
 			want: "ping-1",
 		},
 		{
+			// With method field QUERY (RFC 10008), where the page sends QUERY
+			// requests, to ensure QUERY is accepted and matched.
+			name:   "with_query_method",
+			method: "QUERY",
+			fun: `page.on('metric', (metric) => {
+				metric.tag({
+					name:'ping-1',
+					matches: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, method: 'QUERY'},
+					]
+				});
+			});`,
+			want: "ping-1",
+		},
+		{
 			// With method field " get ", which is to ensure it is internally
 			// converted to "GET" before comparing.
 			name: "lowercase_needs_trimming",
@@ -2214,6 +2230,10 @@ func TestPageOnMetric(t *testing.T) {
 			// This page will perform many pings with a changing h query parameter.
 			// This URL should be grouped according to how page.on('metric') is used.
 			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
+			method := tt.method
+			if method == "" {
+				method = http.MethodGet
+			}
 			tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
 				_, err := fmt.Fprintf(w, `
 		<html>
@@ -2222,12 +2242,12 @@ func TestPageOnMetric(t *testing.T) {
 				<script type="module">
 					await ping();
 					async function ping() {
-						await fetch('/ping?h=2kq2lo6n06');
-						await fetch('/ping?h=ej0ypprcjk');
+						await fetch('/ping?h=2kq2lo6n06', {method: '%s'});
+						await fetch('/ping?h=ej0ypprcjk', {method: '%s'});
 					}
 				</script>
 			</body>
-		</html>`)
+		</html>`, method, method)
 				require.NoError(t, err)
 			})
 			tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
