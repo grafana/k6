@@ -35,12 +35,17 @@ jobs:
           go-version: ${{ steps.go_versions.outputs.current }}
           check-latest: true
           cache: false # against cache-poisoning
-      - name: Build k6
+      - name: Build k6 and the gRPC server
         run: |
           which go
           go version
           go build .
           ./k6 version
+          # The example server imports google.golang.org/grpc/testdata, which is
+          # not vendored, so it is built from the repo root with -mod=mod (as
+          # `make grpc-server-run` does). Building it up front means the process
+          # started below is the server itself, not a `go run` wrapper.
+          go build -mod=mod -o grpc-server examples/grpc_server/main.go
       - name: Run gRPC examples against a real server
         # Runs the gRPC example scripts against the example gRPC server, both as
         # separate OS processes. Because k6 runs in its own process it can't rely
@@ -50,11 +55,10 @@ jobs:
         run: |
           set -uo pipefail
 
-          # The example server lives in a nested module and imports an internal
-          # k6 package, so it is started with `go run` from the repo root (the
-          # same way `make grpc-server-run` does) rather than built standalone.
-          # It listens on the fixed port 10000 that the example scripts default to.
-          go run -mod=mod examples/grpc_server/main.go > server.log 2>&1 &
+          # Start the prebuilt server directly so that $! is the server's own PID
+          # and the trap below actually stops it. It listens on the fixed port
+          # 10000 that the example scripts default to.
+          ./grpc-server > server.log 2>&1 &
           server_pid=$!
           trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
 
