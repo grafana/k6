@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      - v1.x
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -30,11 +31,64 @@ jobs:
         with:
           go-version: 1.x
           check-latest: true
-      - name: Run gRPC E2E tests
-        # These tests build the k6 binary and a helper gRPC server and run them
-        # as separate OS processes, so that k6 cannot rely on the server's
-        # process-global protobuf registrations and must load proto definitions
-        # at runtime itself. See https://github.com/grafana/k6/issues/3552.
+          cache: false # against cache-poisoning
+      - name: Build k6
         run: |
+          which go
           go version
-          go test -tags grpc_e2e -race -count=1 -timeout 600s ./internal/e2e/grpc/...
+          go build .
+          ./k6 version
+      - name: Run gRPC examples against a real server
+        # Runs the gRPC example scripts against the example gRPC server, both as
+        # separate OS processes. Because k6 runs in its own process it can't rely
+        # on the server's process-global protobuf registrations and must load the
+        # proto definitions at runtime itself (from the .proto file or via server
+        # reflection). See https://github.com/grafana/k6/issues/3552.
+        run: |
+          set -uo pipefail
+
+          # The example server lives in a nested module and imports an internal
+          # k6 package, so it is started with `go run` from the repo root (the
+          # same way `make grpc-server-run` does) rather than built standalone.
+          # It listens on the fixed port 10000 that the example scripts default to.
+          go run -mod=mod examples/grpc_server/main.go > server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
+
+          echo "Waiting for the gRPC server on localhost:10000..."
+          if ! timeout 60 bash -c 'until nc -z localhost 10000; do sleep 0.2; done'; then
+            echo "::error::gRPC server did not start listening on :10000"
+            cat server.log
+            exit 1
+          fi
+          echo "gRPC server is up."
+
+          # Expected server-computed output per script, so a run that connects but
+          # gets an empty/wrong reply fails instead of passing on a clean exit.
+          declare -A expect=(
+            ["examples/grpc_invoke.js"]="3 Hasta Way"
+            ["examples/grpc_reflection.js"]="3 Hasta Way"
+            ["examples/grpc_server_streaming.js"]="Found feature called"
+            ["examples/grpc_client_streaming.js"]="Finished trip with 5 points"
+          )
+
+          status=0
+          for f in examples/grpc_*.js; do
+            echo "::group::${f}"
+            if ! ./k6 run -q --no-usage-report "${f}" 2>&1 | tee run.log; then
+              echo "::error::${f} exited non-zero"
+              status=1
+            fi
+            if grep -qiE 'level=error|GoError' run.log; then
+              echo "::error::${f} logged an error"
+              status=1
+            fi
+            want="${expect[${f}]:-}"
+            if [ -n "${want}" ] && ! grep -qF "${want}" run.log; then
+              echo "::error::${f} did not produce expected output: ${want}"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+
+          exit "${status}"
