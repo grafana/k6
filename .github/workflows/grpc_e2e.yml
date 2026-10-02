@@ -1,0 +1,101 @@
+name: gRPC E2E
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - v1.x
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'release notes/**'
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  grpc-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Resolve Go versions
+        id: go_versions
+        uses: grafana/k6-ci/.github/actions/go-versions@4437a05286b70dbd87d6bce2bea5220694a40474 # v0.5.2
+      - name: Install Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ steps.go_versions.outputs.current }}
+          check-latest: true
+          cache: false # against cache-poisoning
+      - name: Build k6 and the gRPC server
+        run: |
+          which go
+          go version
+          go build .
+          ./k6 version
+          # The example server imports google.golang.org/grpc/testdata, which is
+          # not vendored, so it is built from the repo root with -mod=mod (as
+          # `make grpc-server-run` does). Building it up front means the process
+          # started below is the server itself, not a `go run` wrapper.
+          go build -mod=mod -o grpc-server examples/grpc_server/main.go
+      - name: Run gRPC examples against a real server
+        # Runs the gRPC example scripts against the example gRPC server, both as
+        # separate OS processes. Because k6 runs in its own process it can't rely
+        # on the server's process-global protobuf registrations and must load the
+        # proto definitions at runtime itself (from the .proto file or via server
+        # reflection). See https://github.com/grafana/k6/issues/3552.
+        run: |
+          set -uo pipefail
+
+          # Start the prebuilt server directly so that $! is the server's own PID
+          # and the trap below actually stops it. It listens on the fixed port
+          # 10000 that the example scripts default to.
+          ./grpc-server > server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "${server_pid}" 2>/dev/null || true' EXIT
+
+          echo "Waiting for the gRPC server on localhost:10000..."
+          if ! timeout 60 bash -c 'until nc -z localhost 10000; do sleep 0.2; done'; then
+            echo "::error::gRPC server did not start listening on :10000"
+            cat server.log
+            exit 1
+          fi
+          echo "gRPC server is up."
+
+          # Expected server-computed output per script, so a run that connects but
+          # gets an empty/wrong reply fails instead of passing on a clean exit.
+          declare -A expect=(
+            ["examples/grpc_invoke.js"]="3 Hasta Way"
+            ["examples/grpc_reflection.js"]="3 Hasta Way"
+            ["examples/grpc_server_streaming.js"]="Found feature called"
+            ["examples/grpc_client_streaming.js"]="Finished trip with 5 points"
+          )
+
+          status=0
+          for f in examples/grpc_*.js; do
+            echo "::group::${f}"
+            if ! ./k6 run -q --no-usage-report "${f}" 2>&1 | tee run.log; then
+              echo "::error::${f} exited non-zero"
+              status=1
+            fi
+            if grep -qiE 'level=error|GoError' run.log; then
+              echo "::error::${f} logged an error"
+              status=1
+            fi
+            want="${expect[${f}]:-}"
+            if [ -n "${want}" ] && ! grep -qF "${want}" run.log; then
+              echo "::error::${f} did not produce expected output: ${want}"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+
+          exit "${status}"
