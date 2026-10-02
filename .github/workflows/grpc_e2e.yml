@@ -26,10 +26,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Resolve Go versions
+        id: go_versions
+        uses: grafana/k6-ci/.github/actions/go-versions@4437a05286b70dbd87d6bce2bea5220694a40474 # v0.5.2
       - name: Install Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
-          go-version: 1.x
+          go-version: ${{ steps.go_versions.outputs.current }}
           check-latest: true
           cache: false # against cache-poisoning
       - name: Build k6
