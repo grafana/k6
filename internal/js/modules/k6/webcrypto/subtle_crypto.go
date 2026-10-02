@@ -17,7 +17,16 @@ import (
 
 // SubtleCrypto represents the SubtleCrypto interface of the Web Crypto API.
 type SubtleCrypto struct {
-	vu modules.VU
+	vu           modules.VU
+	bufferSource bufferSourceAccessors
+}
+
+func (sc *SubtleCrypto) rejectBufferSourceError(reject func(any) error, err error) error {
+	var bufferErr *bufferSourceTypeError
+	if errors.As(err, &bufferErr) {
+		return reject(sc.vu.Runtime().NewTypeError(bufferErr.cause.Message))
+	}
+	return reject(err)
 }
 
 // Encrypt encrypts data.
@@ -50,7 +59,7 @@ func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
 	err := func() error {
 		var err error
 
-		plaintext, err = exportArrayBuffer(rt, data)
+		plaintext, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -87,7 +96,7 @@ func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -140,7 +149,7 @@ func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
 
 	err := func() error {
 		var err error
-		ciphertext, err = exportArrayBuffer(rt, data)
+		ciphertext, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -177,7 +186,7 @@ func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -230,7 +239,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data sobek.Value) (*sobek.Promise, 
 		var err error
 		// 2.
 		// We obtain a copy of the key data, because we might need to modify it.
-		dataToSign, err = exportArrayBuffer(rt, data)
+		dataToSign, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -270,7 +279,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data sobek.Value) (*sobek.Promise, 
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -325,12 +334,12 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data sobek.Value) (*so
 	err := func() error {
 		var err error
 
-		signatureData, err = exportArrayBuffer(sc.vu.Runtime(), signature)
+		signatureData, err = exportArrayBuffer(sc.vu.Runtime(), signature, sc.bufferSource)
 		if err != nil {
 			return err
 		}
 
-		signedData, err = exportArrayBuffer(sc.vu.Runtime(), data)
+		signedData, err = exportArrayBuffer(sc.vu.Runtime(), data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -367,7 +376,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data sobek.Value) (*so
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -416,14 +425,7 @@ func (sc *SubtleCrypto) Digest(algorithm sobek.Value, data sobek.Value) (*sobek.
 	err := func() error {
 		var err error
 
-		// Validate that the value we received is either an ArrayBuffer, TypedArray, or DataView
-		// This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
-		if !IsInstanceOf(sc.vu.Runtime(), data, ArrayBufferConstructor, DataViewConstructor) &&
-			!IsTypedArray(sc.vu.Runtime(), data) {
-			return errors.New("data must be an ArrayBuffer, TypedArray, or DataView")
-		}
-
-		bytes, err = exportArrayBuffer(rt, data)
+		bytes, err = exportArrayBuffer(rt, data, sc.bufferSource)
 		if err != nil {
 			return err
 		}
@@ -448,7 +450,7 @@ func (sc *SubtleCrypto) Digest(algorithm sobek.Value, data sobek.Value) (*sobek.
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
@@ -835,7 +837,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 	err := func() error {
 		switch format {
 		case Pkcs8KeyFormat, RawKeyFormat, SpkiKeyFormat:
-			ab, err := exportArrayBuffer(rt, keyData)
+			ab, err := exportArrayBuffer(rt, keyData, sc.bufferSource)
 			if err != nil {
 				return err
 			}
@@ -866,7 +868,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 
 	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
-		err := reject(err)
+		err := sc.rejectBufferSourceError(reject, err)
 		return promise, err
 	}
 
