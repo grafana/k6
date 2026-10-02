@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
+	"go.k6.io/k6/v2/js/common"
 )
 
 // Algorithm represents
@@ -129,6 +130,12 @@ const (
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
 func normalizeAlgorithm(rt *sobek.Runtime, v sobek.Value, op AlgorithmIdentifier) (Algorithm, error) {
+	// Sobek's undefined/null ExportType() is a nil reflect.Type; calling Kind()
+	// on it SIGSEGVs. Treat a missing algorithm as a WebCrypto TypeError instead.
+	if common.IsNullish(v) {
+		return Algorithm{}, NewError(TypeError, "algorithm is null or undefined")
+	}
+
 	var algorithm Algorithm
 
 	// "if alg is an instance of a DOMString: return the result of the running the
