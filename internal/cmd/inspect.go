@@ -20,6 +20,9 @@ func getCmdInspect(gs *state.GlobalState) *cobra.Command {
 		Short: "Inspect a script or archive",
 		Long:  `Inspect a script or archive.`,
 		Args:  cobra.ExactArgs(1),
+		// inspect only reads a test's structure and never uses real secret
+		// values, so it may default to the dummy secret source.
+		Annotations: map[string]string{secretsOptionalAnnotation: "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			test, err := loadLocalTest(gs, cmd, args)
 			if err != nil {
