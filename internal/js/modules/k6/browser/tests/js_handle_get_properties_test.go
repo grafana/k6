@@ -19,7 +19,8 @@ func TestJSHandleGetProperties(t *testing.T) {
 		return {
 			prop1: "one",
 			prop2: "two",
-			prop3: "three"
+			prop3: "three",
+			get accessor() { return "from-getter"; }
 		};
 	}
 	`)
@@ -31,4 +32,7 @@ func TestJSHandleGetProperties(t *testing.T) {
 	value, err := props["prop1"].JSONValue()
 	assert.NoError(t, err, "expected no error when getting JSONValue")
 	assert.Equal(t, value, "one", `expected property value of "one", got %q`, value)
+
+	_, hasAccessor := props["accessor"]
+	assert.False(t, hasAccessor, "enumerable getters have no CDP value and must be skipped, not panic")
 }
