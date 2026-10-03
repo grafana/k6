@@ -831,4 +831,22 @@ func TestValidate(t *testing.T) {
 			})
 		}
 	})
+	t.Run("batch", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, Options{Batch: null.IntFrom(1)}.Validate())
+		assert.Empty(t, Options{Batch: null.IntFrom(20)}.Validate())
+		errs := Options{Batch: null.IntFrom(0)}.Validate()
+		require.Len(t, errs, 1)
+		assert.Contains(t, errs[0].Error(), "batch must be a positive number")
+		errs = Options{Batch: null.IntFrom(-1)}.Validate()
+		require.Len(t, errs, 1)
+		assert.Contains(t, errs[0].Error(), "batch must be a positive number")
+	})
+	t.Run("batchPerHost", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, Options{BatchPerHost: null.IntFrom(1)}.Validate())
+		errs := Options{BatchPerHost: null.IntFrom(0)}.Validate()
+		require.Len(t, errs, 1)
+		assert.Contains(t, errs[0].Error(), "batchPerHost must be a positive number")
+	})
 }

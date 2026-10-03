@@ -83,6 +83,11 @@ type BrowserContext struct {
 
 	// DownloadsPath is the path where downloads will be stored.
 	DownloadsPath string
+	// downloadsPathOwned is true when DownloadsPath was created by k6 via
+	// MkdirTemp. Only owned paths are removed on cleanup so a user-supplied
+	// downloadsPath (e.g. "/tmp" or a project downloads directory) is never
+	// recursively deleted on browser.close().
+	downloadsPathOwned bool
 }
 
 // artifactsDirectory is the prefix for the temporary directory created for downloads.
@@ -95,6 +100,7 @@ func (b *BrowserContext) setDownloadsPath(path string) error {
 	path = strings.TrimSpace(path)
 	if path != "" {
 		b.DownloadsPath = path
+		b.downloadsPathOwned = false
 		return nil
 	}
 	dir, err := os.MkdirTemp(os.TempDir(), artifactsDirectory+"*") //nolint:forbidigo
@@ -102,16 +108,25 @@ func (b *BrowserContext) setDownloadsPath(path string) error {
 		return fmt.Errorf("creating temporary directory for downloads: %w", err)
 	}
 	b.DownloadsPath = dir
+	b.downloadsPathOwned = true
 
 	return nil
 }
 
 // cleanup cleans up the resources associated with the browser context.
+// User-supplied downloads paths are left intact; only temporary directories
+// created by setDownloadsPath are removed.
 func (b *BrowserContext) cleanup() error {
+	if !b.downloadsPathOwned || b.DownloadsPath == "" {
+		b.DownloadsPath = ""
+		b.downloadsPathOwned = false
+		return nil
+	}
 	if err := os.RemoveAll(b.DownloadsPath); err != nil { //nolint:forbidigo
 		return fmt.Errorf("removing downloads path: %w", err)
 	}
 	b.DownloadsPath = ""
+	b.downloadsPathOwned = false
 
 	return nil
 }
