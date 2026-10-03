@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -203,6 +204,62 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 	reader, err := gzip.NewReader(file)
 	require.NoError(t, err)
 	validateResults(reader)
+	assert.NoError(t, file.Close())
+}
+
+// writeCountingFs wraps an Fs and counts the Write calls made on the files it creates.
+type writeCountingFs struct {
+	fsext.Fs
+	writes *int
+}
+
+func (fs writeCountingFs) Create(name string) (afero.File, error) {
+	f, err := fs.Fs.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return writeCountingFile{File: f, writes: fs.writes}, nil
+}
+
+type writeCountingFile struct {
+	afero.File
+	writes *int
+}
+
+func (f writeCountingFile) Write(p []byte) (int, error) {
+	*f.writes++
+	return f.File.Write(p)
+}
+
+func TestJsonOutputFileIsBuffered(t *testing.T) {
+	t.Parallel()
+
+	var writes int
+	fs := writeCountingFs{Fs: fsext.NewMemMapFs(), writes: &writes}
+	out, err := New(output.Params{
+		Logger:         testutils.NewLogger(t),
+		StdOut:         new(bytes.Buffer),
+		FS:             fs,
+		ConfigArgument: "/json-output",
+	})
+	require.NoError(t, err)
+
+	setThresholds(t, out)
+	require.NoError(t, out.Start())
+
+	samples, validateResults := generateTestMetricSamples(t)
+	out.AddMetricSamples(samples[:2])
+	out.AddMetricSamples(samples[2:])
+	require.NoError(t, out.Stop())
+
+	// The whole output is much smaller than the buffer, so it should reach
+	// the file in a single write when the output is stopped, instead of
+	// one write per encoded line.
+	assert.Equal(t, 1, writes)
+
+	file, err := fs.Open("/json-output")
+	require.NoError(t, err)
+	validateResults(file)
 	assert.NoError(t, file.Close())
 }
 
