@@ -21,6 +21,8 @@ type (
 
 		exports modules.Exports
 
+		readableStreamPrototype              *sobek.Object
+		readableStreamDefaultReaderPrototype *sobek.Object
 		writableStreamPrototype              *sobek.Object
 		writableStreamDefaultWriterPrototype *sobek.Object
 	}
@@ -42,9 +44,34 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mi := &ModuleInstance{vu: vu}
 	rt := vu.Runtime()
 
-	// Convert the writable stream constructors once per VU. Besides keeping the exported
+	// Convert the stream constructors once per VU. Besides keeping the exported
 	// constructor identities stable, this gives the implementation canonical prototypes that
 	// cannot be replaced by a caller-controlled `this` value.
+	readableStreamConstructor, err := newWebIDLConstructor(rt, "ReadableStream", mi.NewReadableStream)
+	if err != nil {
+		throw(rt, err)
+	}
+	readableStreamDefaultReaderConstructor, err := newWebIDLConstructor(
+		rt,
+		"ReadableStreamDefaultReader",
+		mi.NewReadableStreamDefaultReader,
+	)
+	if err != nil {
+		throw(rt, err)
+	}
+	readableIntrinsics := readableIntrinsicsForRuntime(rt)
+	if readableIntrinsics != nil {
+		if err := useConstructorPrototype(
+			rt, readableStreamConstructor, readableIntrinsics.streamPrototype,
+		); err != nil {
+			throw(rt, err)
+		}
+		if err := useConstructorPrototype(
+			rt, readableStreamDefaultReaderConstructor, readableIntrinsics.readerPrototype,
+		); err != nil {
+			throw(rt, err)
+		}
+	}
 	writableStreamConstructor, err := newWebIDLConstructor(rt, "WritableStream", mi.NewWritableStream)
 	if err != nil {
 		throw(rt, err)
@@ -66,12 +93,34 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		throw(rt, err)
 	}
 
+	mi.readableStreamPrototype = constructorPrototype(rt, readableStreamConstructor)
+	mi.readableStreamDefaultReaderPrototype = constructorPrototype(
+		rt,
+		readableStreamDefaultReaderConstructor,
+	)
+	if readableIntrinsics == nil {
+		if err := storeReadableIntrinsics(rt, &readableStreamIntrinsics{
+			streamPrototype: mi.readableStreamPrototype,
+			readerPrototype: mi.readableStreamDefaultReaderPrototype,
+		}); err != nil {
+			throw(rt, err)
+		}
+	}
 	mi.writableStreamPrototype = constructorPrototype(rt, writableStreamConstructor)
 	mi.writableStreamDefaultWriterPrototype = constructorPrototype(
 		rt,
 		writableStreamDefaultWriterConstructor,
 	)
 	transformStreamPrototype := constructorPrototype(rt, transformStreamConstructor)
+	if err := installReadableStreamPrototype(rt, mi.readableStreamPrototype); err != nil {
+		throw(rt, err)
+	}
+	if err := installReadableStreamDefaultReaderPrototype(
+		rt,
+		mi.readableStreamDefaultReaderPrototype,
+	); err != nil {
+		throw(rt, err)
+	}
 	if err := installWritableStreamPrototype(rt, mi.writableStreamPrototype); err != nil {
 		throw(rt, err)
 	}
@@ -85,9 +134,9 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		throw(rt, err)
 	}
 	mi.exports = modules.Exports{Named: map[string]any{
-		"ReadableStream":              mi.NewReadableStream,
+		"ReadableStream":              readableStreamConstructor,
 		"CountQueuingStrategy":        mi.NewCountQueuingStrategy,
-		"ReadableStreamDefaultReader": mi.NewReadableStreamDefaultReader,
+		"ReadableStreamDefaultReader": readableStreamDefaultReaderConstructor,
 		"WritableStream":              writableStreamConstructor,
 		"WritableStreamDefaultWriter": writableStreamDefaultWriterConstructor,
 		"TransformStream":             transformStreamConstructor,
@@ -116,10 +165,17 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 
 // NewReadableStream is the constructor for the ReadableStream object.
 func (mi *ModuleInstance) NewReadableStream(call sobek.ConstructorCall) *sobek.Object {
-	return newReadableStream(mi.vu, call)
+	rt := mi.vu.Runtime()
+	requireNewTarget(rt, call, "ReadableStream")
+
+	return newReadableStream(mi.vu, call, mi.readableStreamDefaultReaderPrototype)
 }
 
-func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object {
+func newReadableStream(
+	vu modules.VU,
+	call sobek.ConstructorCall,
+	readerPrototype *sobek.Object,
+) *sobek.Object {
 	var (
 		// 1. If underlyingSource is missing, set it to null.
 		underlyingSource *sobek.Object
@@ -153,8 +209,9 @@ func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 
 	// 3. Perform ! InitializeReadableStream(this).
 	stream := &ReadableStream{
-		runtime: rt,
-		vu:      vu,
+		runtime:         rt,
+		vu:              vu,
+		readerPrototype: readerPrototype,
 	}
 	stream.initialize()
 
@@ -267,6 +324,8 @@ func (mi *ModuleInstance) NewTransformStream(call sobek.ConstructorCall) *sobek.
 	return newTransformStream(
 		mi.vu,
 		call,
+		mi.readableStreamPrototype,
+		mi.readableStreamDefaultReaderPrototype,
 		mi.writableStreamPrototype,
 		mi.writableStreamDefaultWriterPrototype,
 	)
@@ -275,6 +334,8 @@ func (mi *ModuleInstance) NewTransformStream(call sobek.ConstructorCall) *sobek.
 func newTransformStream(
 	vu modules.VU,
 	call sobek.ConstructorCall,
+	readableStreamPrototype *sobek.Object,
+	readableStreamDefaultReaderPrototype *sobek.Object,
 	writableStreamPrototype *sobek.Object,
 	writableStreamDefaultWriterPrototype *sobek.Object,
 ) *sobek.Object {
@@ -338,15 +399,15 @@ func newTransformStream(
 		readableHighWaterMark,
 		readableSizeAlgorithm,
 	)
+	stream.readable.readerPrototype = readableStreamDefaultReaderPrototype
 	stream.writable.writerPrototype = writableStreamDefaultWriterPrototype
 
 	// 11. Perform ? SetUpTransformStreamDefaultControllerFromTransformer(this, transformer, transformerDict).
 	stream.setupDefaultControllerFromTransformer(transformerObj, transformerDict)
 
-	// Build the JavaScript objects for the readable and writable sides. WritableStream has a
-	// canonical prototype cached by the module instance. ReadableStream still exposes its
-	// prototype through the runtime global.
-	stream.readableObj = stream.readable.toObject(readableStreamPrototype(rt))
+	// Build the JavaScript objects for the readable and writable sides using the canonical
+	// prototypes cached by the module instance.
+	stream.readableObj = stream.readable.toObject(readableStreamPrototype)
 	stream.writableObj = stream.writable.toObject(writableStreamPrototype)
 
 	// 12. If transformerDict["start"] exists, then resolve startPromise with the result of
@@ -381,29 +442,6 @@ func transformStrategyObject(rt *sobek.Runtime, call sobek.ConstructorCall, inde
 		return call.Arguments[index].ToObject(rt)
 	}
 	return rt.NewObject()
-}
-
-// readableStreamPrototype returns the ReadableStream constructor's prototype if it is reachable
-// from the runtime, or a new object otherwise. The latter keeps the stream fully functional (its
-// methods are own properties) even when the constructor is not exposed as a global, at the cost
-// of failing an `instanceof` check.
-func readableStreamPrototype(rt *sobek.Runtime) *sobek.Object {
-	ctor := rt.Get("ReadableStream")
-	if ctor == nil || common.IsNullish(ctor) {
-		return rt.NewObject()
-	}
-
-	ctorObj, ok := ctor.(*sobek.Object)
-	if !ok {
-		return rt.NewObject()
-	}
-
-	protoObj, ok := ctorObj.Get("prototype").(*sobek.Object)
-	if !ok {
-		return rt.NewObject()
-	}
-
-	return protoObj
 }
 
 // NewWritableStreamDefaultWriter is the constructor for the [WritableStreamDefaultWriter] object.
@@ -571,13 +609,14 @@ func extractSizeAlgorithm(rt *sobek.Runtime, strategy *sobek.Object) SizeAlgorit
 // [ReadableStreamDefaultReader]: https://streams.spec.whatwg.org/#readablestreamdefaultreader
 func (mi *ModuleInstance) NewReadableStreamDefaultReader(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
+	requireNewTarget(rt, call, "ReadableStreamDefaultReader")
 
 	if len(call.Arguments) != 1 {
 		throw(rt, newTypeError(rt, "ReadableStreamDefaultReader takes a single argument"))
 	}
 
-	stream, ok := call.Argument(0).Export().(*ReadableStream)
-	if !ok {
+	stream := readableStreamFromValue(rt, call.Argument(0))
+	if stream == nil {
 		throw(rt, newTypeError(rt, "ReadableStreamDefaultReader argument must be a ReadableStream"))
 	}
 
@@ -585,7 +624,7 @@ func (mi *ModuleInstance) NewReadableStreamDefaultReader(call sobek.ConstructorC
 	reader := &ReadableStreamDefaultReader{}
 	reader.setup(stream)
 
-	object, err := NewReadableStreamDefaultReaderObject(reader)
+	object, err := NewReadableStreamDefaultReaderObject(reader, call.This.Prototype())
 	if err != nil {
 		throw(rt, err)
 	}
@@ -598,10 +637,34 @@ func (mi *ModuleInstance) NewReadableStreamDefaultReader(call sobek.ConstructorC
 // It is useful for those situations when a [io.Reader] needs to be surfaced up to the JS runtime.
 func NewReadableStreamFromReader(vu modules.VU, reader io.Reader) *sobek.Object {
 	rt := vu.Runtime()
+	intrinsics := readableIntrinsicsForRuntime(rt)
+	if intrinsics == nil {
+		intrinsics = &readableStreamIntrinsics{
+			streamPrototype: rt.NewObject(),
+			readerPrototype: rt.NewObject(),
+		}
+		if err := installReadableStreamPrototype(rt, intrinsics.streamPrototype); err != nil {
+			throw(rt, err)
+		}
+		if err := installReadableStreamDefaultReaderPrototype(rt, intrinsics.readerPrototype); err != nil {
+			throw(rt, err)
+		}
+		if err := storeReadableIntrinsics(rt, intrinsics); err != nil {
+			throw(rt, err)
+		}
+	}
 	return newReadableStream(vu, sobek.ConstructorCall{
 		Arguments: []sobek.Value{rt.ToValue(underlyingSourceFromReader(vu, reader))},
-		This:      rt.NewObject(),
-	})
+		This:      objectWithPrototype(rt, intrinsics.streamPrototype),
+	}, intrinsics.readerPrototype)
+}
+
+func objectWithPrototype(rt *sobek.Runtime, proto *sobek.Object) *sobek.Object {
+	obj := rt.NewObject()
+	if err := obj.SetPrototype(proto); err != nil {
+		throw(rt, err)
+	}
+	return obj
 }
 
 func underlyingSourceFromReader(vu modules.VU, reader io.Reader) *sobek.Object {

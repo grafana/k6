@@ -232,17 +232,40 @@ func writableStreamFromValue(rt *sobek.Runtime, value sobek.Value) *WritableStre
 }
 
 func installWritableStreamPrototype(rt *sobek.Runtime, proto *sobek.Object) error {
-	if hasOwnProperty(proto, "locked") {
-		return nil
-	}
-
-	return proto.DefineAccessorProperty("locked", rt.ToValue(func(fc sobek.FunctionCall) sobek.Value {
-		stream := writableStreamFromValue(rt, fc.This)
+	if err := defineStreamGetter(rt, proto, "locked", func(this sobek.Value) sobek.Value {
+		stream := writableStreamFromValue(rt, this)
 		if stream == nil {
-			return sobek.Undefined()
+			throw(rt, newTypeError(rt, "value is not a WritableStream"))
 		}
 		return rt.ToValue(stream.isLocked())
-	}), nil, sobek.FLAG_TRUE, sobek.FLAG_TRUE)
+	}); err != nil {
+		return err
+	}
+	if err := defineStreamMethod(rt, proto, "abort", func(this, reason sobek.Value) *sobek.Promise {
+		stream := writableStreamFromValue(rt, this)
+		if stream == nil {
+			return newRejectedPromiseForRuntime(rt, newTypeError(rt, "value is not a WritableStream").Err())
+		}
+		return stream.Abort(reason)
+	}); err != nil {
+		return err
+	}
+	if err := defineStreamMethod(rt, proto, "close", func(this, _ sobek.Value) *sobek.Promise {
+		stream := writableStreamFromValue(rt, this)
+		if stream == nil {
+			return newRejectedPromiseForRuntime(rt, newTypeError(rt, "value is not a WritableStream").Err())
+		}
+		return stream.Close()
+	}); err != nil {
+		return err
+	}
+	return defineStreamMethod(rt, proto, "getWriter", func(this, _ sobek.Value) sobek.Value {
+		stream := writableStreamFromValue(rt, this)
+		if stream == nil {
+			throw(rt, newTypeError(rt, "value is not a WritableStream"))
+		}
+		return stream.GetWriter()
+	})
 }
 
 // toObject builds the stream's JavaScript object.
@@ -254,17 +277,6 @@ func installWritableStreamPrototype(rt *sobek.Runtime, proto *sobek.Object) erro
 func (stream *WritableStream) toObject(proto *sobek.Object) *sobek.Object {
 	rt := stream.runtime
 	obj := rt.NewObject()
-	objName := "WritableStream"
-
-	if err := setReadOnlyPropertyOf(obj, objName, "abort", rt.ToValue(stream.Abort)); err != nil {
-		common.Throw(rt, newError(RuntimeError, err.Error()))
-	}
-	if err := setReadOnlyPropertyOf(obj, objName, "close", rt.ToValue(stream.Close)); err != nil {
-		common.Throw(rt, newError(RuntimeError, err.Error()))
-	}
-	if err := setReadOnlyPropertyOf(obj, objName, "getWriter", rt.ToValue(stream.GetWriter)); err != nil {
-		common.Throw(rt, newError(RuntimeError, err.Error()))
-	}
 
 	// We keep a hidden, non-enumerable reference to the Go stream on the object, so that the
 	// WritableStreamDefaultWriter constructor and the prototype's `locked` getter can retrieve
