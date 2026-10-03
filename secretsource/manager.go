@@ -61,8 +61,7 @@ func (sm *Manager) Get(sourceName, key string) (string, error) {
 	if !ok {
 		return "", UnknownSourceError(sourceName)
 	}
-	v, ok := sourceCache.Load(key)
-	if ok {
+	if v, ok := sourceCache.Load(key); ok {
 		return v.(string), nil //nolint:forcetypeassert
 	}
 	source := sm.sources[sourceName]
@@ -70,9 +69,14 @@ func (sm *Manager) Get(sourceName, key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	sourceCache.Store(key, value)
+	// Redact before caching. secrets.get() runs Get in a goroutine (and across
+	// VUs), so concurrent first-time fetches of the same key can interleave.
+	// Caching before add let a second caller hit the cache, return, and log the
+	// plaintext secret — including into the cloud log pusher — before redaction
+	// was armed.
 	sm.hook.add(value)
-	return value, err
+	actual, _ := sourceCache.LoadOrStore(key, value)
+	return actual.(string), nil //nolint:forcetypeassert
 }
 
 // UnknownSourceError is returned when a unknown source is requested
