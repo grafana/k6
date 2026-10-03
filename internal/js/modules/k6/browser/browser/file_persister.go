@@ -78,8 +78,12 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 
 		switch k {
 		case "url":
+			// ParseRequestURI returns (nil, err) on failure. The previous check used
+			// `err != nil && u.Scheme != ""`, which both nil-dereferenced u on parse
+			// errors and inverted the intended validation (only rejecting some
+			// impossible non-nil+error cases). Reject any unusable URL instead.
 			u, err := url.ParseRequestURI(v)
-			if err != nil && u.Scheme != "" && u.Host != "" {
+			if err != nil || u.Scheme == "" || u.Host == "" {
 				return presignedURLConfig{}, fmt.Errorf("invalid url %q", s)
 			}
 			presignedURL.getterURL = v
