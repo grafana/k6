@@ -1251,6 +1251,33 @@ func TestClient(t *testing.T) {
 				}`,
 			},
 		},
+		{
+			// Regression: healthCheck used to nil-deref and crash the process when
+			// called without connect (or after close). Invoke already returned a
+			// proper error for the same state.
+			name:       "HealthCheckWithoutConnect",
+			initString: codeBlock{code: `var client = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `client.healthCheck()`,
+				err:  "no gRPC connection, you must call connect first",
+			},
+		},
+		{
+			name: "HealthCheckAfterClose",
+			setup: func(hb *httpmultibin.HTTPMultiBin) {
+				grpcHealthSrv := health.NewServer()
+				healthgrpc.RegisterHealthServer(hb.ServerGRPC, grpcHealthSrv)
+				grpcHealthSrv.SetServingStatus("", healthgrpc.HealthCheckResponse_SERVING)
+			},
+			initString: codeBlock{code: `var client = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.close();
+				client.healthCheck()`,
+				err: "no gRPC connection, you must call connect first",
+			},
+		},
 	}
 
 	for _, tt := range tests {
