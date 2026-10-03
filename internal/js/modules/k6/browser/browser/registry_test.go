@@ -11,11 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 
-	k6event "go.k6.io/k6/v2/internal/event"
+	k6event "go.k6.io/k6/v2/event"
 )
 
 func TestPidRegistry(t *testing.T) {
@@ -253,8 +254,8 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.Equal(t, 3, browserRegistry.browserCount())
 
 		// Send Exit event
-		events, ok := vu.EventsField.Global.(*k6event.System)
-		require.True(t, ok, "want *k6event.System; got %T", events)
+		events, ok := vu.EventsField.Global.(*eventdispatcher.System)
+		require.True(t, ok, "want *eventdispatcher.System; got %T", events)
 		waitDone := events.Emit(&k6event.Event{
 			Type: k6event.Exit,
 		})
@@ -309,8 +310,8 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.Equal(t, 1, browserRegistry.browserCount())
 
 		// Do cleanup by sending the Exit event
-		events, ok := vu.EventsField.Global.(*k6event.System)
-		require.True(t, ok, "want *k6event.System; got %T", events)
+		events, ok := vu.EventsField.Global.(*eventdispatcher.System)
+		require.True(t, ok, "want *eventdispatcher.System; got %T", events)
 		waitDone := events.Emit(&k6event.Event{
 			Type: k6event.Exit,
 		})

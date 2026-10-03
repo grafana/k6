@@ -22,7 +22,7 @@ import (
 	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
 	"go.k6.io/k6/v2/internal/js/taskqueue"
 
-	k6event "go.k6.io/k6/v2/internal/event"
+	k6event "go.k6.io/k6/v2/event"
 	k6modules "go.k6.io/k6/v2/js/modules"
 )
 

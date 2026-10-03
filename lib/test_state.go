@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/eventdispatcher"
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/internal/usage"
@@ -21,7 +21,7 @@ type TestPreInitState struct {
 	RuntimeOptions RuntimeOptions
 	Registry       *metrics.Registry
 	BuiltinMetrics *metrics.BuiltinMetrics
-	Events         *event.System
+	Events         *eventdispatcher.System
 	KeyLogger      io.Writer
 	LookupEnv      func(key string) (val string, ok bool)
 	Logger         logrus.FieldLogger
