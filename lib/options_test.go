@@ -831,4 +831,19 @@ func TestValidate(t *testing.T) {
 			})
 		}
 	})
+	t.Run("metricSamplesBufferSize", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, Options{MetricSamplesBufferSize: null.IntFrom(1)}.Validate())
+		assert.Empty(t, Options{MetricSamplesBufferSize: null.IntFrom(1000)}.Validate())
+		// Default (Valid=false) must not fail validation.
+		assert.Empty(t, Options{MetricSamplesBufferSize: null.NewInt(1000, false)}.Validate())
+
+		errs := Options{MetricSamplesBufferSize: null.IntFrom(0)}.Validate()
+		require.Len(t, errs, 1)
+		assert.ErrorContains(t, errs[0], "metricSamplesBufferSize must be a positive number but is 0")
+
+		errs = Options{MetricSamplesBufferSize: null.IntFrom(-1)}.Validate()
+		require.Len(t, errs, 1)
+		assert.ErrorContains(t, errs[0], "metricSamplesBufferSize must be a positive number but is -1")
+	})
 }
