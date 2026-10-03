@@ -89,7 +89,7 @@ func (o *Output) Start() error {
 				_ = w.Flush()
 				return logfile.Close()
 			}
-			o.out = logfile
+			o.out = w
 		}
 	}
 
