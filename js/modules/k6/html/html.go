@@ -433,15 +433,39 @@ func (s Selection) Map(v sobek.Value) []sobek.Value {
 	return values
 }
 
+// Slice reduces the matched set to a range of indices, matching jQuery /
+// JavaScript Array.prototype.slice semantics.
+//
+// goquery.Selection.Slice does not clamp indexes, so out-of-range or inverted
+// values (for example `.slice(-1)` on an empty selection, or `.slice(n)` when
+// n is past the end) panic with a slice-bounds error and abort the VU.
 func (s Selection) Slice(start int, def ...int) Selection {
-	// We are forced to check that def[0] is inferior to the length of the array
-	// otherwise the s.sel.Slice panics. Besides returning the whole array when
-	// the end value for slicing is superior to the array length is standard in js.
-	if len(def) > 0 && def[0] < len(s.sel.Nodes) {
-		return Selection{s.rt, s.sel.Slice(start, def[0]), s.URL}
+	n := s.sel.Length()
+	from := normalizeSliceIndex(start, n)
+	to := n
+	if len(def) > 0 {
+		to = normalizeSliceIndex(def[0], n)
 	}
+	if from > to {
+		from = to
+	}
+	return Selection{s.rt, s.sel.Slice(from, to), s.URL}
+}
 
-	return Selection{s.rt, s.sel.Slice(start, s.sel.Length()), s.URL}
+// normalizeSliceIndex converts a JS-style slice index (negative or past the
+// end) into a clamped index in [0, length].
+func normalizeSliceIndex(idx, length int) int {
+	if idx < 0 {
+		idx += length
+		if idx < 0 {
+			return 0
+		}
+		return idx
+	}
+	if idx > length {
+		return length
+	}
+	return idx
 }
 
 func (s Selection) Get(def ...int) sobek.Value {
