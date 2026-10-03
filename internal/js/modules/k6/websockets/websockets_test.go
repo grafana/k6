@@ -1,6 +1,7 @@
 package websockets
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -1906,6 +1907,110 @@ func TestRemoteCloseWithCodeAndReason(t *testing.T) {
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-remote-close"), http.StatusSwitchingProtocols, "")
 	assert.Equal(t, []string{"remote closed"}, ts.callRecorder.Recorded())
+}
+
+// TestBidirectionalTransferDoesNotDeadlock sends a large client payload while the
+// server writes a larger flood and does not read again until that flood finishes.
+// readPump must keep draining the socket during WriteMessage. Holding the
+// connection lock across the write stops readPump, the TCP window fills, and
+// both sides block forever.
+func TestBidirectionalTransferDoesNotDeadlock(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+
+	const (
+		frameSize    = 64 * 1024
+		frames       = 128 // 8MiB, above a fully opened receive window
+		payloadSize  = 8 * 1024 * 1024
+		exchangeWait = 5 * time.Second
+	)
+	serverDone := make(chan error, 1)
+	ts.tb.Mux.HandleFunc("/ws-bidirectional-stall", func(w http.ResponseWriter, req *http.Request) {
+		conn, upgErr := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		if upgErr != nil {
+			serverDone <- upgErr
+			return
+		}
+		defer func() {
+			_ = conn.Close()
+		}()
+		deadline := time.Now().Add(exchangeWait)
+		_ = conn.SetWriteDeadline(deadline)
+		_ = conn.SetReadDeadline(deadline)
+
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			serverDone <- err
+			return
+		}
+		if string(msg) != "start" {
+			serverDone <- fmt.Errorf("expected start, got %q", msg)
+			return
+		}
+
+		payload := bytes.Repeat([]byte("x"), frameSize)
+		for range frames {
+			if err = conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+				serverDone <- err
+				return
+			}
+		}
+		_, big, err := conn.ReadMessage()
+		if err != nil {
+			serverDone <- err
+			return
+		}
+		if len(big) != payloadSize {
+			serverDone <- fmt.Errorf("server read %d bytes, want %d", len(big), payloadSize)
+			return
+		}
+		serverDone <- nil
+	})
+
+	result := make(chan error, 1)
+	go func() {
+		_, runErr := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		var ws = new WebSocket("WSBIN_URL/ws-bidirectional-stall");
+		var got = 0;
+		ws.onopen = () => {
+			// Build the payload before the server starts writing so the large
+			// send overlaps the flood instead of waiting behind it.
+			const big = "y".repeat(8 * 1024 * 1024);
+			ws.send("start");
+			ws.send(big);
+		};
+		ws.onmessage = () => {
+			got++;
+			if (got === 128) {
+				ws.close();
+			}
+		};
+		ws.onclose = () => {
+			call("closed:" + got);
+		};
+		ws.onerror = (e) => {
+			call("error:" + e.error);
+		};
+	`))
+		result <- runErr
+	}()
+
+	var err error
+	select {
+	case err = <-result:
+	case <-time.After(exchangeWait + time.Second):
+		ts.runtime.CancelContext()
+		err = fmt.Errorf("event loop did not finish")
+	}
+	require.NoError(t, err)
+	require.Contains(t, ts.callRecorder.Recorded(), "closed:128")
+
+	select {
+	case serverErr := <-serverDone:
+		require.NoError(t, serverErr)
+	case <-time.After(time.Second):
+		t.Fatal("server did not finish the bidirectional transfer")
+	}
 }
 
 // TestPingHandlerDeadlock verifies that server pings arriving during connection
