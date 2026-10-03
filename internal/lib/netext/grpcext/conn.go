@@ -106,6 +106,16 @@ func Dial(ctx context.Context, addr string, types *protoregistry.Types, options 
 	}, nil
 }
 
+// WithTypes returns a copy of the connection that resolves protobuf types with
+// the given registry. The underlying gRPC client connection is shared with the
+// original, so closing either of them closes both.
+func (c *Conn) WithTypes(types *protoregistry.Types) *Conn {
+	return &Conn{
+		raw:   c.raw,
+		types: types,
+	}
+}
+
 // Reflect returns using the reflection the FileDescriptorSet describing the service.
 func (c *Conn) Reflect(ctx context.Context) (*descriptorpb.FileDescriptorSet, error) {
 	rc := reflectionClient{Conn: c.raw}

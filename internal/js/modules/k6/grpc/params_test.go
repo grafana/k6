@@ -206,6 +206,56 @@ func TestConnectParamsAuthority(t *testing.T) {
 	}
 }
 
+func TestConnectParamsConnectionSharing(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name        string
+		JSON        string
+		Expected    bool
+		ErrContains string
+	}{
+		{
+			Name:     "Unset",
+			JSON:     `{}`,
+			Expected: false,
+		},
+		{
+			Name:     "Enabled",
+			JSON:     `{connectionSharing: true}`,
+			Expected: true,
+		},
+		{
+			Name:     "Disabled",
+			JSON:     `{connectionSharing: false}`,
+			Expected: false,
+		},
+		{
+			Name:        "NotABoolean",
+			JSON:        `{connectionSharing: "true"}`,
+			ErrContains: "invalid connectionSharing value",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+
+			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
+
+			p, err := newConnectParams(testRuntime.VU, params)
+
+			if tc.ErrContains != "" {
+				require.ErrorContains(t, err, tc.ErrContains)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.Expected, p.ConnectionSharing)
+		})
+	}
+}
+
 // newParamsTestRuntime creates a new test runtime
 // that could be used to test the params
 // it also moves to the VU context and creates the params
