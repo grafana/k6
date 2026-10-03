@@ -24,9 +24,15 @@ func newConsole(logger logrus.FieldLogger) *console {
 }
 
 // Creates a console logger with its output set to the file at the provided `filepath`.
-func newFileConsole(filepath string, formatter logrus.Formatter, level logrus.Level) (*console, error) {
+// Optional hooks (typically the secretsource redaction hook) are attached so the
+// separate file logger cannot bypass log redaction that applies to the primary logger.
+func newFileConsole(
+	filepath string, formatter logrus.Formatter, level logrus.Level, hooks ...logrus.Hook,
+) (*console, error) {
 	//nolint:gosec,forbidigo // see https://github.com/grafana/k6/issues/2565
-	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+	// 0o600 matches --log-output=file and avoids world-readable console logs that may
+	// have contained secrets before redaction was attached to this logger.
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +41,11 @@ func newFileConsole(filepath string, formatter logrus.Formatter, level logrus.Le
 	l.SetLevel(level)
 	l.SetOutput(f)
 	l.SetFormatter(formatter)
+	for _, h := range hooks {
+		if h != nil {
+			l.AddHook(h)
+		}
+	}
 
 	return &console{l}, nil
 }

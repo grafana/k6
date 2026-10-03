@@ -222,6 +222,13 @@ func (s *stream) writeData(wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	writeChannel := make(chan message)
+	// writeFailed is closed when the writer goroutine stops after a send/close
+	// error. The outer pump must then stop forwarding to writeChannel and keep
+	// draining writeQueueCh until done closes. Otherwise a later stream.write()
+	// or stream.end() from the event loop blocks forever on the unbuffered
+	// writeQueueCh and prevents the queued closeWithError callback from
+	// running — hanging the VU.
+	writeFailed := make(chan struct{})
 
 	wg.Go(func() {
 		for {
@@ -237,6 +244,7 @@ func (s *stream) writeData(wg *sync.WaitGroup) {
 						s.logger.WithError(err).Error("an error happened during stream closing")
 					}
 
+					close(writeFailed)
 					s.tq.Queue(func() error {
 						return s.closeWithError(err)
 					})
@@ -246,6 +254,7 @@ func (s *stream) writeData(wg *sync.WaitGroup) {
 
 				err := s.stream.Send(msg.msg)
 				if err != nil {
+					close(writeFailed)
 					s.processSendError(err)
 					return
 				}
@@ -283,7 +292,16 @@ func (s *stream) writeData(wg *sync.WaitGroup) {
 				queue = append(queue, msg)
 			case wch <- msg:
 				queue = queue[:copy(queue, queue[1:])]
-
+			case <-writeFailed:
+				for {
+					select {
+					case <-s.writeQueueCh:
+						// Discard: the stream write side is already failing;
+						// keep write()/end() from blocking the event loop.
+					case <-s.done:
+						return
+					}
+				}
 			case <-s.done:
 				return
 			}
