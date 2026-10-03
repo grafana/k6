@@ -133,17 +133,23 @@ func (c *Crypto) ripemd160(input any, outputEncoding string) (any, error) {
 }
 
 // createHash returns a Hasher instance that uses the given algorithm.
-func (c *Crypto) createHash(algorithm string) *Hasher {
+func (c *Crypto) createHash(algorithm string) (*Hasher, error) {
 	hashfn := c.parseHashFunc(algorithm)
+	if hashfn == nil {
+		return nil, fmt.Errorf("invalid algorithm: %s", algorithm)
+	}
 	return &Hasher{
 		runtime: c.vu.Runtime(),
 		hash:    hashfn(),
-	}
+	}, nil
 }
 
 // buildInputsDigest implements basic digest calculation for given algorithm and input/output
 func (c *Crypto) buildInputsDigest(alg string, input any, outputEncoding string) (any, error) {
-	hasher := c.createHash(alg)
+	hasher, err := c.createHash(alg)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := hasher.Update(input); err != nil {
 		return nil, fmt.Errorf("%s failed: %w", alg, err)
