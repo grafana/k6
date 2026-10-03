@@ -4,6 +4,7 @@ package expv2
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/cloudapi/insights"
+	"go.k6.io/k6/v2/internal/cloudapi/provisioning"
 	insightsOutput "go.k6.io/k6/v2/internal/output/cloud/insights"
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/output"
@@ -385,12 +387,26 @@ func (o *Output) handleFlushError(err error) {
 	o.logger.WithError(err).Error("Failed to push metrics to the cloud")
 
 	var errResp cloudapi.ResponseError
-	if !errors.As(err, &errResp) || errResp.Response == nil {
-		return
-	}
+	matched := errors.As(err, &errResp)
 	// The Cloud service returns the error code 4 when it doesn't accept any more metrics.
 	// So, when k6 sees that, the cloud output just stops prematurely.
-	if errResp.Response.StatusCode != http.StatusForbidden || errResp.Code != 4 {
+	metricsRejected := matched && errResp.Response != nil &&
+		errResp.Response.StatusCode == http.StatusForbidden && errResp.Code == 4
+	if !metricsRejected {
+		var provisioningErr *provisioning.ResponseError
+		if errors.As(err, &provisioningErr) && provisioningErr != nil &&
+			provisioningErr.StatusCode == http.StatusForbidden {
+			var payload struct {
+				Error struct {
+					Code int `json:"code"`
+				} `json:"error"`
+			}
+			if json.Unmarshal([]byte(provisioningErr.Body), &payload) == nil {
+				metricsRejected = payload.Error.Code == 4
+			}
+		}
+	}
+	if !metricsRejected {
 		return
 	}
 
