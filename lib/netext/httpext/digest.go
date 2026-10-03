@@ -2,7 +2,10 @@ package httpext
 
 import (
 	"errors"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/icholy/digest"
 	"github.com/sirupsen/logrus"
@@ -20,7 +23,12 @@ import (
 // "http: read on closed response body".
 type digestTransport struct {
 	inner  *digest.Transport
+	base   http.RoundTripper
 	logger logrus.FieldLogger
+
+	// authority is the origin (scheme, host, and port) the credentials belong
+	// to. Redirects to any other origin must not reuse them.
+	authority string
 
 	// noChallenge records whether the wrapped transport found no usable digest
 	// challenge in the latest 401 response, and thus returned it with its body
@@ -31,10 +39,16 @@ type digestTransport struct {
 
 // newDigestTransport returns an http.RoundTripper that will perform HTTP digest
 // authentication with the given credentials over the given transport.
+// Credentials are only applied to requests for origin; other origins are sent
+// without digest authentication.
 func newDigestTransport(
-	inner http.RoundTripper, username, password string, logger logrus.FieldLogger,
+	inner http.RoundTripper, username, password string, origin *url.URL, logger logrus.FieldLogger,
 ) *digestTransport {
-	t := &digestTransport{logger: logger}
+	t := &digestTransport{
+		base:      inner,
+		logger:    logger,
+		authority: canonicalAuthority(origin),
+	}
 	t.inner = &digest.Transport{
 		Username:  username,
 		Password:  password,
@@ -62,6 +76,16 @@ func newDigestTransport(
 // RoundTrip implements http.RoundTripper and performs the digest authentication
 // handshake on top of the wrapped transport.
 func (t *digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// The username and password live on the digest transport for the whole
+	// http.Client.Do call, including redirects. Go strips Authorization on
+	// cross-host redirects, but digest auth is added afterwards inside this
+	// transport, so an open redirect could otherwise deliver a Digest
+	// Authorization (the username and a password-derived response) to another
+	// origin. Only the origin the credentials were configured for is
+	// authenticated.
+	if req != nil && req.URL != nil && canonicalAuthority(req.URL) != t.authority {
+		return t.base.RoundTrip(req)
+	}
 	res, err := t.inner.RoundTrip(req)
 	if err == nil && t.noChallenge && res != nil && res.StatusCode == http.StatusUnauthorized {
 		// The body of the challenge-less 401 response was drained and closed by
@@ -72,6 +96,24 @@ func (t *digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		res.Body = http.NoBody
 	}
 	return res, err
+}
+
+// canonicalAuthority is the request origin digest credentials are scoped to.
+// Default ports are filled in so http://host and http://host:80 match.
+func canonicalAuthority(u *url.URL) string {
+	if u == nil {
+		return ""
+	}
+	port := u.Port()
+	if port == "" {
+		switch strings.ToLower(u.Scheme) {
+		case "https":
+			port = "443"
+		case "http":
+			port = "80"
+		}
+	}
+	return strings.ToLower(u.Scheme) + "://" + strings.ToLower(net.JoinHostPort(u.Hostname(), port))
 }
 
 // interface assertion to catch changes in the wrapped types early
