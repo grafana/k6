@@ -4,6 +4,7 @@ package streams
 import (
 	"errors"
 	"io"
+	"math"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/v2/js/common"
@@ -56,13 +57,31 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	if err != nil {
 		throw(rt, err)
 	}
+	transformStreamConstructor, err := newWebIDLConstructor(
+		rt,
+		"TransformStream",
+		mi.NewTransformStream,
+	)
+	if err != nil {
+		throw(rt, err)
+	}
 
 	mi.writableStreamPrototype = constructorPrototype(rt, writableStreamConstructor)
-	mi.writableStreamDefaultWriterPrototype = constructorPrototype(rt, writableStreamDefaultWriterConstructor)
+	mi.writableStreamDefaultWriterPrototype = constructorPrototype(
+		rt,
+		writableStreamDefaultWriterConstructor,
+	)
+	transformStreamPrototype := constructorPrototype(rt, transformStreamConstructor)
 	if err := installWritableStreamPrototype(rt, mi.writableStreamPrototype); err != nil {
 		throw(rt, err)
 	}
-	if err := installWritableStreamDefaultWriterPrototype(rt, mi.writableStreamDefaultWriterPrototype); err != nil {
+	if err := installWritableStreamDefaultWriterPrototype(
+		rt,
+		mi.writableStreamDefaultWriterPrototype,
+	); err != nil {
+		throw(rt, err)
+	}
+	if err := installTransformStreamPrototype(rt, transformStreamPrototype); err != nil {
 		throw(rt, err)
 	}
 	mi.exports = modules.Exports{Named: map[string]any{
@@ -71,6 +90,7 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		"ReadableStreamDefaultReader": mi.NewReadableStreamDefaultReader,
 		"WritableStream":              writableStreamConstructor,
 		"WritableStreamDefaultWriter": writableStreamDefaultWriterConstructor,
+		"TransformStream":             transformStreamConstructor,
 	}}
 
 	return mi
@@ -162,24 +182,7 @@ func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object 
 		)
 	}
 
-	streamObj := rt.ToValue(stream).ToObject(rt)
-
-	proto := call.This.Prototype()
-	if proto.Get("locked") == nil {
-		err = proto.DefineAccessorProperty("locked", rt.ToValue(func() sobek.Value {
-			return rt.ToValue(stream.Locked)
-		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
-		if err != nil {
-			common.Throw(rt, newError(RuntimeError, err.Error()))
-		}
-	}
-
-	err = streamObj.SetPrototype(proto)
-	if err != nil {
-		common.Throw(rt, newError(RuntimeError, err.Error()))
-	}
-
-	return streamObj
+	return stream.toObject(call.This.Prototype())
 }
 
 // NewWritableStream is the constructor for the WritableStream object.
@@ -254,6 +257,153 @@ func newWritableStream(
 	)
 
 	return stream.toObject(call.This.Prototype())
+}
+
+// NewTransformStream is the constructor for the TransformStream object.
+func (mi *ModuleInstance) NewTransformStream(call sobek.ConstructorCall) *sobek.Object {
+	rt := mi.vu.Runtime()
+	requireNewTarget(rt, call, "TransformStream")
+
+	return newTransformStream(
+		mi.vu,
+		call,
+		mi.writableStreamPrototype,
+		mi.writableStreamDefaultWriterPrototype,
+	)
+}
+
+func newTransformStream(
+	vu modules.VU,
+	call sobek.ConstructorCall,
+	writableStreamPrototype *sobek.Object,
+	writableStreamDefaultWriterPrototype *sobek.Object,
+) *sobek.Object {
+	rt := vu.Runtime()
+
+	var (
+		transformerObj  *sobek.Object
+		transformerDict Transformer
+		err             error
+	)
+
+	// 1. If transformer is missing, set it to null.
+	// 2. Let transformerDict be transformer, converted to an IDL value of type Transformer.
+	if len(call.Arguments) > 0 && !common.IsNullish(call.Arguments[0]) {
+		// We first assert that it is an object (requirement).
+		if !isObject(call.Arguments[0]) {
+			throw(rt, newTypeError(rt, "transformer must be an object"))
+		}
+
+		// Then we try to convert it to a Transformer.
+		transformerObj = call.Arguments[0].ToObject(rt)
+		transformerDict, err = NewTransformerFromObject(rt, transformerObj)
+		if err != nil {
+			throw(rt, err)
+		}
+	}
+
+	// 3. If transformerDict["readableType"] exists, throw a RangeError exception.
+	if transformerDict.ReadableType != nil && !sobek.IsUndefined(transformerDict.ReadableType) {
+		throw(rt, newRangeError(rt, "'readableType' is not supported"))
+	}
+
+	// 4. If transformerDict["writableType"] exists, throw a RangeError exception.
+	if transformerDict.WritableType != nil && !sobek.IsUndefined(transformerDict.WritableType) {
+		throw(rt, newRangeError(rt, "'writableType' is not supported"))
+	}
+
+	// 5. Let readableHighWaterMark be ? ExtractHighWaterMark(readableStrategy, 0).
+	readableStrategy := transformStrategyObject(rt, call, 2)
+	readableHighWaterMark := extractHighWaterMark(rt, readableStrategy, 0)
+
+	// 6. Let readableSizeAlgorithm be ! ExtractSizeAlgorithm(readableStrategy).
+	readableSizeAlgorithm := extractSizeAlgorithm(rt, readableStrategy)
+
+	// 7. Let writableHighWaterMark be ? ExtractHighWaterMark(writableStrategy, 1).
+	writableStrategy := transformStrategyObject(rt, call, 1)
+	writableHighWaterMark := extractHighWaterMark(rt, writableStrategy, 1)
+
+	// 8. Let writableSizeAlgorithm be ! ExtractSizeAlgorithm(writableStrategy).
+	writableSizeAlgorithm := extractSizeAlgorithm(rt, writableStrategy)
+
+	// 9. Let startPromise be a new promise.
+	startPromise := newPromiseWrapper(rt)
+
+	// 10. Perform ! InitializeTransformStream(this, startPromise, ...).
+	stream := &TransformStream{runtime: rt, vu: vu}
+	stream.initialize(
+		startPromise,
+		writableHighWaterMark,
+		writableSizeAlgorithm,
+		readableHighWaterMark,
+		readableSizeAlgorithm,
+	)
+	stream.writable.writerPrototype = writableStreamDefaultWriterPrototype
+
+	// 11. Perform ? SetUpTransformStreamDefaultControllerFromTransformer(this, transformer, transformerDict).
+	stream.setupDefaultControllerFromTransformer(transformerObj, transformerDict)
+
+	// Build the JavaScript objects for the readable and writable sides. WritableStream has a
+	// canonical prototype cached by the module instance. ReadableStream still exposes its
+	// prototype through the runtime global.
+	stream.readableObj = stream.readable.toObject(readableStreamPrototype(rt))
+	stream.writableObj = stream.writable.toObject(writableStreamPrototype)
+
+	// 12. If transformerDict["start"] exists, then resolve startPromise with the result of
+	// invoking transformerDict["start"] with argument list « this.[[controller]] » and callback
+	// this value transformer.
+	if transformerDict.Start != nil && !sobek.IsUndefined(transformerDict.Start) {
+		startFn, ok := sobek.AssertFunction(transformerDict.Start)
+		if !ok {
+			throw(rt, newTypeError(rt, "transformer.start must be a function"))
+		}
+
+		res, startErr := startFn(transformerObj, stream.controller.object)
+		if startErr != nil {
+			// Any thrown exceptions are re-thrown by the TransformStream constructor.
+			throw(rt, startErr)
+		}
+		stream.resolveStartPromiseAsync(startPromise, res)
+	} else {
+		// 13. Otherwise, resolve startPromise with undefined.
+		stream.resolveStartPromiseAsync(startPromise, sobek.Undefined())
+	}
+
+	return stream.toObject(call.This.Prototype())
+}
+
+// transformStrategyObject returns the queuing strategy argument at the given index as an object,
+// or a new empty object if it is missing or nullish. It never writes to the strategy, so that
+// the TransformStream constructor does not invoke user-defined setters (as verified by the Web
+// Platform Tests).
+func transformStrategyObject(rt *sobek.Runtime, call sobek.ConstructorCall, index int) *sobek.Object {
+	if len(call.Arguments) > index && !common.IsNullish(call.Arguments[index]) {
+		return call.Arguments[index].ToObject(rt)
+	}
+	return rt.NewObject()
+}
+
+// readableStreamPrototype returns the ReadableStream constructor's prototype if it is reachable
+// from the runtime, or a new object otherwise. The latter keeps the stream fully functional (its
+// methods are own properties) even when the constructor is not exposed as a global, at the cost
+// of failing an `instanceof` check.
+func readableStreamPrototype(rt *sobek.Runtime) *sobek.Object {
+	ctor := rt.Get("ReadableStream")
+	if ctor == nil || common.IsNullish(ctor) {
+		return rt.NewObject()
+	}
+
+	ctorObj, ok := ctor.(*sobek.Object)
+	if !ok {
+		return rt.NewObject()
+	}
+
+	protoObj, ok := ctorObj.Get("prototype").(*sobek.Object)
+	if !ok {
+		return rt.NewObject()
+	}
+
+	return protoObj
 }
 
 // NewWritableStreamDefaultWriter is the constructor for the [WritableStreamDefaultWriter] object.
@@ -373,23 +523,25 @@ func newCountQueuingStrategy(
 //
 // [ExtractHighWaterMark]: https://streams.spec.whatwg.org/#validate-and-normalize-high-water-mark
 func extractHighWaterMark(rt *sobek.Runtime, strategy *sobek.Object, defaultHWM float64) float64 {
+	hwmValue := strategy.Get("highWaterMark")
+
 	// 1. If strategy["highWaterMark"] does not exist, return defaultHWM.
-	if common.IsNullish(strategy.Get("highWaterMark")) {
+	if common.IsNullish(hwmValue) {
 		return defaultHWM
 	}
 
-	// 2. Let highWaterMark be strategy["highWaterMark"].
-	highWaterMark := strategy.Get("highWaterMark")
+	// 2. Let highWaterMark be strategy["highWaterMark"], converted to a number. The WebIDL type
+	// of QueuingStrategy's highWaterMark member is an unrestricted double, so values such as an
+	// object with a toString()/valueOf() are coerced here rather than rejected outright.
+	highWaterMark := hwmValue.ToFloat()
 
 	// 3. If highWaterMark is NaN or highWaterMark < 0, throw a RangeError exception.
-	if sobek.IsNaN(strategy.Get("highWaterMark")) ||
-		!isNumber(strategy.Get("highWaterMark")) ||
-		!isNonNegativeNumber(strategy.Get("highWaterMark")) {
+	if math.IsNaN(highWaterMark) || highWaterMark < 0 {
 		throw(rt, newRangeError(rt, "highWaterMark must be a non-negative number"))
 	}
 
 	// 4. Return highWaterMark.
-	return highWaterMark.ToFloat()
+	return highWaterMark
 }
 
 // extractSizeAlgorithm returns the size algorithm for the given queuing strategy.
