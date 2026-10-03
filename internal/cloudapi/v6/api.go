@@ -415,13 +415,18 @@ func (c *Client) FetchTest(ctx context.Context, testRunID int64) (_ *TestProgres
 		return nil, errUnknown
 	}
 
-	return &TestProgress{
+	tp := &TestProgress{
 		Status:            Status(res.GetStatus()),
 		Result:            Result(res.GetResult()),
 		EstimatedDuration: res.GetEstimatedDuration(),
 		ExecutionDuration: res.GetExecutionDuration(),
 		StatusHistory:     FromStatusModel(res.GetStatusHistory()),
-	}, nil
+	}
+	if rd, ok := res.GetResultDetailsOk(); ok && rd != nil && rd.ResultDetailsApiModel != nil {
+		tp.ResultMessage = rd.ResultDetailsApiModel.GetMessage()
+	}
+
+	return tp, nil
 }
 
 func (c *Client) authCtx(ctx context.Context) context.Context {
