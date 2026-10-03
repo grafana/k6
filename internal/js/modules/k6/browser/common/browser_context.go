@@ -236,24 +236,48 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts GrantPermis
 		"payment-handler":      {Name: "payment-handler"},
 	}
 
-	descriptors := make([]*cdpbrowser.PermissionDescriptor, 0, len(permissions))
+	requested := make(map[string]struct{}, len(permissions))
 	for _, p := range permissions {
-		d, ok := permsToDescriptor[p]
-		if !ok {
+		if _, ok := permsToDescriptor[p]; !ok {
 			return fmt.Errorf("%q is an invalid permission", p)
 		}
-		descriptors = append(descriptors, d)
+		requested[p] = struct{}{}
 	}
 
-	for _, d := range descriptors {
-		action := cdpbrowser.SetPermission(d, cdpbrowser.PermissionSettingGranted).
-			WithOrigin(opts.Origin).
-			WithBrowserContextID(b.id)
-		if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
-			return fmt.Errorf("granting browser permission %q: %w", d.Name, err)
+	// Browser.grantPermissions granted the listed permissions and denied every
+	// other permission for that origin. Browser.setPermission updates only the
+	// permission it is given, so deny the known permissions that were not
+	// requested, then grant the requested ones. Granting last keeps a requested
+	// permission enabled when two descriptors share a name (midi and midi-sysex).
+	for name, d := range permsToDescriptor {
+		if _, ok := requested[name]; ok {
+			continue
+		}
+		if err := b.setPermission(d, cdpbrowser.PermissionSettingDenied, opts); err != nil {
+			return err
+		}
+	}
+	for _, p := range permissions {
+		err := b.setPermission(permsToDescriptor[p], cdpbrowser.PermissionSettingGranted, opts)
+		if err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func (b *BrowserContext) setPermission(
+	d *cdpbrowser.PermissionDescriptor,
+	setting cdpbrowser.PermissionSetting,
+	opts GrantPermissionsOptions,
+) error {
+	action := cdpbrowser.SetPermission(d, setting).
+		WithOrigin(opts.Origin).
+		WithBrowserContextID(b.id)
+	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		return fmt.Errorf("setting browser permission %q to %s: %w", d.Name, setting, err)
+	}
 	return nil
 }
 
