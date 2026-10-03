@@ -1,6 +1,7 @@
 package websockets
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -21,6 +22,7 @@ type wsParams struct {
 	tagsAndMeta       *metrics.TagsAndMeta
 	enableCompression bool
 	subprocotols      []string
+	tlsClientCerts    []tls.Certificate
 }
 
 // buildParams builds WebSocket params and configure some of them
@@ -78,6 +80,16 @@ func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value) (*wsParam
 			}
 
 			parsed.enableCompression = true
+		case "tlsAuth":
+			tlsAuthV := params.Get(k)
+			if common.IsNullish(tlsAuthV) {
+				continue
+			}
+			cert, err := common.ParseTLSAuth(tlsAuthV.Export())
+			if err != nil {
+				return nil, fmt.Errorf("invalid tlsAuth: %w", err)
+			}
+			parsed.tlsClientCerts = []tls.Certificate{*cert}
 		default:
 			return nil, fmt.Errorf("unknown WebSocket's option %s", k)
 		}
