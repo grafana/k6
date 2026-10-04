@@ -54,7 +54,9 @@ func Main(m *testing.M) {
 	}()
 
 	defer func() {
-		if err := goleak.Find(); err != nil {
+		// Go tip on Windows keeps a pooled worker for synchronous file I/O alive
+		// after the tests finish. It belongs to the runtime, not to k6.
+		if err := goleak.Find(goleak.IgnoreTopFunction("internal/poll.(*syncIOWorkerState).run")); err != nil {
 			fmt.Println(err)
 			exitCode = 3
 		}
