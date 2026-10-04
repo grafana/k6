@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -261,6 +262,50 @@ func TestJsonOutputFileIsBuffered(t *testing.T) {
 	require.NoError(t, err)
 	validateResults(file)
 	assert.NoError(t, file.Close())
+}
+
+// failingWriteFs wraps an Fs and makes every Write on the files it creates fail.
+type failingWriteFs struct {
+	fsext.Fs
+	err error
+}
+
+func (fs failingWriteFs) Create(name string) (afero.File, error) {
+	f, err := fs.Fs.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return failingWriteFile{File: f, err: fs.err}, nil
+}
+
+type failingWriteFile struct {
+	afero.File
+	err error
+}
+
+func (f failingWriteFile) Write([]byte) (int, error) {
+	return 0, f.err
+}
+
+func TestJsonOutputFileStopReturnsFlushError(t *testing.T) {
+	t.Parallel()
+
+	errWrite := errors.New("no space left on device")
+	out, err := New(output.Params{
+		Logger:         testutils.NewLogger(t),
+		StdOut:         new(bytes.Buffer),
+		FS:             failingWriteFs{Fs: fsext.NewMemMapFs(), err: errWrite},
+		ConfigArgument: "/json-output",
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+
+	samples, _ := generateTestMetricSamples(t)
+	out.AddMetricSamples(samples)
+
+	// The samples only reach the file when the buffer is flushed on Stop,
+	// so that is where the write error has to be reported.
+	require.ErrorIs(t, out.Stop(), errWrite)
 }
 
 func TestWrapSampleWithSamplePointer(t *testing.T) {

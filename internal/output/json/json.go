@@ -5,6 +5,7 @@ package json
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -86,8 +87,7 @@ func (o *Output) Start() error {
 			o.out = outfile
 		} else {
 			o.closeFn = func() error {
-				_ = w.Flush()
-				return logfile.Close()
+				return errors.Join(w.Flush(), logfile.Close())
 			}
 			o.out = w
 		}
