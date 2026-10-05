@@ -151,7 +151,7 @@ func (i *Index) reduce() {
 	i.estBlockUncomp += i.estBlockUncomp * int64(removeN)
 }
 
-func (i *Index) appendTo(b []byte, uncompTotal, compTotal int64) []byte {
+func (i *Index) appendTo(b []byte, compTotal, uncompTotal int64) []byte {
 	i.reduce()
 	var tmp [binary.MaxVarintLen64]byte
 
@@ -425,7 +425,7 @@ func IndexStream(r io.Reader) ([]byte, error) {
 		_, err := io.ReadFull(r, buf[:4])
 		if err != nil {
 			if err == io.EOF {
-				return i.appendTo(nil, i.TotalUncompressed, i.TotalCompressed), nil
+				return i.appendTo(nil, i.TotalCompressed, i.TotalUncompressed), nil
 			}
 			return nil, err
 		}
