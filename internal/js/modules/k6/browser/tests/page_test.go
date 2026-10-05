@@ -753,6 +753,42 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	assert.Equal(t, true, viewportRestored)
 }
 
+// TestPageScreenshotAfterViewportResize checks that a screenshot taken right after a viewport
+// resize covers the whole viewport, with no stale area at the bottom (seen in headless on macOS).
+func TestPageScreenshotAfterViewportResize(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+
+	// Paint once before the resize, so stale pixels would show in the capture right after it.
+	_, err := p.Evaluate(`
+	() => {
+		document.documentElement.style.margin = '0';
+		document.body.style.margin = '0';
+		document.body.style.height = '100vh';
+		document.body.style.background = 'linear-gradient(to bottom, red, blue)';
+	}`)
+	require.NoError(t, err)
+	_, err = p.Evaluate(`() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+	require.NoError(t, err)
+
+	err = p.SetViewportSize(&common.Size{Width: 1280, Height: 1600})
+	require.NoError(t, err)
+
+	buf, err := p.Screenshot(common.NewPageScreenshotOptions(), &mockPersister{})
+	require.NoError(t, err)
+
+	img, err := png.Decode(bytes.NewReader(buf))
+	require.NoError(t, err)
+	assert.Equal(t, 1280, img.Bounds().Max.X)
+	assert.Equal(t, 1600, img.Bounds().Max.Y)
+
+	r, _, b, _ := img.At(0, 0).RGBA()
+	assert.Truef(t, r > b*2, "want: the top pixel to be dominantly red, got R: %d, B: %d", r, b)
+	r, _, b, _ = img.At(0, 1599).RGBA()
+	assert.Truef(t, b > r*2, "want: the bottom pixel to be dominantly blue, got R: %d, B: %d", r, b)
+}
+
 func TestPageTitle(t *testing.T) {
 	t.Parallel()
 

@@ -73,11 +73,8 @@ func (v Viewport) String() string {
 
 // recalculateInset is used to calculate the inset width and height
 // depending on the operating system and add it to the given v, and
-// return a new Viewport. It returns the same Viewport if headless is true.
-func (v Viewport) recalculateInset(headless bool, os string) Viewport {
-	if headless {
-		return v
-	}
+// return a new Viewport.
+func (v Viewport) recalculateInset(os string) Viewport {
 	// TODO: popup windows have their own insets.
 	var inset Viewport
 	switch os {
