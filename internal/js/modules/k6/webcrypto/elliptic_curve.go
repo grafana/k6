@@ -1,4 +1,3 @@
-//nolint:staticcheck //a bunch of deprecated logic is used in this package. Needs to be fixed.
 package webcrypto
 
 import (
