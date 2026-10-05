@@ -1325,13 +1325,15 @@ func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *Emulat
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
-	if fs.hasUIWindow {
+	// Only resize the actual browser window for headed browsers, as Playwright does. In headless
+	// mode the emulated viewport above is all that is needed, and sizing the window to the
+	// viewport leaves it smaller than the viewport on some platforms, because the window has
+	// non-client area (about 87px on macOS) that we can't know. The bottom of the viewport is
+	// then not repainted, and screenshots come back with a stale band at the bottom.
+	headless := fs.page.browserCtx.browser.browserOpts.Headless
+	if fs.hasUIWindow && !headless {
 		// add an inset to viewport depending on the operating system.
-		// this won't add an inset if we're running in headless mode.
-		viewport = viewport.recalculateInset(
-			fs.page.browserCtx.browser.browserOpts.Headless,
-			runtime.GOOS,
-		)
+		viewport = viewport.recalculateInset(headless, runtime.GOOS)
 		action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
 			Width:  viewport.Width,
 			Height: viewport.Height,

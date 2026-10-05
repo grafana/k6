@@ -753,6 +753,45 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	assert.Equal(t, true, viewportRestored)
 }
 
+// TestPageScreenshotAfterViewportResize checks that a viewport screenshot taken right after
+// resizing the viewport covers the whole viewport. In headless mode, resizing the browser window
+// to the viewport size left the bottom of the screenshot stale on some platforms (e.g. about 87px
+// on macOS), because the window has non-client area that is not part of the emulated viewport.
+func TestPageScreenshotAfterViewportResize(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+
+	// The gradient always fills the viewport, so it needs to be painted once before the resize
+	// for the stale area to show up in the capture right after it.
+	_, err := p.Evaluate(`
+	() => {
+		document.documentElement.style.margin = '0';
+		document.body.style.margin = '0';
+		document.body.style.height = '100vh';
+		document.body.style.background = 'linear-gradient(to bottom, red, blue)';
+	}`)
+	require.NoError(t, err)
+	_, err = p.Evaluate(`() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))`)
+	require.NoError(t, err)
+
+	err = p.SetViewportSize(&common.Size{Width: 1280, Height: 1600})
+	require.NoError(t, err)
+
+	buf, err := p.Screenshot(common.NewPageScreenshotOptions(), &mockPersister{})
+	require.NoError(t, err)
+
+	img, err := png.Decode(bytes.NewReader(buf))
+	require.NoError(t, err)
+	assert.Equal(t, 1280, img.Bounds().Max.X)
+	assert.Equal(t, 1600, img.Bounds().Max.Y)
+
+	r, _, b, _ := img.At(0, 0).RGBA()
+	assert.Truef(t, r > b*2, "want: the top pixel to be dominantly red, got R: %d, B: %d", r, b)
+	r, _, b, _ = img.At(0, 1599).RGBA()
+	assert.Truef(t, b > r*2, "want: the bottom pixel to be dominantly blue, got R: %d, B: %d", r, b)
+}
+
 func TestPageTitle(t *testing.T) {
 	t.Parallel()
 
