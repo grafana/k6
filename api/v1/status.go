@@ -24,8 +24,20 @@ type ExecutionResult struct {
 	ExitCode int `json:"exit_code" yaml:"exit_code"`
 }
 
+// runHasReturned reports whether the given execution status can only be seen after the scheduler's
+// Run() has returned. Runs that were aborted or marked as failed never get an end time (see
+// ExecutionState.MarkEnded() and https://github.com/grafana/k6/pull/4665), so HasEnded() alone
+// can't tell that they are finished.
+//
+// This relies on both statuses being set only by deferred functions at the end of Init() and Run(),
+// never in the middle of a run. If another terminal status is added, it needs to be listed here.
+func runHasReturned(status lib.ExecutionStatus) bool {
+	return status == lib.ExecutionStatusInterrupted || status == lib.ExecutionStatusMarkedAsFailed
+}
+
 func newStatus(cs *ControlSurface) Status {
 	executionState := cs.Scheduler.GetState()
+	executionStatus := executionState.GetCurrentExecutionStatus()
 	var executionResult *ExecutionResult
 	if exitCode, ok := executionState.GetExecutionResult(); ok {
 		executionResult = &ExecutionResult{ExitCode: exitCode}
@@ -37,8 +49,8 @@ func newStatus(cs *ControlSurface) Status {
 	default:
 	}
 	return Status{
-		Status:          executionState.GetCurrentExecutionStatus(),
-		Running:         executionState.HasStarted() && !executionState.HasEnded(),
+		Status:          executionStatus,
+		Running:         executionState.HasStarted() && !executionState.HasEnded() && !runHasReturned(executionStatus),
 		Paused:          null.BoolFrom(executionState.IsPaused()),
 		Stopped:         isStopped,
 		VUs:             null.IntFrom(executionState.GetCurrentlyActiveVUsCount()),
