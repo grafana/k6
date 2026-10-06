@@ -82,8 +82,7 @@ func TestMappings(t *testing.T) {
 			mapped = tt.mapp()
 			tested = make(map[string]bool)
 		)
-		for i := 0; i < typ.NumMethod(); i++ {
-			method := typ.Method(i)
+		for method := range typ.Methods() {
 			require.NotNil(t, method)
 
 			// sobek uses methods that starts with lowercase.
