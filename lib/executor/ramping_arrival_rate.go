@@ -339,12 +339,24 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 
 	vusPool := newActiveVUPool(varr.executionState)
 
+	// The number of iterations that fit in the stages usually isn't a whole number, so the last
+	// one can be scheduled well before the total duration of the stages has elapsed. When that
+	// happens, the executor finishes early since there is nothing left for it to start. These
+	// let the progress bar tell that apart from an actual interruption, but only once the last
+	// iteration has really finished, see https://github.com/grafana/k6/issues/2951
+	var allIterationsScheduled bool
+	var allIterationsDone atomic.Bool
+
 	defer func() {
 		// Make sure all VUs aren't executing iterations anymore, for the cancel()
 		// below to deactivate them.
 		<-returnedVUs
 		// first close the vusPool so we wait for the gracefulShutdown
 		vusPool.Close()
+		// Set before cancel(), which is what makes trackProgress take its final snapshot.
+		if allIterationsScheduled {
+			allIterationsDone.Store(true)
+		}
 		cancel()
 		regCancel()
 		activeVUsWg.Wait()
@@ -355,13 +367,6 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	tickerPeriod := int64(startTickerPeriod.Duration)
 	vusFmt := pb.GetFixedLengthIntFormat(maxVUs)
 	itersFmt := pb.GetFixedLengthFloatFormat(maxArrivalRatePerSec, 2) + " iters/s"
-
-	// The number of iterations that fit in the stages usually isn't a whole number, so the last
-	// one can be scheduled well before the total duration of the stages has elapsed. When that
-	// happens, and the iterations are fast, the executor finishes early since there is nothing
-	// left for it to start. This flag lets the progress bar tell that apart from an actual
-	// interruption, see https://github.com/grafana/k6/issues/2951
-	var allIterationsScheduled atomic.Bool
 
 	progressFn := func() (float64, []string) {
 		currActiveVUs := atomic.LoadUint64(&activeVUsCount)
@@ -386,7 +391,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		progDur := fmt.Sprintf("%s/%s", spentDuration, duration)
 		right[1] = progDur
 
-		if allIterationsScheduled.Load() {
+		if allIterationsDone.Load() {
 			// Nothing else is going to be started, regardless of how much time is left
 			return 1, right
 		}
@@ -518,7 +523,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	// cal() closed the channel, so every iteration that fits in the stages has been scheduled.
 	// If that was because the context was done instead, the progress bar status is going to be
 	// determined by the context anyway, so it is safe to set this either way.
-	allIterationsScheduled.Store(true)
+	allIterationsScheduled = true
 	return nil
 }
 

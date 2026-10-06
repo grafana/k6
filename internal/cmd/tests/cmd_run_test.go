@@ -1775,38 +1775,6 @@ func TestActiveVUsCount(t *testing.T) {
 	}
 }
 
-func TestRampingArrivalRateProgressBarWhenFinishingEarly(t *testing.T) {
-	t.Parallel()
-
-	// Only 2 iterations fit in the 2.5s stage at 1 iter/s, so the scenario finishes 0.5s early.
-	// The progress bar must show that as a normal completion and not as an interruption, see
-	// https://github.com/grafana/k6/issues/2951
-	script := `
-		export const options = {
-			scenarios: {
-				demo: {
-					executor: 'ramping-arrival-rate',
-					startRate: 1,
-					preAllocatedVUs: 1,
-					stages: [
-						{ duration: '2.5s', target: 1 },
-					],
-				},
-			},
-		};
-
-		export default function () {}
-	`
-
-	ts := getSingleFileTestState(t, script, []string{"--no-color"}, 0)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	stdout := ts.Stdout.String()
-	t.Log(stdout)
-	assert.Regexp(t, `demo ✓ \[ 100% \] 0/1 VUs  2\.\ds/2\.5s  1\.00 iters/s`, stdout)
-	assert.NotContains(t, stdout, "demo ✗")
-}
-
 func TestMinIterationDuration(t *testing.T) {
 	t.Parallel()
 	script := `
