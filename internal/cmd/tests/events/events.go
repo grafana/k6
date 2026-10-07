@@ -4,7 +4,7 @@ package events
 import (
 	"sync"
 
-	"go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/event"
 	"go.k6.io/k6/v2/js/modules"
 )
 
