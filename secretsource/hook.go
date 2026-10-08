@@ -35,7 +35,9 @@ func (s *secretsHook) add(secret string) {
 // Fire is part of the [logrus.Hook]
 func (s *secretsHook) Fire(entry *logrus.Entry) error {
 	s.mx.Lock()
-	// there is no way for us to get a secret after we got a log for it so we can use that to cache the replacer
+	// Snapshot the replacer under the lock. Concurrent add() calls may replace
+	// it; a log line only needs the secrets known at Fire time (Manager.Get
+	// registers a secret with add before returning it to callers).
 	replacer := s.replacer
 	s.mx.Unlock()
 	if replacer == nil { // no secrets no work
