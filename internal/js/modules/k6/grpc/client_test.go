@@ -355,6 +355,34 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "ConnectionSharing",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");
+
+				var otherClient = new grpc.Client();
+				otherClient.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+					return &grpc_testing.Empty{}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR", { connectionSharing: true });
+				otherClient.connect("GRPCBIN_ADDR", { connectionSharing: true });
+
+				// Closing one client must leave the shared connection open for the other one.
+				client.close();
+
+				var resp = otherClient.invoke("grpc.testing.TestService/EmptyCall", {})
+				if (resp.status !== grpc.StatusOK) {
+					throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
+				}
+				otherClient.close();`,
+			},
+		},
+		{
 			name: "InvokeDiscardResponseMessage",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
