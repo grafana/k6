@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand" // nosemgrep: math-random-used // This is used to generate id for easier debugging
+	"net/http"
 	"net/url"
 	"os/exec"
 	"path/filepath"
@@ -112,20 +113,28 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 	return ctx
 }
 
+// ConnectOverCDPOptions holds the optional settings for ConnectOverCDP,
+// mirroring the trailing options argument of Playwright's connectOverCDP.
+type ConnectOverCDPOptions struct {
+	// Timeout, when greater than zero, overrides the env-derived connect
+	// timeout (K6_BROWSER_TIMEOUT) for this call.
+	Timeout time.Duration
+}
+
 // ConnectOverCDP attaches the k6 browser to an existing, user-managed browser
 // over CDP, without requiring scenario browser options.
+//
+// The endpoint may be a ws:// or wss:// CDP WebSocket URL, or an http(s):// URL
+// pointing at the browser's debugging endpoint; in the latter case the
+// browser-level WebSocket URL is resolved from /json/version, mirroring
+// Playwright's connectOverCDP.
 //
 // The passed context must be the context the caller wants to control both the
 // connection and the browser lifetime; when it is canceled (iteration ends),
 // the connection is torn down.
-func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*common.Browser, error) {
-	// Validate wsEndpoint up front so an empty or malformed value
-	// fails fast with a clear error, instead of a confusing lower-level
-	// connection error.
-	if err := validateWSEndpoint(wsEndpoint); err != nil {
-		return nil, err
-	}
-
+func (b *BrowserType) ConnectOverCDP(
+	ctx context.Context, endpoint string, opts ConnectOverCDPOptions,
+) (*common.Browser, error) {
 	// Parse browser options from the environment (K6_BROWSER_TIMEOUT,
 	// K6_BROWSER_DEBUG, the log category filter, ...) like Connect does. Pass a
 	// fixed chromium type instead of scenario options: connectOverCDP works
@@ -133,6 +142,23 @@ func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*c
 	ctx, browserOpts, logger, err := b.init(ctx, true, map[string]any{"type": "chromium"})
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
+	}
+
+	// A per-call timeout overrides the env-derived connect timeout.
+	if opts.Timeout > 0 {
+		browserOpts.Timeout = opts.Timeout
+	}
+
+	// Resolve the endpoint to a CDP WebSocket URL (an http(s) endpoint is
+	// resolved via /json/version), then validate it up front so an empty or
+	// malformed value fails fast with a clear error instead of a confusing
+	// lower-level connection error.
+	wsEndpoint, err := resolveCDPWSEndpoint(ctx, endpoint, browserOpts.Timeout)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateWSEndpoint(wsEndpoint); err != nil {
+		return nil, err
 	}
 
 	bp, err := b.connect(ctx, ctx, wsEndpoint, browserOpts, logger)
@@ -145,6 +171,77 @@ func (b *BrowserType) ConnectOverCDP(ctx context.Context, wsEndpoint string) (*c
 	}
 
 	return bp, nil
+}
+
+// resolveCDPWSEndpoint returns a CDP WebSocket URL for the given endpoint.
+//
+// A ws:// or wss:// endpoint is returned unchanged. An http(s):// endpoint is
+// treated as the browser's debugging endpoint: the browser-level WebSocket URL
+// is fetched from {endpoint}/json/version (the "webSocketDebuggerUrl" field),
+// mirroring Playwright. This is convenient because that WS URL embeds a
+// per-launch GUID users would otherwise have to discover themselves.
+func resolveCDPWSEndpoint(ctx context.Context, endpoint string, timeout time.Duration) (string, error) {
+	if strings.TrimSpace(endpoint) == "" {
+		return "", errors.New("CDP endpoint cannot be empty")
+	}
+
+	u, err := url.Parse(strings.TrimSpace(endpoint))
+	if err != nil {
+		return "", fmt.Errorf("invalid CDP endpoint %q: %w", endpoint, err)
+	}
+
+	switch u.Scheme {
+	case "ws", "wss":
+		return endpoint, nil
+	case "http", "https":
+		return fetchWSDebuggerURL(ctx, u, timeout)
+	default:
+		return "", fmt.Errorf(
+			"invalid CDP endpoint %q: scheme must be ws, wss, http or https, got %q", endpoint, u.Scheme,
+		)
+	}
+}
+
+// fetchWSDebuggerURL fetches {endpoint}/json/version and returns the
+// webSocketDebuggerUrl reported by the browser.
+func fetchWSDebuggerURL(ctx context.Context, endpoint *url.URL, timeout time.Duration) (string, error) {
+	versionURL := *endpoint
+	versionURL.Path = strings.TrimRight(endpoint.Path, "/") + "/json/version"
+
+	if timeout <= 0 {
+		timeout = common.DefaultTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL.String(), nil)
+	if err != nil {
+		return "", fmt.Errorf("building CDP version request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching CDP version from %q: %w", versionURL.String(), err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf(
+			"fetching CDP version from %q: unexpected status %s", versionURL.String(), resp.Status,
+		)
+	}
+
+	var payload struct {
+		WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", fmt.Errorf("decoding CDP version from %q: %w", versionURL.String(), err)
+	}
+	if payload.WebSocketDebuggerURL == "" {
+		return "", fmt.Errorf("no webSocketDebuggerUrl in CDP version response from %q", versionURL.String())
+	}
+
+	return payload.WebSocketDebuggerURL, nil
 }
 
 // validateWSEndpoint returns an error if wsEndpoint is not a usable CDP
