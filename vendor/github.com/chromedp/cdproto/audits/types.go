@@ -49,15 +49,14 @@ func (t CookieExclusionReason) String() string {
 
 // CookieExclusionReason values.
 const (
-	CookieExclusionReasonExcludeSameSiteUnspecifiedTreatedAsLax        CookieExclusionReason = "ExcludeSameSiteUnspecifiedTreatedAsLax"
-	CookieExclusionReasonExcludeSameSiteNoneInsecure                   CookieExclusionReason = "ExcludeSameSiteNoneInsecure"
-	CookieExclusionReasonExcludeSameSiteLax                            CookieExclusionReason = "ExcludeSameSiteLax"
-	CookieExclusionReasonExcludeSameSiteStrict                         CookieExclusionReason = "ExcludeSameSiteStrict"
-	CookieExclusionReasonExcludeDomainNonASCII                         CookieExclusionReason = "ExcludeDomainNonASCII"
-	CookieExclusionReasonExcludeThirdPartyCookieBlockedInFirstPartySet CookieExclusionReason = "ExcludeThirdPartyCookieBlockedInFirstPartySet"
-	CookieExclusionReasonExcludeThirdPartyPhaseout                     CookieExclusionReason = "ExcludeThirdPartyPhaseout"
-	CookieExclusionReasonExcludePortMismatch                           CookieExclusionReason = "ExcludePortMismatch"
-	CookieExclusionReasonExcludeSchemeMismatch                         CookieExclusionReason = "ExcludeSchemeMismatch"
+	CookieExclusionReasonExcludeSameSiteUnspecifiedTreatedAsLax CookieExclusionReason = "ExcludeSameSiteUnspecifiedTreatedAsLax"
+	CookieExclusionReasonExcludeSameSiteNoneInsecure            CookieExclusionReason = "ExcludeSameSiteNoneInsecure"
+	CookieExclusionReasonExcludeSameSiteLax                     CookieExclusionReason = "ExcludeSameSiteLax"
+	CookieExclusionReasonExcludeSameSiteStrict                  CookieExclusionReason = "ExcludeSameSiteStrict"
+	CookieExclusionReasonExcludeDomainNonASCII                  CookieExclusionReason = "ExcludeDomainNonASCII"
+	CookieExclusionReasonExcludeThirdPartyPhaseout              CookieExclusionReason = "ExcludeThirdPartyPhaseout"
+	CookieExclusionReasonExcludePortMismatch                    CookieExclusionReason = "ExcludePortMismatch"
+	CookieExclusionReasonExcludeSchemeMismatch                  CookieExclusionReason = "ExcludeSchemeMismatch"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -76,8 +75,6 @@ func (t *CookieExclusionReason) UnmarshalJSON(buf []byte) error {
 		*t = CookieExclusionReasonExcludeSameSiteStrict
 	case CookieExclusionReasonExcludeDomainNonASCII:
 		*t = CookieExclusionReasonExcludeDomainNonASCII
-	case CookieExclusionReasonExcludeThirdPartyCookieBlockedInFirstPartySet:
-		*t = CookieExclusionReasonExcludeThirdPartyCookieBlockedInFirstPartySet
 	case CookieExclusionReasonExcludeThirdPartyPhaseout:
 		*t = CookieExclusionReasonExcludeThirdPartyPhaseout
 	case CookieExclusionReasonExcludePortMismatch:
@@ -2033,6 +2030,56 @@ type PermissionElementIssueDetails struct {
 	DisableReason          string                     `json:"disableReason,omitempty,omitzero"`          // Used for messages about activation disabled reason
 }
 
+// WebInstallIssueReason [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Audits#type-WebInstallIssueReason
+type WebInstallIssueReason string
+
+// String returns the WebInstallIssueReason as string value.
+func (t WebInstallIssueReason) String() string {
+	return string(t)
+}
+
+// WebInstallIssueReason values.
+const (
+	WebInstallIssueReasonManifestParsingOrNetworkError  WebInstallIssueReason = "ManifestParsingOrNetworkError"
+	WebInstallIssueReasonStartURLInvalid                WebInstallIssueReason = "StartUrlInvalid"
+	WebInstallIssueReasonManifestMissingNameOrShortName WebInstallIssueReason = "ManifestMissingNameOrShortName"
+	WebInstallIssueReasonManifestMissingID              WebInstallIssueReason = "ManifestMissingId"
+	WebInstallIssueReasonNoManifest                     WebInstallIssueReason = "NoManifest"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *WebInstallIssueReason) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch WebInstallIssueReason(s) {
+	case WebInstallIssueReasonManifestParsingOrNetworkError:
+		*t = WebInstallIssueReasonManifestParsingOrNetworkError
+	case WebInstallIssueReasonStartURLInvalid:
+		*t = WebInstallIssueReasonStartURLInvalid
+	case WebInstallIssueReasonManifestMissingNameOrShortName:
+		*t = WebInstallIssueReasonManifestMissingNameOrShortName
+	case WebInstallIssueReasonManifestMissingID:
+		*t = WebInstallIssueReasonManifestMissingID
+	case WebInstallIssueReasonNoManifest:
+		*t = WebInstallIssueReasonNoManifest
+	default:
+		return fmt.Errorf("unknown WebInstallIssueReason value: %v", s)
+	}
+	return nil
+}
+
+// WebInstallIssueDetails this issue reports a failure involving a web app
+// manifest used by a Web Install operation.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Audits#type-WebInstallIssueDetails
+type WebInstallIssueDetails struct {
+	ManifestURL string                `json:"manifestUrl,omitempty,omitzero"`
+	Reason      WebInstallIssueReason `json:"reason"`
+}
+
 // SelectivePermissionsInterventionIssueDetails the issue warns about blocked
 // calls to privacy sensitive APIs via the Selective Permissions Intervention.
 //
@@ -2097,6 +2144,7 @@ const (
 	InspectorIssueCodeSelectivePermissionsInterventionIssue InspectorIssueCode = "SelectivePermissionsInterventionIssue"
 	InspectorIssueCodeEmailVerificationRequestIssue         InspectorIssueCode = "EmailVerificationRequestIssue"
 	InspectorIssueCodeLazyLoadImageIssue                    InspectorIssueCode = "LazyLoadImageIssue"
+	InspectorIssueCodeWebInstallIssue                       InspectorIssueCode = "WebInstallIssue"
 )
 
 // UnmarshalJSON satisfies [json.Unmarshaler].
@@ -2165,6 +2213,8 @@ func (t *InspectorIssueCode) UnmarshalJSON(buf []byte) error {
 		*t = InspectorIssueCodeEmailVerificationRequestIssue
 	case InspectorIssueCodeLazyLoadImageIssue:
 		*t = InspectorIssueCodeLazyLoadImageIssue
+	case InspectorIssueCodeWebInstallIssue:
+		*t = InspectorIssueCodeWebInstallIssue
 	default:
 		return fmt.Errorf("unknown InspectorIssueCode value: %v", s)
 	}
@@ -2206,6 +2256,7 @@ type InspectorIssueDetails struct {
 	SelectivePermissionsInterventionIssueDetails *SelectivePermissionsInterventionIssueDetails `json:"selectivePermissionsInterventionIssueDetails,omitempty,omitzero"`
 	EmailVerificationRequestIssueDetails         *EmailVerificationRequestIssueDetails         `json:"emailVerificationRequestIssueDetails,omitempty,omitzero"`
 	LazyLoadImageIssueDetails                    *LazyLoadImageIssueDetails                    `json:"lazyLoadImageIssueDetails,omitempty,omitzero"`
+	WebInstallIssueDetails                       *WebInstallIssueDetails                       `json:"webInstallIssueDetails,omitempty,omitzero"`
 }
 
 // IssueID a unique id for a DevTools inspector issue. Allows other entities
