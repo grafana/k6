@@ -1,19 +1,8 @@
 diff --git a/WebCryptoAPI/sign_verify/ecdsa_vectors.js b/WebCryptoAPI/sign_verify/ecdsa_vectors.js
-index aa9b81ba8..185c82622 100644
+index aa9b81ba8..231183090 100644
 --- a/WebCryptoAPI/sign_verify/ecdsa_vectors.js
 +++ b/WebCryptoAPI/sign_verify/ecdsa_vectors.js
-@@ -90,7 +90,9 @@ function getInvalidTestVectors() {
-         {
-             const vector = structuredClone(validVector);
-             vector.name = `${vector.name} - The signature was truncated by 1 byte`;
--            vector.signature = vector.signature.subarray(0, vector.signature.byteLength - 1);
-+            // this copyUint8Array is a workaround, since we have to modify the way how we read ArrayBuffers
-+            // https://github.com/grafana/xk6-webcrypto/issues/72
-+            vector.signature = copyUint8Array(vector.signature.subarray(0, vector.signature.byteLength - 1));
-             vectors.push(vector);
-         }
- 
-@@ -137,3 +139,26 @@ function getInvalidTestVectors() {
+@@ -137,3 +137,26 @@ function getInvalidTestVectors() {
  
      return vectors;
  }
