@@ -158,6 +158,62 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			callFn: "define_tests",
 		},
 		{
+			catalog: "sign_verify",
+			files: []string{
+				"eddsa_vectors.js",
+				"eddsa.js",
+				"eddsa_curve25519.https.any.js",
+			},
+		},
+		{
+			catalog: "sign_verify",
+			files: []string{
+				"eddsa_vectors.js",
+				"eddsa_small_order_points.js",
+				"eddsa_small_order_points.https.any.js",
+			},
+		},
+		{
+			catalog: "import_export",
+			files: []string{
+				"okp_importKey_fixtures.js",
+				"okp_importKey.js",
+				"okp_importKey_Ed25519.https.any.js",
+			},
+		},
+		{
+			catalog: "import_export",
+			files: []string{
+				"okp_importKey_fixtures.js",
+				"okp_importKey.js",
+				"okp_importKey_X25519.https.any.js",
+			},
+		},
+		{
+			catalog: "import_export",
+			files: []string{
+				"okp_importKey_failures_fixtures.js",
+				"importKey_failures.js",
+				"okp_importKey_failures_Ed25519.https.any.js",
+			},
+		},
+		{
+			catalog: "import_export",
+			files: []string{
+				"okp_importKey_failures_fixtures.js",
+				"importKey_failures.js",
+				"okp_importKey_failures_X25519.https.any.js",
+			},
+		},
+		{
+			catalog: "derive_bits_keys",
+			files: []string{
+				"cfrg_curves_bits_fixtures.js",
+				"cfrg_curves_bits.js",
+				"cfrg_curves_bits_curve25519.https.any.js",
+			},
+		},
+		{
 			catalog: "derive_bits_keys",
 			files: []string{
 				"pbkdf2.js",

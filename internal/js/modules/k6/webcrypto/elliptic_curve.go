@@ -548,8 +548,11 @@ func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length in
 		return nil, NewError(InvalidAccessError, "provided baseKey does not contain the 'deriveBits' usage")
 	}
 
-	if err := ensureKeysUseSameCurve(*privateKey, *keyParams.Public); err != nil {
-		return nil, NewError(InvalidAccessError, err.Error())
+	// X25519 keys have no named curve to compare.
+	if keyParams.Name == ECDH {
+		if err := ensureKeysUseSameCurve(*privateKey, *keyParams.Public); err != nil {
+			return nil, NewError(InvalidAccessError, err.Error())
+		}
 	}
 
 	pk, ok := privateKey.handle.(*ecdh.PrivateKey)
@@ -561,9 +564,11 @@ func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length in
 		return nil, NewError(InvalidAccessError, "key is not a valid ECDH public key")
 	}
 
+	// For X25519, ECDH returns an error when the shared secret is the all-zero value, which the
+	// specification requires to be reported as an OperationError.
 	b, err := pk.ECDH(pc)
 	if err != nil {
-		return nil, err
+		return nil, NewError(OperationError, err.Error())
 	}
 
 	if len(b) < length/8 {
