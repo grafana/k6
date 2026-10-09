@@ -548,15 +548,11 @@ func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length in
 		return nil, NewError(InvalidAccessError, "provided baseKey does not contain the 'deriveBits' usage")
 	}
 
-	// X25519 is a standalone algorithm rather than an ECDH named curve, so its keys carry a plain
-	// Algorithm instead of an EcKeyAlgorithm. There is no curve to compare, so we only check that
-	// the base key belongs to the same algorithm.
+	// X25519 keys have no named curve to compare.
 	if keyParams.Name == ECDH {
 		if err := ensureKeysUseSameCurve(*privateKey, *keyParams.Public); err != nil {
 			return nil, NewError(InvalidAccessError, err.Error())
 		}
-	} else if alg, ok := privateKey.Algorithm.(Algorithm); !ok || alg.Name != keyParams.Name {
-		return nil, NewError(InvalidAccessError, "provided baseKey is not an "+keyParams.Name+" key")
 	}
 
 	pk, ok := privateKey.handle.(*ecdh.PrivateKey)

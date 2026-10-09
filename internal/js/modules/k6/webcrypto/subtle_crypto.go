@@ -759,6 +759,15 @@ func (sc *SubtleCrypto) DeriveBits(
 			return err
 		}
 
+		keyAlgorithmNameValue, err := traverseObject(rt, baseKey, "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalized.Name != keyAlgorithmNameValue.String() {
+			return NewError(InvalidAccessError, "algorithm name does not match baseKey algorithm name")
+		}
+
 		return nil
 	}()
 
