@@ -35,7 +35,7 @@ services:
       - "4318:4318" # HTTP receiver
 
   grafana:
-    image: grafana/grafana:12.4.11@sha256:3ea272e5cab64a4a62240c682e2c62433b25614d956d44c299a10cb6994f6f2e
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
     networks:
       - k6
     ports:
