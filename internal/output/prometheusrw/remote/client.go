@@ -23,6 +23,8 @@ import (
 type HTTPConfig struct {
 	Timeout   time.Duration
 	TLSConfig *tls.Config
+	// ProxyURL, if set, is the HTTP proxy used for all the requests.
+	ProxyURL  *url.URL
 	BasicAuth *BasicAuth
 	SigV4     *sigv4.Config
 	Headers   http.Header
@@ -58,10 +60,14 @@ func NewWriteClient(endpoint string, cfg *HTTPConfig) (*WriteClient, error) {
 		url: u,
 		cfg: cfg,
 	}
-	if cfg.TLSConfig != nil {
-		wc.hc.Transport = &http.Transport{
+	if cfg.TLSConfig != nil || cfg.ProxyURL != nil {
+		transport := &http.Transport{
 			TLSClientConfig: cfg.TLSConfig,
 		}
+		if cfg.ProxyURL != nil {
+			transport.Proxy = http.ProxyURL(cfg.ProxyURL)
+		}
+		wc.hc.Transport = transport
 	}
 	if cfg.SigV4 != nil {
 		tripper, err := sigv4.NewRoundTripper(cfg.SigV4, wc.hc.Transport)
