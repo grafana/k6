@@ -120,6 +120,22 @@ func (t *ContrastAlgorithm) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
+// ImcbHighlightConfig configuration for Inset-Modified Containing Block
+// (IMCB) and CSS Anchor Positioning highlight.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-ImcbHighlightConfig
+type ImcbHighlightConfig struct {
+	ImcbBorderColor               *cdp.RGBA `json:"imcbBorderColor,omitempty,omitzero"`               // Border color for the Inset-Modified Containing Block (default: transparent).
+	ImcbBackgroundColor           *cdp.RGBA `json:"imcbBackgroundColor,omitempty,omitzero"`           // Background fill color for the Inset-Modified Containing Block (default: transparent).
+	InsetsBackgroundColor         *cdp.RGBA `json:"insetsBackgroundColor,omitempty,omitzero"`         // Fill color for the inset modifiers area (difference between CB and IMCB).
+	InsetsHatchColor              *cdp.RGBA `json:"insetsHatchColor,omitempty,omitzero"`              // Hatch color for the inset modifiers area.
+	AnchorBorderColor             *cdp.RGBA `json:"anchorBorderColor,omitempty,omitzero"`             // Border color for the referenced target anchor element(s) (when element is anchor-positioned).
+	AnchorBackgroundColor         *cdp.RGBA `json:"anchorBackgroundColor,omitempty,omitzero"`         // Background fill color for the referenced target anchor element(s) (when element is anchor-positioned).
+	ShowPositionAreaGrid          bool      `json:"showPositionAreaGrid"`                             // Whether to render the 3x3 position-area grid lines when position-area is used.
+	PositionAreaGridLineColor     *cdp.RGBA `json:"positionAreaGridLineColor,omitempty,omitzero"`     // Line color for the 3x3 position-area grid lines.
+	PositionAreaActiveRegionColor *cdp.RGBA `json:"positionAreaActiveRegionColor,omitempty,omitzero"` // Fill color for the active region within the position-area grid.
+}
+
 // HighlightConfig configuration data for the highlighting of page elements.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-HighlightConfig
@@ -143,6 +159,7 @@ type HighlightConfig struct {
 	FlexItemHighlightConfig                *FlexItemHighlightConfig                `json:"flexItemHighlightConfig,omitempty,omitzero"`                // The flex item highlight configuration (default: all transparent).
 	ContrastAlgorithm                      ContrastAlgorithm                       `json:"contrastAlgorithm,omitempty,omitzero"`                      // The contrast algorithm to use for the contrast ratio (default: aa).
 	ContainerQueryContainerHighlightConfig *ContainerQueryContainerHighlightConfig `json:"containerQueryContainerHighlightConfig,omitempty,omitzero"` // The container query container highlight configuration (default: all transparent).
+	ImcbHighlightConfig                    *ImcbHighlightConfig                    `json:"imcbHighlightConfig,omitempty,omitzero"`                    // The IMCB highlight configuration (default: all transparent).
 }
 
 // ColorFormat [no description].
@@ -226,6 +243,59 @@ type HingeConfig struct {
 	OutlineColor *cdp.RGBA `json:"outlineColor,omitempty,omitzero"` // The content box highlight outline color (default: transparent).
 }
 
+// DisplayCutoutShape supported display cutout shapes.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-DisplayCutoutShape
+type DisplayCutoutShape string
+
+// String returns the DisplayCutoutShape as string value.
+func (t DisplayCutoutShape) String() string {
+	return string(t)
+}
+
+// DisplayCutoutShape values.
+const (
+	DisplayCutoutShapePill      DisplayCutoutShape = "pill"
+	DisplayCutoutShapeNotch     DisplayCutoutShape = "notch"
+	DisplayCutoutShapeCircle    DisplayCutoutShape = "circle"
+	DisplayCutoutShapeRectangle DisplayCutoutShape = "rectangle"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *DisplayCutoutShape) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch DisplayCutoutShape(s) {
+	case DisplayCutoutShapePill:
+		*t = DisplayCutoutShapePill
+	case DisplayCutoutShapeNotch:
+		*t = DisplayCutoutShapeNotch
+	case DisplayCutoutShapeCircle:
+		*t = DisplayCutoutShapeCircle
+	case DisplayCutoutShapeRectangle:
+		*t = DisplayCutoutShapeRectangle
+	default:
+		return fmt.Errorf("unknown DisplayCutoutShape value: %v", s)
+	}
+	return nil
+}
+
+// DisplayCutoutConfig configuration for a display cutout.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-DisplayCutoutConfig
+type DisplayCutoutConfig struct {
+	Rect         *dom.Rect          `json:"rect"`                            // A rectangle representing the cutout bounds.
+	Shape        DisplayCutoutShape `json:"shape"`                           // Shape used to draw the cutout.
+	BorderRadius int64              `json:"borderRadius,omitempty,omitzero"` // Border radius for rounded cutout shapes.
+	UpperRadius  int64              `json:"upperRadius,omitempty,omitzero"`  // Upper shoulder radius for notch cutout shapes.
+	LowerRadius  int64              `json:"lowerRadius,omitempty,omitzero"`  // Lower transition radius for notch cutout shapes.
+	Cx           int64              `json:"cx,omitempty,omitzero"`           // Center x coordinate for circle cutout shapes.
+	Cy           int64              `json:"cy,omitempty,omitzero"`           // Center y coordinate for circle cutout shapes.
+	Radius       int64              `json:"radius,omitempty,omitzero"`       // Radius for circle cutout shapes.
+	ContentColor *cdp.RGBA          `json:"contentColor,omitempty,omitzero"` // The cutout fill color (default: black).
+}
+
 // WindowControlsOverlayConfig configuration for Window Controls Overlay.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-WindowControlsOverlayConfig
@@ -304,6 +374,14 @@ func (t *InspectMode) UnmarshalJSON(buf []byte) error {
 		return fmt.Errorf("unknown InspectMode value: %v", s)
 	}
 	return nil
+}
+
+// InspectedElementAnchorConfig [no description].
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-InspectedElementAnchorConfig
+type InspectedElementAnchorConfig struct {
+	NodeID        cdp.NodeID        `json:"nodeId,omitempty,omitzero"`        // Identifier of the node to highlight.
+	BackendNodeID cdp.BackendNodeID `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node to highlight.
 }
 
 // LineStylePattern the line pattern (default: solid).
