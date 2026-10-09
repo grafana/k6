@@ -566,11 +566,20 @@ func (keyParams ECDHKeyDeriveParams) DeriveBits(privateKey *CryptoKey, length in
 		return nil, err
 	}
 
-	if len(b) < length/8 {
+	// The length is in bits, so round it up to whole bytes.
+	n := (length + 7) / 8
+	if len(b) < n {
 		return nil, NewError(OperationError, "length is too large")
 	}
 
-	return b[:length/8], nil
+	// Keep only the first length bits: the unused trailing bits of the last byte are
+	// set to zero, as browsers do.
+	b = b[:n]
+	if rem := length % 8; rem != 0 {
+		b[n-1] &= byte(0xFF << (8 - rem))
+	}
+
+	return b, nil
 }
 
 // The ECDSAParams represents the object that should be passed as the algorithm
