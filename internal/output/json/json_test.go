@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -205,6 +207,43 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 	validateResults(reader)
 	assert.NoError(t, file.Close())
 }
+
+func TestJsonGzipCloseError(t *testing.T) {
+	t.Parallel()
+
+	fs := failWriteFS{Fs: fsext.NewMemMapFs()}
+	out, err := New(output.Params{
+		Logger:         testutils.NewLogger(t),
+		StdOut:         new(bytes.Buffer),
+		FS:             fs,
+		ConfigArgument: "/json-output.gz",
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+	require.ErrorIs(t, out.Stop(), errFailWrite)
+}
+
+type failWriteFS struct {
+	afero.Fs
+}
+
+func (f failWriteFS) Create(name string) (afero.File, error) {
+	file, err := f.Fs.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return &failWriteFile{File: file}, nil
+}
+
+type failWriteFile struct {
+	afero.File
+}
+
+func (f *failWriteFile) Write(p []byte) (int, error) {
+	return 0, errFailWrite
+}
+
+var errFailWrite = errors.New("disk full")
 
 func TestWrapSampleWithSamplePointer(t *testing.T) {
 	t.Parallel()
