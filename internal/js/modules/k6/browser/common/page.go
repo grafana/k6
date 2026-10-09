@@ -456,6 +456,11 @@ type Match struct {
 	Method string `js:"method"`
 }
 
+// methodQuery is the HTTP QUERY method, standardized by RFC 10008. Go 1.28
+// adds net/http.MethodQuery; once k6 moves to Go 1.28, this local constant
+// should be replaced by the standard library one.
+const methodQuery = "QUERY"
+
 // Tag will find the first match given the URLTagPatterns and the URL from
 // the metric tag and update the name field.
 func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
@@ -471,7 +476,8 @@ func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
 			method = strings.ToUpper(method)
 			switch method {
 			case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
-				http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace:
+				http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace,
+				methodQuery:
 			default:
 				return fmt.Errorf("method %q is invalid", m.Method)
 			}
