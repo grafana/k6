@@ -91,8 +91,8 @@ type Config struct {
 	SigV4SecretKey null.String `json:"sigV4SecretKey" envconfig:"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY"`
 
 	// SigV4Token is the AWS session token. It is required when the credentials
-	// are temporary, for example when they come from an IAM role or STS, and it
-	// is ignored otherwise.
+	// are temporary, for example when they come from an IAM role or STS. When
+	// set, it is always included in the signed headers.
 	SigV4Token null.String `json:"sigV4Token" envconfig:"K6_PROMETHEUS_RW_SIGV4_TOKEN"`
 }
 
@@ -150,7 +150,8 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 		return nil, errors.New(
 			"sigv4 seems to be partially configured. All of " +
 				"K6_PROMETHEUS_RW_SIGV4_REGION, K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY, K6_PROMETHEUS_RW_SIGV4_SECRET_KEY " +
-				"must all be set. Unset all to bypass sigv4",
+				"must all be set; K6_PROMETHEUS_RW_SIGV4_TOKEN is optional but valid only together with them. " +
+				"Unset all to bypass sigv4",
 		)
 	}
 
