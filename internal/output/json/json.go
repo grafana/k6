@@ -5,6 +5,7 @@ package json
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -79,9 +80,8 @@ func (o *Output) Start() error {
 			outfile := gzip.NewWriter(w)
 
 			o.closeFn = func() error {
-				_ = outfile.Close()
-				_ = w.Flush()
-				return logfile.Close()
+				// A dropped gzip or flush error made Stop succeed for a truncated file.
+				return errors.Join(outfile.Close(), w.Flush(), logfile.Close())
 			}
 			o.out = outfile
 		} else {

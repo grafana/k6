@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -101,8 +102,8 @@ func newOutput(params output.Params) (*Output, error) {
 		csvWriter := csv.NewWriter(outfile)
 		c.csvWriter = csvWriter
 		c.closeFn = func() error {
-			_ = outfile.Close()
-			return logFile.Close()
+			// A dropped gzip error made Stop succeed for a truncated file.
+			return errors.Join(outfile.Close(), logFile.Close())
 		}
 	} else {
 		csvWriter := csv.NewWriter(logFile)
