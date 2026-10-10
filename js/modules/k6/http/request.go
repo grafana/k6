@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"mime/multipart"
@@ -418,6 +419,16 @@ func (c *Client) parseRequest(
 				} else {
 					return nil, fmt.Errorf("unsupported responseCallback")
 				}
+			case "tlsAuth":
+				tlsAuthV := params.Get(k)
+				if common.IsNullish(tlsAuthV) {
+					continue
+				}
+				cert, err := common.ParseTLSAuth(tlsAuthV.Export())
+				if err != nil {
+					return nil, fmt.Errorf("invalid tlsAuth: %w", err)
+				}
+				result.TLSClientCerts = []tls.Certificate{*cert}
 			}
 		}
 	}

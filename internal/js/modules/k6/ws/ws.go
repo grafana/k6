@@ -105,6 +105,7 @@ type wsConnectArgs struct {
 	enableCompression bool
 	cookieJar         *cookiejar.Jar
 	tagsAndMeta       *metrics.TagsAndMeta
+	tlsClientCerts    []tls.Certificate
 }
 
 const writeWait = 10 * time.Second
@@ -252,6 +253,15 @@ func (mi *WS) dial(
 	if state.TLSConfig != nil {
 		tlsConfig = state.TLSConfig.Clone()
 		tlsConfig.NextProtos = []string{"http/1.1"}
+	} else if len(args.tlsClientCerts) > 0 {
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			NextProtos: []string{"http/1.1"},
+		}
+	}
+	if tlsConfig != nil && len(args.tlsClientCerts) > 0 {
+		tlsConfig.Certificates = args.tlsClientCerts
+		tlsConfig.NameToCertificate = nil //nolint:staticcheck
 	}
 
 	wsd := websocket.Dialer{
@@ -698,6 +708,16 @@ func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) 
 			}
 
 			parsedArgs.enableCompression = true
+		case "tlsAuth":
+			tlsAuthV := params.Get(k)
+			if common.IsNullish(tlsAuthV) {
+				continue
+			}
+			cert, err := common.ParseTLSAuth(tlsAuthV.Export())
+			if err != nil {
+				return nil, fmt.Errorf("invalid tlsAuth: %w", err)
+			}
+			parsedArgs.tlsClientCerts = []tls.Certificate{*cert}
 		}
 	}
 

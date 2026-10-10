@@ -392,6 +392,15 @@ func (w *webSocket) dial(ctx context.Context, params *wsParams) (*websocket.Conn
 	if state.TLSConfig != nil {
 		tlsConfig = state.TLSConfig.Clone()
 		tlsConfig.NextProtos = []string{"http/1.1"}
+	} else if len(params.tlsClientCerts) > 0 {
+		tlsConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			NextProtos: []string{"http/1.1"},
+		}
+	}
+	if tlsConfig != nil && len(params.tlsClientCerts) > 0 {
+		tlsConfig.Certificates = params.tlsClientCerts
+		tlsConfig.NameToCertificate = nil //nolint:staticcheck
 	}
 	// technically we have to do a fetch request here, so ... uh do normal one ;)
 	wsd := websocket.Dialer{
