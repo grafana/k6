@@ -524,6 +524,15 @@ func (sc *SubtleCrypto) GenerateKey(
 			}
 
 			if result.IsKeyPair() {
+				keyPair, err := result.ResolveCryptoKeyPair()
+				if err != nil {
+					return nil, NewError(OperationError, "could not resolve generated key pair")
+				}
+
+				if len(keyPair.PrivateKey.Usages) == 0 {
+					return nil, NewError(SyntaxError, "usages cannot be empty for a generated private key")
+				}
+
 				return result, nil
 			}
 
