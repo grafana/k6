@@ -1260,6 +1260,28 @@ func TestLocatorFilter(t *testing.T) {
 	})
 }
 
+func TestVisibleSelectorPart(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`
+		<button>visible</button>
+		<button hidden>hidden 1</button>
+		<button style="display: none">hidden 2</button>
+		<div><span>a</span><span>b</span></div>`,
+		nil,
+	))
+
+	count, err := p.Locator("button >> visible=false", nil).Count()
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "visible=false should match the hidden buttons")
+
+	count, err = p.Locator("div >> visible=true >> span", nil).Count()
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "parts after visible= should be evaluated")
+}
+
 func TestFrameLocatorLocatorOptions(t *testing.T) {
 	t.Parallel()
 
