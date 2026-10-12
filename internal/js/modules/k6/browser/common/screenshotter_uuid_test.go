@@ -40,12 +40,12 @@ func (s *screenshotUUIDSession) Execute(_ context.Context, _ string, _, _ any) e
 	return nil
 }
 
-func newCapturingLogrus(t *testing.T, buf *bytes.Buffer) *logrus.Logger {
+func newCapturingLogger(t *testing.T, buf *bytes.Buffer) *log.Logger {
 	t.Helper()
 	l := logrus.New()
 	l.SetOutput(buf)
 	l.SetLevel(logrus.InfoLevel)
-	return l
+	return log.New(l, "")
 }
 
 func TestScreenshotterLogsUUID(t *testing.T) {
@@ -75,8 +75,7 @@ func TestScreenshotterLogsUUID(t *testing.T) {
 			t.Parallel()
 
 			var buf bytes.Buffer
-			logrusLogger := newCapturingLogrus(t, &buf)
-			logger := log.New(logrusLogger, "")
+			logger := newCapturingLogger(t, &buf)
 
 			s, cancel := newScreenshotter(
 				context.Background(),

@@ -249,23 +249,32 @@ func (s *screenshotter) screenshot(
 
 	// Save screenshot capture to file
 	if path != "" {
-		uuid, err := s.persister.PersistWithResult(s.ctx, path, bytes.NewBuffer(buf))
-		if err != nil {
-			return nil, fmt.Errorf("persisting screenshot: %w", err)
-		}
-		// Log the UUID the remote server assigned to the screenshot so that
-		// it can be extracted from the logs and used to retrieve the
-		// screenshot at a later point in time.
-		if uuid != "" {
-			s.logger.Infof(
-				"Screenshotter::screenshot",
-				"screenshot:%s",
-				uuid,
-			)
+		if err := s.persistScreenshot(path, buf); err != nil {
+			return nil, err
 		}
 	}
 
 	return buf, nil
+}
+
+// persistScreenshot persists the screenshot data to the given path and logs
+// the UUID the remote server assigned to it, if any.
+func (s *screenshotter) persistScreenshot(path string, buf []byte) error {
+	uuid, err := s.persister.PersistWithResult(s.ctx, path, bytes.NewBuffer(buf))
+	if err != nil {
+		return fmt.Errorf("persisting screenshot: %w", err)
+	}
+	// Log the UUID the remote server assigned to the screenshot so that it
+	// can be extracted from the logs and used to retrieve the screenshot at
+	// a later point in time.
+	if uuid != "" {
+		s.logger.Infof(
+			"Screenshotter::screenshot",
+			"screenshot:%s",
+			uuid,
+		)
+	}
+	return nil
 }
 
 func getViewPortDimensions(ctx context.Context, sess session, logger *log.Logger) (float64, float64, float64, error) {
