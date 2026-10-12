@@ -2268,36 +2268,46 @@ class InjectedScript {
     if (!root["querySelector"]) {
       return "error:notqueryablenode";
     }
-    const result = this._querySelectorRecursively(
-      [{ element: root, capture: undefined }],
-      selector,
-      0,
-      new k6BrowserNative.Map()
-    );
-    if (strict && result.length > 1) {
-      throw "error:strictmodeviolation";
+    this._evaluator.begin();
+    try {
+      const result = this._querySelectorRecursively(
+        [{ element: root, capture: undefined }],
+        selector,
+        0,
+        new k6BrowserNative.Map()
+      );
+      if (strict && result.length > 1) {
+        throw "error:strictmodeviolation";
+      }
+      if (result.length == 0) {
+        return null;
+      }
+      return result[0].capture || result[0].element;
+    } finally {
+      this._evaluator.end();
     }
-    if (result.length == 0) {
-      return null;
-    }
-    return result[0].capture || result[0].element;
   }
 
   querySelectorAll(selector, root) {
     if (!root["querySelectorAll"]) {
       return "error:notqueryablenode";
     }
-    const result = this._querySelectorRecursively(
-      [{ element: root, capture: undefined }],
-      selector,
-      0,
-      new k6BrowserNative.Map()
-    );
-    const set = new k6BrowserNative.Set();
-    for (const r of result) {
-      set.add(r.capture || r.element);
+    this._evaluator.begin();
+    try {
+      const result = this._querySelectorRecursively(
+        [{ element: root, capture: undefined }],
+        selector,
+        0,
+        new k6BrowserNative.Map()
+      );
+      const set = new k6BrowserNative.Set();
+      for (const r of result) {
+        set.add(r.capture || r.element);
+      }
+      return [...set];
+    } finally {
+      this._evaluator.end();
     }
-    return [...set];
   }
 
   selectOptions(node, optionsToSelect) {

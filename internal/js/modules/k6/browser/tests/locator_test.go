@@ -1147,6 +1147,25 @@ func TestDetachedRetry(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestLocatorHasTextAfterTextChange(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<div id="status">Loading</div>`, nil))
+
+	count, err := p.Locator("#status", &common.LocatorOptions{HasText: "Loading"}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	_, err = p.Evaluate(`() => { document.querySelector('#status').textContent = 'Done'; }`)
+	require.NoError(t, err)
+
+	count, err = p.Locator("#status", &common.LocatorOptions{HasText: "Done"}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "hasText should match the updated text")
+}
+
 func TestLocatorFilter(t *testing.T) {
 	t.Parallel()
 
