@@ -223,7 +223,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		// header for basic auth
 		preq.URL.GetURL().User = nil
 
-		transport = newDigestTransport(transport, username, password, state.Logger)
+		transport = newDigestTransport(transport, username, password, preq.Req.URL, state.Logger)
 	case "ntlm":
 		// The first response of NTLM auth may be a 401 error.
 		if tracerTransport.responseCallback != nil {
