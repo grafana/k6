@@ -1557,12 +1557,6 @@ class CSSQueryEngine {
   }
 }
 
-class TextQueryEngine {
-  queryAll(root, selector) {
-    return root.queryAll(selector);
-  }
-}
-
 class XPathQueryEngine {
   queryAll(root, selector) {
     if (selector.startsWith("/")) {
@@ -1725,7 +1719,7 @@ class InjectedScript {
     this._evaluator = new SelectorEvaluatorImpl();
     this._queryEngines = {
       css: new CSSQueryEngine(),
-      text: new TextQueryEngine(),
+      text: new TextEngine(true, false),
       xpath: new XPathQueryEngine(),
       'internal:role': createRoleEngine(true),
       'internal:attr': new AttributeEngine(),

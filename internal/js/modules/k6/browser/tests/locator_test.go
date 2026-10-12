@@ -880,6 +880,29 @@ func TestSelectOption(t *testing.T) {
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
 
+func TestTextSelector(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<div><button>Log in</button><span>Sign up</span></div>`, nil))
+
+	tests := []struct {
+		selector string
+		want     int
+	}{
+		{selector: `text=Log in`, want: 1},
+		{selector: `text=log IN`, want: 1}, // unquoted is a case-insensitive substring match
+		{selector: `"Log in"`, want: 1},    // quoted is a strict match
+		{selector: `"log in"`, want: 0},    // strict match is case-sensitive
+	}
+	for _, tt := range tests {
+		count, err := p.Locator(tt.selector, nil).Count()
+		require.NoError(t, err, tt.selector)
+		require.Equal(t, tt.want, count, tt.selector)
+	}
+}
+
 func TestCount(t *testing.T) {
 	t.Parallel()
 
