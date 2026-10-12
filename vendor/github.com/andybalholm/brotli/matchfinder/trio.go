@@ -58,17 +58,18 @@ func (z *Trio) FindMatches(dst []Match, src []byte) []Match {
 		}
 	}
 
+	e := matchEmitter{
+		Dst:      dst,
+		NextEmit: len(z.history),
+	}
+	z.history = append(z.history, src...)
+
 	if len(src) < 20 {
 		return append(dst, Match{
 			Unmatched: len(src),
 		})
 	}
 
-	e := matchEmitter{
-		Dst:      dst,
-		NextEmit: len(z.history),
-	}
-	z.history = append(z.history, src...)
 	src = z.history
 
 	// matches stores the matches that have been found but not emitted,
