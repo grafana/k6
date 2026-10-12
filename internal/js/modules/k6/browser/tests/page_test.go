@@ -679,9 +679,16 @@ type timeoutScreenshotPersister struct {
 }
 
 func (p *timeoutScreenshotPersister) Persist(ctx context.Context, _ string, _ io.Reader) error {
+	_, err := p.PersistWithResult(ctx, "", nil)
+	return err
+}
+
+func (p *timeoutScreenshotPersister) PersistWithResult(
+	ctx context.Context, _ string, _ io.Reader,
+) (uuid string, err error) {
 	p.called = true
 	<-ctx.Done()
-	return ctx.Err()
+	return "", ctx.Err()
 }
 
 func TestPageScreenshotFullpage(t *testing.T) {

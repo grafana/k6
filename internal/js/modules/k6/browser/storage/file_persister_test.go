@@ -99,6 +99,8 @@ func TestRemoteFilePersister(t *testing.T) {
 		wantPresignedURLMethod  string
 		uploadResponse          int
 		getPresignedURLResponse int
+		presignedResponseUUID   string
+		wantUUID                string
 		wantError               string
 	}{
 		{
@@ -121,6 +123,28 @@ func TestRemoteFilePersister(t *testing.T) {
 			wantPresignedURLMethod:  http.MethodPost,
 			uploadResponse:          http.StatusOK,
 			getPresignedURLResponse: http.StatusOK,
+		},
+		{
+			name:         "upload_file_with_uuid",
+			path:         "some/path/file.png",
+			dataToUpload: "here's some data",
+			multipartFormFields: map[string]string{
+				"fooKey": "foo",
+			},
+			wantPresignedURLBody: `{
+					"service":"aws_s3",
+					"operation": "upload_post",
+					"files":[{"name":"%s"}]
+				}`,
+			wantPresignedHeaders: map[string]string{
+				"Authorization": "token asd123",
+				"Run_id":        "123456",
+			},
+			wantPresignedURLMethod:  http.MethodPost,
+			uploadResponse:          http.StatusOK,
+			getPresignedURLResponse: http.StatusOK,
+			presignedResponseUUID:   "7fc56f68-1e6b-4b64-8f3f-3b0d1a3c9c31",
+			wantUUID:                "7fc56f68-1e6b-4b64-8f3f-3b0d1a3c9c31",
 		},
 		{
 			name:         "upload_file",
@@ -249,16 +273,23 @@ func TestRemoteFilePersister(t *testing.T) {
 					}
 					formFields = strings.TrimRight(formFields, ",")
 
+					uuidField := ""
+					if tt.presignedResponseUUID != "" {
+						uuidField = fmt.Sprintf(`"uuid": %q,`, tt.presignedResponseUUID)
+					}
+
 					w.WriteHeader(tt.getPresignedURLResponse)
 					_, err = fmt.Fprintf(w, `{
-							"service": "aws_s3",
-							"urls": [{
-								"name": "%s",
-								"pre_signed_url": "%s",
-								"method": "%s",
-								"form_fields": {%s}
-							}]
-							}`,
+										"service": "aws_s3",
+										%s
+										"urls": [{
+											"name": "%s",
+											"pre_signed_url": "%s",
+											"method": "%s",
+											"form_fields": {%s}
+										}]
+									}`,
+						uuidField,
 						basePath+"/"+tt.path,
 						s.URL+uploadEndpoint,
 						tt.wantPresignedURLMethod,
@@ -298,13 +329,17 @@ func TestRemoteFilePersister(t *testing.T) {
 				}))
 
 			r := NewRemoteFilePersister(s.URL+presignedEndpoint, tt.wantPresignedHeaders, basePath)
-			err := r.Persist(context.Background(), tt.path, strings.NewReader(tt.dataToUpload))
+			uuid, err := r.PersistWithResult(
+				context.Background(), tt.path, strings.NewReader(tt.dataToUpload),
+			)
 			if tt.wantError != "" {
 				assert.EqualError(t, err, tt.wantError)
+				assert.Empty(t, uuid)
 				return
 			}
 
 			assert.NoError(t, err)
+			assert.Equal(t, tt.wantUUID, uuid)
 		})
 	}
 }

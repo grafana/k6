@@ -448,6 +448,10 @@ func (m *mockPersister) Persist(_ context.Context, _ string, _ io.Reader) (err e
 	return nil
 }
 
+func (m *mockPersister) PersistWithResult(_ context.Context, _ string, _ io.Reader) (uuid string, err error) {
+	return "", nil
+}
+
 func TestElementHandleScreenshot(t *testing.T) {
 	t.Parallel()
 

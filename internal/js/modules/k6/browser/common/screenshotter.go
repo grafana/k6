@@ -21,6 +21,10 @@ import (
 // to persist a file somewhere, hiding the details of where and how from the caller.
 type ScreenshotPersister interface {
 	Persist(ctx context.Context, path string, data io.Reader) (err error)
+	// PersistWithResult persists a file like Persist does, and additionally
+	// returns the UUID the persister assigned to the persisted file, if any.
+	// Persisters that do not support UUIDs return an empty UUID.
+	PersistWithResult(ctx context.Context, path string, data io.Reader) (uuid string, err error)
 }
 
 // ImageFormat represents an image file format.
@@ -245,8 +249,19 @@ func (s *screenshotter) screenshot(
 
 	// Save screenshot capture to file
 	if path != "" {
-		if err := s.persister.Persist(s.ctx, path, bytes.NewBuffer(buf)); err != nil {
+		uuid, err := s.persister.PersistWithResult(s.ctx, path, bytes.NewBuffer(buf))
+		if err != nil {
 			return nil, fmt.Errorf("persisting screenshot: %w", err)
+		}
+		// Log the UUID the remote server assigned to the screenshot so that
+		// it can be extracted from the logs and used to retrieve the
+		// screenshot at a later point in time.
+		if uuid != "" {
+			s.logger.Infof(
+				"Screenshotter::screenshot",
+				"screenshot:%s",
+				uuid,
+			)
 		}
 	}
 

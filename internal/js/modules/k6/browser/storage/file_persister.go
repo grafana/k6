@@ -21,17 +21,27 @@ type LocalFilePersister struct{}
 
 // Persist will write the contents of data to the local disk on the specified path.
 // TODO: we should not write to disk here but put it on some queue for async disk writes.
-func (l *LocalFilePersister) Persist(_ context.Context, path string, data io.Reader) (err error) {
+func (l *LocalFilePersister) Persist(ctx context.Context, path string, data io.Reader) error {
+	_, err := l.PersistWithResult(ctx, path, data)
+	return err
+}
+
+// PersistWithResult writes the contents of data to the local disk on the
+// specified path. Screenshots persisted locally are not assigned a server
+// side UUID, so the returned UUID is always empty.
+func (l *LocalFilePersister) PersistWithResult(
+	_ context.Context, path string, data io.Reader,
+) (uuid string, err error) {
 	cp := filepath.Clean(path)
 
 	dir := filepath.Dir(cp)
 	if err = os.MkdirAll(dir, 0o755); err != nil { //nolint:forbidigo,gosec
-		return fmt.Errorf("creating a local directory %q: %w", dir, err)
+		return "", fmt.Errorf("creating a local directory %q: %w", dir, err)
 	}
 
 	f, err := os.OpenFile(cp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:forbidigo
 	if err != nil {
-		return fmt.Errorf("creating a local file %q: %w", cp, err)
+		return "", fmt.Errorf("creating a local file %q: %w", cp, err)
 	}
 	defer func() {
 		if cerr := f.Close(); cerr != nil && err == nil {
@@ -42,14 +52,14 @@ func (l *LocalFilePersister) Persist(_ context.Context, path string, data io.Rea
 	bf := bufio.NewWriter(f)
 
 	if _, err := io.Copy(bf, data); err != nil {
-		return fmt.Errorf("copying data to file: %w", err)
+		return "", fmt.Errorf("copying data to file: %w", err)
 	}
 
 	if err := bf.Flush(); err != nil {
-		return fmt.Errorf("flushing data to disk: %w", err)
+		return "", fmt.Errorf("flushing data to disk: %w", err)
 	}
 
-	return nil
+	return "", nil
 }
 
 // RemoteFilePersister is to be used when files created by the browser module need
@@ -67,7 +77,10 @@ type RemoteFilePersister struct {
 // PresignedURLResponse holds the response from a presigned generation request.
 type PresignedURLResponse struct {
 	Service string `json:"service"`
-	URLs    []struct {
+	// UUID is an optional field the presigned URL server can return to
+	// identify the uploaded file once the upload completes.
+	UUID string `json:"uuid,omitempty"`
+	URLs []struct {
 		Name         string            `json:"name"`
 		PresignedURL string            `json:"pre_signed_url"` //nolint:tagliatelle
 		Method       string            `json:"method"`
@@ -92,32 +105,42 @@ func NewRemoteFilePersister(
 }
 
 // Persist will upload the contents of data to a remote location.
-func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) (err error) {
+func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) error {
+	_, err := r.PersistWithResult(ctx, path, data)
+	return err
+}
+
+// PersistWithResult uploads the contents of data to a remote location and
+// returns the UUID the presigned URL server assigned to the uploaded file, if
+// the server returned one.
+func (r *RemoteFilePersister) PersistWithResult(
+	ctx context.Context, path string, data io.Reader,
+) (uuid string, err error) {
 	psResp, err := r.requestPresignedURL(ctx, path)
 	if err != nil {
-		return fmt.Errorf("requesting presigned url: %w", err)
+		return "", fmt.Errorf("requesting presigned url: %w", err)
 	}
 
 	req, err := newFileUploadRequest(ctx, psResp, data)
 	if err != nil {
-		return fmt.Errorf("creating upload request: %w", err)
+		return "", fmt.Errorf("creating upload request: %w", err)
 	}
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("performing upload request: %w", err)
+		return "", fmt.Errorf("performing upload request: %w", err)
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		return fmt.Errorf("draining upload response body: %w", err)
+		return "", fmt.Errorf("draining upload response body: %w", err)
 	}
 
 	if err := checkStatusCode(resp); err != nil {
-		return fmt.Errorf("uploading: %w", err)
+		return "", fmt.Errorf("uploading: %w", err)
 	}
 
-	return nil
+	return psResp.UUID, nil
 }
 
 // requestPresignedURL will request a new presigned URL from the remote server

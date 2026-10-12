@@ -26,6 +26,9 @@ type (
 	// to persist a file somewhere, hiding the details of where and how from the caller.
 	filePersister interface {
 		Persist(ctx context.Context, path string, data io.Reader) (err error)
+		// PersistWithResult persists a file like Persist does, and additionally
+		// returns the UUID the persister assigned to the persisted file, if any.
+		PersistWithResult(ctx context.Context, path string, data io.Reader) (uuid string, err error)
 	}
 
 	// RootModule is the global module instance that will create module
