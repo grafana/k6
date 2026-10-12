@@ -1429,6 +1429,29 @@ func TestGetByTextSuccess(t *testing.T) {
 	}
 }
 
+func TestGetByWithBackslash(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	_, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		await page.setContent('<button>C:\\temp</button><p>C:\\path</p>');
+
+		const byRole = await page.getByRole('button', { name: 'C:\\temp' }).count();
+		if (byRole !== 1) {
+			throw new Error('getByRole: expected 1 match, got ' + byRole);
+		}
+		const byText = await page.getByText('C:\\path').count();
+		if (byText !== 1) {
+			throw new Error('getByText: expected 1 match, got ' + byText);
+		}
+	`)
+	require.NoError(t, err)
+}
+
 func TestGetByNullHandling(t *testing.T) {
 	t.Parallel()
 
