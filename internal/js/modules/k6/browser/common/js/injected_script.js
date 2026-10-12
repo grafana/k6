@@ -466,8 +466,7 @@ function trimFlatString(s) {
   return s.trim();
 }
 function asFlatString(s) {
-  return s.split("\xA0").map((chunk) => chunk.replace(/\r\n/g, "\
-").replace(/[\u200b\u00ad]/g, "").replace(/\s\s*/g, " ")).join("\xA0").trim();
+  return s.split("\xA0").map((chunk) => chunk.replace(/\r\n/g, "\n").replace(/[\u200b\u00ad]/g, "").replace(/\s\s*/g, " ")).join("\xA0").trim();
 }
 function queryInAriaOwned(element, selector) {
   const result = [...element.querySelectorAll(selector)];

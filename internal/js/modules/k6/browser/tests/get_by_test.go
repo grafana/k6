@@ -1484,6 +1484,22 @@ func TestGetByNullHandling(t *testing.T) {
 	}
 }
 
+func TestGetByRoleNameWithCRLF(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<button>placeholder</button>`, nil))
+
+	// The HTML parser normalizes CRLF in markup, so it has to be set from JS.
+	_, err := p.Evaluate(`() => document.querySelector('button').setAttribute('aria-label', 'Sign\r\nin')`)
+	require.NoError(t, err)
+
+	count, err := p.GetByRole("button", &common.GetByRoleOptions{Name: new(`'Sign in'`), Exact: new(true)}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+}
+
 func getByImplementationsOf[T any](p *common.Page) map[string]T {
 	return map[string]T{
 		pageImpl:         any(p).(T),
