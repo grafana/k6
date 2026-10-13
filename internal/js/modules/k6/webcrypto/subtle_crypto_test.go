@@ -11,6 +11,8 @@ import (
 )
 
 func TestGenerateKeyPrivateKeyUsages(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name              string
 		algorithm         string
@@ -142,6 +144,8 @@ func TestGenerateKeyPrivateKeyUsages(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			rt := modulestest.NewRuntime(t)
 
 			usages, err := json.Marshal(tc.usages)
