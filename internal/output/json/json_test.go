@@ -253,15 +253,48 @@ func TestJsonOutputFileIsBuffered(t *testing.T) {
 	out.AddMetricSamples(samples[2:])
 	require.NoError(t, out.Stop())
 
-	// The whole output is much smaller than the buffer, so it should reach
-	// the file in a single write when the output is stopped, instead of
-	// one write per encoded line.
-	assert.Equal(t, 1, writes)
-
-	file, err := fs.Open("/json-output")
+	content, err := fsext.ReadFile(fs, "/json-output")
 	require.NoError(t, err)
-	validateResults(file)
-	assert.NoError(t, file.Close())
+	validateResults(bytes.NewReader(content))
+
+	// The buffer is written out once per flush, so the number of writes
+	// depends on how many flushes ran, but it has to stay below one write
+	// per encoded line.
+	lines := bytes.Count(content, []byte("\n"))
+	assert.Positive(t, writes)
+	assert.Less(t, writes, lines)
+}
+
+func TestJsonOutputFileIsWrittenWhileRunning(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	out, err := New(output.Params{
+		Logger:         testutils.NewLogger(t),
+		StdOut:         new(bytes.Buffer),
+		FS:             fs,
+		ConfigArgument: "/json-output",
+	})
+	require.NoError(t, err)
+
+	setThresholds(t, out)
+	require.NoError(t, out.Start())
+
+	samples, validateResults := generateTestMetricSamples(t)
+	out.AddMetricSamples(samples)
+
+	// The samples are much smaller than the buffer, so they only show up
+	// in the file before Stop if the buffer is flushed periodically.
+	require.Eventually(t, func() bool {
+		info, err := fs.Stat("/json-output")
+		return err == nil && info.Size() > 0
+	}, 5*time.Second, 10*time.Millisecond)
+
+	content, err := fsext.ReadFile(fs, "/json-output")
+	require.NoError(t, err)
+	validateResults(bytes.NewReader(content))
+
+	require.NoError(t, out.Stop())
 }
 
 // failingWriteFs wraps an Fs and makes every Write on the files it creates fail.
