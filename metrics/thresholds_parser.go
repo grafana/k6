@@ -196,6 +196,10 @@ func parseThresholdAggregationMethod(input string) (string, null.Float, error) {
 		}
 	}
 
+	if input == tokenPercentile {
+		return "", null.Float{}, fmt.Errorf("percentile requires a value, e.g. p(95)")
+	}
+
 	// Otherwise, attempt to parse a percentile expression
 	if strings.HasPrefix(input, tokenPercentile+"(") && strings.HasSuffix(input, ")") {
 		aggregationValue, err := strconv.ParseFloat(trimDelimited("p(", input, ")"), 64)

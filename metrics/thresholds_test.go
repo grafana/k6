@@ -332,14 +332,14 @@ func TestThresholdsPercentileRequiresValue(t *testing.T) {
 			t.Parallel()
 
 			thresholds := NewThresholds([]string{source})
-			assert.Error(t, thresholds.Parse())
+			assert.ErrorContains(t, thresholds.Parse(), "percentile requires a value, e.g. p(95)")
 
 			registry := NewRegistry()
 			_, err := registry.NewMetric("test_trend", Trend)
 			require.NoError(t, err)
 
 			thresholds = NewThresholds([]string{source})
-			assert.Error(t, thresholds.Validate("test_trend", registry))
+			assert.ErrorContains(t, thresholds.Validate("test_trend", registry), "percentile requires a value, e.g. p(95)")
 		})
 	}
 }
