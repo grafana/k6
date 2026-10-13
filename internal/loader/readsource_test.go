@@ -3,8 +3,11 @@ package loader
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -120,5 +123,31 @@ func TestReadSourceMissingFileError(t *testing.T) {
 	_, err := ReadSource(logger, "some file with spaces.js", "/c",
 		map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fs}, nil)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), `The moduleSpecifier "some file with spaces.js" couldn't be found on local disk.`)
+	searched := filepath.Join("/c", "some file with spaces.js")
+	require.ErrorContains(t, err, fmt.Sprintf(
+		`The moduleSpecifier "some file with spaces.js" couldn't be found on local disk, we searched here: "%s".`,
+		searched,
+	))
+}
+
+func TestReadSourceMissingRelativeFileIncludesResolvedPath(t *testing.T) {
+	t.Parallel()
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+	_, err := ReadSource(logger, "./missing.js", "/c",
+		map[string]fsext.Fs{"file": fsext.NewMemMapFs()}, nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, fmt.Sprintf(
+		`The moduleSpecifier "./missing.js" couldn't be found on local disk, we searched here: "%s".`,
+		filepath.FromSlash("/c/missing.js"),
+	))
+}
+
+func TestLocalPathForError(t *testing.T) {
+	t.Parallel()
+	require.Equal(t, filepath.FromSlash("/tmp/test-js.js"), localPathForError(filepath.FromSlash("/tmp/test-js.js")))
+	if runtime.GOOS != "windows" {
+		return
+	}
+	require.Equal(t, `C:\tmp\test-js.js`, localPathForError(`\C:\tmp\test-js.js`))
 }

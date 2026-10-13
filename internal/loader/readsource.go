@@ -37,8 +37,9 @@ func ReadSource(
 	} else {
 		srcLocalPath = filepath.Join(pwd, src)
 	}
-	// All paths should start with a / in all fses. This is mostly for windows where it will start
-	// with a volume name : C:\something.js
+	// searchedPath is what a user would type. Filesystem lookups add a leading separator,
+	// mostly so Windows volume paths work: C:\something.js is stored as \C:\something.js.
+	searchedPath := srcLocalPath
 	srcLocalPath = filepath.Clean(fsext.FilePathSeparator + srcLocalPath)
 	if ok, _ := fsext.Exists(filesystems["file"], srcLocalPath); ok {
 		// there is file on the local disk ... lets use it :)
@@ -48,7 +49,7 @@ func ReadSource(
 	srcURL, err := Resolve(pwdURL, filepath.ToSlash(src))
 	if err != nil {
 		if unresolvedError, ok := errors.AsType[unresolvableURLError](err); ok {
-			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, string(unresolvedError)) //nolint:staticcheck
+			return nil, fileNotFoundError(string(unresolvedError), searchedPath)
 		}
 		return nil, err
 	}
