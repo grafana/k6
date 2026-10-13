@@ -143,6 +143,18 @@ func TestOptions(t *testing.T) {
 					assert.Equal(t, &vers2, opts.TLSCipherSuites)
 				})
 			})
+			t.Run("Standard ChaCha20 names", func(t *testing.T) {
+				t.Parallel()
+				var opts Options
+				jsonStr := `{"tlsCipherSuites":[` +
+					`"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",` +
+					`"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"]}`
+				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
+				assert.Equal(t, &TLSCipherSuites{
+					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				}, opts.TLSCipherSuites)
+			})
 			t.Run("Not a string", func(t *testing.T) {
 				t.Parallel()
 				var opts Options
