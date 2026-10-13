@@ -1376,6 +1376,13 @@ func TestConnectionErrorTags(t *testing.T) {
 			wantStatus:    "404",
 			wantErrorCode: "1404",
 		},
+		{
+			name:          "response that is not an upgrade",
+			url:           "WSBIN_URL/status/200",
+			wantStatus:    "200",
+			wantErrorCode: "1000",
+			wantError:     true,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
