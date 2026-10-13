@@ -102,7 +102,6 @@ func newOutput(params output.Params) (*Output, error) {
 		csvWriter := csv.NewWriter(outfile)
 		c.csvWriter = csvWriter
 		c.closeFn = func() error {
-			// A dropped gzip error made Stop succeed for a truncated file.
 			return errors.Join(outfile.Close(), logFile.Close())
 		}
 	} else {
