@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
       - name: Resolve Go versions
         id: go_versions
-        uses: grafana/k6-ci/.github/actions/go-versions@4437a05286b70dbd87d6bce2bea5220694a40474 # v0.5.2
+        uses: grafana/k6-ci/.github/actions/go-versions@bc53c239916ae45b50a0bdea2a37698589219c84 # v0.5.3
       - name: Install Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -88,6 +88,12 @@ jobs:
             fi
             if grep -qiE 'level=error|GoError' run.log; then
               echo "::error::${f} logged an error"
+              status=1
+            fi
+            # A failed check() doesn't change k6's exit code, but the end-of-test
+            # summary marks it with ✗ (e.g. grpc_healthcheck.js has only a check).
+            if grep -qF '✗' run.log; then
+              echo "::error::${f} had a failed check"
               status=1
             fi
             want="${expect[${f}]:-}"
