@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // LocalFilePersister will persist files to the local disk.
@@ -61,6 +63,7 @@ type RemoteFilePersister struct {
 	presignedURLRequestURL string
 	headers                map[string]string
 	basePath               string
+	logger                 logrus.FieldLogger
 
 	httpClient *http.Client
 }
@@ -68,7 +71,9 @@ type RemoteFilePersister struct {
 // PresignedURLResponse holds the response from a presigned generation request.
 type PresignedURLResponse struct {
 	Service string `json:"service"`
-	URLs    []struct {
+	// UUID identifies the uploaded file, when the remote store returns one.
+	UUID string `json:"uuid"`
+	URLs []struct {
 		Name         string            `json:"name"`
 		PresignedURL string            `json:"pre_signed_url"` //nolint:tagliatelle
 		Method       string            `json:"method"`
@@ -81,11 +86,13 @@ func NewRemoteFilePersister(
 	presignedURLRequestURL string,
 	headers map[string]string,
 	basePath string,
+	logger logrus.FieldLogger,
 ) *RemoteFilePersister {
 	return &RemoteFilePersister{
 		presignedURLRequestURL: presignedURLRequestURL,
 		headers:                headers,
 		basePath:               basePath,
+		logger:                 logger,
 		httpClient: &http.Client{
 			Timeout: time.Second * 10,
 		},
@@ -117,6 +124,8 @@ func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.
 	if err := checkStatusCode(resp); err != nil {
 		return fmt.Errorf("uploading: %w", err)
 	}
+
+	logUploadedUUID(r.logger, psResp.UUID)
 
 	return nil
 }
@@ -283,4 +292,14 @@ func newRequestError(err error) error {
 	}
 
 	return &requestError{msg: msg, err: err}
+}
+
+// logUploadedUUID logs the UUID the remote store returned for an uploaded file,
+// so that the upload can be correlated with the test's logs. Stores that don't
+// return a UUID log nothing.
+func logUploadedUUID(logger logrus.FieldLogger, uuid string) {
+	if uuid == "" || logger == nil {
+		return
+	}
+	logger.Info("screenshot:" + uuid)
 }

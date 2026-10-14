@@ -60,7 +60,7 @@ func Test_newScreenshotPersister(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			gotType, err := newScreenshotPersister(tt.envLookup)
+			gotType, err := newScreenshotPersister(tt.envLookup, nil)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

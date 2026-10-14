@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/storage"
 )
@@ -26,7 +28,7 @@ const (
 // newScreenshotPersister will return either a persister that persists file to the local
 // disk or uploads the files to a remote location. This decision depends on whether
 // the K6_BROWSER_SCREENSHOTS_OUTPUT env var is setup with the correct configs.
-func newScreenshotPersister(envLookup env.LookupFunc) (filePersister, error) {
+func newScreenshotPersister(envLookup env.LookupFunc, logger logrus.FieldLogger) (filePersister, error) {
 	envVar, ok := envLookup(env.ScreenshotsOutput)
 	if !ok || envVar == "" {
 		return &storage.LocalFilePersister{}, nil
@@ -38,10 +40,12 @@ func newScreenshotPersister(envLookup env.LookupFunc) (filePersister, error) {
 	}
 
 	if popts.upload == uploadDirect {
-		return storage.NewDirectFilePersister(popts.getterURL, popts.headers, popts.formFields, popts.basePath), nil
+		return storage.NewDirectFilePersister(
+			popts.getterURL, popts.headers, popts.formFields, popts.basePath, logger,
+		), nil
 	}
 
-	return storage.NewRemoteFilePersister(popts.getterURL, popts.headers, popts.basePath), nil
+	return storage.NewRemoteFilePersister(popts.getterURL, popts.headers, popts.basePath, logger), nil
 }
 
 // parsePresignedURLEnvVar will parse a value such as:
