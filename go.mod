@@ -7,7 +7,7 @@ require (
 	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/PuerkitoBio/goquery v1.12.0
-	github.com/andybalholm/brotli v1.2.3
+	github.com/andybalholm/brotli v1.2.6
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/chromedp/cdproto v0.0.0-20260922220944-a19bff23514f
 	github.com/evanw/esbuild v0.28.2
@@ -27,14 +27,14 @@ require (
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.18.1
 	github.com/klauspost/compress v1.20.0
-	github.com/mattn/go-colorable v0.1.15
+	github.com/mattn/go-colorable v0.1.16
 	github.com/mattn/go-isatty v0.0.24
 	github.com/mccutchen/go-httpbin/v2 v2.25.0
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.5.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/client_model v0.6.2
+	github.com/prometheus/client_model v0.6.3
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.3
@@ -57,7 +57,7 @@ require (
 	go.uber.org/goleak v1.3.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260921070245-7a4a4d6beae2
-	golang.org/x/net v0.59.0
+	golang.org/x/net v0.60.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/term v0.46.0
 	golang.org/x/time v0.16.0
