@@ -44,13 +44,15 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 	presignedURL := presignedURLConfig{
 		headers: make(map[string]string),
 	}
-	for _, s := range ss {
+	// Errors must not include values, as they can hold credentials
+	// such as Authorization header values.
+	for i, s := range ss {
 		// The key value pair should be of the form key=value, so split
 		// on the first '=' to retrieve the key and value separately. The
 		// value may itself contain '=', e.g. base64 padding or a query string.
 		k, v, ok := strings.Cut(s, "=")
 		if !ok || k == "" {
-			return presignedURLConfig{}, fmt.Errorf("format of value must be k=v, received %q", s)
+			return presignedURLConfig{}, fmt.Errorf("format of value must be k=v, at entry %d", i+1)
 		}
 
 		// A key with "header." means that the header name is encoded in the
@@ -63,21 +65,21 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 
 			hh := strings.Split(k, ".")
 			if len(hh) != 2 {
-				return presignedURLConfig{}, fmt.Errorf("format of header must be header.k=v, received %q", s)
+				return presignedURLConfig{}, fmt.Errorf("format of header must be header.k=v, received key %q", k)
 			}
 
 			k = hh[0]
 			hk = hh[1]
 
 			if hk == "" {
-				return presignedURLConfig{}, fmt.Errorf("empty header key, received %q", s)
+				return presignedURLConfig{}, fmt.Errorf("empty header key, at entry %d", i+1)
 			}
 		}
 
 		switch k {
 		case "url":
 			if _, err := url.ParseRequestURI(v); err != nil {
-				return presignedURLConfig{}, fmt.Errorf("invalid url %q", s)
+				return presignedURLConfig{}, errors.New("invalid url")
 			}
 			presignedURL.getterURL = v
 		case "basePath":

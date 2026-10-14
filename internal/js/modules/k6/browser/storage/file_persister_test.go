@@ -308,3 +308,42 @@ func TestRemoteFilePersister(t *testing.T) {
 		})
 	}
 }
+
+func TestRemoteFilePersisterErrorsDoNotLeakURLQuery(t *testing.T) {
+	t.Parallel()
+
+	const secret = "s3cr3t"
+
+	// A server that is closed straight away, so that any request to it fails
+	// with a connection error that includes the request URL.
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closedURL := closed.URL
+	closed.Close()
+
+	t.Run("presign_request", func(t *testing.T) {
+		t.Parallel()
+
+		r := NewRemoteFilePersister(closedURL+"/presign?token="+secret, nil, "")
+		err := r.Persist(context.Background(), "a.png", strings.NewReader("data"))
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), secret)
+		assert.Contains(t, err.Error(), closedURL+"/presign")
+	})
+
+	t.Run("upload_request", func(t *testing.T) {
+		t.Parallel()
+
+		presignedURL := closedURL + "/upload?X-Amz-Signature=" + secret
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, `{"service":"aws_s3","urls":[{"name":"a.png","pre_signed_url":%q,"method":"PUT","form_fields":{}}]}`,
+				presignedURL)
+		}))
+		defer s.Close()
+
+		r := NewRemoteFilePersister(s.URL, nil, "")
+		err := r.Persist(context.Background(), "a.png", strings.NewReader("data"))
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), secret)
+		assert.Contains(t, err.Error(), closedURL+"/upload")
+	})
+}
