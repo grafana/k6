@@ -3,12 +3,15 @@ package storage
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // DirectFilePersister uploads files together with their metadata in a single
@@ -18,6 +21,7 @@ type DirectFilePersister struct {
 	headers    map[string]string
 	formFields map[string]string
 	basePath   string
+	logger     logrus.FieldLogger
 
 	httpClient *http.Client
 }
@@ -28,12 +32,14 @@ func NewDirectFilePersister(
 	headers map[string]string,
 	formFields map[string]string,
 	basePath string,
+	logger logrus.FieldLogger,
 ) *DirectFilePersister {
 	return &DirectFilePersister{
 		uploadURL:  uploadURL,
 		headers:    headers,
 		formFields: formFields,
 		basePath:   basePath,
+		logger:     logger,
 		httpClient: &http.Client{
 			Timeout: time.Second * 10,
 		},
@@ -82,13 +88,22 @@ func (d *DirectFilePersister) Persist(ctx context.Context, path string, data io.
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
-	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		return fmt.Errorf("draining upload response body: %w", err)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading upload response body: %w", err)
 	}
 
 	if err := checkStatusCode(resp); err != nil {
 		return fmt.Errorf("uploading: %w", err)
 	}
+
+	// The upload succeeded, so a response body that isn't the expected
+	// JSON only means there's no UUID to log.
+	var rb struct {
+		UUID string `json:"uuid"`
+	}
+	_ = json.Unmarshal(body, &rb)
+	logUploadedUUID(d.logger, rb.UUID)
 
 	return nil
 }

@@ -50,6 +50,7 @@ func TestDirectFilePersister(t *testing.T) {
 			map[string]string{"Authorization": "Basic abc=="},
 			map[string]string{"execution_id": "exec-1"},
 			"screenshots",
+			nil,
 		)
 		err := d.Persist(context.Background(), "a.png", strings.NewReader("image data"))
 		require.NoError(t, err)
@@ -63,7 +64,7 @@ func TestDirectFilePersister(t *testing.T) {
 		}))
 		defer s.Close()
 
-		d := NewDirectFilePersister(s.URL, nil, nil, "")
+		d := NewDirectFilePersister(s.URL, nil, nil, "", nil)
 		err := d.Persist(context.Background(), "a.png", strings.NewReader("image data"))
 		assert.EqualError(t, err, "uploading: server returned 429 (too many requests)")
 	})
@@ -75,7 +76,7 @@ func TestDirectFilePersister(t *testing.T) {
 		u := s.URL
 		s.Close()
 
-		d := NewDirectFilePersister(u+"/upload?token=s3cr3t", nil, nil, "")
+		d := NewDirectFilePersister(u+"/upload?token=s3cr3t", nil, nil, "", nil)
 		err := d.Persist(context.Background(), "a.png", strings.NewReader("image data"))
 		assert.EqualError(t, err, "performing upload request: connecting to host failed")
 	})
