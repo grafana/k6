@@ -78,7 +78,9 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 
 		switch k {
 		case "url":
-			if _, err := url.ParseRequestURI(v); err != nil {
+			// The url must be absolute, since it's used to make requests.
+			u, err := url.ParseRequestURI(v)
+			if err != nil || u.Scheme == "" || u.Host == "" {
 				return presignedURLConfig{}, errors.New("invalid url")
 			}
 			presignedURL.getterURL = v
