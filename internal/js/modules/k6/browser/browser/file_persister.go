@@ -11,10 +11,17 @@ import (
 )
 
 type presignedURLConfig struct {
-	getterURL string
-	headers   map[string]string
-	basePath  string
+	getterURL  string
+	headers    map[string]string
+	basePath   string
+	upload     string // empty means uploadPresign
+	formFields map[string]string
 }
+
+const (
+	uploadPresign = "presign"
+	uploadDirect  = "direct"
+)
 
 // newScreenshotPersister will return either a persister that persists file to the local
 // disk or uploads the files to a remote location. This decision depends on whether
@@ -30,12 +37,21 @@ func newScreenshotPersister(envLookup env.LookupFunc) (filePersister, error) {
 		return nil, fmt.Errorf("parsing %s: %w", env.ScreenshotsOutput, err)
 	}
 
+	if popts.upload == uploadDirect {
+		return storage.NewDirectFilePersister(popts.getterURL, popts.headers, popts.formFields, popts.basePath), nil
+	}
+
 	return storage.NewRemoteFilePersister(popts.getterURL, popts.headers, popts.basePath), nil
 }
 
 // parsePresignedURLEnvVar will parse a value such as:
 // url=https://127.0.0.1/,basePath=/screenshots,header.1=a,header.2=b
 // and return them.
+//
+// With upload=direct, url is the endpoint that receives the file and its
+// metadata in a single request, and field.k=v entries are sent as multipart
+// form fields. The default, upload=presign, requests a presigned URL from url
+// first and then uploads the file to it.
 //
 
 func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
@@ -53,6 +69,17 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 		k, v, ok := strings.Cut(s, "=")
 		if !ok || k == "" {
 			return presignedURLConfig{}, fmt.Errorf("format of value must be k=v, at entry %d", i+1)
+		}
+
+		if fk, ok := strings.CutPrefix(k, "field."); ok {
+			if fk == "" {
+				return presignedURLConfig{}, fmt.Errorf("empty field key, at entry %d", i+1)
+			}
+			if presignedURL.formFields == nil {
+				presignedURL.formFields = make(map[string]string)
+			}
+			presignedURL.formFields[fk] = v
+			continue
 		}
 
 		// A key with "header." means that the header name is encoded in the
@@ -86,6 +113,11 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 			presignedURL.getterURL = v
 		case "basePath":
 			presignedURL.basePath = v
+		case "upload":
+			if v != uploadPresign && v != uploadDirect {
+				return presignedURLConfig{}, fmt.Errorf("upload must be %q or %q", uploadPresign, uploadDirect)
+			}
+			presignedURL.upload = v
 		case "header":
 			presignedURL.headers[hk] = hv
 		default:
@@ -95,6 +127,9 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 
 	if presignedURL.getterURL == "" {
 		return presignedURLConfig{}, errors.New("missing required url")
+	}
+	if presignedURL.upload != uploadDirect && len(presignedURL.formFields) > 0 {
+		return presignedURLConfig{}, errors.New("field options are only supported with upload=direct")
 	}
 
 	return presignedURL, nil
