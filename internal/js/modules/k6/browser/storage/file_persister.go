@@ -10,6 +10,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,7 +106,7 @@ func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("performing upload request: %w", err)
+		return fmt.Errorf("performing upload request: %w", redactURLError(err))
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -135,7 +136,7 @@ func (r *RemoteFilePersister) requestPresignedURL(ctx context.Context, path stri
 		bytes.NewReader(b),
 	)
 	if err != nil {
-		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", redactURLError(err))
 	}
 
 	for k, v := range r.headers {
@@ -144,7 +145,7 @@ func (r *RemoteFilePersister) requestPresignedURL(ctx context.Context, path stri
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return PresignedURLResponse{}, fmt.Errorf("performing request: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("performing request: %w", redactURLError(err))
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -214,7 +215,7 @@ func newFileUploadRequest(
 	fw := multipart.NewWriter(&form)
 	for k, v := range psu.FormFields {
 		if err := fw.WriteField(k, v); err != nil {
-			return nil, fmt.Errorf("writing form field key %q and value %q: %w", k, v, err)
+			return nil, fmt.Errorf("writing form field key %q: %w", k, err)
 		}
 	}
 	// attach the file data to the form.
@@ -236,7 +237,7 @@ func newFileUploadRequest(
 		&form,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("creating new request: %w", err)
+		return nil, fmt.Errorf("creating new request: %w", redactURLError(err))
 	}
 	req.Header.Set("Content-Type", fw.FormDataContentType())
 
@@ -249,4 +250,29 @@ func checkStatusCode(resp *http.Response) error {
 	}
 
 	return nil
+}
+
+// redactURLError removes the user info, query and fragment from the URL of a
+// [url.Error], since they can hold credentials such as presigned URL signatures.
+func redactURLError(err error) error {
+	var uerr *url.Error
+	if !errors.As(err, &uerr) {
+		return err
+	}
+
+	return &url.Error{Op: uerr.Op, URL: redactURL(uerr.URL), Err: uerr.Err}
+}
+
+func redactURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "<redacted>"
+	}
+	u.User = nil
+	u.RawQuery = ""
+	u.ForceQuery = false
+	u.Fragment = ""
+	u.RawFragment = ""
+
+	return u.String()
 }
