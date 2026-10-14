@@ -298,7 +298,7 @@ func TestRemoteFilePersister(t *testing.T) {
 					w.WriteHeader(tt.uploadResponse)
 				}))
 
-			r := NewRemoteFilePersister(s.URL+presignedEndpoint, tt.wantPresignedHeaders, basePath)
+			r := NewRemoteFilePersister(s.URL+presignedEndpoint, tt.wantPresignedHeaders, basePath, nil)
 			err := r.Persist(context.Background(), tt.path, strings.NewReader(tt.dataToUpload))
 			if tt.wantError != "" {
 				assert.EqualError(t, err, tt.wantError)
@@ -393,7 +393,7 @@ func TestRemoteFilePersisterErrorsDoNotLeakURL(t *testing.T) {
 				defer cancel()
 			}
 
-			r := NewRemoteFilePersister(tt.presignURL(t), nil, "")
+			r := NewRemoteFilePersister(tt.presignURL(t), nil, "", nil)
 			err := r.Persist(ctx, "a.png", strings.NewReader("data"))
 			require.Error(t, err)
 			assert.EqualError(t, err, tt.wantErr)
