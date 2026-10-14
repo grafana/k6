@@ -40,6 +40,14 @@ func Test_newScreenshotPersister(t *testing.T) {
 			wantType: &storage.RemoteFilePersister{},
 		},
 		{
+			name: "remote_direct",
+			envLookup: env.ConstLookup(
+				env.ScreenshotsOutput,
+				"url=https://127.0.0.1/,upload=direct,field.id=1",
+			),
+			wantType: &storage.DirectFilePersister{},
+		},
+		{
 			name: "remote_parse_failed",
 			envLookup: env.ConstLookup(
 				env.ScreenshotsOutput,
@@ -141,6 +149,43 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 			},
 		},
 		{
+			name:        "upload_presign",
+			envVarValue: "url=https://127.0.0.1/,upload=presign",
+			want: presignedURLConfig{
+				getterURL: "https://127.0.0.1/",
+				headers:   map[string]string{},
+				upload:    "presign",
+			},
+		},
+		{
+			name:        "upload_direct_fields",
+			envVarValue: "url=https://127.0.0.1/,upload=direct,header.1=a,field.execution_id=b,field.x=c=d",
+			want: presignedURLConfig{
+				getterURL: "https://127.0.0.1/",
+				headers:   map[string]string{"1": "a"},
+				upload:    "direct",
+				formFields: map[string]string{
+					"execution_id": "b",
+					"x":            "c=d",
+				},
+			},
+		},
+		{
+			name:        "invalid_upload",
+			envVarValue: "url=https://127.0.0.1/,upload=post",
+			wantErr:     `upload must be "presign" or "direct"`,
+		},
+		{
+			name:        "field_without_direct_upload",
+			envVarValue: "url=https://127.0.0.1/,field.a=b",
+			wantErr:     "field options are only supported with upload=direct",
+		},
+		{
+			name:        "empty_field_key",
+			envVarValue: "url=https://127.0.0.1/,upload=direct,field.=b",
+			wantErr:     "empty field key, at entry 3",
+		},
+		{
 			name:        "empty",
 			envVarValue: "",
 			wantErr:     "format of value must be k=v, at entry 1",
@@ -225,6 +270,8 @@ func Test_parsePresignedURLEnvVarErrorsDoNotLeakValues(t *testing.T) {
 		{name: "invalid_header_format", envVarValue: "url=https://127.0.0.1/,header..x=Basic " + secret},
 		{name: "empty_header_key", envVarValue: "url=https://127.0.0.1/,header.=Basic " + secret},
 		{name: "invalid_url", envVarValue: "url=:" + secret},
+		{name: "empty_field_key", envVarValue: "url=https://127.0.0.1/,upload=direct,field.=" + secret},
+		{name: "invalid_upload", envVarValue: "url=https://127.0.0.1/,upload=" + secret},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
