@@ -165,7 +165,7 @@ func TestLoad(t *testing.T) {
 			_, err = loader.Load(logger, filesystems, pathURL, path)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(),
-				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk, we searched here: "%s". `,
+				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk at "%s". `,
 					path, path))
 		})
 	})

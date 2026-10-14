@@ -123,10 +123,10 @@ func TestReadSourceMissingFileError(t *testing.T) {
 	_, err := ReadSource(logger, "some file with spaces.js", "/c",
 		map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fs}, nil)
 	require.Error(t, err)
-	searched := filepath.Join("/c", "some file with spaces.js")
+	lookedUp := filepath.Clean(fsext.FilePathSeparator + filepath.Join("/c", "some file with spaces.js"))
 	require.ErrorContains(t, err, fmt.Sprintf(
-		`The moduleSpecifier "some file with spaces.js" couldn't be found on local disk, we searched here: "%s".`,
-		searched,
+		`The moduleSpecifier "some file with spaces.js" couldn't be found on local disk at "%s".`,
+		localPathForError(lookedUp),
 	))
 }
 
@@ -138,7 +138,7 @@ func TestReadSourceMissingRelativeFileIncludesResolvedPath(t *testing.T) {
 		map[string]fsext.Fs{"file": fsext.NewMemMapFs()}, nil)
 	require.Error(t, err)
 	require.ErrorContains(t, err, fmt.Sprintf(
-		`The moduleSpecifier "./missing.js" couldn't be found on local disk, we searched here: "%s".`,
+		`The moduleSpecifier "./missing.js" couldn't be found on local disk at "%s".`,
 		filepath.FromSlash("/c/missing.js"),
 	))
 }
