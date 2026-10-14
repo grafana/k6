@@ -46,14 +46,12 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 	}
 	for _, s := range ss {
 		// The key value pair should be of the form key=value, so split
-		// on '=' to retrieve the key and value separately.
-		kv := strings.Split(s, "=")
-		if len(kv) != 2 {
+		// on the first '=' to retrieve the key and value separately. The
+		// value may itself contain '=', e.g. base64 padding or a query string.
+		k, v, ok := strings.Cut(s, "=")
+		if !ok || k == "" {
 			return presignedURLConfig{}, fmt.Errorf("format of value must be k=v, received %q", s)
 		}
-
-		k := kv[0]
-		v := kv[1]
 
 		// A key with "header." means that the header name is encoded in the
 		// key, separated by a ".". Split the header on "." to retrieve the
@@ -78,8 +76,7 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 
 		switch k {
 		case "url":
-			u, err := url.ParseRequestURI(v)
-			if err != nil && u.Scheme != "" && u.Host != "" {
+			if _, err := url.ParseRequestURI(v); err != nil {
 				return presignedURLConfig{}, fmt.Errorf("invalid url %q", s)
 			}
 			presignedURL.getterURL = v

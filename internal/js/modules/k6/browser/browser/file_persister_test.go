@@ -123,6 +123,24 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 			},
 		},
 		{
+			name:        "header_value_with_equals",
+			envVarValue: "url=https://127.0.0.1/,header.Authorization=Basic dGVzdHN0YWNrOmFiYw==",
+			want: presignedURLConfig{
+				getterURL: "https://127.0.0.1/",
+				headers: map[string]string{
+					"Authorization": "Basic dGVzdHN0YWNrOmFiYw==",
+				},
+			},
+		},
+		{
+			name:        "url_with_query",
+			envVarValue: "url=https://127.0.0.1/presign?a=b",
+			want: presignedURLConfig{
+				getterURL: "https://127.0.0.1/presign?a=b",
+				headers:   map[string]string{},
+			},
+		},
+		{
 			name:        "empty",
 			envVarValue: "",
 			wantErr:     `format of value must be k=v, received ""`,
@@ -145,6 +163,11 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 		{
 			name:        "invalid_format",
 			envVarValue: "url==https://127.0.0.1/",
+			wantErr:     "invalid url",
+		},
+		{
+			name:        "empty_key",
+			envVarValue: "url=https://127.0.0.1/,=a",
 			wantErr:     "format of value must be k=v",
 		},
 		{
