@@ -11,4 +11,4 @@ permissions:
   id-token: write
 jobs:
   approve:
-    uses: grafana/k6-ci/.github/workflows/auto-approve-renovate.yml@4437a05286b70dbd87d6bce2bea5220694a40474 # v0.5.2
+    uses: grafana/k6-ci/.github/workflows/auto-approve-renovate.yml@bc53c239916ae45b50a0bdea2a37698589219c84 # v0.5.3
