@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,7 +106,7 @@ func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("performing upload request: %w", redactURLError(err))
+		return fmt.Errorf("performing upload request: %w", newRequestError(err))
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -136,7 +136,7 @@ func (r *RemoteFilePersister) requestPresignedURL(ctx context.Context, path stri
 		bytes.NewReader(b),
 	)
 	if err != nil {
-		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", redactURLError(err))
+		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", newRequestError(err))
 	}
 
 	for k, v := range r.headers {
@@ -145,7 +145,7 @@ func (r *RemoteFilePersister) requestPresignedURL(ctx context.Context, path stri
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return PresignedURLResponse{}, fmt.Errorf("performing request: %w", redactURLError(err))
+		return PresignedURLResponse{}, fmt.Errorf("performing request: %w", newRequestError(err))
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -237,7 +237,7 @@ func newFileUploadRequest(
 		&form,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("creating new request: %w", redactURLError(err))
+		return nil, fmt.Errorf("creating new request: %w", newRequestError(err))
 	}
 	req.Header.Set("Content-Type", fw.FormDataContentType())
 
@@ -252,27 +252,35 @@ func checkStatusCode(resp *http.Response) error {
 	return nil
 }
 
-// redactURLError removes the user info, query and fragment from the URL of a
-// [url.Error], since they can hold credentials such as presigned URL signatures.
-func redactURLError(err error) error {
-	var uerr *url.Error
-	if !errors.As(err, &uerr) {
-		return err
-	}
-
-	return &url.Error{Op: uerr.Op, URL: redactURL(uerr.URL), Err: uerr.Err}
+// requestError hides the details of a failed request, as they can include
+// internal URLs, hosts and credentials such as presigned URL signatures.
+// The original error is still available with [errors.Is] and [errors.As].
+type requestError struct {
+	msg string
+	err error
 }
 
-func redactURL(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return "<redacted>"
-	}
-	u.User = nil
-	u.RawQuery = ""
-	u.ForceQuery = false
-	u.Fragment = ""
-	u.RawFragment = ""
+func (e *requestError) Error() string { return e.msg }
 
-	return u.String()
+func (e *requestError) Unwrap() error { return e.err }
+
+func newRequestError(err error) error {
+	var (
+		netErr net.Error
+		dnsErr *net.DNSError
+		opErr  *net.OpError
+	)
+	msg := "request failed"
+	switch {
+	case errors.Is(err, context.Canceled):
+		msg = "request canceled"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():
+		msg = "request timed out"
+	case errors.As(err, &dnsErr):
+		msg = "resolving host failed"
+	case errors.As(err, &opErr) && opErr.Op == "dial":
+		msg = "connecting to host failed"
+	}
+
+	return &requestError{msg: msg, err: err}
 }
