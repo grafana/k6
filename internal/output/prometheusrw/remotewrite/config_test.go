@@ -14,6 +14,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/internal/output/prometheusrw/remote"
+	"go.k6.io/k6/v2/internal/output/prometheusrw/sigv4"
 	"go.k6.io/k6/v2/lib/types"
 )
 
@@ -725,9 +726,10 @@ func TestOptionSigV4(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		arg     string
-		env     map[string]string
-		jsonRaw json.RawMessage
+		arg           string
+		env           map[string]string
+		jsonRaw       json.RawMessage
+		expSigV4Token null.String
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`
 {
@@ -741,6 +743,20 @@ func TestOptionSigV4(t *testing.T) {
 			"K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY": "ASIAUZABC123456",
 			"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY": "5wfFi0FEaaaaacccc1111111111111",
 		}},
+		"JSON with session token": {jsonRaw: json.RawMessage(`
+{
+  "sigV4Region":"us-east-2",
+  "sigV4AccessKey":"ASIAUZABC123456",
+  "sigV4SecretKey":"5wfFi0FEaaaaacccc1111111111111",
+  "sigV4Token":"mock-session-token"
+}
+`), expSigV4Token: null.StringFrom("mock-session-token")},
+		"Env with session token": {env: map[string]string{
+			"K6_PROMETHEUS_RW_SIGV4_REGION":     "us-east-2",
+			"K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY": "ASIAUZABC123456",
+			"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY": "5wfFi0FEaaaaacccc1111111111111",
+			"K6_PROMETHEUS_RW_SIGV4_TOKEN":      "mock-session-token",
+		}, expSigV4Token: null.StringFrom("mock-session-token")},
 	}
 
 	expconfig := Config{
@@ -761,7 +777,79 @@ func TestOptionSigV4(t *testing.T) {
 			c, err := GetConsolidatedConfig(
 				tc.jsonRaw, tc.env, tc.arg)
 			require.NoError(t, err)
-			assert.Equal(t, expconfig, c)
+			exp := expconfig
+			exp.SigV4Token = tc.expSigV4Token
+			assert.Equal(t, exp, c)
+		})
+	}
+}
+
+func TestConfigRemoteConfigSigV4(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		config   Config
+		expSigV4 *sigv4.Config
+		expErr   bool
+	}{
+		{
+			name: "static credentials",
+			config: Config{
+				SigV4Region:    null.StringFrom("us-east-2"),
+				SigV4AccessKey: null.StringFrom("AKIAUZABC123456"),
+				SigV4SecretKey: null.StringFrom("5wfFi0FEaaaaacccc1111111111111"),
+			},
+			expSigV4: &sigv4.Config{
+				Region:             "us-east-2",
+				AwsAccessKeyID:     "AKIAUZABC123456",
+				AwsSecretAccessKey: "5wfFi0FEaaaaacccc1111111111111",
+			},
+		},
+		{
+			name: "temporary credentials with session token",
+			config: Config{
+				SigV4Region:    null.StringFrom("us-east-2"),
+				SigV4AccessKey: null.StringFrom("ASIAUZABC123456"),
+				SigV4SecretKey: null.StringFrom("5wfFi0FEaaaaacccc1111111111111"),
+				SigV4Token:     null.StringFrom("mock-session-token"),
+			},
+			expSigV4: &sigv4.Config{
+				Region:             "us-east-2",
+				AwsAccessKeyID:     "ASIAUZABC123456",
+				AwsSecretAccessKey: "5wfFi0FEaaaaacccc1111111111111",
+				AwsSessionToken:    "mock-session-token",
+			},
+		},
+		{
+			name: "session token without the other credentials",
+			config: Config{
+				SigV4Token: null.StringFrom("mock-session-token"),
+			},
+			expErr: true,
+		},
+		{
+			name: "session token with partially set credentials",
+			config: Config{
+				SigV4Region:    null.StringFrom("us-east-2"),
+				SigV4AccessKey: null.StringFrom("ASIAUZABC123456"),
+				SigV4Token:     null.StringFrom("mock-session-token"),
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rcc, err := tc.config.RemoteConfig()
+			if tc.expErr {
+				assert.Error(t, err)
+				assert.Nil(t, rcc)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expSigV4, rcc.SigV4)
 		})
 	}
 }
