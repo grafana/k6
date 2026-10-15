@@ -45,7 +45,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 				WaitUntil: common.LifecycleEventNetworkIdle,
 				Timeout:   timeout,
 			}
-			resp, err := p.Goto(tb.staticURL("/nav_in_doc.html"), opts)
+			resp, err := p.Goto(tb.staticURL("nav_in_doc.html"), opts)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
 
