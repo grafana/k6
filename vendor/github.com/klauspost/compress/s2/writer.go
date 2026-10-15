@@ -139,11 +139,9 @@ func (w *Writer) Reset(writer io.Writer) {
 
 	toWrite := make(chan chan result, w.concurrency)
 	w.output = toWrite
-	w.writerWg.Add(1)
 
 	// Start a writer goroutine that will write all output in order.
-	go func() {
-		defer w.writerWg.Done()
+	w.writerWg.Go(func() {
 
 		// Get a queued write.
 		for write := range toWrite {
@@ -175,7 +173,7 @@ func (w *Writer) Reset(writer io.Writer) {
 			// This can be used for synchronizing flushes.
 			close(write)
 		}
-	}()
+	})
 }
 
 // Write satisfies the io.Writer interface.

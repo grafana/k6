@@ -295,13 +295,20 @@ func NewCharSetRuntime(buf string) CharSet {
 // CharIn returns true if the rune is in our character set (either ranges or categories).
 // It handles negations and subtracted sub-charsets.
 func (c CharSet) CharIn(ch rune) bool {
+	return c.Contains(ch)
+}
+
+// Contains reports whether ch is in the character set, including negation and
+// subtraction. It is equivalent to CharIn but avoids copying the set on each
+// call when testing many runes.
+func (c *CharSet) Contains(ch rune) bool {
 	if ch >= 0 && ch < 128 && c.ascii != nil {
 		return (c.ascii.bits[ch/64] & (1 << (uint(ch) % 64))) != 0
 	}
 	return c.charInSlow(ch)
 }
 
-func (c CharSet) charInSlow(ch rune) bool {
+func (c *CharSet) charInSlow(ch rune) bool {
 	val := false
 	// in s && !s.subtracted
 
@@ -346,7 +353,7 @@ func (c CharSet) charInSlow(ch rune) bool {
 
 	// get subtracted recurse
 	if val && c.sub != nil {
-		val = !c.sub.CharIn(ch)
+		val = !c.sub.Contains(ch)
 	}
 
 	//log.Printf("Char '%v' in %v == %v", string(ch), c.String(), val)

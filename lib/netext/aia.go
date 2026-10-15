@@ -147,8 +147,7 @@ func (f *AIAFetcher) verifyWithAIA(
 	}
 
 	// Only unknown-authority errors are AIA-fixable; expired, hostname mismatch, etc. aren't.
-	var unknownAuthErr x509.UnknownAuthorityError
-	if !errors.As(verifyErr, &unknownAuthErr) {
+	if _, ok := errors.AsType[x509.UnknownAuthorityError](verifyErr); !ok {
 		return verifyErr
 	}
 
@@ -283,7 +282,7 @@ func (f *AIAFetcher) fetchCertFromAIAURL(
 		return nil, fmt.Errorf("building AIA request: %w", err)
 	}
 
-	resp, err := f.httpClient.Do(req) //nolint:gosec // G107: URL is from a server-presented cert AIA extension
+	resp, err := f.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching AIA certificate: %w", err)
 	}

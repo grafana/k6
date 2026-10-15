@@ -40,11 +40,11 @@ type EventPlayerErrorsRaised struct {
 	Errors   []*PlayerError `json:"errors"`
 }
 
-// EventPlayersCreated called whenever a player is created, or when a new
+// EventPlayerCreated called whenever a player is created, or when a new
 // agent joins and receives a list of active players. If an agent is restored,
-// it will receive the full list of player ids and all events again.
+// it will receive one event for each active player.
 //
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Media#event-playersCreated
-type EventPlayersCreated struct {
-	Players []PlayerID `json:"players"`
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Media#event-playerCreated
+type EventPlayerCreated struct {
+	Player *Player `json:"player"`
 }

@@ -25,8 +25,7 @@ func WithExitCodeIfNone(err error, exitCode exitcodes.ExitCode) error {
 		// No error, do nothing
 		return nil
 	}
-	var ecerr HasExitCode
-	if errors.As(err, &ecerr) {
+	if _, ok := errors.AsType[HasExitCode](err); ok {
 		// The given error already has an exit code, do nothing
 		return err
 	}

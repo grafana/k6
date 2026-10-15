@@ -13,6 +13,14 @@ type RuntimeEngineData struct {
 	Execute            func(*Runner) error
 	ExecuteQuick       func(*Runner) error // optional bool-only execution with unobservable captures removed
 	StringPrefixFilter StringPrefixFilter  // optional pre-decode candidate search for string input
+	// LeftContextKnown reports that LeftContextRunes was computed by the
+	// code generator. If it is false, decoded string input is never sliced;
+	// older generated engines omit the field and must keep the full string.
+	LeftContextKnown bool
+	// LeftContextRunes is how many runes before a candidate start matching
+	// may inspect. 0 means none, 1 means a single previous rune, and -1
+	// means do not slice (lookbehind or \G). Ignored unless LeftContextKnown.
+	LeftContextRunes int
 }
 
 type cacheKey struct {
@@ -30,6 +38,10 @@ func RegisterEngine(pattern string, engine RuntimeEngineData, options ...Compile
 }
 
 func newEngineRegexp(pattern string, c compileConfig, engine RuntimeEngineData) *Regexp {
+	leftContext := -1
+	if engine.LeftContextKnown {
+		leftContext = engine.LeftContextRunes
+	}
 	re := &Regexp{
 		pattern:            pattern,
 		options:            c.regexOptions,
@@ -44,6 +56,7 @@ func newEngineRegexp(pattern string, c compileConfig, engine RuntimeEngineData) 
 		execute:            engine.Execute,
 		executeQuick:       engine.ExecuteQuick,
 		stringPrefixFilter: engine.StringPrefixFilter,
+		leftContextRunes:   leftContext,
 	}
 	re.initCaches()
 	return re

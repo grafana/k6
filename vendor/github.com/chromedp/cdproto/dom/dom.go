@@ -2020,8 +2020,9 @@ func (p *GetAnchorElementParams) Do(ctx context.Context) (nodeID cdp.NodeID, err
 // ForceShowPopoverParams when enabling, this API force-opens the popover
 // identified by nodeId and keeps it open until disabled.
 type ForceShowPopoverParams struct {
-	NodeID cdp.NodeID `json:"nodeId"` // Id of the popover HTMLElement
-	Enable bool       `json:"enable"` // If true, opens the popover and keeps it open. If false, closes the popover if it was previously force-opened.
+	NodeID        cdp.NodeID        `json:"nodeId"`                           // Id of the popover HTMLElement
+	Enable        bool              `json:"enable"`                           // If true, opens the popover and keeps it open. If false, closes the popover if it was previously force-opened.
+	InvokerNodeID cdp.BackendNodeID `json:"invokerNodeId,omitempty,omitzero"` // Optional ID of the element invoking this popover, used to establish the implicit anchor. If not provided, it will fall back to the first invoker in the document, preferring elements with a popovertarget attribute over those with a commandfor attribute. Note that if there are multiple invokers, this is just an estimate.
 }
 
 // ForceShowPopover when enabling, this API force-opens the popover
@@ -2038,6 +2039,16 @@ func ForceShowPopover(nodeID cdp.NodeID, enable bool) *ForceShowPopoverParams {
 		NodeID: nodeID,
 		Enable: enable,
 	}
+}
+
+// WithInvokerNodeID optional ID of the element invoking this popover, used
+// to establish the implicit anchor. If not provided, it will fall back to the
+// first invoker in the document, preferring elements with a popovertarget
+// attribute over those with a commandfor attribute. Note that if there are
+// multiple invokers, this is just an estimate.
+func (p ForceShowPopoverParams) WithInvokerNodeID(invokerNodeID cdp.BackendNodeID) *ForceShowPopoverParams {
+	p.InvokerNodeID = invokerNodeID
+	return &p
 }
 
 // ForceShowPopoverReturns return values.
@@ -2059,6 +2070,152 @@ func (p *ForceShowPopoverParams) Do(ctx context.Context) (nodeIDs []cdp.NodeID, 
 	}
 
 	return res.NodeIDs, nil
+}
+
+// GetImplicitAnchorCandidatesParams returns candidate nodes that are
+// configured as triggers for the given popover.
+type GetImplicitAnchorCandidatesParams struct {
+	NodeID cdp.NodeID `json:"nodeId"` // Id of the popover HTMLElement.
+}
+
+// GetImplicitAnchorCandidates returns candidate nodes that are configured as
+// triggers for the given popover.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#method-getImplicitAnchorCandidates
+//
+// parameters:
+//
+//	nodeID - Id of the popover HTMLElement.
+func GetImplicitAnchorCandidates(nodeID cdp.NodeID) *GetImplicitAnchorCandidatesParams {
+	return &GetImplicitAnchorCandidatesParams{
+		NodeID: nodeID,
+	}
+}
+
+// GetImplicitAnchorCandidatesReturns return values.
+type GetImplicitAnchorCandidatesReturns struct {
+	BackendNodeIDs []cdp.BackendNodeID `json:"backendNodeIds,omitempty,omitzero"` // Candidate elements that can invoke this popover.
+}
+
+// Do executes DOM.getImplicitAnchorCandidates against the provided context.
+//
+// returns:
+//
+//	backendNodeIDs - Candidate elements that can invoke this popover.
+func (p *GetImplicitAnchorCandidatesParams) Do(ctx context.Context) (backendNodeIDs []cdp.BackendNodeID, err error) {
+	// execute
+	var res GetImplicitAnchorCandidatesReturns
+	err = cdp.Execute(ctx, CommandGetImplicitAnchorCandidates, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.BackendNodeIDs, nil
+}
+
+// ForceShowInterestParams when enabling, this API forces an element to gain
+// interest in its target, keeping interest active until disabled.
+type ForceShowInterestParams struct {
+	NodeID cdp.NodeID `json:"nodeId"` // Id of the interest invoker HTMLElement.
+	Enable bool       `json:"enable"` // If true, opens and holds interest. If false, releases forced interest.
+}
+
+// ForceShowInterest when enabling, this API forces an element to gain
+// interest in its target, keeping interest active until disabled.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#method-forceShowInterest
+//
+// parameters:
+//
+//	nodeID - Id of the interest invoker HTMLElement.
+//	enable - If true, opens and holds interest. If false, releases forced interest.
+func ForceShowInterest(nodeID cdp.NodeID, enable bool) *ForceShowInterestParams {
+	return &ForceShowInterestParams{
+		NodeID: nodeID,
+		Enable: enable,
+	}
+}
+
+// Do executes DOM.forceShowInterest against the provided context.
+func (p *ForceShowInterestParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandForceShowInterest, p, nil)
+}
+
+// SetTextMarkerParams sets a spelling or grammar error marker on the given
+// range of text. See
+// https://github.com/Igalia/explainers/blob/main/force-spelling-grammar-markers/README.md
+// Note: exactly one between nodeId, backendNodeId and objectId should be passed
+// to identify the node.
+type SetTextMarkerParams struct {
+	NodeID        cdp.NodeID             `json:"nodeId,omitempty,omitzero"`        // Identifier of the node.
+	BackendNodeID cdp.BackendNodeID      `json:"backendNodeId,omitempty,omitzero"` // Identifier of the backend node.
+	ObjectID      runtime.RemoteObjectID `json:"objectId,omitempty,omitzero"`      // JavaScript object id of the node wrapper.
+	Type          SetTextMarkerType      `json:"type"`                             // The type of marker to set on the given range of text.
+	Start         int64                  `json:"start"`                            // Start offset into the element's rendered text in UTF-16 code units. For a text control, an offset into the control's value. Offsets count text in DOM order and do not enter shadow trees. To mark text inside a shadow tree, pass the element inside the shadow tree.
+	End           int64                  `json:"end"`                              // End offset (exclusive) in the same units and space as start.
+}
+
+// SetTextMarker sets a spelling or grammar error marker on the given range
+// of text. See
+// https://github.com/Igalia/explainers/blob/main/force-spelling-grammar-markers/README.md
+// Note: exactly one between nodeId, backendNodeId and objectId should be passed
+// to identify the node.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#method-setTextMarker
+//
+// parameters:
+//
+//	type - The type of marker to set on the given range of text.
+//	start - Start offset into the element's rendered text in UTF-16 code units. For a text control, an offset into the control's value. Offsets count text in DOM order and do not enter shadow trees. To mark text inside a shadow tree, pass the element inside the shadow tree.
+//	end - End offset (exclusive) in the same units and space as start.
+func SetTextMarker(typeVal SetTextMarkerType, start int64, end int64) *SetTextMarkerParams {
+	return &SetTextMarkerParams{
+		Type:  typeVal,
+		Start: start,
+		End:   end,
+	}
+}
+
+// WithNodeID identifier of the node.
+func (p SetTextMarkerParams) WithNodeID(nodeID cdp.NodeID) *SetTextMarkerParams {
+	p.NodeID = nodeID
+	return &p
+}
+
+// WithBackendNodeID identifier of the backend node.
+func (p SetTextMarkerParams) WithBackendNodeID(backendNodeID cdp.BackendNodeID) *SetTextMarkerParams {
+	p.BackendNodeID = backendNodeID
+	return &p
+}
+
+// WithObjectID JavaScript object id of the node wrapper.
+func (p SetTextMarkerParams) WithObjectID(objectID runtime.RemoteObjectID) *SetTextMarkerParams {
+	p.ObjectID = objectID
+	return &p
+}
+
+// Do executes DOM.setTextMarker against the provided context.
+func (p *SetTextMarkerParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetTextMarker, p, nil)
+}
+
+// ClearTextMarkersParams clears the spelling and grammar error text markers
+// overlapping the ranges set by setTextMarker in this session. These markers
+// are also removed when the DOM domain is disabled or the session ends.
+type ClearTextMarkersParams struct{}
+
+// ClearTextMarkers clears the spelling and grammar error text markers
+// overlapping the ranges set by setTextMarker in this session. These markers
+// are also removed when the DOM domain is disabled or the session ends.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#method-clearTextMarkers
+func ClearTextMarkers() *ClearTextMarkersParams {
+	return &ClearTextMarkersParams{}
+}
+
+// Do executes DOM.clearTextMarkers against the provided context.
+func (p *ClearTextMarkersParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandClearTextMarkers, nil, nil)
 }
 
 // Command names.
@@ -2112,4 +2269,8 @@ const (
 	CommandGetQueryingDescendantsForContainer = "DOM.getQueryingDescendantsForContainer"
 	CommandGetAnchorElement                   = "DOM.getAnchorElement"
 	CommandForceShowPopover                   = "DOM.forceShowPopover"
+	CommandGetImplicitAnchorCandidates        = "DOM.getImplicitAnchorCandidates"
+	CommandForceShowInterest                  = "DOM.forceShowInterest"
+	CommandSetTextMarker                      = "DOM.setTextMarker"
+	CommandClearTextMarkers                   = "DOM.clearTextMarkers"
 )

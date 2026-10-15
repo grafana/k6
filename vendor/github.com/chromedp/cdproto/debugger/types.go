@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 )
 
@@ -33,9 +34,9 @@ func (t CallFrameID) String() string {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#type-Location
 type Location struct {
-	ScriptID     runtime.ScriptID `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
-	LineNumber   int64            `json:"lineNumber"`                      // Line number in the script (0-based).
-	ColumnNumber int64            `json:"columnNumber,omitempty,omitzero"` // Column number in the script (0-based).
+	ScriptID     cdp.ScriptID `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
+	LineNumber   int64        `json:"lineNumber"`                      // Line number in the script (0-based).
+	ColumnNumber int64        `json:"columnNumber,omitempty,omitzero"` // Column number in the script (0-based).
 }
 
 // ScriptPosition location in the source code.
@@ -50,9 +51,9 @@ type ScriptPosition struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#type-LocationRange
 type LocationRange struct {
-	ScriptID runtime.ScriptID `json:"scriptId"`
-	Start    *ScriptPosition  `json:"start"`
-	End      *ScriptPosition  `json:"end"`
+	ScriptID cdp.ScriptID    `json:"scriptId"`
+	Start    *ScriptPosition `json:"start"`
+	End      *ScriptPosition `json:"end"`
 }
 
 // CallFrame JavaScript call frame. Array of call frames form the call stack.
@@ -78,6 +79,7 @@ type Scope struct {
 	Name          string                `json:"name,omitempty,omitzero"`
 	StartLocation *Location             `json:"startLocation,omitempty,omitzero"` // Location in the source code where scope starts
 	EndLocation   *Location             `json:"endLocation,omitempty,omitzero"`   // Location in the source code where scope ends
+	Empty         bool                  `json:"empty"`                            // True if the scope does not declare any variables or have a runtime context. Only present if true. Empty scopes are retained in the scope chain because they can be targeted via evaluateOnCallFrame (using scopeNumber) or matched against scopes in source maps.
 }
 
 // SearchMatch search match for resource.
@@ -92,7 +94,7 @@ type SearchMatch struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#type-BreakLocation
 type BreakLocation struct {
-	ScriptID     runtime.ScriptID  `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
+	ScriptID     cdp.ScriptID      `json:"scriptId"`                        // Script identifier as reported in the Debugger.scriptParsed.
 	LineNumber   int64             `json:"lineNumber"`                      // Line number in the script (0-based).
 	ColumnNumber int64             `json:"columnNumber,omitempty,omitzero"` // Column number in the script (0-based).
 	Type         BreakLocationType `json:"type,omitempty,omitzero"`
@@ -473,49 +475,6 @@ func (t *ExceptionsState) UnmarshalJSON(buf []byte) error {
 		*t = ExceptionsStateAll
 	default:
 		return fmt.Errorf("unknown ExceptionsState value: %v", s)
-	}
-	return nil
-}
-
-// SetScriptSourceStatus whether the operation was successful or not. Only Ok
-// denotes a successful live edit while the other enum variants denote why the
-// live edit failed.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#method-setScriptSource
-type SetScriptSourceStatus string
-
-// String returns the SetScriptSourceStatus as string value.
-func (t SetScriptSourceStatus) String() string {
-	return string(t)
-}
-
-// SetScriptSourceStatus values.
-const (
-	SetScriptSourceStatusOk                              SetScriptSourceStatus = "Ok"
-	SetScriptSourceStatusCompileError                    SetScriptSourceStatus = "CompileError"
-	SetScriptSourceStatusBlockedByActiveGenerator        SetScriptSourceStatus = "BlockedByActiveGenerator"
-	SetScriptSourceStatusBlockedByActiveFunction         SetScriptSourceStatus = "BlockedByActiveFunction"
-	SetScriptSourceStatusBlockedByTopLevelEsModuleChange SetScriptSourceStatus = "BlockedByTopLevelEsModuleChange"
-)
-
-// UnmarshalJSON satisfies [json.Unmarshaler].
-func (t *SetScriptSourceStatus) UnmarshalJSON(buf []byte) error {
-	s := string(buf)
-	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
-
-	switch SetScriptSourceStatus(s) {
-	case SetScriptSourceStatusOk:
-		*t = SetScriptSourceStatusOk
-	case SetScriptSourceStatusCompileError:
-		*t = SetScriptSourceStatusCompileError
-	case SetScriptSourceStatusBlockedByActiveGenerator:
-		*t = SetScriptSourceStatusBlockedByActiveGenerator
-	case SetScriptSourceStatusBlockedByActiveFunction:
-		*t = SetScriptSourceStatusBlockedByActiveFunction
-	case SetScriptSourceStatusBlockedByTopLevelEsModuleChange:
-		*t = SetScriptSourceStatusBlockedByTopLevelEsModuleChange
-	default:
-		return fmt.Errorf("unknown SetScriptSourceStatus value: %v", s)
 	}
 	return nil
 }

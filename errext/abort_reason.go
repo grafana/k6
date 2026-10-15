@@ -31,8 +31,7 @@ func WithAbortReasonIfNone(err error, abortReason AbortReason) error {
 	if err == nil {
 		return nil // No error, do nothing
 	}
-	var arerr HasAbortReason
-	if errors.As(err, &arerr) {
+	if _, ok := errors.AsType[HasAbortReason](err); ok {
 		// The given error already has an abort reason, do nothing
 		return err
 	}

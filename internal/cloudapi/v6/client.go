@@ -64,8 +64,7 @@ func (c *Client) BaseURL() string {
 // otherwise it tries to parse the body and return a parsed error.
 func CheckResponse(r *http.Response, err error) error {
 	if err != nil {
-		var aerr *k6cloud.GenericOpenAPIError
-		if !errors.As(err, &aerr) {
+		if _, ok := errors.AsType[*k6cloud.GenericOpenAPIError](err); !ok {
 			return err
 		}
 	}

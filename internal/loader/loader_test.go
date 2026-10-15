@@ -165,8 +165,8 @@ func TestLoad(t *testing.T) {
 			_, err = loader.Load(logger, filesystems, pathURL, path)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(),
-				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk. `,
-					path))
+				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk at "%s". `,
+					path, path))
 		})
 	})
 
@@ -210,7 +210,7 @@ func TestLoad(t *testing.T) {
 			pwdURL, err := url.Parse(sr("HTTPSBIN_URL"))
 			require.NoError(t, err)
 
-			moduleSpecifier := ("./robots.txt")
+			moduleSpecifier := "./robots.txt"
 			moduleSpecifierURL, err := loader.Resolve(pwdURL, moduleSpecifier)
 			require.NoError(t, err)
 

@@ -87,6 +87,19 @@ func (h *BaseJSHandle) AsElement() *ElementHandle {
 	return nil
 }
 
+// Page returns the page that owns this handle, or nil when the handle is not
+// associated with a frame (e.g. a worker or isolated-world execution context).
+func (h *BaseJSHandle) Page() *Page {
+	if h == nil || h.execCtx == nil {
+		return nil
+	}
+	frame := h.execCtx.Frame()
+	if frame == nil {
+		return nil
+	}
+	return frame.Page()
+}
+
 // Dispose releases the remote object.
 func (h *BaseJSHandle) Dispose() error {
 	err := h.dispose()

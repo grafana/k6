@@ -214,7 +214,7 @@ func postUsageReport(ctx context.Context, lookupEnv func(string) (string, bool),
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req) //nolint:gosec
+	res, err := http.DefaultClient.Do(req)
 	if err == nil {
 		_ = res.Body.Close()
 	}

@@ -43,8 +43,7 @@ func getCmdDeps(gs *state.GlobalState) *cobra.Command {
 func (c *depsCmd) run(cmd *cobra.Command, args []string) error {
 	test, err := loadLocalTestWithoutRunner(c.gs, cmd, args)
 	if err != nil {
-		var unsatisfiedErr binaryIsNotSatisfyingDependenciesError
-		if !errors.As(err, &unsatisfiedErr) {
+		if _, ok := errors.AsType[binaryIsNotSatisfyingDependenciesError](err); !ok {
 			return err
 		}
 	}

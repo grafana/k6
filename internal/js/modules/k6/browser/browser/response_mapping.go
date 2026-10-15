@@ -18,13 +18,13 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 		return nil
 	}
 	maps := mapping{
-		"allHeaders": func() *sobek.Promise {
+		"allHeaders": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				r.WaitForRawHeaders()
 				return r.AllHeaders(), nil
 			})
-		},
-		"body": func() *sobek.Promise {
+		}),
+		"body": passiveCall(func() *sobek.Promise {
 			rt := vu.Runtime()
 			promise, res, rej := rt.NewPromise()
 			callback := vu.RegisterCallback()
@@ -42,11 +42,11 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 				})
 			}()
 			return promise
-		},
-		"frame": func() mapping {
+		}),
+		"frame": passiveCall(func() mapping {
 			return mapFrame(vu, r.Frame())
-		},
-		"headerValue": func(name string) *sobek.Promise {
+		}),
+		"headerValue": passiveCall(func(name string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				r.WaitForRawHeaders()
 				v, ok := r.HeaderValue(name)
@@ -55,53 +55,53 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 				}
 				return v, nil
 			})
-		},
-		"headerValues": func(name string) *sobek.Promise {
+		}),
+		"headerValues": passiveCall(func(name string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				r.WaitForRawHeaders()
 				return r.HeaderValues(name), nil
 			})
-		},
-		"headers": r.Headers,
-		"headersArray": func() *sobek.Promise {
+		}),
+		"headers": passiveCall(r.Headers),
+		"headersArray": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				r.WaitForRawHeaders()
 				return r.HeadersArray(), nil
 			})
-		},
-		"json": func() *sobek.Promise {
+		}),
+		"json": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return r.JSON() //nolint: wrapcheck
 			})
-		},
-		"ok": r.Ok,
-		"request": func() mapping {
+		}),
+		"ok": passiveCall(r.Ok),
+		"request": passiveCall(func() mapping {
 			return mapRequest(vu, r.Request())
-		},
-		"securityDetails": func() *sobek.Promise {
+		}),
+		"securityDetails": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return r.SecurityDetails(), nil
 			})
-		},
-		"serverAddr": func() *sobek.Promise {
+		}),
+		"serverAddr": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return r.ServerAddr(), nil
 			})
-		},
-		"size": func() *sobek.Promise {
+		}),
+		"size": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return r.Size(), nil
 			})
-		},
-		"status":     r.Status,
-		"statusText": r.StatusText,
-		"url":        r.URL,
-		"text": func() *sobek.Promise {
+		}),
+		"status":     passiveCall(r.Status),
+		"statusText": passiveCall(r.StatusText),
+		"url":        passiveCall(r.URL),
+		"text": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return r.Text() //nolint:wrapcheck
 			})
-		},
+		}),
 	}
 
-	return maps
+	return finishMapping(maps)
 }

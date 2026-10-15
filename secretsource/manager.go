@@ -79,5 +79,5 @@ func (sm *Manager) Get(sourceName, key string) (string, error) {
 type UnknownSourceError string
 
 func (u UnknownSourceError) Error() string {
-	return fmt.Sprintf("no secret source with name %q is configured", (string)(u))
+	return fmt.Sprintf("no secret source with name %q is configured", string(u))
 }

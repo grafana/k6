@@ -255,21 +255,59 @@ func (self *_RegExp_parser) scanBracket() {
 	}
 
 	self.pass()
-	for self.chr != -1 {
-		if self.chr == ']' {
-			break
-		} else if self.chr == '\\' {
-			self.read()
-			self.scanEscape(true)
+	if self.chr == '^' {
+		self.pass()
+	}
+	for self.chr != -1 && self.chr != ']' {
+		leftIsClass := self.scanClassAtom()
+		if self.unicode || self.chr != '-' {
 			continue
 		}
-		self.pass()
+		if self.offset >= self.length || self.str[self.offset] == ']' {
+			continue
+		}
+		if leftIsClass || self.nextIsCharacterClassEscape() {
+			// A '-' next to a class escape is a literal, not a range operator.
+			self.writeString(`\-`)
+			self.read()
+		} else {
+			self.pass()
+		}
+		self.scanClassAtom()
 	}
 	if self.chr != ']' {
 		self.error(true, "Unterminated character class")
 		return
 	}
 	self.pass()
+}
+
+// scanClassAtom writes a single class atom and reports whether it stands for more than one character.
+func (self *_RegExp_parser) scanClassAtom() bool {
+	if self.chr == '\\' {
+		self.read()
+		isClass := isCharacterClassEscape(self.chr)
+		self.scanEscape(true)
+		return isClass
+	}
+	if self.chr == '-' && !self.unicode {
+		// A '-' in atom position is a literal; escape it so re2 cannot pair it with the next atom.
+		self.writeString(`\-`)
+		self.read()
+		return false
+	}
+	self.pass()
+	return false
+}
+
+// isCharacterClassEscape reports whether c is a class escape standing for more than one character.
+func isCharacterClassEscape(c rune) bool {
+	return c == 'd' || c == 'D' || c == 's' || c == 'S' || c == 'w' || c == 'W'
+}
+
+// nextIsCharacterClassEscape reports whether the input after the current character is a class escape.
+func (self *_RegExp_parser) nextIsCharacterClassEscape() bool {
+	return self.offset+1 < self.length && self.str[self.offset] == '\\' && isCharacterClassEscape(rune(self.str[self.offset+1]))
 }
 
 // \...

@@ -31,7 +31,7 @@ func TestResponseError_Error(t *testing.T) {
 			respErr: ResponseError{
 				APIError: k6cloud.ErrorApiModel{
 					Message: "validation failed",
-					Target:  *k6cloud.NewNullableString(k6cloud.PtrString("field_name")),
+					Target:  *k6cloud.NewNullableString(new("field_name")),
 				},
 			},
 			expected: "validation failed (target: 'field_name')",
@@ -44,11 +44,11 @@ func TestResponseError_Error(t *testing.T) {
 					Details: []k6cloud.ErrorDetailsApiModel{
 						{
 							Message: "field is required",
-							Target:  *k6cloud.NewNullableString(k6cloud.PtrString("first_property")),
+							Target:  *k6cloud.NewNullableString(new("first_property")),
 						},
 						{
 							Message: "field must be positive",
-							Target:  *k6cloud.NewNullableString(k6cloud.PtrString("second_property")),
+							Target:  *k6cloud.NewNullableString(new("second_property")),
 						},
 					},
 				},
