@@ -775,6 +775,11 @@ func (sc *SubtleCrypto) DeriveBits(
 				return nil, NewError(OperationError, "length can not be 0")
 			}
 
+			// A negative length would make the derivers index out of range and panic.
+			if length < 0 {
+				return nil, NewError(OperationError, "length can not be negative")
+			}
+
 			b, err := deriver.DeriveBits(privateKey, length)
 			if err != nil {
 				return b, err

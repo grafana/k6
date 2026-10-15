@@ -109,6 +109,27 @@ func TestPBKDF2DeriveBitsNonMultipleOf8(t *testing.T) {
 	assert.Contains(t, vm.Get("error").String(), "OperationError")
 }
 
+// TestECDHDeriveBitsNegativeLength asserts that a negative length is rejected with an
+// OperationError instead of making the derivation panic.
+func TestECDHDeriveBitsNegativeLength(t *testing.T) {
+	t.Parallel()
+
+	for _, length := range []int{-1, -3, -8, -16} {
+		t.Run(fmt.Sprintf("%d bits", length), func(t *testing.T) {
+			t.Parallel()
+
+			rt := modulestest.NewRuntime(t)
+			_, err := rt.RunOnEventLoop(fmt.Sprintf(deriveBitsScript, "P-256", length, 8*32))
+			require.NoError(t, err)
+
+			vm := rt.VU.Runtime()
+			require.NotNil(t, vm.Get("error"), "deriveBits was expected to fail")
+			assert.Contains(t, vm.Get("error").String(), "OperationError")
+			assert.Contains(t, vm.Get("error").String(), "length can not be negative")
+		})
+	}
+}
+
 // TestECDHDeriveBitsTooLong asserts that asking for more bits than the shared secret
 // has is rejected, including when the extra bits do not add up to a whole byte.
 func TestECDHDeriveBitsTooLong(t *testing.T) {
