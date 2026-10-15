@@ -395,6 +395,77 @@ func TestNavigationSpanPhantomOnClientRedirect(t *testing.T) {
 		"expected 3 navigation spans (no phantom), got %d; spans: %v", navs, got)
 }
 
+// TestNavigationSpanAfterNonCommittingLoad asserts that a main-frame load that
+// never commits a document (a download or a 204 response) does not stop the
+// next real navigation from rotating a new navigation span. Such loads fire
+// frameStartedLoading and frameStoppedLoading but no frameNavigated.
+func TestNavigationSpanAfterNonCommittingLoad(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "download", path: "/download"},
+		{name: "no_content", path: "/no-content"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tracer := &mockTracer{spans: make(map[string]struct{})}
+			tp := &mockTracerProvider{tracer: tracer}
+
+			ts := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/download":
+						w.Header().Set("Content-Type", "application/octet-stream")
+						w.Header().Set("Content-Disposition", `attachment; filename="file.bin"`)
+						_, err := fmt.Fprint(w, "data")
+						require.NoError(t, err)
+					case "/no-content":
+						w.WriteHeader(http.StatusNoContent)
+					default:
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+						_, err := fmt.Fprint(w, html)
+						require.NoError(t, err)
+					}
+				},
+			))
+			t.Cleanup(ts.Close)
+
+			vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+			rt := vu.Runtime()
+			root := browser.New()
+			mod := root.NewModuleInstance(vu)
+			jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+			require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+			require.NoError(t, rt.Set("browser", jsMod.Browser))
+			vu.ActivateVU()
+			vu.StartIteration(t)
+			defer vu.EndIteration(t)
+
+			assertJSInEventLoop(t, vu, fmt.Sprintf(`
+				page = await browser.newPage();
+				await page.goto('%s/a', {waitUntil:'load'});
+				await page.evaluate((p) => { location.href = p; }, '%s');
+				await page.waitForTimeout(1000);
+				`, ts.URL, tt.path))
+			_ = tracer.cloneOrderedSpans()
+
+			assertJSInEventLoop(t, vu, fmt.Sprintf(`
+				await page.goto('%s/b', {waitUntil:'load'});
+				await page.close();
+				`, ts.URL))
+
+			got := tracer.cloneOrderedSpans()
+			assert.Containsf(t, got, "navigation",
+				"navigating after a non-committing load should rotate a new navigation span; spans: %v", got)
+		})
+	}
+}
+
 func setupTestTracing(t *testing.T, rt *sobek.Runtime) {
 	t.Helper()
 
