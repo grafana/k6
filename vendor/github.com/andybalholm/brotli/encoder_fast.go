@@ -12,7 +12,8 @@ func gaussianProbability(x, mean, stdDev float64) float64 {
 
 // A FastEncoder implements the matchfinder.Encoder interface, writing in Brotli
 // format. It uses a simplified encoding (like level 0 in the reference
-// implementation) to save time.
+// implementation) to save time. It does not support matches shorter than four
+// bytes.
 type FastEncoder struct {
 	wroteHeader   bool
 	bw            bitWriter
@@ -120,6 +121,9 @@ func (e *FastEncoder) Encode(dst []byte, src []byte, matches []matchfinder.Match
 
 	pos := 0
 	for i, m := range matches {
+		if m.Length < 4 && m.Length != 0 {
+			panic("match too short (minimum 4 bytes)")
+		}
 		lengthFinished := false
 		// Write a command with the appropriate insert length, and a copy length of 2.
 		if m.Unmatched < 6 {

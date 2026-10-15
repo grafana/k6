@@ -231,6 +231,7 @@ type BaseAudioContext struct {
 	CallbackBufferSize    float64              `json:"callbackBufferSize"`    // Platform-dependent callback buffer size.
 	MaxOutputChannelCount float64              `json:"maxOutputChannelCount"` // Number of output channels supported by audio hardware in use.
 	SampleRate            float64              `json:"sampleRate"`            // Context sample rate.
+	RenderQuantumSize     float64              `json:"renderQuantumSize"`
 }
 
 // AudioListener protocol object for AudioListener.

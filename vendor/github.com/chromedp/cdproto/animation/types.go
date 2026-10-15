@@ -45,7 +45,7 @@ type Effect struct {
 	Delay          float64           `json:"delay"`                            // AnimationEffect's delay.
 	EndDelay       float64           `json:"endDelay"`                         // AnimationEffect's end delay.
 	IterationStart float64           `json:"iterationStart"`                   // AnimationEffect's iteration start.
-	Iterations     float64           `json:"iterations"`                       // AnimationEffect's iterations.
+	Iterations     float64           `json:"iterations,omitempty,omitzero"`    // AnimationEffect's iterations. Omitted if the value is infinite.
 	Duration       float64           `json:"duration"`                         // AnimationEffect's iteration duration. Milliseconds for time based animations and percentage [0 - 100] for scroll driven animations (i.e. when viewOrScrollTimeline exists).
 	Direction      string            `json:"direction"`                        // AnimationEffect's playback direction.
 	Fill           string            `json:"fill"`                             // AnimationEffect's fill mode.

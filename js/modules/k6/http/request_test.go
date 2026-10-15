@@ -1234,6 +1234,21 @@ func TestRequest(t *testing.T) {
 		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "DELETE", sr("HTTPBIN_URL/delete?test=mest"), 200, "")
 	})
 
+	// http.query() is a convenience wrapper for the HTTP QUERY method
+	// (RFC 10008), which carries a request body like POST but with
+	// GET-like safe, idempotent semantics.
+	t.Run("QUERY", func(t *testing.T) {
+		_, err := rt.RunString(sr(`
+		var res = http.query("HTTPBIN_URL/anything/query", '{"filter": "all"}', {headers: {"Content-Type": "application/json", "X-We-Want-This": "value"}});
+		if (res.status != 200) { throw new Error("wrong status: " + res.status); }
+		if (res.json().method != "QUERY") { throw new Error("wrong method: " + res.json().method); }
+		if (res.json().data != '{"filter": "all"}') { throw new Error("wrong body: " + res.json().data); }
+		if (res.request.headers["X-We-Want-This"] != "value") { throw new Error("Missing or invalid X-We-Want-This header!"); }
+		`))
+		require.NoError(t, err)
+		assertRequestMetricsEmitted(t, metrics.GetBufferedSamples(samples), "QUERY", sr("HTTPBIN_URL/anything/query"), 200, "")
+	})
+
 	postMethods := map[string]string{
 		"POST":  "post",
 		"PUT":   "put",
