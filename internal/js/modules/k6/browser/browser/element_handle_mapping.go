@@ -15,9 +15,13 @@ import (
 
 // mapElementHandle to the JS module.
 func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,funlen,cyclop
+	if eh == nil {
+		return nil
+	}
+
 	rt := vu.Runtime()
 	maps := mapping{
-		"boundingBox": func() *sobek.Promise {
+		"boundingBox": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				box, err := eh.BoundingBox()
 				// We want to avoid errors when an element is not visible or detached and instead
@@ -27,8 +31,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				}
 				return box, err
 			})
-		},
-		"check": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"check": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleSetCheckedOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing check options: %w", err)
@@ -36,8 +40,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Check(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"click": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"click": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleClickOptions(rt, opts, eh.Timeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing element click options: %w", err)
@@ -47,8 +51,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				err := eh.Click(popts)
 				return nil, err //nolint:wrapcheck
 			}), nil
-		},
-		"contentFrame": func() *sobek.Promise {
+		}),
+		"contentFrame": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				f, err := eh.ContentFrame()
 				if err != nil {
@@ -56,8 +60,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				}
 				return mapFrame(vu, f), nil
 			})
-		},
-		"dblclick": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"dblclick": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleDblclickOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing element double click options: %w", err)
@@ -65,13 +69,13 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Dblclick(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"dispatchEvent": func(typ string, eventInit sobek.Value) *sobek.Promise {
+		}),
+		"dispatchEvent": networkCall(func(typ string, eventInit sobek.Value) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, eh.DispatchEvent(typ, exportArg(eventInit)) //nolint:wrapcheck
 			})
-		},
-		"fill": func(value string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"fill": networkCall(func(value string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewElementHandleBaseOptions(eh.DefaultTimeout())
 			if err := parseElementHandleBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing element fill options: %w", err)
@@ -79,13 +83,13 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Fill(value, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"focus": func() *sobek.Promise {
+		}),
+		"focus": networkCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, eh.Focus() //nolint:wrapcheck
 			})
-		},
-		"getAttribute": func(name string) *sobek.Promise {
+		}),
+		"getAttribute": passiveCall(func(name string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				s, ok, err := eh.GetAttribute(name)
 				if err != nil {
@@ -96,8 +100,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				}
 				return s, nil
 			})
-		},
-		"hover": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"hover": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleHoverOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing element hover options: %w", err)
@@ -105,18 +109,18 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Hover(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"innerHTML": func() *sobek.Promise {
+		}),
+		"innerHTML": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.InnerHTML() //nolint:wrapcheck
 			})
-		},
-		"innerText": func() *sobek.Promise {
+		}),
+		"innerText": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.InnerText() //nolint:wrapcheck
 			})
-		},
-		"inputValue": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"inputValue": passiveCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewElementHandleBaseOptions(eh.DefaultTimeout())
 			if err := parseElementHandleBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing element input value options: %w", err)
@@ -124,38 +128,38 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return eh.InputValue(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"isChecked": func() *sobek.Promise {
+		}),
+		"isChecked": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.IsChecked() //nolint:wrapcheck
 			})
-		},
-		"isDisabled": func() *sobek.Promise {
+		}),
+		"isDisabled": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.IsDisabled() //nolint:wrapcheck
 			})
-		},
-		"isEditable": func() *sobek.Promise {
+		}),
+		"isEditable": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.IsEditable() //nolint:wrapcheck
 			})
-		},
-		"isEnabled": func() *sobek.Promise {
+		}),
+		"isEnabled": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.IsEnabled() //nolint:wrapcheck
 			})
-		},
-		"isHidden": func() *sobek.Promise {
+		}),
+		"isHidden": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.IsHidden() //nolint:wrapcheck
 			})
-		},
-		"isVisible": func() *sobek.Promise {
+		}),
+		"isVisible": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return eh.IsVisible() //nolint:wrapcheck
 			})
-		},
-		"ownerFrame": func() *sobek.Promise {
+		}),
+		"ownerFrame": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				f, err := eh.OwnerFrame()
 				if err != nil {
@@ -163,8 +167,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				}
 				return mapFrame(vu, f), nil
 			})
-		},
-		"press": func(key string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"press": networkCall(func(key string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandlePressOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing press %q options: %w", key, err)
@@ -172,8 +176,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Press(key, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"screenshot": passiveCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleScreenshotOptions(rt, opts, eh.Timeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing element handle screenshot options: %w", err)
@@ -189,8 +193,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 
 				return &ab, nil
 			}), nil
-		},
-		"scrollIntoViewIfNeeded": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"scrollIntoViewIfNeeded": passiveCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewElementHandleBaseOptions(eh.DefaultTimeout())
 			if err := parseElementHandleBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing scrollIntoViewIfNeeded options: %w", err)
@@ -198,8 +202,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.ScrollIntoViewIfNeeded(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"selectOption": func(values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"selectOption": networkCall(func(values sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			convValues, err := ConvertSelectOptionValues(vu.Runtime(), values)
 			if err != nil {
 				return nil, fmt.Errorf("parsing select options values: %w", err)
@@ -211,8 +215,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return eh.SelectOption(convValues, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"selectText": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"selectText": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewElementHandleBaseOptions(eh.DefaultTimeout())
 			if err := parseElementHandleBaseOptions(popts, rt, opts); err != nil {
 				return nil, fmt.Errorf("parsing selectText options: %w", err)
@@ -220,8 +224,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.SelectText(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"setChecked": func(checked bool, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"setChecked": networkCall(func(checked bool, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleSetCheckedOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing setChecked options: %w", err)
@@ -229,8 +233,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.SetChecked(checked, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"setInputFiles": func(files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"setInputFiles": networkCall(func(files sobek.Value, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleSetInputFilesOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing setInputFiles options: %w", err)
@@ -242,8 +246,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.SetInputFiles(&pfiles, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"tap": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"tap": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleTapOptions(rt, opts, eh.Timeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing element tap options: %w", err)
@@ -251,8 +255,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Tap(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"textContent": func() *sobek.Promise {
+		}),
+		"textContent": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				s, ok, err := eh.TextContent()
 				if err != nil {
@@ -263,8 +267,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				}
 				return s, nil
 			})
-		},
-		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"type": networkCall(func(text string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleTypeOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing type options: %w", err)
@@ -272,8 +276,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Type(text, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"uncheck": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"uncheck": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleSetCheckedOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing uncheck options: %w", err)
@@ -281,8 +285,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.Uncheck(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"waitForElementState": func(state string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"waitForElementState": passiveCall(func(state string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseElementHandleWaitForElementStateOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing waitForElementState options: %w", err)
@@ -290,8 +294,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return promise(vu, func() (any, error) {
 				return nil, eh.WaitForElementState(state, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"waitForSelector": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"waitForSelector": passiveCall(func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameWaitForSelectorOptions(rt, opts, eh.DefaultTimeout())
 			if err != nil {
 				return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)
@@ -303,9 +307,9 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				}
 				return mapElementHandle(vu, eh), nil
 			}), nil
-		},
+		}),
 	}
-	maps["$"] = func(selector string) *sobek.Promise {
+	maps["$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			eh, err := eh.Query(selector, common.StrictModeOff)
 			if err != nil {
@@ -321,8 +325,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 
 			return ehm, nil
 		})
-	}
-	maps["$$"] = func(selector string) *sobek.Promise {
+	})
+	maps["$$"] = passiveCall(func(selector string) *sobek.Promise {
 		return promise(vu, func() (any, error) {
 			ehs, err := eh.QueryAll(selector)
 			if err != nil {
@@ -335,12 +339,12 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			}
 			return mehs, nil
 		})
-	}
+	})
 
-	jsHandleMap := mapJSHandle(vu, eh)
+	jsHandleMap := newJSHandleMapping(vu, eh)
 	maps0.Copy(maps, jsHandleMap)
 
-	return maps
+	return withPageNetworkCalls(vu, eh.Page(), maps)
 }
 
 // parseElementHandleTypeOptions parses the element handle type options from a Sobek value.

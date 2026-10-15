@@ -636,11 +636,16 @@ func (p *parser) scanRegex() (*RegexNode, error) {
 			}
 
 		case '\\':
+			quoted := !p.useOptionE() && p.charsRight() > 0 && p.rightChar(0) == 'Q'
 			n, err := p.scanBackslash(false)
 			if err != nil {
 				return nil, err
 			}
-			p.addUnitNode(n)
+			if quoted {
+				p.addQuotedUnit(n)
+			} else {
+				p.addUnitNode(n)
+			}
 
 		case '^':
 			if p.useOptionM() {
@@ -702,7 +707,7 @@ func (p *parser) scanRegex() (*RegexNode, error) {
 		// Handle quantifiers
 		for p.unit != nil {
 			var min, max int
-			var lazy bool
+			var lazy, possessive bool
 
 			switch ch {
 			case '*':
@@ -753,18 +758,19 @@ func (p *parser) scanRegex() (*RegexNode, error) {
 				return nil, err
 			}
 
-			if p.charsRight() == 0 || p.rightChar(0) != '?' {
-				lazy = false
-			} else {
+			if p.charsRight() > 0 && p.rightChar(0) == '?' {
 				p.moveRight(1)
 				lazy = true
+			} else if p.charsRight() > 0 && p.rightChar(0) == '+' && !p.useOptionE() {
+				p.moveRight(1)
+				possessive = true
 			}
 
 			if min > max {
 				return nil, p.getErr(ErrInvalidRepeatSize)
 			}
 
-			p.addConcatenate3(lazy, min, max)
+			p.addConcatenate3(lazy, possessive, min, max)
 		}
 
 	ContinueOuterScan:
@@ -1280,6 +1286,37 @@ func (p *parser) scanBackslash(scanOnly bool) (*RegexNode, error) {
 	}
 
 	switch ch := p.rightChar(0); ch {
+	case 'Q':
+		if p.useOptionE() {
+			return p.scanBasicBackslash(scanOnly)
+		}
+		p.moveRight(1)
+		quoted := p.scanQuoted()
+		if scanOnly {
+			return nil, nil
+		}
+		return newRegexNodeStr(NtMulti, p.options&^IgnoreCase, quoted), nil
+
+	case 'R':
+		if p.useOptionE() || p.useRE2() {
+			return p.scanBasicBackslash(scanOnly)
+		}
+		p.moveRight(1)
+		if scanOnly {
+			return nil, nil
+		}
+		return newUnicodeNewlineNode(p.options), nil
+
+	case 'X':
+		if p.useOptionE() || p.useRE2() {
+			return p.scanBasicBackslash(scanOnly)
+		}
+		p.moveRight(1)
+		if scanOnly {
+			return nil, nil
+		}
+		return newRegexNode(NtGrapheme, p.options), nil
+
 	case 'b', 'B', 'A', 'G', 'Z', 'z':
 		p.moveRight(1)
 		return newRegexNode(p.typeFromCode(ch), p.options), nil
@@ -1352,6 +1389,58 @@ func (p *parser) scanBackslash(scanOnly bool) (*RegexNode, error) {
 	default:
 		return p.scanBasicBackslash(scanOnly)
 	}
+}
+
+// newUnicodeNewlineNode constructs \R from existing general-purpose nodes.
+// Its branches have disjoint starting sets, and the optional LF is atomic, so
+// reduction can remove the outer atomic wrapper without changing semantics.
+func newUnicodeNewlineNode(options RegexOptions) *RegexNode {
+	options &^= IgnoreCase
+
+	lead, optional := '\r', '\n'
+	if options&RightToLeft != 0 {
+		// Stored concatenations are already in execution order. In RTL, consume
+		// LF first and then the optional preceding CR.
+		lead, optional = '\n', '\r'
+	}
+
+	newlines := &CharSet{}
+	for _, ch := range []rune{'\n', '\v', '\f', '\u0085', '\u2028', '\u2029'} {
+		if ch != lead {
+			newlines.addChar(ch)
+		}
+	}
+	if '\r' != lead {
+		newlines.addChar('\r')
+	}
+
+	crlf := newRegexNode(NtConcatenate, options)
+	crlf.addChild(newRegexNodeCh(NtOne, options, lead))
+	crlf.addChild(newRegexNodeCh(NtOne, options, optional).makeQuantifier(false, 0, 1))
+
+	alternate := newRegexNode(NtAlternate, options)
+	alternate.addChild(newRegexNodeSet(NtSet, options, newlines))
+	alternate.addChild(crlf)
+
+	atomic := newRegexNode(NtAtomic, options)
+	atomic.addChild(alternate)
+	return atomic
+}
+
+// scanQuoted scans the literal text after \Q through the next \E, or through
+// the end of the pattern when there is no terminator.
+func (p *parser) scanQuoted() []rune {
+	start := p.textpos()
+	var quoted []rune
+	for p.charsRight() > 0 {
+		if p.rightChar(0) == '\\' && p.charsRight() > 1 && p.rightChar(1) == 'E' {
+			quoted = append(quoted, p.pattern[start:p.textpos()]...)
+			p.moveRight(2)
+			return quoted
+		}
+		p.moveRight(1)
+	}
+	return append(quoted, p.pattern[start:p.textpos()]...)
 }
 
 // Scans \-style backreferences and character escapes
@@ -1684,6 +1773,7 @@ func (p *parser) scanCharSet(caseInsensitive, scanOnly bool) (*CharSet, error) {
 	inRange := false
 	firstChar := true
 	closed := false
+	var quoted []rune
 
 	var cc *CharSet
 	if !scanOnly {
@@ -1697,11 +1787,33 @@ func (p *parser) scanCharSet(caseInsensitive, scanOnly bool) (*CharSet, error) {
 		}
 	}
 
-	for ; p.charsRight() > 0; firstChar = false {
+	for ; p.charsRight() > 0 || len(quoted) > 0; firstChar = false {
 		fTranslatedChar := false
-		ch = p.moveRightGetChar()
+		for {
+			if len(quoted) > 0 {
+				ch = quoted[0]
+				quoted = quoted[1:]
+				fTranslatedChar = true
+				break
+			}
+			ch = p.moveRightGetChar()
+			if ch == '\\' && !p.useOptionE() && p.charsRight() > 0 && p.rightChar(0) == 'Q' {
+				p.moveRight(1)
+				quoted = p.scanQuoted()
+				if len(quoted) == 0 {
+					if p.charsRight() == 0 {
+						break
+					}
+					continue
+				}
+				continue
+			}
+			break
+		}
 		if ch == ']' {
-			if !firstChar {
+			if fTranslatedChar {
+				// A quoted closing bracket is an ordinary class member.
+			} else if !firstChar {
 				closed = true
 				break
 			} else if p.useOptionE() {
@@ -1712,7 +1824,7 @@ func (p *parser) scanCharSet(caseInsensitive, scanOnly bool) (*CharSet, error) {
 				break
 			}
 
-		} else if ch == '\\' && p.charsRight() > 0 {
+		} else if ch == '\\' && !fTranslatedChar && p.charsRight() > 0 {
 			switch ch = p.moveRightGetChar(); ch {
 			case 'D', 'd':
 				if !scanOnly {
@@ -1815,7 +1927,7 @@ func (p *parser) scanCharSet(caseInsensitive, scanOnly bool) (*CharSet, error) {
 				}
 				fTranslatedChar = true
 			}
-		} else if ch == '[' {
+		} else if ch == '[' && !fTranslatedChar {
 			// This is code for Posix style properties - [:Ll:] or [:IsTibetan:].
 			// It currently doesn't do anything other than skip the whole thing!
 			if p.charsRight() > 0 && p.rightChar(0) == ':' && !inRange {
@@ -2291,9 +2403,52 @@ func (p *parser) addConcatenate() {
 }
 
 // Finish the current quantifiable (when a quantifier is found)
-func (p *parser) addConcatenate3(lazy bool, min, max int) {
-	p.concatenation.addChild(p.unit.makeQuantifier(lazy, min, max))
+func (p *parser) addConcatenate3(lazy, possessive bool, min, max int) {
+	node := p.unit.makeQuantifier(lazy, min, max)
+	if possessive {
+		atomic := newRegexNode(NtAtomic, p.options)
+		atomic.addChild(node)
+		node = atomic
+	}
+	p.concatenation.addChild(node)
 	p.unit = nil
+}
+
+// addQuotedUnit adds the literal characters scanned by \Q...\E. All but the
+// final character are completed immediately so a following quantifier applies
+// to the final literal character, just as if each character had been escaped.
+func (p *parser) addQuotedUnit(node *RegexNode) {
+	quoted := node.Str
+	if len(quoted) == 0 {
+		p.restoreLastUnit()
+		if p.unit == nil {
+			p.unit = newRegexNode(NtEmpty, p.options)
+		}
+		return
+	}
+	for _, ch := range quoted[:len(quoted)-1] {
+		p.concatenation.addChild(newRegexNodeCh(NtOne, p.options, ch))
+	}
+	p.unit = newRegexNodeCh(NtOne, p.options, quoted[len(quoted)-1])
+}
+
+// restoreLastUnit makes an immediately preceding literal quantifiable again
+// when an empty \Q\E appears between it and its quantifier.
+func (p *parser) restoreLastUnit() {
+	if len(p.concatenation.Children) == 0 {
+		return
+	}
+	last := len(p.concatenation.Children) - 1
+	node := p.concatenation.Children[last]
+	p.concatenation.Children = p.concatenation.Children[:last]
+	node.Parent = nil
+	if node.T == NtMulti && len(node.Str) > 1 {
+		prefix := append([]rune(nil), node.Str[:len(node.Str)-1]...)
+		p.concatenation.addChild(newRegexNodeStr(NtMulti, node.Options, prefix))
+		p.unit = newRegexNodeCh(NtOne, p.options, node.Str[len(node.Str)-1])
+		return
+	}
+	p.unit = node
 }
 
 // Sets the current unit to a single char node

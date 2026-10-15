@@ -608,7 +608,11 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	if testCase.options.runner != nil {
 		opts = *testCase.options.runner
 	}
-	consolidatedConfig, err := getConsolidatedConfig(ts.GlobalState, cliConf, opts, testCase.options.features)
+	var consolidatedConfig Config
+	fileConf, envConf, err := readConfigLayers(ts.GlobalState)
+	if err == nil {
+		consolidatedConfig, err = getConsolidatedConfig(ts.GlobalState, cliConf, fileConf, envConf, opts, testCase.options.features)
+	}
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return

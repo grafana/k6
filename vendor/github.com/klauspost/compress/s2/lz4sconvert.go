@@ -37,7 +37,7 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 
 	s, d := 0, len(dst)
 	dst = dst[:cap(dst)]
-	if !debug && hasAmd64Asm {
+	if !debug && hasAsm {
 		res, sz := cvtLZ4sBlockAsm(dst[d:], src)
 		if res < 0 {
 			const (
@@ -297,7 +297,7 @@ func (l *LZ4sConverter) ConvertBlockSnappy(dst, src []byte) ([]byte, int, error)
 	s, d := 0, len(dst)
 	dst = dst[:cap(dst)]
 	// Use assembly when possible
-	if !debug && hasAmd64Asm {
+	if !debug && hasAsm {
 		res, sz := cvtLZ4sBlockSnappyAsm(dst[d:], src)
 		if res < 0 {
 			const (

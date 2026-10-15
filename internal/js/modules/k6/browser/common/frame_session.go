@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 	k6metrics "go.k6.io/k6/v2/metrics"
 
@@ -407,7 +408,17 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	}
 
 	state := fs.vu.State()
-	tags := state.Tags.GetCurrentValues().Tags
+	// Web Vitals are reported asynchronously through a CDP binding, long after the navigation that
+	// produced them. Reading live tags here would attribute the sample to whatever group/tags happen
+	// to be active at report time. When async metric context is enabled, prefer the context captured
+	// by the navigation operation instead, mirroring how NetworkManager attributes delayed requests.
+	tagsAndMeta := state.Tags.GetCurrentValues()
+	if k6common.AsyncMetricContextEnabled(state) {
+		if captured, ok := fs.page.getNetworkTagsAndMeta(); ok {
+			tagsAndMeta = captured
+		}
+	}
+	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
 		tags = handleURLTag(fs.page, wv.URL, http.MethodGet, tags)
 	}
@@ -573,7 +584,7 @@ func (fs *FrameSession) initOptions() error {
 
 	if fs.isMainFrame() {
 		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
-		if err := fs.updateViewport(); err != nil {
+		if err := fs.updateViewport(fs.ctx, fs.page.emulatedSize); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
 				fs.session.ID(), fs.targetID, err)
@@ -1320,7 +1331,7 @@ func (fs *FrameSession) updateRequestInterception(enable bool) error {
 	return fs.networkManager.setRequestInterception(enable)
 }
 
-func (fs *FrameSession) updateViewport() error {
+func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *EmulatedSize) error {
 	fs.logger.Debugf("NewFrameSession:updateViewport", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// other frames don't have viewports and,
@@ -1333,7 +1344,6 @@ func (fs *FrameSession) updateViewport() error {
 	}
 
 	opts := fs.page.browserCtx.opts
-	emulatedSize := fs.page.emulatedSize
 	if emulatedSize == nil {
 		return nil
 	}
@@ -1352,7 +1362,7 @@ func (fs *FrameSession) updateViewport() error {
 		WithScreenOrientation(&orientation).
 		WithScreenWidth(screen.Width).
 		WithScreenHeight(screen.Height)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	if err := action.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
@@ -1367,7 +1377,7 @@ func (fs *FrameSession) updateViewport() error {
 			Width:  viewport.Width,
 			Height: viewport.Height,
 		})
-		if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		if err := action2.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
 			return fmt.Errorf("setting window bounds: %w", err)
 		}
 	}

@@ -7,52 +7,52 @@ import (
 )
 
 type weakMap struct {
-	m map[uint64]Value
+	m map[weak.Pointer[Object]]Value
 	sync.Mutex
 }
 
 func (wm *weakMap) set(key *Object, value Value) {
-	id := key.getId()
+	p := weak.Make(key)
 	wm.Lock()
-	_, exists := wm.m[id]
-	wm.m[id] = value
+	_, exists := wm.m[p]
+	wm.m[p] = value
 	wm.Unlock()
 	if !exists {
 		wmPtr := weak.Make(wm) // do not hold strong reference to wm so that it could be collected by GC
-		runtime.AddCleanup(key, func(id uint64) {
+		runtime.AddCleanup(key, func(p weak.Pointer[Object]) {
 			wm := wmPtr.Value()
 			if wm == nil {
 				return
 			}
 			wm.Lock()
-			delete(wm.m, id)
+			delete(wm.m, p)
 			wm.Unlock()
-		}, id)
+		}, p)
 	}
 }
 
 func (wm *weakMap) get(key *Object) (res Value) {
-	id := key.getId()
+	p := weak.Make(key)
 	wm.Lock()
-	res = wm.m[id]
+	res = wm.m[p]
 	wm.Unlock()
 	return
 }
 
 func (wm *weakMap) remove(key *Object) (removed bool) {
-	id := key.getId()
+	p := weak.Make(key)
 	wm.Lock()
-	if _, removed = wm.m[id]; removed {
-		delete(wm.m, id)
+	if _, removed = wm.m[p]; removed {
+		delete(wm.m, p)
 	}
 	wm.Unlock()
 	return
 }
 
 func (wm *weakMap) has(key *Object) bool {
-	id := key.getId()
+	p := weak.Make(key)
 	wm.Lock()
-	_, exists := wm.m[id]
+	_, exists := wm.m[p]
 	wm.Unlock()
 	return exists
 }
@@ -65,7 +65,7 @@ type weakMapObject struct {
 func (wmo *weakMapObject) init() {
 	wmo.baseObject.init()
 	wmo.m = weakMap{
-		m: make(map[uint64]Value),
+		m: make(map[weak.Pointer[Object]]Value),
 	}
 }
 

@@ -11,8 +11,8 @@ import (
 // mapFrameLocator API to the JS module.
 func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 	rt := vu.Runtime()
-	return mapping{
-		"getByAltText": func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+	return finishMapping(mapping{
+		"getByAltText": passiveCall(func(alt sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(alt) {
 				return nil, errors.New("missing required argument 'altText'")
 			}
@@ -20,8 +20,8 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 
 			ml := mapLocator(vu, fl.GetByAltText(palt, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
-		},
-		"getByLabel": func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+		}),
+		"getByLabel": passiveCall(func(label sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(label) {
 				return nil, errors.New("missing required argument 'label'")
 			}
@@ -29,8 +29,8 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 
 			ml := mapLocator(vu, fl.GetByLabel(plabel, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
-		},
-		"getByPlaceholder": func(placeholder sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+		}),
+		"getByPlaceholder": passiveCall(func(placeholder sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(placeholder) {
 				return nil, errors.New("missing required argument 'placeholder'")
 			}
@@ -38,8 +38,8 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 
 			ml := mapLocator(vu, fl.GetByPlaceholder(pplaceholder, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
-		},
-		"getByRole": func(role sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+		}),
+		"getByRole": passiveCall(func(role sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(role) {
 				return nil, errors.New("missing required argument 'role'")
 			}
@@ -47,8 +47,8 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 
 			ml := mapLocator(vu, fl.GetByRole(role.String(), popts))
 			return rt.ToValue(ml).ToObject(rt), nil
-		},
-		"getByTestId": func(testID sobek.Value) (*sobek.Object, error) {
+		}),
+		"getByTestId": passiveCall(func(testID sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(testID) {
 				return nil, errors.New("missing required argument 'testId'")
 			}
@@ -56,8 +56,8 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 
 			ml := mapLocator(vu, fl.GetByTestID(ptestID))
 			return rt.ToValue(ml).ToObject(rt), nil
-		},
-		"getByText": func(text sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+		}),
+		"getByText": passiveCall(func(text sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(text) {
 				return nil, errors.New("missing required argument 'text'")
 			}
@@ -65,8 +65,8 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 
 			ml := mapLocator(vu, fl.GetByText(ptext, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
-		},
-		"getByTitle": func(title sobek.Value, opts sobek.Value) (*sobek.Object, error) {
+		}),
+		"getByTitle": passiveCall(func(title sobek.Value, opts sobek.Value) (*sobek.Object, error) {
 			if k6common.IsNullish(title) {
 				return nil, errors.New("missing required argument 'title'")
 			}
@@ -74,13 +74,13 @@ func mapFrameLocator(vu moduleVU, fl *common.FrameLocator) mapping {
 
 			ml := mapLocator(vu, fl.GetByTitle(ptitle, popts))
 			return rt.ToValue(ml).ToObject(rt), nil
-		},
-		"locator": func(selector string, opts sobek.Value) mapping {
+		}),
+		"locator": passiveCall(func(selector string, opts sobek.Value) mapping {
 			return mapLocator(vu, fl.Locator(selector, parseLocatorOptions(rt, opts)))
-		},
-		"frameLocator": func(selector string) *sobek.Object {
+		}),
+		"frameLocator": passiveCall(func(selector string) *sobek.Object {
 			mfl := mapFrameLocator(vu, fl.FrameLocator(selector))
 			return rt.ToValue(mfl).ToObject(rt)
-		},
-	}
+		}),
+	})
 }

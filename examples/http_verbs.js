@@ -3,7 +3,7 @@ import { check, group } from "k6";
 
 /*
  * k6 supports all standard HTTP verbs/methods:
- * CONNECT, DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT and TRACE.
+ * CONNECT, DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT, QUERY and TRACE.
  * 
  * Below are examples showing how to use the most common of these.
  */
@@ -51,6 +51,19 @@ export default function() {
         check(res, {
             "status is 200": (r) => r.status === 200,
             "is verb correct": (r) => r.json().args.verb === "delete",
+        });
+    });
+
+    // QUERY request (RFC 10008): safe and idempotent like GET, but carries a
+    // request body — for queries too large or complex to fit in the URL.
+    // httpbin.org doesn't support QUERY yet, so this uses httpbingo.org (the
+    // Go port of httpbin) which does.
+    group("QUERY", function() {
+        let res = http.query("https://httpbingo.org/anything", JSON.stringify({ verb: "query" }), { headers: { "Content-Type": "application/json" }});
+        check(res, {
+            "status is 200": (r) => r.status === 200,
+            "is verb correct": (r) => r.json().method === "QUERY",
+            "is body correct": (r) => r.json().json.verb === "query",
         });
     });
 }

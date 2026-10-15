@@ -8,11 +8,15 @@ import (
 
 // mapTouchscreen to the JS module.
 func mapTouchscreen(vu moduleVU, ts *common.Touchscreen) mapping {
+	return finishMapping(newTouchscreenMapping(vu, ts))
+}
+
+func newTouchscreenMapping(vu moduleVU, ts *common.Touchscreen) mapping {
 	return mapping{
-		"tap": func(x float64, y float64) *sobek.Promise {
+		"tap": networkCall(func(x float64, y float64) *sobek.Promise {
 			return promise(vu, func() (result any, reason error) {
 				return nil, ts.Tap(x, y) //nolint:wrapcheck
 			})
-		},
+		}),
 	}
 }
