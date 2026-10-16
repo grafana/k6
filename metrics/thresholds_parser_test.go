@@ -29,6 +29,12 @@ func TestParseThresholdExpression(t *testing.T) {
 			wantErr:        true,
 		},
 		{
+			name:           "percentile expression without a value fails",
+			input:          "p<100",
+			wantExpression: nil,
+			wantErr:        true,
+		},
+		{
 			name:           "non numerical expression's value fails",
 			input:          "count>abc",
 			wantExpression: nil,
@@ -165,6 +171,13 @@ func TestParseThresholdAggregationMethod(t *testing.T) {
 		{
 			name:            "parsing empty percentile expression fails",
 			input:           "p()",
+			wantMethod:      "",
+			wantMethodValue: null.Float{},
+			wantErr:         true,
+		},
+		{
+			name:            "parsing bare percentile method fails",
+			input:           "p",
 			wantMethod:      "",
 			wantMethodValue: null.Float{},
 			wantErr:         true,
