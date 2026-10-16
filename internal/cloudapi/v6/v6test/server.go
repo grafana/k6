@@ -236,7 +236,11 @@ func (s *Server) handleGetTestRun(w http.ResponseWriter, _ *http.Request) {
 	res.SetStatusHistory(cloudapi.ToStatusModel(tp.StatusHistory))
 	// SDK decoder requires these keys on the other end even when empty.
 	res.SetDistribution([]k6cloud.DistributionZoneApiModel{})
-	res.SetResultDetails(k6cloud.ResultDetailsApiModelAsTestRunApiModelResultDetails(k6cloud.NewResultDetailsApiModel("")))
+	rd := k6cloud.NewResultDetailsApiModel(tp.Result.String())
+	if tp.ResultMessage != "" {
+		rd.SetMessage(tp.ResultMessage)
+	}
+	res.SetResultDetails(k6cloud.ResultDetailsApiModelAsTestRunApiModelResultDetails(rd))
 	res.SetOptions(map[string]any{})
 	writeJSON(w, http.StatusOK, res)
 }
