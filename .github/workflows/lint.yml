@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0
       - name: Resolve Go versions
         id: go_versions
-        uses: grafana/k6-ci/.github/actions/go-versions@bc53c239916ae45b50a0bdea2a37698589219c84 # v0.5.3
+        uses: grafana/k6-ci/.github/actions/go-versions@7dc7a71c57a30eddd3f1591ee0cc5abaeedafa14 # v0.5.4
       - name: Install Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
@@ -43,8 +43,8 @@ jobs:
           fi
 
   k6-ci:
-    uses: grafana/k6-ci/.github/workflows/all.yml@bc53c239916ae45b50a0bdea2a37698589219c84 # v0.5.3
+    uses: grafana/k6-ci/.github/workflows/all.yml@7dc7a71c57a30eddd3f1591ee0cc5abaeedafa14 # v0.5.4
     with:
-      k6-ci-ref: bc53c239916ae45b50a0bdea2a37698589219c84 # v0.5.3
+      k6-ci-ref: 7dc7a71c57a30eddd3f1591ee0cc5abaeedafa14 # v0.5.4
       skip-tests: true
       skip-extension-testing: true
