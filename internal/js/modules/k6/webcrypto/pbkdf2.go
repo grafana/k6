@@ -1,6 +1,7 @@
 package webcrypto
 
 import (
+	"bytes"
 	"crypto/pbkdf2"
 
 	"github.com/grafana/sobek"
@@ -95,6 +96,13 @@ func newPBKDF2DeriveParams(rt *sobek.Runtime, normalized Algorithm, params sobek
 	if err != nil {
 		return nil, err
 	}
+
+	// ToBytes returns a slice aliasing the script's view or buffer, and the
+	// derivation runs later, in the callback goroutine — after the call has
+	// already returned its promise. Snapshot the salt so mutating or reusing
+	// the buffer while the promise is pending cannot change (or race with)
+	// the bytes actually used (#6319).
+	byteSalt = bytes.Clone(byteSalt)
 
 	return &PBKDF2Params{
 		Name:       normalized.Name,
