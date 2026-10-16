@@ -95,6 +95,19 @@ type TrustTokens struct {
 	Count        float64 `json:"count"`
 }
 
+// PrivateVerificationToken details of a stored Private Verification Token.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#type-PrivateVerificationToken
+type PrivateVerificationToken struct {
+	ID           string              `json:"id"`           // Unique identifier of the token in the database.
+	IssuerOrigin string              `json:"issuerOrigin"` // Origin of the token issuer.
+	KeyID        int64               `json:"keyId"`        // Public key ID used to issue the token.
+	Expiration   *cdp.TimeSinceEpoch `json:"expiration"`   // Expiration timestamp in seconds since the epoch.
+	CreationTime *cdp.TimeSinceEpoch `json:"creationTime"` // Token creation timestamp in seconds since the epoch.
+	Version      int64               `json:"version"`      // Token protocol version.
+	Token        string              `json:"token"`        // Base64-encoded serialized token.
+}
+
 // BucketsDurability [no description].
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#type-StorageBucketsDurability
@@ -145,13 +158,4 @@ type BucketInfo struct {
 	Quota      float64             `json:"quota"` // Storage quota (bytes).
 	Persistent bool                `json:"persistent"`
 	Durability BucketsDurability   `json:"durability"`
-}
-
-// RelatedWebsiteSet a single Related Website Set object.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#type-RelatedWebsiteSet
-type RelatedWebsiteSet struct {
-	PrimarySites    []string `json:"primarySites"`    // The primary site of this set, along with the ccTLDs if there is any.
-	AssociatedSites []string `json:"associatedSites"` // The associated sites of this set, along with the ccTLDs if there is any.
-	ServiceSites    []string `json:"serviceSites"`    // The service sites of this set, along with the ccTLDs if there is any.
 }

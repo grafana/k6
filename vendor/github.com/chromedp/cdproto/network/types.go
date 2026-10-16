@@ -1084,7 +1084,6 @@ const (
 	SetCookieBlockedReasonSameSiteNoneInsecure                     SetCookieBlockedReason = "SameSiteNoneInsecure"
 	SetCookieBlockedReasonUserPreferences                          SetCookieBlockedReason = "UserPreferences"
 	SetCookieBlockedReasonThirdPartyPhaseout                       SetCookieBlockedReason = "ThirdPartyPhaseout"
-	SetCookieBlockedReasonThirdPartyBlockedInFirstPartySet         SetCookieBlockedReason = "ThirdPartyBlockedInFirstPartySet"
 	SetCookieBlockedReasonSyntaxError                              SetCookieBlockedReason = "SyntaxError"
 	SetCookieBlockedReasonSchemeNotSupported                       SetCookieBlockedReason = "SchemeNotSupported"
 	SetCookieBlockedReasonOverwriteSecure                          SetCookieBlockedReason = "OverwriteSecure"
@@ -1119,8 +1118,6 @@ func (t *SetCookieBlockedReason) UnmarshalJSON(buf []byte) error {
 		*t = SetCookieBlockedReasonUserPreferences
 	case SetCookieBlockedReasonThirdPartyPhaseout:
 		*t = SetCookieBlockedReasonThirdPartyPhaseout
-	case SetCookieBlockedReasonThirdPartyBlockedInFirstPartySet:
-		*t = SetCookieBlockedReasonThirdPartyBlockedInFirstPartySet
 	case SetCookieBlockedReasonSyntaxError:
 		*t = SetCookieBlockedReasonSyntaxError
 	case SetCookieBlockedReasonSchemeNotSupported:
@@ -1173,7 +1170,6 @@ const (
 	CookieBlockedReasonSameSiteNoneInsecure                     CookieBlockedReason = "SameSiteNoneInsecure"
 	CookieBlockedReasonUserPreferences                          CookieBlockedReason = "UserPreferences"
 	CookieBlockedReasonThirdPartyPhaseout                       CookieBlockedReason = "ThirdPartyPhaseout"
-	CookieBlockedReasonThirdPartyBlockedInFirstPartySet         CookieBlockedReason = "ThirdPartyBlockedInFirstPartySet"
 	CookieBlockedReasonUnknownError                             CookieBlockedReason = "UnknownError"
 	CookieBlockedReasonSchemefulSameSiteStrict                  CookieBlockedReason = "SchemefulSameSiteStrict"
 	CookieBlockedReasonSchemefulSameSiteLax                     CookieBlockedReason = "SchemefulSameSiteLax"
@@ -1208,8 +1204,6 @@ func (t *CookieBlockedReason) UnmarshalJSON(buf []byte) error {
 		*t = CookieBlockedReasonUserPreferences
 	case CookieBlockedReasonThirdPartyPhaseout:
 		*t = CookieBlockedReasonThirdPartyPhaseout
-	case CookieBlockedReasonThirdPartyBlockedInFirstPartySet:
-		*t = CookieBlockedReasonThirdPartyBlockedInFirstPartySet
 	case CookieBlockedReasonUnknownError:
 		*t = CookieBlockedReasonUnknownError
 	case CookieBlockedReasonSchemefulSameSiteStrict:

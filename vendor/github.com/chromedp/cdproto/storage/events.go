@@ -56,3 +56,9 @@ type EventStorageBucketCreatedOrUpdated struct {
 type EventStorageBucketDeleted struct {
 	BucketID string `json:"bucketId"`
 }
+
+// EventPrivateVerificationTokensUpdated private Verification Tokens have
+// been stored or deleted.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Storage#event-privateVerificationTokensUpdated
+type EventPrivateVerificationTokensUpdated struct{}

@@ -234,3 +234,35 @@ func (t *GetElementByRelationRelation) UnmarshalJSON(buf []byte) error {
 	}
 	return nil
 }
+
+// SetTextMarkerType the type of marker to set on the given range of text.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#method-setTextMarker
+type SetTextMarkerType string
+
+// String returns the SetTextMarkerType as string value.
+func (t SetTextMarkerType) String() string {
+	return string(t)
+}
+
+// SetTextMarkerType values.
+const (
+	SetTextMarkerTypeSpelling SetTextMarkerType = "spelling"
+	SetTextMarkerTypeGrammar  SetTextMarkerType = "grammar"
+)
+
+// UnmarshalJSON satisfies [json.Unmarshaler].
+func (t *SetTextMarkerType) UnmarshalJSON(buf []byte) error {
+	s := string(buf)
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+
+	switch SetTextMarkerType(s) {
+	case SetTextMarkerTypeSpelling:
+		*t = SetTextMarkerTypeSpelling
+	case SetTextMarkerTypeGrammar:
+		*t = SetTextMarkerTypeGrammar
+	default:
+		return fmt.Errorf("unknown SetTextMarkerType value: %v", s)
+	}
+	return nil
+}

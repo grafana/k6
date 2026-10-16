@@ -18,6 +18,7 @@ type Annotation struct {
 	ReadOnly         bool `json:"readOnly"`         // A hint indicating that the tool does not modify any state.
 	UntrustedContent bool `json:"untrustedContent"` // A hint indicating that the tool output may contain untrusted content, ex: UGC, 3rd party data.
 	Consequential    bool `json:"consequential"`    // A hint indicating that executing the tool will result in consequential actions, ex: booking a flight, transferring money.
+	Debugging        bool `json:"debugging"`        // If true, indicates that the tool is intended for debugging and developer tooling rather than end-user interactions.
 	Autosubmit       bool `json:"autosubmit"`       // If the declarative tool was declared with the autosubmit attribute.
 }
 
