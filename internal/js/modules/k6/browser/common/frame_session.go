@@ -1325,13 +1325,12 @@ func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *Emulat
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
-	if fs.hasUIWindow {
+	// Only headed browsers need the window resized. In headless mode it ends up smaller than the
+	// emulated viewport (about 87px on macOS), which leaves a stale band in screenshots.
+	headless := fs.page.browserCtx.browser.browserOpts.Headless
+	if fs.hasUIWindow && !headless {
 		// add an inset to viewport depending on the operating system.
-		// this won't add an inset if we're running in headless mode.
-		viewport = viewport.recalculateInset(
-			fs.page.browserCtx.browser.browserOpts.Headless,
-			runtime.GOOS,
-		)
+		viewport = viewport.recalculateInset(runtime.GOOS)
 		action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
 			Width:  viewport.Width,
 			Height: viewport.Height,
