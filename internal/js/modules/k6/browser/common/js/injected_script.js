@@ -466,8 +466,7 @@ function trimFlatString(s) {
   return s.trim();
 }
 function asFlatString(s) {
-  return s.split("\xA0").map((chunk) => chunk.replace(/\r\n/g, "\
-").replace(/[\u200b\u00ad]/g, "").replace(/\s\s*/g, " ")).join("\xA0").trim();
+  return s.split("\xA0").map((chunk) => chunk.replace(/\r\n/g, "\n").replace(/[\u200b\u00ad]/g, "").replace(/\s\s*/g, " ")).join("\xA0").trim();
 }
 function queryInAriaOwned(element, selector) {
   const result = [...element.querySelectorAll(selector)];
@@ -1558,12 +1557,6 @@ class CSSQueryEngine {
   }
 }
 
-class TextQueryEngine {
-  queryAll(root, selector) {
-    return root.queryAll(selector);
-  }
-}
-
 class XPathQueryEngine {
   queryAll(root, selector) {
     if (selector.startsWith("/")) {
@@ -1726,7 +1719,7 @@ class InjectedScript {
     this._evaluator = new SelectorEvaluatorImpl();
     this._queryEngines = {
       css: new CSSQueryEngine(),
-      text: new TextQueryEngine(),
+      text: new TextEngine(true, false),
       xpath: new XPathQueryEngine(),
       'internal:role': createRoleEngine(true),
       'internal:attr': new AttributeEngine(),
@@ -1803,8 +1796,14 @@ class InjectedScript {
     }
 
     if (part.name === "visible") {
-      const visible = Boolean(part.body);
-      return roots.filter((match) => visible === isVisible(match.element));
+      const visible = part.body === "true";
+      const filtered = roots.filter((match) => visible === isVisible(match.element));
+      return this._querySelectorRecursively(
+        filtered,
+        selector,
+        index + 1,
+        queryCache
+      );
     }
 
     const result = [];
@@ -2269,36 +2268,46 @@ class InjectedScript {
     if (!root["querySelector"]) {
       return "error:notqueryablenode";
     }
-    const result = this._querySelectorRecursively(
-      [{ element: root, capture: undefined }],
-      selector,
-      0,
-      new k6BrowserNative.Map()
-    );
-    if (strict && result.length > 1) {
-      throw "error:strictmodeviolation";
+    this._evaluator.begin();
+    try {
+      const result = this._querySelectorRecursively(
+        [{ element: root, capture: undefined }],
+        selector,
+        0,
+        new k6BrowserNative.Map()
+      );
+      if (strict && result.length > 1) {
+        throw "error:strictmodeviolation";
+      }
+      if (result.length == 0) {
+        return null;
+      }
+      return result[0].capture || result[0].element;
+    } finally {
+      this._evaluator.end();
     }
-    if (result.length == 0) {
-      return null;
-    }
-    return result[0].capture || result[0].element;
   }
 
   querySelectorAll(selector, root) {
     if (!root["querySelectorAll"]) {
       return "error:notqueryablenode";
     }
-    const result = this._querySelectorRecursively(
-      [{ element: root, capture: undefined }],
-      selector,
-      0,
-      new k6BrowserNative.Map()
-    );
-    const set = new k6BrowserNative.Set();
-    for (const r of result) {
-      set.add(r.capture || r.element);
+    this._evaluator.begin();
+    try {
+      const result = this._querySelectorRecursively(
+        [{ element: root, capture: undefined }],
+        selector,
+        0,
+        new k6BrowserNative.Map()
+      );
+      const set = new k6BrowserNative.Set();
+      for (const r of result) {
+        set.add(r.capture || r.element);
+      }
+      return [...set];
+    } finally {
+      this._evaluator.end();
     }
-    return [...set];
   }
 
   selectOptions(node, optionsToSelect) {

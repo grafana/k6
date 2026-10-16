@@ -880,6 +880,29 @@ func TestSelectOption(t *testing.T) {
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
 
+func TestTextSelector(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<div><button>Log in</button><span>Sign up</span></div>`, nil))
+
+	tests := []struct {
+		selector string
+		want     int
+	}{
+		{selector: `text=Log in`, want: 1},
+		{selector: `text=log IN`, want: 1}, // unquoted is a case-insensitive substring match
+		{selector: `"Log in"`, want: 1},    // quoted is a strict match
+		{selector: `"log in"`, want: 0},    // strict match is case-sensitive
+	}
+	for _, tt := range tests {
+		count, err := p.Locator(tt.selector, nil).Count()
+		require.NoError(t, err, tt.selector)
+		require.Equal(t, tt.want, count, tt.selector)
+	}
+}
+
 func TestCount(t *testing.T) {
 	t.Parallel()
 
@@ -1124,6 +1147,25 @@ func TestDetachedRetry(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestLocatorHasTextAfterTextChange(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<div id="status">Loading</div>`, nil))
+
+	count, err := p.Locator("#status", &common.LocatorOptions{HasText: "Loading"}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	_, err = p.Evaluate(`() => { document.querySelector('#status').textContent = 'Done'; }`)
+	require.NoError(t, err)
+
+	count, err = p.Locator("#status", &common.LocatorOptions{HasText: "Done"}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "hasText should match the updated text")
+}
+
 func TestLocatorFilter(t *testing.T) {
 	t.Parallel()
 
@@ -1258,6 +1300,28 @@ func TestLocatorFilter(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, count)
 	})
+}
+
+func TestVisibleSelectorPart(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`
+		<button>visible</button>
+		<button hidden>hidden 1</button>
+		<button style="display: none">hidden 2</button>
+		<div><span>a</span><span>b</span></div>`,
+		nil,
+	))
+
+	count, err := p.Locator("button >> visible=false", nil).Count()
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "visible=false should match the hidden buttons")
+
+	count, err = p.Locator("div >> visible=true >> span", nil).Count()
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "parts after visible= should be evaluated")
 }
 
 func TestFrameLocatorLocatorOptions(t *testing.T) {

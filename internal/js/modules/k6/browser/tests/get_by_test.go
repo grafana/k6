@@ -1429,6 +1429,29 @@ func TestGetByTextSuccess(t *testing.T) {
 	}
 }
 
+func TestGetByWithBackslash(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	_, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		await page.setContent('<button>C:\\temp</button><p>C:\\path</p>');
+
+		const byRole = await page.getByRole('button', { name: 'C:\\temp' }).count();
+		if (byRole !== 1) {
+			throw new Error('getByRole: expected 1 match, got ' + byRole);
+		}
+		const byText = await page.getByText('C:\\path').count();
+		if (byText !== 1) {
+			throw new Error('getByText: expected 1 match, got ' + byText);
+		}
+	`)
+	require.NoError(t, err)
+}
+
 func TestGetByNullHandling(t *testing.T) {
 	t.Parallel()
 
@@ -1482,6 +1505,22 @@ func TestGetByNullHandling(t *testing.T) {
 	`, getByImpl)
 		require.ErrorContains(t, err, "missing required argument 'text'")
 	}
+}
+
+func TestGetByRoleNameWithCRLF(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<button>placeholder</button>`, nil))
+
+	// The HTML parser normalizes CRLF in markup, so it has to be set from JS.
+	_, err := p.Evaluate(`() => document.querySelector('button').setAttribute('aria-label', 'Sign\r\nin')`)
+	require.NoError(t, err)
+
+	count, err := p.GetByRole("button", &common.GetByRoleOptions{Name: new(`'Sign in'`), Exact: new(true)}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
 }
 
 func getByImplementationsOf[T any](p *common.Page) map[string]T {
