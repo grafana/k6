@@ -1,6 +1,7 @@
 package cloudapi
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -621,9 +622,35 @@ func assertJSONEqual(t *testing.T, want, got any) {
 	assert.JSONEq(t, string(w), string(g))
 }
 
+// assertArchiveEqual checks that got is the serialized form of want.
+// Archive.Write stamps the current time into the tar headers,
+// so the entries are compared with their timestamps cleared.
 func assertArchiveEqual(t *testing.T, want *lib.Archive, got []byte) {
 	t.Helper()
 	var b bytes.Buffer
 	require.NoError(t, want.Write(&b))
-	assert.Equal(t, b.Bytes(), got)
+	assert.Equal(t, readTarEntries(t, b.Bytes()), readTarEntries(t, got))
+}
+
+type tarEntry struct {
+	Header tar.Header
+	Data   []byte
+}
+
+func readTarEntries(t *testing.T, data []byte) []tarEntry {
+	t.Helper()
+	var entries []tarEntry
+	r := tar.NewReader(bytes.NewReader(data))
+	for {
+		hdr, err := r.Next()
+		if errors.Is(err, io.EOF) {
+			return entries
+		}
+		require.NoError(t, err)
+		content, err := io.ReadAll(r)
+		require.NoError(t, err)
+		h := *hdr
+		h.ModTime, h.AccessTime, h.ChangeTime = time.Time{}, time.Time{}, time.Time{}
+		entries = append(entries, tarEntry{Header: h, Data: content})
+	}
 }
