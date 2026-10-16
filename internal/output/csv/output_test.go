@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,6 +22,45 @@ import (
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/output"
 )
+
+func TestCSVGzipCloseError(t *testing.T) {
+	t.Parallel()
+
+	fs := failWriteFS{Fs: fsext.NewMemMapFs()}
+	out, err := newOutput(output.Params{
+		Logger:         testutils.NewLogger(t),
+		FS:             fs,
+		ConfigArgument: "out.csv.gz",
+		ScriptOptions: lib.Options{
+			SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck | metrics.TagVU),
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+	require.ErrorIs(t, out.Stop(), errFailWrite)
+}
+
+type failWriteFS struct {
+	afero.Fs
+}
+
+func (f failWriteFS) Create(name string) (afero.File, error) {
+	file, err := f.Fs.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return &failWriteFile{File: file}, nil
+}
+
+type failWriteFile struct {
+	afero.File
+}
+
+func (f *failWriteFile) Write(p []byte) (int, error) {
+	return 0, errFailWrite
+}
+
+var errFailWrite = errors.New("disk full")
 
 func TestMakeHeader(t *testing.T) {
 	t.Parallel()
