@@ -720,6 +720,44 @@ func TestConnectWrongStatusCode(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestDialFailureWithIPSystemTag ensures a failed dial does not panic when the
+// ip system tag is enabled. DialContext returns a nil conn on connection
+// errors; reading RemoteAddr without a nil guard used to crash the process.
+func TestDialFailureWithIPSystemTag(t *testing.T) {
+	t.Parallel()
+
+	t.Run("connection refused", func(t *testing.T) {
+		t.Parallel()
+		test := newTestState(t)
+		test.VU.StateField.Options.Throw = null.BoolFrom(false)
+		test.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{"ip"})
+
+		_, err := test.VU.Runtime().RunString(`
+		var res = ws.connect("ws://127.0.0.2:1", function(socket){});
+		if (!res || !res.error) {
+			throw new Error("expected a dial error response");
+		}
+		`)
+		require.NoError(t, err)
+	})
+
+	t.Run("non-switching status", func(t *testing.T) {
+		t.Parallel()
+		test := newTestState(t)
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		test.VU.StateField.Options.Throw = null.BoolFrom(false)
+		test.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{"ip"})
+
+		_, err := test.VU.Runtime().RunString(tb.Replacer.Replace(`
+		var res = ws.connect("WSBIN_URL/status/404", function(socket){});
+		if (res.status != 404) {
+			throw new Error("no status code set for invalid response");
+		}
+		`))
+		require.NoError(t, err)
+	})
+}
+
 func TestSystemTags(t *testing.T) {
 	t.Parallel()
 	testedSystemTags := []string{"status", "subproto", "url", "ip"}
