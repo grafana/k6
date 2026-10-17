@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -555,6 +557,35 @@ const expectedHandleSummaryDataWithSetup = `
         }
     }
 }`
+
+// TestHandleSummaryPendingPromise checks that a handleSummary() whose promise never settles is
+// logged as an error and k6 falls back to the default summary, as it does for other callback errors.
+func TestHandleSummaryPendingPromise(t *testing.T) {
+	t.Parallel()
+	logger, hook := logtest.NewNullLogger()
+	runner, err := getSimpleRunner(t, "/script.js", `
+		exports.options = {handleSummaryTimeout: "1s"};
+		exports.default = function() { /* we don't run this, metrics are mocked */ };
+		exports.handleSummary = async function(data) {
+			await new Promise(function() {});
+			return {'never.json': '{}'};
+		};
+		`, logger)
+	require.NoError(t, err)
+
+	result, err := runner.HandleSummary(t.Context(), createTestLegacySummary(t), nil, summary.Meta{})
+	require.NoError(t, err)
+	require.NotNil(t, result["stdout"], "falls back to the default summary")
+	require.Nil(t, result["never.json"])
+
+	var logged bool
+	for _, e := range hook.AllEntries() {
+		if strings.Contains(e.Message, "did not finish") {
+			logged = true
+		}
+	}
+	require.True(t, logged, "the pending promise is logged as an error")
+}
 
 func TestRawHandleSummaryData(t *testing.T) {
 	t.Parallel()

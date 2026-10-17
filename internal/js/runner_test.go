@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -505,6 +506,145 @@ func TestSetupDataPromise(t *testing.T) {
 			throw new Error("teardown: wrong data: " + JSON.stringify(data))
 		}
 	};`)
+}
+
+// TestSetupDataPendingPromise checks that a setup() whose promise never settles is reported as an
+// error rather than crashing k6.
+func TestSetupDataPendingPromise(t *testing.T) {
+	t.Parallel()
+	r, err := getSimpleRunner(t, "/script.js", `
+	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	exports.setup = async function() {
+		// Nothing that could ever settle this promise is registered with the event loop, so the
+		// loop runs dry with setup() still awaiting it. setupTimeout does not save us: there is no
+		// pending callback keeping the loop alive until the deadline, so it returns immediately.
+		await new Promise(function() {});
+		return {"data": "correct"};
+	}
+	exports.default = function() {};`)
+	require.NoError(t, err)
+
+	err = r.Setup(t.Context(), make(chan metrics.SampleContainer, 100))
+	require.Error(t, err, "a setup() that never finishes must be reported as an error")
+	require.Contains(t, err.Error(), "setup()")
+	require.Contains(t, err.Error(), "did not finish")
+}
+
+// TestTeardownPendingPromise checks that a teardown() whose promise never settles is reported as an
+// error, like setup().
+func TestTeardownPendingPromise(t *testing.T) {
+	t.Parallel()
+	r, err := getSimpleRunner(t, "/script.js", `
+	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	exports.default = function() {};
+	exports.teardown = async function() {
+		await new Promise(function() {});
+	};`)
+	require.NoError(t, err)
+
+	err = r.Teardown(t.Context(), make(chan metrics.SampleContainer, 100))
+	require.ErrorIs(t, err, errPromiseNotSettled)
+	require.Contains(t, err.Error(), "teardown()")
+}
+
+// TestVUIterationPendingPromise checks how a default function whose promise never settles behaves:
+// a full iteration reports the pending promise as the iteration's error instead of silently
+// counting as successful, while settled async iterations are unaffected.
+func TestVUIterationPendingPromise(t *testing.T) {
+	t.Parallel()
+
+	testCases := map[string]struct {
+		script  string
+		wantErr bool
+	}{
+		"never settles": {
+			script: `exports.default = async function() {
+				await new Promise(function() {});
+			};`,
+			wantErr: true,
+		},
+		"resolves": {
+			script: `exports.default = async function() {
+				await Promise.resolve(1);
+			};`,
+		},
+		"resolves after a timer": {
+			script: `exports.default = async function() {
+				await new Promise(function(resolve) { setTimeout(resolve, 10); });
+			};`,
+		},
+		"sync": {
+			script: `exports.default = function() {};`,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			r, err := getSimpleRunner(t, "/script.js", tc.script)
+			require.NoError(t, err)
+
+			initVU, err := r.NewVU(t.Context(), 1, 1, make(chan metrics.SampleContainer, 100))
+			require.NoError(t, err)
+			vu := initVU.Activate(&lib.VUActivationParams{RunContext: t.Context()})
+
+			err = vu.RunOnce()
+			if tc.wantErr {
+				require.ErrorIs(t, err, errPromiseNotSettled)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestVUIterationPendingPromiseCanceled checks that an iteration whose context is canceled while its
+// promise is still pending (e.g. the scenario ended) is not reported as errPromiseNotSettled.
+func TestVUIterationPendingPromiseCanceled(t *testing.T) {
+	t.Parallel()
+	r, err := getSimpleRunner(t, "/script.js", `
+	exports.default = async function() {
+		await new Promise(function(resolve) { setTimeout(resolve, 60000); });
+	};`)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+	require.NoError(t, err)
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+
+	err = vu.RunOnce()
+	require.NotErrorIs(t, err, errPromiseNotSettled)
+}
+
+// TestUnPromisify checks unPromisify on plain values and on promises in every state.
+func TestUnPromisify(t *testing.T) {
+	t.Parallel()
+	rt := sobek.New()
+
+	v, err := unPromisify(rt.ToValue(42))
+	require.NoError(t, err)
+	require.Equal(t, int64(42), v.ToInteger())
+
+	v, err = unPromisify(sobek.Undefined())
+	require.NoError(t, err)
+	require.True(t, sobek.IsUndefined(v))
+
+	p, resolve, _ := rt.NewPromise()
+	_, err = unPromisify(rt.ToValue(p))
+	require.ErrorIs(t, err, errPromiseNotSettled)
+
+	require.NoError(t, resolve("done"))
+	v, err = unPromisify(rt.ToValue(p))
+	require.NoError(t, err)
+	require.Equal(t, "done", v.String())
+
+	p, _, reject := rt.NewPromise()
+	require.NoError(t, reject("boom"))
+	v, err = unPromisify(rt.ToValue(p))
+	require.NoError(t, err, "a rejection is reported by the event loop, not by unPromisify")
+	require.Equal(t, "boom", v.String())
 }
 
 func TestRunnerIntegrationImports(t *testing.T) {

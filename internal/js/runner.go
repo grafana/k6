@@ -685,25 +685,36 @@ func (r *Runner) runPart(
 		return nil, deadlineError
 	}
 
+	if errors.Is(err, errPromiseNotSettled) {
+		return nil, fmt.Errorf("%s() %w", name, err)
+	}
+
 	return v, err
 }
 
 //nolint:gochecknoglobals
 var sobekPromiseType = reflect.TypeFor[*sobek.Promise]()
 
-// unPromisify gets the result of v if it is a promise, otherwise returns v
-func unPromisify(v sobek.Value) sobek.Value {
-	if !common.IsNullish(v) {
-		if v.ExportType() == sobekPromiseType {
-			p, ok := v.Export().(*sobek.Promise)
-			if !ok {
-				panic("Something that was promise did not export to a promise; this shouldn't happen")
-			}
-			return p.Result()
-		}
-	}
+// errPromiseNotSettled is returned by unPromisify when the function's promise is still pending after
+// the event loop has run out of work, so nothing is left that could ever settle it.
+var errPromiseNotSettled = errors.New(
+	"did not finish: it is still awaiting an operation that never completed")
 
-	return v
+// unPromisify gets the result of v if it is a promise, otherwise returns v. It returns
+// errPromiseNotSettled if v is a promise that is still pending, as its result will never be
+// available. Callers only call it once the event loop has stopped.
+func unPromisify(v sobek.Value) (sobek.Value, error) {
+	if common.IsNullish(v) || v.ExportType() != sobekPromiseType {
+		return v, nil
+	}
+	p, ok := v.Export().(*sobek.Promise)
+	if !ok {
+		panic("Something that was promise did not export to a promise; this shouldn't happen")
+	}
+	if p.State() == sobek.PromiseStatePending {
+		return nil, errPromiseNotSettled
+	}
+	return p.Result(), nil
 }
 
 // getTimeoutFor returns the timeout duration for given special script function.
@@ -992,7 +1003,12 @@ func (u *VU) runFn(
 		u.state.Samples <- iterationSamples(startTime, endTime, ctm, builtinMetrics)
 	}
 
-	v = unPromisify(v)
+	v, promiseErr := unPromisify(v)
+	// An iteration cut short by its context (e.g. the scenario ending) can legitimately leave its
+	// promise pending, and an existing error (an exception, an interrupt) explains more than this.
+	if promiseErr != nil && err == nil && isFullIteration {
+		err = promiseErr
+	}
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }
