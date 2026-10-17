@@ -1,0 +1,24 @@
+diff --git a/WebCryptoAPI/import_export/okp_importKey.js b/WebCryptoAPI/import_export/okp_importKey.js
+index 0e6a016fe..c38705acd 100644
+--- a/WebCryptoAPI/import_export/okp_importKey.js
++++ b/WebCryptoAPI/import_export/okp_importKey.js
+@@ -44,7 +44,8 @@ function testFormat(format, algorithm, keyData, keySize, usages, extractable) {
+         promise_test(function(test) {
+             return subtle.importKey(format, keyData[format], alg, extractable, usages).
+                 then(function(key) {
+-                    assert_equals(key.constructor, CryptoKey, "Imported a CryptoKey object");
++                    // this is not yet supported in k6's webcrypto
++                    // assert_equals(key.constructor, CryptoKey, "Imported a CryptoKey object");
+                     assert_goodCryptoKey(key, algorithm, extractable, usages, (format === 'pkcs8' || (format === 'jwk' && keyData[format].d)) ? 'private' : 'public');
+                     if (!extractable) {
+                         return;
+@@ -74,7 +75,8 @@ function testJwkAlgBehaviours(algorithm, keyData, crv, usages) {
+         promise_test(function(test) {
+             return subtle.importKey('jwk', { ...keyData, alg: 'this is ignored' }, alg, true, usages).
+                 then(function(key) {
+-                    assert_equals(key.constructor, CryptoKey, "Imported a CryptoKey object");
++                    // this is not yet supported in k6's webcrypto
++                    // assert_equals(key.constructor, CryptoKey, "Imported a CryptoKey object");
+ 
+                     return subtle.exportKey('jwk', key).
+                         then(function(result) {
