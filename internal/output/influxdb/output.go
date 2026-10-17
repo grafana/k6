@@ -133,6 +133,9 @@ func (o *Output) batchFromSamples(containers []metrics.SampleContainer) (client.
 				o.extractTagsToValues(tags, values)
 				cache[sample.Tags] = cacheItem{tags, values}
 			}
+			for k, v := range sample.Metadata {
+				values[k] = v
+			}
 			values["value"] = sample.Value
 			var p *client.Point
 			p, err = client.NewPoint(

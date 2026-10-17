@@ -20,6 +20,7 @@ const (
 	HTTPReqSendingName        = "http_req_sending"
 	HTTPReqWaitingName        = "http_req_waiting"
 	HTTPReqReceivingName      = "http_req_receiving"
+	HTTPSavedResponsesName    = "http_saved_responses"
 
 	WSSessionsName         = "ws_sessions"
 	WSMessagesSentName     = "ws_msgs_sent"
@@ -56,6 +57,7 @@ type BuiltinMetrics struct {
 	HTTPReqSending        *Metric
 	HTTPReqWaiting        *Metric
 	HTTPReqReceiving      *Metric
+	HTTPSavedResponses    *Metric
 
 	// Websocket-related
 	WSSessions         *Metric
@@ -94,6 +96,7 @@ func RegisterBuiltinMetrics(registry *Registry) *BuiltinMetrics {
 		HTTPReqSending:        registry.MustNewMetric(HTTPReqSendingName, Trend, Time),
 		HTTPReqWaiting:        registry.MustNewMetric(HTTPReqWaitingName, Trend, Time),
 		HTTPReqReceiving:      registry.MustNewMetric(HTTPReqReceivingName, Trend, Time),
+		HTTPSavedResponses:    registry.MustNewMetric(HTTPSavedResponsesName, Counter),
 
 		WSSessions:         registry.MustNewMetric(WSSessionsName, Counter),
 		WSMessagesSent:     registry.MustNewMetric(WSMessagesSentName, Counter),

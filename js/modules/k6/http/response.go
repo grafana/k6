@@ -7,7 +7,11 @@ import (
 	"maps"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/tidwall/gjson"
@@ -15,6 +19,7 @@ import (
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules/k6/html"
 	"go.k6.io/k6/v2/lib/netext/httpext"
+	"go.k6.io/k6/v2/metrics"
 )
 
 // Response is a representation of an HTTP response to be returned to the Sobek VM
@@ -269,4 +274,97 @@ func (res *Response) ClickLink(args ...sobek.Value) (*Response, error) {
 	requestURL := responseURL.ResolveReference(hrefURL)
 
 	return res.client.Request(http.MethodGet, rt.ToValue(requestURL.String()), sobek.Undefined(), requestParams)
+}
+
+// Save writes the response URL, status, headers, and body as formatted JSON to the given
+// filePath (or an auto-generated path in ./saved_responses/ if omitted) and emits an
+// http_saved_responses metric sample containing the response headers and body.
+func (res *Response) Save(args ...string) (string, error) {
+	now := time.Now()
+	filePath := ""
+	if len(args) > 0 {
+		filePath = strings.TrimSpace(args[0])
+	}
+	if filePath == "" {
+		filePath = fmt.Sprintf("saved_responses/response-%d-status-%d.json", now.UnixNano(), res.Status)
+	}
+
+	var bodyVal any
+	var bodyStr string
+	switch b := res.Body.(type) {
+	case nil:
+		bodyVal = nil
+		bodyStr = ""
+	case sobek.ArrayBuffer:
+		bodyStr = string(b.Bytes())
+		bodyVal = bodyStr
+	case []byte:
+		bodyStr = string(b)
+		bodyVal = bodyStr
+	case string:
+		bodyStr = b
+		bodyVal = b
+	default:
+		bodyStr = fmt.Sprintf("%v", b)
+		bodyVal = b
+	}
+
+	payload := map[string]any{
+		"timestamp":   now.Format(time.RFC3339Nano),
+		"url":         res.URL,
+		"status":      res.Status,
+		"status_text": res.StatusText,
+		"headers":     res.Headers,
+		"body":        bodyVal,
+	}
+
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	if dir := filepath.Dir(filePath); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return "", err
+		}
+	}
+
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+		return "", err
+	}
+
+	if res.client != nil && res.client.moduleInstance != nil {
+		if state := res.client.moduleInstance.vu.State(); state != nil &&
+			state.BuiltinMetrics != nil && state.BuiltinMetrics.HTTPSavedResponses != nil {
+			headersJSON, _ := json.Marshal(res.Headers)
+			tagsAndMeta := state.Tags.GetCurrentValues()
+			statusStr := strconv.Itoa(res.Status)
+			tags := tagsAndMeta.Tags.
+				With("url", res.URL).
+				With("status", statusStr)
+
+			meta := maps.Clone(tagsAndMeta.Metadata)
+			if meta == nil {
+				meta = make(map[string]string)
+			}
+			meta["url"] = res.URL
+			meta["status"] = statusStr
+			meta["status_text"] = res.StatusText
+			meta["response_headers"] = string(headersJSON)
+			meta["response_body"] = bodyStr
+			meta["saved_file"] = filePath
+
+			metrics.PushIfNotDone(res.client.moduleInstance.vu.Context(), state.Samples, metrics.Sample{
+				TimeSeries: metrics.TimeSeries{
+					Metric: state.BuiltinMetrics.HTTPSavedResponses,
+					Tags:   tags,
+				},
+				Time:     now,
+				Value:    1,
+				Metadata: meta,
+			})
+		}
+	}
+
+	return filePath, nil
 }

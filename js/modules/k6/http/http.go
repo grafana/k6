@@ -115,6 +115,12 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mustExport("asyncRequest", mi.defaultClient.asyncRequest)
 	mustExport("batch", mi.defaultClient.Batch)
 	mustExport("setResponseCallback", mi.defaultClient.SetResponseCallback)
+	mustExport("saveResponse", func(res *Response, args ...string) (string, error) {
+		if res == nil {
+			return "", http.ErrMissingFile
+		}
+		return res.Save(args...)
+	})
 
 	mustExport("expectedStatuses", mi.expectedStatuses) // TODO: refactor?
 

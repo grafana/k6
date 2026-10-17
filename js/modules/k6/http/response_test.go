@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -449,5 +451,23 @@ func TestResponse(t *testing.T) {
 			}
 		`)
 		assert.NoError(t, err)
+	})
+
+	t.Run("Save", func(t *testing.T) {
+		outFile := filepath.Join(t.TempDir(), "saved_response.json")
+		_, err := rt.RunString(sr(fmt.Sprintf(`
+			var res = http.request("GET", "HTTPBIN_URL/get?foo=bar");
+			res.save(%q);
+		`, outFile)))
+		require.NoError(t, err)
+
+		raw, err := os.ReadFile(outFile)
+		require.NoError(t, err)
+
+		var saved map[string]any
+		require.NoError(t, json.Unmarshal(raw, &saved))
+		assert.Equal(t, float64(200), saved["status"])
+		assert.NotEmpty(t, saved["headers"])
+		assert.Contains(t, saved["body"], "foo")
 	})
 }
