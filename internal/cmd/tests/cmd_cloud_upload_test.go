@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -144,6 +145,40 @@ func TestK6CloudUpload(t *testing.T) {
 		assert.Contains(t, stdout, `execution: cloud`)
 		assert.Contains(t, stdout, `output: https://stack.grafana.com/a/k6-app/tests/456`)
 		assert.Contains(t, stdout, `test status: Archived`)
+	})
+
+	// TestCloudUploadFromStdin checks that a script read from stdin (`-`) is uploaded with the same
+	// default test name used by `k6 run -o cloud`, instead of `-`, which the cloud rejects as too short.
+	t.Run("TestCloudUploadFromStdin", func(t *testing.T) {
+		t.Parallel()
+
+		uploadedName := make(chan string, 1)
+		srv := v6test.NewServer(t, v6test.Config{
+			InspectArchive: func(req *http.Request) {
+				uploadedName <- req.FormValue("name")
+			},
+		})
+
+		ts := NewGlobalTestState(t)
+		ts.Stdin = bytes.NewBufferString("export let options = { cloud: { projectID: 1 } };\nexport default function() {}")
+		ts.CmdArgs = []string{"k6", "cloud", "upload", "-"}
+		ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
+		ts.Env["K6_CLOUD_HOST_V6"] = srv.URL
+		ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+		ts.Env["K6_CLOUD_STACK_ID"] = "1"
+		ts.Env["K6_CLOUD_STACK_URL"] = "https://stack.grafana.com/"
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `test status: Archived`)
+		select {
+		case name := <-uploadedName:
+			assert.Equal(t, "k6 test", name)
+		default:
+			t.Fatal("the test archive was not uploaded")
+		}
 	})
 }
 

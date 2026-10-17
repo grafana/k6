@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -251,10 +250,13 @@ func runCloudTest(gs *state.GlobalState, cmd *cobra.Command, args []string, opts
 
 	arc.Options.Cloud = b
 
-	name := cloudConfig.Name.String
-	if !cloudConfig.Name.Valid || cloudConfig.Name.String == "" {
-		name = filepath.Base(test.sourceRootPath)
+	// Use the same naming rules as `k6 run -o cloud`, so a script read from stdin (`-`) gets the
+	// default test name instead of `-`, which the cloud rejects as too short.
+	resolvedName, err := resolveCloudTestName(cloudConfig.Name, test.sourceRootPath)
+	if err != nil {
+		return err
 	}
+	name := resolvedName.String
 
 	globalCtx, globalCancel := context.WithCancel(gs.Ctx)
 	defer globalCancel()
