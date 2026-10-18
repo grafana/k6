@@ -15,3 +15,10 @@ message HTTPLabels {
   string Method = 2;
   int64 StatusCode = 3;
 }
+
+message GRPCLabels {
+  string Url = 1;
+  string Service = 2;
+  string Method = 3;
+  int64 StatusCode = 4;
+}
