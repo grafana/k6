@@ -2548,9 +2548,7 @@ func TestBrowserInvalidInitConfig(t *testing.T) {
 			`
 
 			ts := getSingleFileTestState(t, script, []string{}, exitcodes.ScriptException)
-			for k, v := range tt.env {
-				ts.Env[k] = v
-			}
+			maps.Copy(ts.Env, tt.env)
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			loglines := ts.LoggerHook.Drain()
