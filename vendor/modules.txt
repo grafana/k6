@@ -463,7 +463,7 @@ golang.org/x/crypto/ripemd160
 ## explicit; go 1.26.0
 golang.org/x/crypto/x509roots/fallback
 golang.org/x/crypto/x509roots/fallback/bundle
-# golang.org/x/net v0.59.0
+# golang.org/x/net v0.60.0
 ## explicit; go 1.26.0
 golang.org/x/net/context
 golang.org/x/net/html

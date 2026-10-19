@@ -211,6 +211,26 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 			wantErr:     "invalid url",
 		},
 		{
+			name:        "invalid_url",
+			envVarValue: "url=foo",
+			wantErr:     "invalid url",
+		},
+		{
+			name:        "empty_url",
+			envVarValue: "url=",
+			wantErr:     "invalid url",
+		},
+		{
+			name:        "relative_url",
+			envVarValue: "url=/relative",
+			wantErr:     "invalid url",
+		},
+		{
+			name:        "url_without_host",
+			envVarValue: "url=foo:bar",
+			wantErr:     "invalid url",
+		},
+		{
 			name:        "empty_key",
 			envVarValue: "url=https://127.0.0.1/,=a",
 			wantErr:     "format of value must be k=v",
