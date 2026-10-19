@@ -1718,6 +1718,629 @@ function copyNodesToDocument(sourceNode, targetNode) {
   });
 }
 
+// packages/isomorphic/stringUtils.ts (Playwright v1.64.0)
+function quoteCSSAttributeValue(text) {
+  return `"${text.replace(/["\\]/g, (char) => "\\" + char)}"`;
+}
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+// Unlike Playwright's version, this reads escapes the same way the selector
+// parser in common/selectors.go does, so adjacent quotes such as ["'] work.
+function escapeRegexForSelector(re) {
+  const s = String(re);
+  if (re.unicode || re.unicodeSets)
+    return s;
+  let result = "";
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "\\" && i + 1 < s.length)
+      result += c + s[++i];
+    else if (c === '"' || c === "'" || c === "`")
+      result += "\\" + c;
+    else if (c === ">" && s[i + 1] === ">")
+      result += "\\>\\>", i++;
+    else
+      result += c;
+  }
+  return result;
+}
+function escapeForTextSelector(text, exact) {
+  if (typeof text !== "string")
+    return escapeRegexForSelector(text);
+  return `${JSON.stringify(text)}${exact ? "s" : "i"}`;
+}
+function escapeForAttributeSelector(value, exact) {
+  if (typeof value !== "string")
+    return escapeRegexForSelector(value);
+  return `"${value.replace(/\\/g, "\\\\").replace(/["]/g, '\\"')}"${exact ? "s" : "i"}`;
+}
+function escapeWithQuotes(text) {
+  const stringified = JSON.stringify(text);
+  const escapedText = stringified.substring(1, stringified.length - 1).replace(/\\"/g, '"');
+  return "'" + escapedText.replace(/[']/g, "\\'") + "'";
+}
+
+// packages/injected/src/domUtils.ts (Playwright v1.64.0)
+function isInsideScope(scope, element) {
+  while (element) {
+    if (scope.contains(element))
+      return true;
+    element = enclosingShadowHost(element);
+  }
+  return false;
+}
+
+// parseSelector parses a selector the same way NewSelector in common/selectors.go
+// does, so generated selectors are checked exactly as k6 will later run them.
+function parseSelector(selector) {
+  const result = { selector, parts: [], capture: null };
+  const appendPart = (start, end) => {
+    const part = selector.substring(start, end).trim();
+    if (!part)
+      return;
+    const eq = part.indexOf("=");
+    let name = "css";
+    let body = part;
+    if (eq !== -1 && /^[a-zA-Z_0-9-+:*]+$/.test(part.substring(0, eq).trim())) {
+      name = part.substring(0, eq).trim();
+      body = part.substring(eq + 1);
+    } else if (part.length > 1 && (part[0] === '"' || part[0] === "'") && part[part.length - 1] === part[0]) {
+      name = "text";
+    } else if (/^\(*\/\//.test(part) || part.startsWith("..")) {
+      name = "xpath";
+    }
+    if (name.startsWith("*")) {
+      if (result.capture !== null)
+        throw new Error("only one of the selectors can capture using * modifier");
+      name = name.substring(1);
+      result.capture = result.parts.length;
+    }
+    result.parts.push({ name, body });
+  };
+  if (!selector.includes(">>")) {
+    appendPart(0, selector.length);
+    return result;
+  }
+  const ignoresQuotes = (start, end) => {
+    const match = selector.substring(start, end).match(/^\s*text\s*=\s*(.*)$/);
+    return !!match && match[1] !== "";
+  };
+  let start = 0;
+  let index = 0;
+  let quote = "";
+  while (index < selector.length) {
+    const c = selector[index];
+    if (c === "\\" && index + 1 < selector.length) {
+      index += 2;
+    } else if (quote && c === quote) {
+      quote = "";
+      index++;
+    } else if (!quote && (c === '"' || c === "'" || c === "`") && !ignoresQuotes(start, index)) {
+      quote = c;
+      index++;
+    } else if (!quote && c === ">" && selector[index + 1] === ">") {
+      appendPart(start, index);
+      index += 2;
+      start = index;
+    } else {
+      index++;
+    }
+  }
+  appendPart(start, index);
+  return result;
+}
+
+// packages/injected/src/selectorGenerator.ts (Playwright v1.64.0), adapted to
+// k6: test ids use internal:attr, the role engine has no description
+// attribute, and the accessible name is a plain string.
+var kTestIdAttributeName = "data-testid";
+var kTextScoreRange = 10;
+var kExactPenalty = kTextScoreRange / 2;
+var kTestIdScore = 1;
+var kOtherTestIdScore = 2;
+var kIframeByAttributeScore = 10;
+var kBeginPenalizedScore = 50;
+var kRoleWithNameScore = 100;
+var kPlaceholderScore = 120;
+var kLabelScore = 140;
+var kAltTextScore = 160;
+var kTextScore = 180;
+var kTitleScore = 200;
+var kTextScoreRegex = 250;
+var kPlaceholderScoreExact = kPlaceholderScore + kExactPenalty;
+var kLabelScoreExact = kLabelScore + kExactPenalty;
+var kRoleWithNameScoreExact = kRoleWithNameScore + kExactPenalty;
+var kAltTextScoreExact = kAltTextScore + kExactPenalty;
+var kTextScoreExact = kTextScore + kExactPenalty;
+var kTitleScoreExact = kTitleScore + kExactPenalty;
+var kEndPenalizedScore = 300;
+var kCSSIdScore = 500;
+var kRoleWithoutNameScore = 510;
+var kCSSInputTypeNameScore = 520;
+var kCSSTagNameScore = 530;
+var kNthScore = 10000;
+var kCSSFallbackScore = 10000000;
+
+function generateSelector(injectedScript, targetElement, options) {
+  injectedScript._evaluator.begin();
+  const cache = { allowText: new k6BrowserNative.Map(), disallowText: new k6BrowserNative.Map() };
+  beginAriaCaches();
+  try {
+    if (!targetElement.matches("input,textarea,select") && !targetElement.isContentEditable) {
+      const interactiveParent = closestCrossShadow(targetElement, "button,select,input,[role=button],[role=checkbox],[role=radio],a,[role=link]", options.root);
+      if (interactiveParent && isVisible(interactiveParent))
+        targetElement = interactiveParent;
+    }
+    const targetTokens = generateSelectorFor(cache, injectedScript, targetElement, options) || cssFallback(injectedScript, targetElement, options);
+    const selector = joinTokens(targetTokens);
+    return {
+      selector,
+      elements: injectedScript.querySelectorAll(parseSelector(selector), options.root || targetElement.ownerDocument),
+    };
+  } finally {
+    endAriaCaches();
+    injectedScript._evaluator.end();
+  }
+}
+
+function generateSelectorFor(cache, injectedScript, targetElement, options) {
+  if (options.root && !isInsideScope(options.root, targetElement))
+    throw new Error(`Target element must belong to the root's subtree`);
+  if (targetElement === options.root)
+    return [{ engine: "css", selector: ":scope", score: 1 }];
+  if (targetElement.ownerDocument.documentElement === targetElement)
+    return [{ engine: "css", selector: "html", score: 1 }];
+
+  let result = null;
+  const updateResult = (candidate) => {
+    if (!result || combineScores(candidate) < combineScores(result))
+      result = candidate;
+  };
+
+  const candidates = [];
+  for (const candidate of buildTextCandidates(injectedScript, targetElement, !options.isRecursive, options))
+    candidates.push({ candidate, isTextCandidate: true });
+  for (const token of buildNoTextCandidates(injectedScript, targetElement, options))
+    candidates.push({ candidate: [token], isTextCandidate: false });
+  candidates.sort((a, b) => combineScores(a.candidate) - combineScores(b.candidate));
+
+  for (const { candidate, isTextCandidate } of candidates) {
+    const elements = injectedScript.querySelectorAll(parseSelector(joinTokens(candidate)), options.root || targetElement.ownerDocument);
+    if (!Array.isArray(elements) || !elements.includes(targetElement))
+      continue;
+    if (elements.length === 1) {
+      // Candidates are sorted by score, so a unique match is the best one.
+      updateResult(candidate);
+      break;
+    }
+    const index = elements.indexOf(targetElement);
+    if (index > 5)
+      continue;
+    updateResult([...candidate, { engine: "nth", selector: String(index), score: kNthScore }]);
+    if (options.isRecursive)
+      continue;
+    // Try (best selector for a parent) >> (this candidate), two levels at most.
+    for (let parent = parentElementOrShadowHost(targetElement); parent && parent !== options.root; parent = parentElementOrShadowHost(parent)) {
+      const filtered = elements.filter((e) => isInsideScope(parent, e) && e !== parent);
+      const newIndex = filtered.indexOf(targetElement);
+      if (filtered.length > 5 || newIndex === -1 || newIndex === index && filtered.length > 1)
+        continue;
+      const inParent = filtered.length === 1 ? candidate : [...candidate, { engine: "nth", selector: String(newIndex), score: kNthScore }];
+      const idealSelectorForParent = { engine: "", selector: "", score: 1 };
+      if (result && combineScores([idealSelectorForParent, ...inParent]) >= combineScores(result))
+        continue;
+      // Don't use text in the parent when the target already uses text.
+      const noText = !!options.noText || isTextCandidate;
+      const cacheMap = noText ? cache.disallowText : cache.allowText;
+      let parentTokens = cacheMap.get(parent);
+      if (parentTokens === undefined) {
+        parentTokens = generateSelectorFor(cache, injectedScript, parent, { ...options, isRecursive: true, noText }) || cssFallback(injectedScript, parent, options);
+        cacheMap.set(parent, parentTokens);
+      }
+      if (!parentTokens)
+        continue;
+      updateResult([...parentTokens, ...inParent]);
+    }
+  }
+  return result;
+}
+
+function buildNoTextCandidates(injectedScript, element, options) {
+  const candidates = [];
+  for (const attr of ["data-test-id", "data-test"]) {
+    if (element.getAttribute(attr))
+      candidates.push({ engine: "css", selector: `[${attr}=${quoteCSSAttributeValue(element.getAttribute(attr))}]`, score: kOtherTestIdScore });
+  }
+  const idAttr = element.getAttribute("id");
+  if (idAttr && !isGuidLike(idAttr))
+    candidates.push({ engine: "css", selector: makeSelectorForId(idAttr), score: kCSSIdScore });
+  candidates.push({ engine: "css", selector: escapeNodeName(element), score: kCSSTagNameScore });
+
+  if (element.nodeName === "IFRAME" || element.nodeName === "FRAME") {
+    for (const attribute of ["name", "title"]) {
+      if (element.getAttribute(attribute))
+        candidates.push({ engine: "css", selector: `${escapeNodeName(element)}[${attribute}=${quoteCSSAttributeValue(element.getAttribute(attribute))}]`, score: kIframeByAttributeScore });
+    }
+    if (element.getAttribute(kTestIdAttributeName))
+      candidates.push({ engine: "css", selector: `[${kTestIdAttributeName}=${quoteCSSAttributeValue(element.getAttribute(kTestIdAttributeName))}]`, score: kTestIdScore });
+    penalizeScoreForLength([candidates]);
+    return candidates;
+  }
+
+  if (element.getAttribute(kTestIdAttributeName))
+    candidates.push({ engine: "internal:attr", selector: `[${kTestIdAttributeName}=${escapeForAttributeSelector(element.getAttribute(kTestIdAttributeName), true)}]`, score: kTestIdScore });
+
+  if ((element.nodeName === "INPUT" || element.nodeName === "TEXTAREA") && element.placeholder) {
+    candidates.push({ engine: "internal:attr", selector: `[placeholder=${escapeForAttributeSelector(element.placeholder, true)}]`, score: kPlaceholderScoreExact });
+    for (const alternative of suitableTextAlternatives(element.placeholder))
+      candidates.push({ engine: "internal:attr", selector: `[placeholder=${escapeForAttributeSelector(alternative.text, false)}]`, score: kPlaceholderScore - alternative.scoreBonus });
+  }
+
+  for (const label of getElementLabels(injectedScript._evaluator._cacheText, element)) {
+    const labelText = label.normalized;
+    candidates.push({ engine: "internal:label", selector: escapeForTextSelector(labelText, true), score: kLabelScoreExact });
+    for (const alternative of suitableTextAlternatives(labelText))
+      candidates.push({ engine: "internal:label", selector: escapeForTextSelector(alternative.text, false), score: kLabelScore - alternative.scoreBonus });
+  }
+
+  const ariaRole = getAriaRole(element);
+  if (ariaRole && !["none", "presentation"].includes(ariaRole))
+    candidates.push({ engine: "internal:role", selector: ariaRole, score: kRoleWithoutNameScore });
+
+  if (element.getAttribute("name") && ["BUTTON", "FORM", "FIELDSET", "FRAME", "IFRAME", "INPUT", "KEYGEN", "OBJECT", "OUTPUT", "SELECT", "TEXTAREA", "MAP", "META", "PARAM"].includes(element.nodeName))
+    candidates.push({ engine: "css", selector: `${escapeNodeName(element)}[name=${quoteCSSAttributeValue(element.getAttribute("name"))}]`, score: kCSSInputTypeNameScore });
+
+  if (["INPUT", "TEXTAREA"].includes(element.nodeName) && element.getAttribute("type") !== "hidden" && element.getAttribute("type"))
+    candidates.push({ engine: "css", selector: `${escapeNodeName(element)}[type=${quoteCSSAttributeValue(element.getAttribute("type"))}]`, score: kCSSInputTypeNameScore });
+
+  if (["INPUT", "TEXTAREA", "SELECT"].includes(element.nodeName) && element.getAttribute("type") !== "hidden")
+    candidates.push({ engine: "css", selector: escapeNodeName(element), score: kCSSInputTypeNameScore + 1 });
+
+  penalizeScoreForLength([candidates]);
+  return candidates;
+}
+
+function buildTextCandidates(injectedScript, element, isTargetNode, options) {
+  if (element.nodeName === "SELECT")
+    return [];
+  const candidates = [];
+
+  if (!options.noText) {
+    const title = element.getAttribute("title");
+    if (title) {
+      candidates.push([{ engine: "internal:attr", selector: `[title=${escapeForAttributeSelector(title, true)}]`, score: kTitleScoreExact }]);
+      for (const alternative of suitableTextAlternatives(title))
+        candidates.push([{ engine: "internal:attr", selector: `[title=${escapeForAttributeSelector(alternative.text, false)}]`, score: kTitleScore - alternative.scoreBonus }]);
+    }
+    const alt = element.getAttribute("alt");
+    if (alt && ["APPLET", "AREA", "IMG", "INPUT"].includes(element.nodeName)) {
+      candidates.push([{ engine: "internal:attr", selector: `[alt=${escapeForAttributeSelector(alt, true)}]`, score: kAltTextScoreExact }]);
+      for (const alternative of suitableTextAlternatives(alt))
+        candidates.push([{ engine: "internal:attr", selector: `[alt=${escapeForAttributeSelector(alternative.text, false)}]`, score: kAltTextScore - alternative.scoreBonus }]);
+    }
+  }
+
+  const text = options.noText ? "" : elementText(injectedScript._evaluator._cacheText, element).normalized;
+  const textAlternatives = text ? suitableTextAlternatives(text) : [];
+  if (text) {
+    if (isTargetNode) {
+      if (text.length <= 80)
+        candidates.push([{ engine: "internal:text", selector: escapeForTextSelector(text, true), score: kTextScoreExact }]);
+      for (const alternative of textAlternatives)
+        candidates.push([{ engine: "internal:text", selector: escapeForTextSelector(alternative.text, false), score: kTextScore - alternative.scoreBonus }]);
+    }
+    const cssToken = { engine: "css", selector: escapeNodeName(element), score: kCSSTagNameScore };
+    for (const alternative of textAlternatives)
+      candidates.push([cssToken, { engine: "internal:has-text", selector: escapeForTextSelector(alternative.text, false), score: kTextScore - alternative.scoreBonus }]);
+    // Regexes are slow, so only use them for the target.
+    if (isTargetNode && text.length <= 80) {
+      const re = new RegExp("^" + escapeRegExp(text) + "$");
+      candidates.push([cssToken, { engine: "internal:has-text", selector: escapeForTextSelector(re, false), score: kTextScoreRegex }]);
+    }
+  }
+
+  const ariaRole = getAriaRole(element);
+  if (ariaRole && !["none", "presentation"].includes(ariaRole)) {
+    const ariaName = getElementAccessibleName(element, false);
+    // \p{Co} is the Unicode "Private Use" category, often used by icon fonts.
+    if (ariaName && !ariaName.match(/^\p{Co}+$/u)) {
+      candidates.push([{ engine: "internal:role", selector: `${ariaRole}[name=${escapeForAttributeSelector(ariaName, true)}]`, score: kRoleWithNameScoreExact }]);
+      for (const alternative of suitableTextAlternatives(ariaName))
+        candidates.push([{ engine: "internal:role", selector: `${ariaRole}[name=${escapeForAttributeSelector(alternative.text, false)}]`, score: kRoleWithNameScore - alternative.scoreBonus }]);
+    } else {
+      const roleToken = { engine: "internal:role", selector: `${ariaRole}`, score: kRoleWithoutNameScore };
+      for (const alternative of textAlternatives)
+        candidates.push([roleToken, { engine: "internal:has-text", selector: escapeForTextSelector(alternative.text, false), score: kTextScore - alternative.scoreBonus }]);
+      if (!options.noText && isTargetNode && text.length <= 80) {
+        const re = new RegExp("^" + escapeRegExp(text) + "$");
+        candidates.push([roleToken, { engine: "internal:has-text", selector: escapeForTextSelector(re, false), score: kTextScoreRegex }]);
+      }
+    }
+  }
+
+  penalizeScoreForLength(candidates);
+  return candidates;
+}
+
+function makeSelectorForId(id) {
+  return /^[a-zA-Z][a-zA-Z0-9\-\_]+$/.test(id) ? "#" + id : `[id=${quoteCSSAttributeValue(id)}]`;
+}
+
+function cssFallback(injectedScript, targetElement, options) {
+  const root = options.root || targetElement.ownerDocument;
+  const tokens = [];
+
+  function uniqueCSSSelector(prefix) {
+    const path = tokens.slice();
+    if (prefix)
+      path.unshift(prefix);
+    const selector = path.join(" > ");
+    const node = injectedScript.querySelector(parseSelector(selector), false, root);
+    return node === targetElement ? selector : undefined;
+  }
+
+  function makeStrict(selector) {
+    const token = { engine: "css", selector, score: kCSSFallbackScore };
+    const elements = injectedScript.querySelectorAll(parseSelector(selector), root);
+    if (elements.length === 1)
+      return [token];
+    return [token, { engine: "nth", selector: String(elements.indexOf(targetElement)), score: kNthScore }];
+  }
+
+  for (let element = targetElement; element && element !== root; element = parentElementOrShadowHost(element)) {
+    let bestTokenForLevel = "";
+    if (element.id) {
+      const token = makeSelectorForId(element.id);
+      const selector = uniqueCSSSelector(token);
+      if (selector)
+        return makeStrict(selector);
+      bestTokenForLevel = token;
+    }
+    const parent = element.parentNode;
+    const classes = [...element.classList].map(escapeClassName);
+    for (let i = 0; i < classes.length; ++i) {
+      const token = "." + classes.slice(0, i + 1).join(".");
+      const selector = uniqueCSSSelector(token);
+      if (selector)
+        return makeStrict(selector);
+      if (!bestTokenForLevel && parent && parent.querySelectorAll(token).length === 1)
+        bestTokenForLevel = token;
+    }
+    if (parent) {
+      const siblings = [...parent.children];
+      const sameTagSiblings = siblings.filter((sibling) => sibling.nodeName === element.nodeName);
+      const token = sameTagSiblings.indexOf(element) === 0 ? escapeNodeName(element) : `${escapeNodeName(element)}:nth-child(${1 + siblings.indexOf(element)})`;
+      const selector = uniqueCSSSelector(token);
+      if (selector)
+        return makeStrict(selector);
+      if (!bestTokenForLevel)
+        bestTokenForLevel = token;
+    } else if (!bestTokenForLevel) {
+      bestTokenForLevel = escapeNodeName(element);
+    }
+    tokens.unshift(bestTokenForLevel);
+  }
+  return makeStrict(uniqueCSSSelector());
+}
+
+function penalizeScoreForLength(groups) {
+  for (const group of groups) {
+    for (const token of group) {
+      if (token.score > kBeginPenalizedScore && token.score < kEndPenalizedScore)
+        token.score += Math.min(kTextScoreRange, token.selector.length / 10 | 0);
+    }
+  }
+}
+
+function joinTokens(tokens) {
+  const parts = [];
+  let lastEngine = "";
+  for (const { engine, selector } of tokens) {
+    if (parts.length && (lastEngine !== "css" || engine !== "css" || selector.startsWith(":nth-match(")))
+      parts.push(">>");
+    lastEngine = engine;
+    if (engine === "css")
+      parts.push(selector);
+    else
+      parts.push(`${engine}=${selector}`);
+  }
+  return parts.join(" ");
+}
+
+function combineScores(tokens) {
+  let score = 0;
+  for (let i = 0; i < tokens.length; i++)
+    score += tokens[i].score * (tokens.length - i);
+  return score;
+}
+
+function isGuidLike(id) {
+  let lastCharacterType;
+  let transitionCount = 0;
+  for (let i = 0; i < id.length; ++i) {
+    const c = id[i];
+    let characterType;
+    if (c === "-" || c === "_")
+      continue;
+    if (c >= "a" && c <= "z")
+      characterType = "lower";
+    else if (c >= "A" && c <= "Z")
+      characterType = "upper";
+    else if (c >= "0" && c <= "9")
+      characterType = "digit";
+    else
+      characterType = "other";
+    if (characterType === "lower" && lastCharacterType === "upper") {
+      lastCharacterType = characterType;
+      continue;
+    }
+    if (lastCharacterType && lastCharacterType !== characterType)
+      ++transitionCount;
+    lastCharacterType = characterType;
+  }
+  return transitionCount >= id.length / 4;
+}
+
+function trimWordBoundary(text, maxLength) {
+  if (text.length <= maxLength)
+    return text;
+  text = text.substring(0, maxLength);
+  const match = text.match(/^(.*)\b(.+?)$/);
+  if (!match)
+    return "";
+  return match[1].trimEnd();
+}
+
+function suitableTextAlternatives(text) {
+  let result = [];
+  {
+    const match = text.match(/^([\d.,]+)[^.,\w]/);
+    const leadingNumberLength = match ? match[1].length : 0;
+    if (leadingNumberLength) {
+      const alt = trimWordBoundary(text.substring(leadingNumberLength).trimStart(), 80);
+      result.push({ text: alt, scoreBonus: alt.length <= 30 ? 2 : 1 });
+    }
+  }
+  {
+    const match = text.match(/[^.,\w]([\d.,]+)$/);
+    const trailingNumberLength = match ? match[1].length : 0;
+    if (trailingNumberLength) {
+      const alt = trimWordBoundary(text.substring(0, text.length - trailingNumberLength).trimEnd(), 80);
+      result.push({ text: alt, scoreBonus: alt.length <= 30 ? 2 : 1 });
+    }
+  }
+  if (text.length <= 30) {
+    result.push({ text, scoreBonus: 0 });
+  } else {
+    result.push({ text: trimWordBoundary(text, 80), scoreBonus: 0 });
+    result.push({ text: trimWordBoundary(text, 30), scoreBonus: 1 });
+  }
+  result = result.filter((r) => r.text);
+  if (!result.length)
+    result.push({ text: text.substring(0, 80), scoreBonus: 0 });
+  return result;
+}
+
+function escapeNodeName(node) {
+  return node.nodeName.toLocaleLowerCase().replace(/[:\.]/g, (char) => "\\" + char);
+}
+
+// Escapes class names for querySelectorAll, following the CSS.escape() rules.
+function escapeClassName(className) {
+  let result = "";
+  for (let i = 0; i < className.length; i++)
+    result += cssEscapeCharacter(className, i);
+  return result;
+}
+
+function cssEscapeCharacter(s, i) {
+  // https://drafts.csswg.org/cssom/#serialize-an-identifier
+  const c = s.charCodeAt(i);
+  if (c === 0)
+    return "\uFFFD";
+  if (c >= 1 && c <= 31 || c >= 48 && c <= 57 && (i === 0 || i === 1 && s.charCodeAt(0) === 45))
+    return "\\" + c.toString(16) + " ";
+  if (i === 0 && c === 45 && s.length === 1)
+    return "\\" + s.charAt(i);
+  if (c >= 128 || c === 45 || c === 95 || c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122)
+    return s.charAt(i);
+  return "\\" + s.charAt(i);
+}
+
+// Which elements listSelectors returns: widgets for "interactive", and
+// meaningful content for "content".
+var kListInteractiveRoles = ["button", "checkbox", "combobox", "gridcell", "link", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "radio", "searchbox", "slider", "spinbutton", "switch", "tab", "textbox", "treeitem"];
+var kListContentRoles = ["alert", "alertdialog", "cell", "dialog", "heading", "listitem", "paragraph", "status"];
+var kListCheckedRoles = ["checkbox", "menuitemcheckbox", "menuitemradio", "radio", "switch"];
+
+function listSelectorsKind(element) {
+  if (!isVisible(element))
+    return null;
+  const role = getAriaRole(element) || "";
+  const style = getElementComputedStyle(element);
+  if (style && style.pointerEvents !== "none" && isListedInteractive(element, role, style))
+    return "interactive";
+  if (element.getAttribute(kTestIdAttributeName) || kListContentRoles.includes(role) || (role === "img" && !!getElementAccessibleName(element, false)))
+    return "content";
+  return null;
+}
+
+function isListedInteractive(element, role, style) {
+  if (kListInteractiveRoles.includes(role) || element.matches("input,select,textarea,button,a[href],summary"))
+    return true;
+  const parent = parentElementOrShadowHost(element);
+  // Only the root of an editable region, not every element inside it.
+  if (element.isContentEditable)
+    return !(parent && parent.isContentEditable);
+  if (style.cursor !== "pointer")
+    return false;
+  // Children inherit the pointer cursor; only list the element that sets it.
+  const parentStyle = parent && getElementComputedStyle(parent);
+  return !parentStyle || parentStyle.cursor !== "pointer";
+}
+
+// selectorToLocatorCode turns a generated selector into k6 locator code, such
+// as page.getByRole('button', { name: 'Sign in' }). If any part has no k6
+// equivalent, the whole selector goes into page.locator().
+function selectorToLocatorCode(selector) {
+  const fallback = `page.locator(${escapeWithQuotes(selector)})`;
+  let code = "page";
+  try {
+    for (const part of parseSelector(selector).parts) {
+      const next = locatorCodeForPart(part);
+      if (next === undefined)
+        return fallback;
+      code += next;
+    }
+  } catch (e) {
+    return fallback;
+  }
+  return code;
+}
+
+function locatorCodeForPart({ name, body }) {
+  if (name === "css")
+    return `.locator(${escapeWithQuotes(body)})`;
+  if (name === "nth")
+    return body === "0" ? ".first()" : body === "-1" ? ".last()" : `.nth(${body})`;
+  if (name === "internal:role") {
+    const { name: role, attributes } = parseAttributeSelector(body, true);
+    if (!attributes.length)
+      return `.getByRole(${escapeWithQuotes(role)})`;
+    const [attr] = attributes;
+    if (attributes.length !== 1 || attr.name !== "name" || typeof attr.value !== "string")
+      return undefined;
+    return `.getByRole(${escapeWithQuotes(role)}, { name: ${escapeWithQuotes(attr.value)}${attr.caseSensitive ? ", exact: true" : ""} })`;
+  }
+  if (name === "internal:attr") {
+    const { name: tag, attributes } = parseAttributeSelector(body, true);
+    const methods = { "data-testid": "getByTestId", placeholder: "getByPlaceholder", alt: "getByAltText", title: "getByTitle" };
+    const method = attributes.length === 1 && methods[attributes[0].name];
+    if (tag || !method || typeof attributes[0].value !== "string")
+      return undefined;
+    const { value, caseSensitive } = attributes[0];
+    if (method === "getByTestId")
+      return caseSensitive ? `.getByTestId(${escapeWithQuotes(value)})` : undefined;
+    return `.${method}(${escapeWithQuotes(value)}${caseSensitive ? ", { exact: true }" : ""})`;
+  }
+  const text = textSelectorToCode(body);
+  if (text && (name === "internal:text" || name === "internal:label"))
+    return `.${name === "internal:text" ? "getByText" : "getByLabel"}(${text.arg}${text.exact ? ", { exact: true }" : ""})`;
+  // k6's hasText is always a case-insensitive substring or regex match.
+  if (text && !text.exact && name === "internal:has-text")
+    return `.filter({ hasText: ${text.arg} })`;
+  return undefined;
+}
+
+function textSelectorToCode(body) {
+  if (body[0] === "/" && body.lastIndexOf("/") > 0)
+    return { arg: body, exact: false };
+  if (body.length > 2 && body[0] === '"' && (body.endsWith('"i') || body.endsWith('"s')))
+    return { arg: escapeWithQuotes(JSON.parse(body.substring(0, body.length - 1))), exact: body.endsWith("s") };
+  return undefined;
+}
+
 class InjectedScript {
   constructor() {
     this._replaceRafWithTimeout = false;
@@ -2627,5 +3250,56 @@ class InjectedScript {
   count(selector, root) {
     const elements = this.querySelectorAll(selector, root || document);
     return elements.length;
+  }
+
+  // listSelectors returns an entry for each element under root of the given
+  // kind ("interactive", "content" or "all"), in document order.
+  listSelectors(root, kind) {
+    const elements = [];
+    const collect = (node) => {
+      for (const child of node.children) {
+        elements.push(child);
+        if (child.shadowRoot)
+          collect(child.shadowRoot);
+        collect(child);
+      }
+    };
+    collect(root);
+
+    const entries = [];
+    const seen = new k6BrowserNative.Set();
+    this._evaluator.begin();
+    beginAriaCaches();
+    try {
+      for (const element of elements) {
+        const elementKind = listSelectorsKind(element);
+        if (!elementKind || kind !== "all" && kind !== elementKind)
+          continue;
+        // The generator may pick an ancestor, e.g. the button around a span.
+        const { selector, elements: matches } = generateSelector(this, element, {});
+        if (!Array.isArray(matches) || matches.length !== 1 || seen.has(matches[0]))
+          continue;
+        const target = matches[0];
+        const targetKind = target === element ? elementKind : listSelectorsKind(target);
+        if (!targetKind || kind !== "all" && kind !== targetKind)
+          continue;
+        seen.add(target);
+        const role = getAriaRole(target) || "";
+        const entry = {
+          kind: targetKind,
+          role,
+          name: getElementAccessibleName(target, false),
+          locator: selectorToLocatorCode(selector),
+          selector,
+        };
+        if (kListCheckedRoles.includes(role))
+          entry.checked = getAriaChecked(target);
+        entries.push(entry);
+      }
+    } finally {
+      endAriaCaches();
+      this._evaluator.end();
+    }
+    return entries;
   }
 }

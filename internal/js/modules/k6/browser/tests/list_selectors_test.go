@@ -1,0 +1,132 @@
+// practically none of this work on windows
+//go:build !windows
+
+package tests
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/grafana/sobek"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestPageListSelectors(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	// For each entry, resolve both the raw selector and the locator code, and
+	// record the data-check marker of the element they find.
+	got := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		await page.goto('%s');
+
+		const resolve = async (loc) => {
+			const count = await loc.count();
+			return { count, check: count ? await loc.first().getAttribute('data-check') : '' };
+		};
+		const result = {};
+		for (const kind of ['interactive', 'content', 'all']) {
+			result[kind] = [];
+			for (const e of await page.listSelectors({ kind })) {
+				const viaSelector = await resolve(page.locator(e.selector));
+				const viaLocator = await resolve(new Function('page', 'return ' + e.locator)(page));
+				result[kind].push({ ...e, viaSelector, viaLocator });
+			}
+		}
+		result.defaultKind = (await page.listSelectors()).map((e) => e.selector);
+		try {
+			await page.listSelectors({ kind: 'nope' });
+		} catch (e) {
+			result.badKindError = String(e);
+		}
+		return JSON.stringify(result);
+	`, tb.staticURL("list_selectors.html"))
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State(), "%v", got.Result())
+
+	type resolved struct {
+		Count int    `json:"count"`
+		Check string `json:"check"`
+	}
+	type entry struct {
+		Kind        string   `json:"kind"`
+		Role        string   `json:"role"`
+		Name        string   `json:"name"`
+		Checked     any      `json:"checked"`
+		Locator     string   `json:"locator"`
+		Selector    string   `json:"selector"`
+		ViaSelector resolved `json:"viaSelector"`
+		ViaLocator  resolved `json:"viaLocator"`
+	}
+	var result struct {
+		Interactive  []entry  `json:"interactive"`
+		Content      []entry  `json:"content"`
+		All          []entry  `json:"all"`
+		DefaultKind  []string `json:"defaultKind"`
+		BadKindError string   `json:"badKindError"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &result))
+
+	marks := func(entries []entry) []string {
+		var marks []string
+		for _, e := range entries {
+			assert.Equal(t, 1, e.ViaSelector.Count, "selector %s", e.Selector)
+			assert.Equal(t, e.ViaSelector, e.ViaLocator, "locator %s", e.Locator)
+			marks = append(marks, e.ViaSelector.Check)
+		}
+		return marks
+	}
+	interactive := []string{
+		"email", "search", "remember", "subscribe", "select-all", "size", "notes",
+		"sign-in", "help", "add-margherita", "add-pepperoni", "promo", "editor",
+	}
+	content := []string{"heading", "paragraph", "logo", "cart-total", "status", "margherita", "pepperoni", "cell"}
+	assert.Equal(t, interactive, marks(result.Interactive))
+	assert.Equal(t, content, marks(result.Content))
+	assert.Equal(t, []string{
+		"heading", "paragraph", "logo", "email", "search", "remember", "subscribe", "select-all",
+		"size", "notes", "sign-in", "help", "cart-total", "status", "margherita", "add-margherita",
+		"pepperoni", "add-pepperoni", "promo", "editor", "cell",
+	}, marks(result.All))
+
+	byCheck := make(map[string]entry)
+	for _, e := range result.All {
+		byCheck[e.ViaSelector.Check] = e
+	}
+	for _, check := range content {
+		assert.Equal(t, "content", byCheck[check].Kind, check)
+	}
+	for _, check := range interactive {
+		assert.Equal(t, "interactive", byCheck[check].Kind, check)
+	}
+
+	signIn := byCheck["sign-in"]
+	assert.Equal(t, "button", signIn.Role)
+	assert.Equal(t, "Sign in", signIn.Name)
+	assert.Equal(t, "page.getByRole('button', { name: 'Sign in' })", signIn.Locator)
+	assert.Equal(t, `internal:role=button[name="Sign in"i]`, signIn.Selector)
+	assert.Nil(t, signIn.Checked)
+	assert.Equal(t, "page.getByRole('link', { name: 'Help' })", byCheck["help"].Locator)
+	assert.Equal(t, "page.getByRole('textbox', { name: 'Email' })", byCheck["email"].Locator)
+	assert.Equal(t, "page.getByRole('heading', { name: 'Pizza shop' })", byCheck["heading"].Locator)
+	assert.Equal(t, "page.getByTestId('cart-total')", byCheck["cart-total"].Locator)
+
+	assert.Equal(t, false, byCheck["remember"].Checked)
+	assert.Equal(t, true, byCheck["subscribe"].Checked)
+	assert.Equal(t, "mixed", byCheck["select-all"].Checked)
+	assert.Equal(t, "Remember me", byCheck["remember"].Name)
+
+	assert.Empty(t, byCheck["promo"].Role)
+	assert.Empty(t, byCheck["promo"].Name)
+
+	var interactiveSelectors []string
+	for _, e := range result.Interactive {
+		interactiveSelectors = append(interactiveSelectors, e.Selector)
+	}
+	assert.Equal(t, interactiveSelectors, result.DefaultKind, "the default kind is interactive")
+	assert.Contains(t, result.BadKindError, "kind")
+}

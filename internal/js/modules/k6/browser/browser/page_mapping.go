@@ -342,6 +342,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		}),
 		"keyboard": newKeyboardMapping(vu, p.GetKeyboard()),
+		"listSelectors": passiveCall(func(opts sobek.Value) *sobek.Promise {
+			kind := parseListSelectorsKind(rt, opts)
+			return promise(vu, func() (any, error) {
+				return p.ListSelectors(kind) //nolint:wrapcheck
+			})
+		}),
 		"locator": passiveCall(func(selector string, opts sobek.Value) *sobek.Object {
 			ml := mapLocator(vu, p.Locator(selector, parseLocatorOptions(rt, opts)))
 			return rt.ToValue(ml).ToObject(rt)
@@ -1302,4 +1308,17 @@ func parsePageScreenshotOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Pa
 	}
 
 	return popts, nil
+}
+
+// parseListSelectorsKind returns the kind option of listSelectors, or "" if it
+// isn't set.
+func parseListSelectorsKind(rt *sobek.Runtime, opts sobek.Value) string {
+	if k6common.IsNullish(opts) {
+		return ""
+	}
+	kind := opts.ToObject(rt).Get("kind")
+	if k6common.IsNullish(kind) {
+		return ""
+	}
+	return kind.String()
 }

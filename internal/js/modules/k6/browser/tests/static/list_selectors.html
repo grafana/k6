@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>List selectors</title>
+</head>
+<body>
+  <h1 data-check="heading">Pizza shop</h1>
+  <p data-check="paragraph">Free delivery</p>
+  <img data-check="logo" alt="Logo" width="10" height="10" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+  <img alt="" width="10" height="10" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7">
+
+  <form>
+    <label>Email <input type="email" data-check="email"></label>
+    <input placeholder="Search" data-check="search">
+    <label><input type="checkbox" data-check="remember"> Remember me</label>
+    <input type="checkbox" aria-label="Subscribe" checked data-check="subscribe">
+    <input type="checkbox" aria-label="Select all" id="select-all" data-check="select-all">
+    <select aria-label="Size" data-check="size"><option>Small</option><option>Large</option></select>
+    <textarea aria-label="Notes" data-check="notes"></textarea>
+    <input type="hidden" name="token" value="secret">
+    <button type="submit" data-check="sign-in">Sign in</button>
+  </form>
+
+  <a href="#help" data-check="help">Help</a>
+  <div data-testid="cart-total" data-check="cart-total">Total</div>
+  <div role="status" data-check="status">Ready</div>
+
+  <ul>
+    <li data-check="margherita">Margherita <button data-check="add-margherita">Add</button></li>
+    <li data-check="pepperoni">Pepperoni <button data-check="add-pepperoni">Add</button></li>
+  </ul>
+
+  <div class="promo" style="cursor: pointer" data-check="promo"><span>Deal of the day</span></div>
+  <div contenteditable="true" aria-label="Editor" data-check="editor">Type here</div>
+
+  <table><tr><td data-check="cell">Subtotal</td></tr></table>
+
+  <button hidden>Hidden attribute</button>
+  <button style="display: none">Display none</button>
+  <button style="visibility: hidden">Visibility hidden</button>
+  <button style="pointer-events: none">No pointer events</button>
+  <div tabindex="0">Focusable only</div>
+
+  <script>document.getElementById('select-all').indeterminate = true;</script>
+</body>
+</html>

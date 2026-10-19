@@ -1613,6 +1613,42 @@ func (f *Frame) ID() string {
 	return f.id.String()
 }
 
+// ListSelectors returns an entry for each element in the frame of the given
+// kind: "interactive" (the default when kind is empty), "content" or "all".
+// Each entry has a selector that matches only that element, and the
+// equivalent locator code.
+func (f *Frame) ListSelectors(kind string) ([]any, error) {
+	f.log.Debugf("Frame:ListSelectors", "fid:%s furl:%q kind:%q", f.ID(), f.URL(), kind)
+
+	switch kind {
+	case "":
+		kind = "interactive"
+	case "interactive", "content", "all":
+	default:
+		return nil, fmt.Errorf("kind must be one of interactive, content or all, got %q", kind)
+	}
+
+	document, err := f.document()
+	if err != nil {
+		return nil, fmt.Errorf("getting document: %w", err)
+	}
+	result, err := document.evalWithScript(
+		f.ctx,
+		evalOptions{forceCallable: true, returnByValue: true},
+		`(node, injected, kind) => injected.listSelectors(node, kind)`,
+		kind,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing selectors: %w", err)
+	}
+	entries, ok := result.([]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected list of selectors: %T", result)
+	}
+
+	return entries, nil
+}
+
 // Locator creates and returns a new locator for this frame.
 func (f *Frame) Locator(selector string, opts *LocatorOptions) *Locator {
 	f.log.Debugf("Frame:Locator", "fid:%s furl:%q selector:%q opts:%+v", f.ID(), f.URL(), selector, opts)
