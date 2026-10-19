@@ -1775,3 +1775,57 @@ func TestFrameLocator(t *testing.T) {
 		require.NotNil(t, newButton)
 	})
 }
+
+func TestLocatorHasTextSpecialCharacters(t *testing.T) { //nolint:tparallel
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	tb.vu.SetVar(t, "page", &sobek.Object{})
+	_, err := tb.vu.RunAsync(t, `
+		page = await browser.newPage();
+		await page.setContent('<ul>' +
+			'<li>a >> b</li>' +
+			'<li>GET /api/users</li>' +
+			'<li>Status: "Done"</li>' +
+			'<li>Done</li>' +
+			'<li>Not "Done" yet</li>' +
+		'</ul>');
+	`)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		locator string
+		want    int
+	}{
+		{"hasText_separator", `page.locator('li', { hasText: 'a >> b' })`, 1},
+		{"hasText_slashes", `page.locator('li', { hasText: '/api/users' })`, 1},
+		{"hasText_quotes", `page.locator('li', { hasText: '"Done"' })`, 2},
+		{"filter_hasText_separator", `page.locator('li').filter({ hasText: 'a >> b' })`, 1},
+		{"filter_hasText_slashes", `page.locator('li').filter({ hasText: '/api/users' })`, 1},
+		{"filter_hasText_quotes", `page.locator('li').filter({ hasText: '"Done"' })`, 2},
+		{"hasNotText_separator", `page.locator('li', { hasNotText: 'a >> b' })`, 4},
+		{"hasNotText_slashes", `page.locator('li', { hasNotText: '/api/users' })`, 4},
+		{"hasNotText_quotes", `page.locator('li', { hasNotText: '"Done"' })`, 3},
+		{"locator_locator_hasText", `page.locator('ul').locator('li', { hasText: '/api/users' })`, 1},
+		{"frame_locator_hasText", `page.mainFrame().locator('li', { hasText: '/api/users' })`, 1},
+		{"hasText_regex", `page.locator('li', { hasText: /^Done$/ })`, 1},
+		{"hasText_regex_separator", `page.locator('li', { hasText: /a >> b/ })`, 1},
+		{"hasText_regex_quote", `page.locator('li', { hasText: /"Done/, hasNotText: 'yet' })`, 1},
+	}
+	for _, tt := range tests { //nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tb.vu.RunAsync(t, `
+				const want = %d;
+				const got = await %s.count();
+				if (got !== want) {
+					throw new Error('expected ' + want + ' matches, got ' + got);
+				}
+			`, tt.want, tt.locator)
+			require.NoError(t, err)
+		})
+	}
+}
