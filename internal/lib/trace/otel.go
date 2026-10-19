@@ -249,3 +249,12 @@ func (p *tracerProviderParams) parseHeader(header, value string) {
 	headerName := strings.TrimPrefix(header, "header.")
 	p.headers[headerName] = value
 }
+
+// WrapTracerProvider wraps an existing OpenTelemetry tracer provider, e.g. one using an
+// in-memory span processor in tests. Shutdown on the result is a noop.
+func WrapTracerProvider(prov trace.TracerProvider) *TracerProvider {
+	return &TracerProvider{
+		TracerProvider: prov,
+		shutdown:       func(context.Context) error { return nil },
+	}
+}

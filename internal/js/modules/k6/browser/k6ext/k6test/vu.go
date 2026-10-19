@@ -3,10 +3,12 @@ package k6test
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
@@ -34,6 +36,13 @@ type VU struct {
 	toBeState *lib.State
 	samples   chan k6metrics.SampleContainer
 	TestRT    *k6modulestest.Runtime
+
+	// iterSpans holds the iteration spans started by StartIteration, as k6 does
+	// before emitting IterStart, keyed by iteration. baseCtx is the VU context
+	// without any iteration span.
+	iterMu    sync.Mutex
+	iterSpans map[int64]oteltrace.Span
+	baseCtx   context.Context
 }
 
 // ToSobekValue is a convenience method for converting any value to a sobek value.
@@ -81,6 +90,7 @@ type WithIteration = int64
 func (v *VU) StartIteration(tb testing.TB, opts ...any) {
 	tb.Helper()
 	tb.Cleanup(func() { v.EndIteration(tb) }) // this prevents leaks. there are no sideeffects if this is done before.
+	v.startIterationSpan(iterData(opts...))
 	v.iterEvent(tb, event.IterStart, "IterStart", opts...)
 }
 
@@ -93,12 +103,56 @@ func (v *VU) StartIteration(tb testing.TB, opts ...any) {
 func (v *VU) EndIteration(tb testing.TB, opts ...any) {
 	tb.Helper()
 	v.iterEvent(tb, event.IterEnd, "IterEnd", opts...)
+	v.endIterationSpan(iterData(opts...).Iteration)
 }
 
-// iterEvent generates an iteration event for the VU.
-func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, opts ...any) {
-	tb.Helper()
+// startIterationSpan mimics k6 starting the iteration span and exposing it
+// through the VU context before the IterStart event is emitted.
+func (v *VU) startIterationSpan(data event.IterData) {
+	tracer := k6trace.Tracer(v.toBeState.TracerProvider)
+	if tracer == nil {
+		return
+	}
 
+	v.iterMu.Lock()
+	defer v.iterMu.Unlock()
+
+	if _, ok := v.iterSpans[data.Iteration]; ok {
+		return
+	}
+	if v.iterSpans == nil {
+		v.iterSpans = make(map[int64]oteltrace.Span)
+		v.baseCtx = v.CtxField
+	}
+
+	ctx, span := k6trace.StartIteration(v.baseCtx, tracer, k6trace.IterationInfo{
+		Number:     data.Iteration,
+		VUID:       data.VUID,
+		VUIDGlobal: data.VUID,
+		Scenario:   data.ScenarioName,
+	})
+	v.iterSpans[data.Iteration] = span
+	v.CtxField = ctx
+}
+
+// endIterationSpan mimics k6 ending the iteration span after the IterEnd event.
+func (v *VU) endIterationSpan(iter int64) {
+	v.iterMu.Lock()
+	defer v.iterMu.Unlock()
+
+	span, ok := v.iterSpans[iter]
+	if !ok {
+		return
+	}
+	span.End()
+	delete(v.iterSpans, iter)
+	if len(v.iterSpans) == 0 {
+		v.CtxField = v.baseCtx
+	}
+}
+
+// iterData builds the iteration data from the given options.
+func iterData(opts ...any) event.IterData {
 	data := event.IterData{
 		Iteration:    0,
 		VUID:         1,
@@ -115,6 +169,15 @@ func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, op
 			data.Iteration = opt
 		}
 	}
+
+	return data
+}
+
+// iterEvent generates an iteration event for the VU.
+func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, opts ...any) {
+	tb.Helper()
+
+	data := iterData(opts...)
 
 	events, ok := v.EventsField.Local.(*event.System)
 	require.True(tb, ok, "want *event.System; got %T", events)

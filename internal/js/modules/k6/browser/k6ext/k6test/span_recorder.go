@@ -47,7 +47,8 @@ func (s RecordedSpan) AttrString(tb testing.TB, key string) string {
 }
 
 // SpanRecorder is a minimal sdktrace.SpanProcessor that records started spans
-// (for name/parent/attribute inspection) and which span ids have ended.
+// (for name/parent/attribute inspection, attributes being refreshed when the span
+// ends) and which span ids have ended.
 type SpanRecorder struct {
 	mu      sync.Mutex
 	started []RecordedSpan
@@ -77,6 +78,20 @@ func (r *SpanRecorder) OnEnd(s sdktrace.ReadOnlySpan) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.ended[s.SpanContext().SpanID()] = true
+
+	// Refresh the attributes, as some are set after the span started.
+	for i := range r.started {
+		if r.started[i].SpanID == s.SpanContext().SpanID() {
+			r.started[i].Attrs = s.Attributes()
+		}
+	}
+}
+
+// Len returns the number of recorded spans.
+func (r *SpanRecorder) Len() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.started)
 }
 
 // Shutdown implements sdktrace.SpanProcessor.

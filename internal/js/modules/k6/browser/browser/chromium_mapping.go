@@ -22,7 +22,7 @@ func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
 				connBT := bt.Clone()
 
 				// Link the connection to the iteration trace and connect.
-				tracedCtx := vu.startConnectTrace(vu.Context(), iter)
+				tracedCtx := vu.startConnectTrace(vu.Context())
 				b, err := connBT.ConnectOverCDP(tracedCtx, wsEndpoint)
 				if err != nil {
 					return nil, fmt.Errorf("connecting to Chromium over CDP: %w", err)

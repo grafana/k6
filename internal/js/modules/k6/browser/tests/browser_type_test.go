@@ -205,9 +205,8 @@ func TestChromiumConnectOverCDPExitSweep(t *testing.T) {
 }
 
 // TestChromiumConnectOverCDPTraceLinkage verifies that a call made over a
-// connectOverCDP browser produces a span parented under an iteration root
-// span keyed by the real iteration number, and that root span is
-// ended at IterEnd.
+// connectOverCDP browser produces a span parented under the k6 iteration
+// span, which the browser module doesn't create itself.
 // It uses a recording tracer provider to inspect the span tree.
 func TestChromiumConnectOverCDPTraceLinkage(t *testing.T) {
 	t.Parallel()
@@ -227,18 +226,17 @@ func TestChromiumConnectOverCDPTraceLinkage(t *testing.T) {
 	`, tb.wsURL)
 	require.NoError(t, err)
 
-	// End the iteration so the iteration root span is closed.
+	// End the iteration so the k6 iteration span is closed.
 	vu.EndIteration(t)
 
 	iterSpan, ok := rec.Find("iteration")
-	require.True(t, ok, "expected an 'iteration' root span")
+	require.True(t, ok, "expected a 'iteration' span")
 	newPageSpan, ok := rec.Find("browser.newPage")
 	require.True(t, ok, "expected a 'browser.newPage' span")
 
-	// The browser API span must be parented under the iteration trace that
-	// connectOverCDP established. If startConnectTrace did not wire the tracer
-	// into the browser's context, browser.newPage would be a noop/orphaned span
-	// and these assertions would fail.
+	// The browser API span must be parented under the k6 iteration span. If
+	// startConnectTrace did not wire the tracer into the browser's context,
+	// browser.newPage would be a noop/orphaned span and these assertions would fail.
 	require.Equal(t, iterSpan.TraceID, newPageSpan.TraceID,
 		"browser.newPage span should be in the same trace as the iteration span")
 	require.Equal(t, iterSpan.SpanID, newPageSpan.ParentID,

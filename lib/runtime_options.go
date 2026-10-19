@@ -44,6 +44,8 @@ type RuntimeOptions struct {
 	SummaryExport null.String `json:"summaryExport"`
 	KeyWriter     null.String `json:"-"`
 	TracesOutput  null.String `json:"tracesOutput"`
+	// TraceParent is the trace context of the system that invoked k6. The test run continues that trace.
+	TraceParent null.String `json:"-"`
 
 	// Until v2
 	NewMachineReadableSummary null.Bool `json:"newMachineReadableSummary"`

@@ -43,6 +43,9 @@ extended: base + sets "global" as alias for "globalThis"
 		"which is used for summary exports and as handleSummary() argument")
 	flags.String("traces-output", "none",
 		"set the output for k6 traces, possible values are none,otel[=host:port]")
+	flags.String("traceparent", "",
+		"continue an existing trace, given the W3C traceparent of the system that invoked k6. "+
+			"It overrides the TRACEPARENT environment variable, and is only used with --traces-output")
 	return flags
 }
 
@@ -84,6 +87,7 @@ func runtimeOptionsFromFlags(flags *pflag.FlagSet) lib.RuntimeOptions {
 		SummaryExport:             getNullString(flags, "summary-export"),
 		NewMachineReadableSummary: getNullBool(flags, "new-machine-readable-summary"),
 		TracesOutput:              getNullString(flags, "traces-output"),
+		TraceParent:               getNullString(flags, "traceparent"),
 		Env:                       make(map[string]string),
 	}
 	return opts
@@ -139,6 +143,11 @@ func populateRuntimeOptionsFromEnv(opts lib.RuntimeOptions, environment map[stri
 
 	if envVar, ok := environment["K6_TRACES_OUTPUT"]; !opts.TracesOutput.Valid && ok {
 		opts.TracesOutput = null.StringFrom(envVar)
+	}
+
+	// TRACEPARENT is the OpenTelemetry standard way to give the trace context to a process.
+	if envVar, ok := environment["TRACEPARENT"]; !opts.TraceParent.Valid && ok {
+		opts.TraceParent = null.StringFrom(envVar)
 	}
 
 	// If enabled, gather the actual system environment variables

@@ -19,6 +19,8 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
+	oteltrace "go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/v2/errext"
@@ -27,6 +29,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/eventloop"
 	"go.k6.io/k6/v2/internal/lib/consts"
 	"go.k6.io/k6/v2/internal/lib/summary"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/internal/loader"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
@@ -254,10 +257,14 @@ func (r *Runner) newVU(
 		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 		FeatureFlags:   r.preInitState.FeatureFlags,
-		TracerProvider: r.preInitState.TracerProvider,
 		Usage:          r.preInitState.Usage,
 		TestStatus:     r.preInitState.TestStatus,
 	}
+	// Avoid storing a typed nil pointer in the interface.
+	if r.preInitState.TracerProvider != nil {
+		vu.state.TracerProvider = r.preInitState.TracerProvider
+	}
+	vu.tracer = k6trace.Tracer(r.preInitState.TracerProvider)
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
 
@@ -741,6 +748,8 @@ type VU struct {
 	setupData sobek.Value
 
 	state *lib.State
+	// tracer creates the VU and iteration spans. It is nil when tracing is disabled.
+	tracer oteltrace.Tracer
 	// count of iterations executed by this VU in each scenario
 	scenarioIter map[string]uint64
 }
@@ -756,6 +765,8 @@ type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
 	busy chan struct{}
+	// vuCtx is the run context of this activation, carrying the VU span.
+	vuCtx context.Context
 
 	scenarioName              string
 	getNextIterationCounters  func() (uint64, uint64)
@@ -804,7 +815,13 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	})
 
 	ctx := params.RunContext
-	u.moduleVUImpl.ctx = ctx
+	vuCtx, vuSpan := ctx, oteltrace.Span(noop.Span{})
+	if u.tracer != nil {
+		vuCtx, vuSpan = k6trace.StartVU(ctx, u.tracer, k6trace.VUInfo{
+			ID: u.ID, IDGlobal: u.IDGlobal, Scenario: params.Scenario,
+		})
+	}
+	u.moduleVUImpl.ctx = vuCtx
 
 	u.state.GetScenarioVUIter = func() uint64 {
 		return u.scenarioIter[params.Scenario]
@@ -818,6 +835,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		scIterLocal:              ^uint64(0),
 		scIterGlobal:             ^uint64(0),
 		getNextIterationCounters: params.GetNextIterationCounters,
+		vuCtx:                    vuCtx,
 	}
 
 	u.state.GetScenarioLocalVUIter = func() uint64 {
@@ -835,6 +853,9 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		// running again for this activation
 		avu.busy <- struct{}{}
 
+		// The VU span ends once the last iteration of this activation has ended.
+		vuSpan.End()
+
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback(u)
 		}
@@ -844,7 +865,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 }
 
 // RunOnce runs the configured Exec function once.
-func (u *ActiveVU) RunOnce() error {
+func (u *ActiveVU) RunOnce() (err error) {
 	select {
 	case <-u.RunContext.Done():
 		return lib.ContextErr(u.RunContext) // we are done, return
@@ -880,8 +901,24 @@ func (u *ActiveVU) RunOnce() error {
 		panic(fmt.Errorf("error setting __ITER in Sobek runtime: %w", err))
 	}
 
-	ctx, cancel := context.WithCancel(u.RunContext)
+	ctx, cancel := context.WithCancel(u.vuCtx)
 	defer cancel()
+	// The iteration context, carrying the iteration span, is only exposed to the modules
+	// during the iteration.
+	previousCtx := u.moduleVUImpl.ctx
+	defer func() {
+		u.moduleVUImpl.ctx = previousCtx
+	}()
+
+	ctx, iterSpan := u.startIterationSpan(ctx)
+	iterationSpanEnded := false
+	defer func() {
+		// The iteration span is normally ended after IterEnd below, this only ends it
+		// when the iteration panics.
+		if !iterationSpanEnded {
+			k6trace.EndSpan(iterSpan, err)
+		}
+	}()
 	u.moduleVUImpl.ctx = ctx
 
 	eventIterData := event.IterData{
@@ -905,6 +942,9 @@ func (u *ActiveVU) RunOnce() error {
 	}
 
 	u.emitAndWaitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})
+	k6trace.EndIteration(iterSpan, err, isInterrupted(isFullIteration, err))
+	iterationSpanEnded = true
+	u.moduleVUImpl.ctx = previousCtx
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder
@@ -919,6 +959,32 @@ func (u *ActiveVU) RunOnce() error {
 	}
 
 	return err
+}
+
+// isInterrupted reports whether an iteration was interrupted rather than failed: its context
+// was done, e.g. at the end of its scenario, or the script aborted the test, which only
+// interrupts the runtime.
+func isInterrupted(isFullIteration bool, err error) bool {
+	_, aborted := errors.AsType[*errext.InterruptError](err)
+	return !isFullIteration || aborted
+}
+
+// startIterationSpan starts the span of the current iteration, or returns a noop span when
+// tracing is disabled.
+func (u *ActiveVU) startIterationSpan(ctx context.Context) (context.Context, oteltrace.Span) {
+	if u.tracer == nil {
+		return ctx, noop.Span{}
+	}
+	return k6trace.StartIteration(ctx, u.tracer, k6trace.IterationInfo{
+		Number:                      u.iteration,
+		VUID:                        u.ID,
+		VUIDGlobal:                  u.IDGlobal,
+		VUIterationInScenario:       u.scenarioIter[u.scenarioName],
+		Scenario:                    u.scenarioName,
+		ScenarioIterationInInstance: u.scIterLocal,
+		ScenarioIterationInTest:     u.scIterGlobal,
+		HasScenarioIterationNumbers: u.getNextIterationCounters != nil,
+	})
 }
 
 func (u *ActiveVU) emitAndWaitEvent(evt *event.Event) {

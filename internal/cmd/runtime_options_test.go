@@ -485,3 +485,45 @@ func TestRuntimeOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestRuntimeOptionsTracesParent(t *testing.T) {
+	t.Parallel()
+
+	const (
+		flagParent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+		envParent  = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
+	)
+
+	tests := map[string]struct {
+		cliFlags  []string
+		systemEnv map[string]string
+		expected  null.String
+	}{
+		"unset": {expected: null.NewString("", false)},
+		"flag": {
+			cliFlags: []string{"--traceparent=" + flagParent},
+			expected: null.StringFrom(flagParent),
+		},
+		"TRACEPARENT": {
+			systemEnv: map[string]string{"TRACEPARENT": envParent},
+			expected:  null.StringFrom(envParent),
+		},
+		"both": {
+			cliFlags:  []string{"--traceparent=" + flagParent},
+			systemEnv: map[string]string{"TRACEPARENT": envParent},
+			expected:  null.StringFrom(flagParent),
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			flags := runtimeOptionFlagSet(false)
+			require.NoError(t, flags.Parse(tc.cliFlags))
+			rtOpts, err := getRuntimeOptions(flags, tc.systemEnv)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, rtOpts.TraceParent)
+		})
+	}
+}

@@ -57,6 +57,25 @@ func (t *Tracer) Start(
 	return t.Tracer.Start(ctx, spanName, opts...)
 }
 
+// AddMetadata adds the tracer metadata as attributes to an existing span.
+func (t *Tracer) AddMetadata(span trace.Span) {
+	span.SetAttributes(t.metadata...)
+}
+
+// EndLiveSpans ends the navigation spans that are still live and forgets them. It must be
+// called when the iteration ends, so its last navigation spans end before the k6 iteration
+// span, which is their ancestor, instead of being left open, or ended by a navigation of a
+// later iteration. Events arriving afterwards for these targets are ignored (see TraceEvent).
+func (t *Tracer) EndLiveSpans() {
+	t.liveSpansMu.Lock()
+	defer t.liveSpansMu.Unlock()
+
+	for targetID, ls := range t.liveSpans {
+		ls.span.End()
+		delete(t.liveSpans, targetID)
+	}
+}
+
 // TraceAPICall adds a new span to the current liveSpan for the given targetID and returns it. It
 // is the caller's responsibility to close the generated span.
 // If there is not a liveSpan for the given targetID, the new span is created based on the given
