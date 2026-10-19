@@ -24,7 +24,7 @@ require (
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/icholy/digest v1.2.0
-	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
+	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 	github.com/jhump/protoreflect v1.18.1
 	github.com/klauspost/compress v1.20.0
 	github.com/mattn/go-colorable v0.1.16
