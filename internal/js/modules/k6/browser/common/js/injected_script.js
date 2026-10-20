@@ -1595,8 +1595,8 @@ class XPathQueryEngine {
 }
 
 class AttributeEngine {
-  constructor() {
-    this._evaluator = new SelectorEvaluatorImpl();
+  constructor(evaluator) {
+    this._evaluator = evaluator;
   }
   queryAll(root, selector) {
     try {
@@ -1623,8 +1623,8 @@ class AttributeEngine {
 }
 
 class LabelEngine {
-  constructor() {
-    this._evaluator = new SelectorEvaluatorImpl();
+  constructor(evaluator) {
+    this._evaluator = evaluator;
   }
   queryAll(root, selector) {
     try {
@@ -1642,8 +1642,8 @@ class LabelEngine {
 }
 
 class TextEngine {
-  constructor(shadow, internal) {
-    this._evaluator = new SelectorEvaluatorImpl();
+  constructor(evaluator, shadow, internal) {
+    this._evaluator = evaluator;
     this._shadow = shadow;
     this._internal = internal;
   }
@@ -1719,12 +1719,12 @@ class InjectedScript {
     this._evaluator = new SelectorEvaluatorImpl();
     this._queryEngines = {
       css: new CSSQueryEngine(),
-      text: new TextEngine(true, false),
+      text: new TextEngine(this._evaluator, true, false),
       xpath: new XPathQueryEngine(),
       'internal:role': createRoleEngine(true),
-      'internal:attr': new AttributeEngine(),
-      'internal:label': new LabelEngine(),
-      'internal:text': new TextEngine(true, true),
+      'internal:attr': new AttributeEngine(this._evaluator),
+      'internal:label': new LabelEngine(this._evaluator),
+      'internal:text': new TextEngine(this._evaluator, true, true),
       'internal:has-text': this._createInternalHasTextEngine(),
       'internal:has-not-text': this._createInternalHasNotTextEngine(),
     };
