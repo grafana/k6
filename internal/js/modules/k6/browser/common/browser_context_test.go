@@ -2,6 +2,8 @@ package common
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -75,6 +77,19 @@ func TestSetDownloadsPath(t *testing.T) {
 		assert.DirExists(t, bc.DownloadsPath)
 		require.NoError(t, bc.cleanup())
 		assert.NoDirExists(t, bc.DownloadsPath)
+	})
+	t.Run("cleanup_preserves_user_path", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		marker := filepath.Join(dir, "keep-me.txt")
+		require.NoError(t, os.WriteFile(marker, []byte("important"), 0o600))
+
+		var bc BrowserContext
+		require.NoError(t, bc.setDownloadsPath(dir))
+		require.NoError(t, bc.cleanup())
+		assert.DirExists(t, dir)
+		assert.FileExists(t, marker)
 	})
 }
 
