@@ -69,13 +69,13 @@ func (c *Collector) CollectRequestMetadatas(sampleContainers []metrics.SampleCon
 			End:     trail.EndTime,
 			TestRunLabels: insights.TestRunLabels{
 				ID:       c.testRunID,
-				Scenario: c.getStringTagFromTrail(trail, scenarioTag),
-				Group:    c.getStringTagFromTrail(trail, groupTag),
+				Scenario: getStringTag(trail.Tags, scenarioTag),
+				Group:    getStringTag(trail.Tags, groupTag),
 			},
 			ProtocolLabels: insights.ProtocolHTTPLabels{
-				URL:        c.getStringTagFromTrail(trail, nameTag),
-				Method:     c.getStringTagFromTrail(trail, methodTag),
-				StatusCode: c.getIntTagFromTrail(trail, statusTag),
+				URL:        getStringTag(trail.Tags, nameTag),
+				Method:     getStringTag(trail.Tags, methodTag),
+				StatusCode: getIntTag(trail.Tags, statusTag),
 			},
 		}
 
@@ -102,23 +102,28 @@ func (c *Collector) PopAll() insights.RequestMetadatas {
 	return b
 }
 
-func (c *Collector) getStringTagFromTrail(trail *httpext.Trail, key string) string {
-	if tag, found := trail.Tags.Get(key); found {
+func getStringTag(tags *metrics.TagSet, key string) string {
+	if tags == nil {
+		return ""
+	}
+
+	if tag, found := tags.Get(key); found {
 		return tag
 	}
 
 	return ""
 }
 
-func (c *Collector) getIntTagFromTrail(trail *httpext.Trail, key string) int64 {
-	if tag, found := trail.Tags.Get(key); found {
-		tagInt, err := strconv.ParseInt(tag, 10, 64)
-		if err != nil {
-			return 0
-		}
-
-		return tagInt
+func getIntTag(tags *metrics.TagSet, key string) int64 {
+	tag := getStringTag(tags, key)
+	if tag == "" {
+		return 0
 	}
 
-	return 0
+	tagInt, err := strconv.ParseInt(tag, 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return tagInt
 }
