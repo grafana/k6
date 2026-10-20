@@ -14,7 +14,9 @@ const (
 	scenarioTag        = "scenario"
 	groupTag           = "group"
 	nameTag            = "name"
+	urlTag             = "url"
 	methodTag          = "method"
+	serviceTag         = "service"
 	statusTag          = "status"
 )
 
@@ -26,8 +28,8 @@ type RequestMetadatasCollector interface {
 }
 
 // Collector is an implementation of RequestMetadatasCollector.
-// Its purpose is to filter and store httpext.Trail samples
-// containing tracing data for later flushing.
+// Its purpose is to filter and store httpext.Trail samples and gRPC request
+// samples containing tracing data for later flushing.
 type Collector struct {
 	testRunID int64
 	buffer    insights.RequestMetadatas
@@ -43,23 +45,28 @@ func NewCollector(testRunID int64) *Collector {
 	}
 }
 
-// CollectRequestMetadatas filters httpext.Trail samples containing trace ids and stores them as
-// insights.RequestMetadatas in the buffer.
+// CollectRequestMetadatas filters httpext.Trail and gRPC request duration samples
+// containing trace ids and stores them as insights.RequestMetadatas in the buffer.
 func (c *Collector) CollectRequestMetadatas(sampleContainers []metrics.SampleContainer) {
 	if len(sampleContainers) < 1 {
 		return
 	}
 
-	// TODO(lukasz, other-proto-support): Support grpc/websocket trails.
+	// TODO(other-proto-support): Support websocket trails.
 	var newBuffer insights.RequestMetadatas
 	for _, sampleContainer := range sampleContainers {
-		trail, ok := sampleContainer.(*httpext.Trail)
-		if !ok {
+		if trail, ok := sampleContainer.(*httpext.Trail); ok {
+			if m, ok := c.requestMetadataFromHTTPTrail(trail); ok {
+				newBuffer = append(newBuffer, m)
+			}
+
 			continue
 		}
 
-		if m, ok := c.requestMetadataFromHTTPTrail(trail); ok {
-			newBuffer = append(newBuffer, m)
+		for _, sample := range sampleContainer.GetSamples() {
+			if m, ok := c.requestMetadataFromGRPCSample(sample); ok {
+				newBuffer = append(newBuffer, m)
+			}
 		}
 	}
 
@@ -102,6 +109,38 @@ func (c *Collector) requestMetadataFromHTTPTrail(trail *httpext.Trail) (insights
 			URL:        getStringTag(trail.Tags, nameTag),
 			Method:     getStringTag(trail.Tags, methodTag),
 			StatusCode: getIntTag(trail.Tags, statusTag),
+		},
+	}, true
+}
+
+// requestMetadataFromGRPCSample builds the request metadata of a gRPC request.
+// gRPC requests are not reported as trails: the gRPC stats handler emits a
+// single grpc_req_duration sample per RPC, carrying the request tags and
+// metadata, so that is the sample to look for.
+func (c *Collector) requestMetadataFromGRPCSample(sample metrics.Sample) (insights.RequestMetadata, bool) {
+	if sample.Metric == nil || sample.Metric.Name != metrics.GRPCReqDurationName {
+		return insights.RequestMetadata{}, false
+	}
+
+	traceID, found := sample.Metadata[metadataTraceIDKey]
+	if !found {
+		return insights.RequestMetadata{}, false
+	}
+
+	return insights.RequestMetadata{
+		TraceID: traceID,
+		Start:   sample.Time.Add(-metrics.ToD(sample.Value)),
+		End:     sample.Time,
+		TestRunLabels: insights.TestRunLabels{
+			ID:       c.testRunID,
+			Scenario: getStringTag(sample.Tags, scenarioTag),
+			Group:    getStringTag(sample.Tags, groupTag),
+		},
+		ProtocolLabels: insights.ProtocolGRPCLabels{
+			URL:        getStringTag(sample.Tags, urlTag),
+			Service:    getStringTag(sample.Tags, serviceTag),
+			Method:     getStringTag(sample.Tags, methodTag),
+			StatusCode: getIntTag(sample.Tags, statusTag),
 		},
 	}, true
 }
