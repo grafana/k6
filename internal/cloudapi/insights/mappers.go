@@ -59,6 +59,15 @@ func setProtocolLabels(rm *k6.RequestMetadata, labels ProtocolLabels) error {
 				StatusCode: l.StatusCode,
 			},
 		}
+	case ProtocolGRPCLabels:
+		rm.ProtocolLabels = &k6.RequestMetadata_GRPCLabels{
+			GRPCLabels: &k6.GRPCLabels{
+				Url:        l.URL,
+				Service:    l.Service,
+				Method:     l.Method,
+				StatusCode: l.StatusCode,
+			},
+		}
 	default:
 		return errors.New("unknown protocol labels type")
 	}
