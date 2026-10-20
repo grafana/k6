@@ -1811,30 +1811,31 @@ class InjectedScript {
       const capture =
         index - 1 === selector.capture ? root.element : root.capture;
 
-      // Do not query engine twice for the same element.
-      let queryResults = queryCache.get(root.element);
-      if (!queryResults) {
-        queryResults = [];
-        queryCache.set(root.element, queryResults);
-      }
-      let all = queryResults[index];
-      if (!all) {
-        all = this._queryEngineAll(selector.parts[index], root.element);
-        queryResults[index] = all;
-      }
-
-      for (const element of all) {
-        if (!("nodeName" in element)) {
-          return `error:expectednode:${Object.prototype.toString.call(
-            element
-          )}`;
+      // Run this part in the root and in each shadow root under it, so that it
+      // also matches inside open shadow DOM. The next part then runs once on
+      // all the matches.
+      for (const scope of [root.element, ...this._shadowRootsUnder(root.element)]) {
+        // Do not query engine twice for the same element.
+        let queryResults = queryCache.get(scope);
+        if (!queryResults) {
+          queryResults = [];
+          queryCache.set(scope, queryResults);
         }
-        result.push({ element, capture });
-      }
+        let all = queryResults[index];
+        if (!all) {
+          all = this._queryEngineAll(selector.parts[index], scope);
+          queryResults[index] = all;
+        }
 
-      // Explore the Shadow DOM recursively.
-      const shadowResults = this._exploreShadowDOM(root.element, selector, index, queryCache, capture);
-      result.push(...shadowResults);
+        for (const element of all) {
+          if (!("nodeName" in element)) {
+            return `error:expectednode:${Object.prototype.toString.call(
+              element
+            )}`;
+          }
+          result.push({ element, capture });
+        }
+      }
     }
 
     return this._querySelectorRecursively(
@@ -1845,26 +1846,23 @@ class InjectedScript {
     );
   }
 
-  _exploreShadowDOM(root, selector, index, queryCache, capture) {
-    let result = [];
-    if (root.shadowRoot) {
-      const shadowRootResults = this._querySelectorRecursively(
-        [{ element: root.shadowRoot, capture }],
-        selector,
-        index,
-        queryCache
-      );
-      result = result.concat(shadowRootResults);
-    }
-
-    if (!root.hasChildNodes()) return result;
-    
-    for (let i = 0; i < root.children.length; i++) {
-      const childElement = root.children[i];
-      result = result.concat(this._exploreShadowDOM(childElement, selector, index, queryCache, capture));
-    }
-    
-    return result;
+  // _shadowRootsUnder returns the open shadow roots under root, including
+  // root's own and nested ones, in document order.
+  _shadowRootsUnder(root) {
+    const shadowRoots = [];
+    const visit = (node) => {
+      const hosts = node.shadowRoot ? [node] : [];
+      for (const element of node.querySelectorAll("*")) {
+        if (element.shadowRoot)
+          hosts.push(element);
+      }
+      for (const host of hosts) {
+        shadowRoots.push(host.shadowRoot);
+        visit(host.shadowRoot);
+      }
+    };
+    visit(root);
+    return shadowRoots;
   }
 
   // Make sure we target an appropriate node in the DOM before performing an action.
