@@ -90,6 +90,25 @@ func TestCloudOutputRequireScriptName(t *testing.T) {
 	assert.Contains(t, err.Error(), "script name not set")
 }
 
+func TestCloudOutputRejectsNonPositiveMetricPushInterval(t *testing.T) {
+	t.Parallel()
+
+	_, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_METRIC_PUSH_INTERVAL": "0s",
+		},
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "metrics push interval must be a positive duration")
+}
+
 func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 	t.Parallel()
 
