@@ -1298,6 +1298,7 @@ var SelectorEvaluatorImpl = class {
     this._retainCacheCounter = 0;
     this._cacheText = new k6BrowserNative.Map();
     this._cacheQueryCSS = new k6BrowserNative.Map();
+    this._cacheShadowRoots = new k6BrowserNative.Map();
   }
   begin() {
     ++this._retainCacheCounter;
@@ -1307,6 +1308,7 @@ var SelectorEvaluatorImpl = class {
     if (!this._retainCacheCounter) {
       this._cacheQueryCSS.clear();
       this._cacheText.clear();
+      this._cacheShadowRoots.clear();
     }
   }
   _cached(cache, main, rest, cb) {
@@ -1550,6 +1552,10 @@ function isVisible(element) {
 function oneLine(s) {
   return s.replace(/\n/g, "↵").replace(/\t/g, "⇆");
 }
+
+// Engines that look inside shadow roots themselves, or that only test the root
+// element, so running them again in each shadow root finds nothing new.
+var kShadowPiercingEngines = ["internal:attr", "internal:has-not-text", "internal:has-text", "internal:label", "internal:role", "internal:text", "text"];
 
 class CSSQueryEngine {
   queryAll(root, selector) {
@@ -1811,10 +1817,12 @@ class InjectedScript {
       const capture =
         index - 1 === selector.capture ? root.element : root.capture;
 
-      // Run this part in the root and in each shadow root under it, so that it
-      // also matches inside open shadow DOM. The next part then runs once on
-      // all the matches.
-      for (const scope of [root.element, ...this._shadowRootsUnder(root.element)]) {
+      // Run this part in the root and, unless the engine looks inside shadow
+      // roots itself, in each shadow root under it, so that it also matches
+      // inside open shadow DOM. The next part then runs once on all the
+      // matches.
+      const scopes = kShadowPiercingEngines.includes(part.name) ? [root.element] : [root.element, ...this._shadowRootsUnder(root.element)];
+      for (const scope of scopes) {
         // Do not query engine twice for the same element.
         let queryResults = queryCache.get(scope);
         if (!queryResults) {
@@ -1847,9 +1855,14 @@ class InjectedScript {
   }
 
   // _shadowRootsUnder returns the open shadow roots under root, including
-  // root's own and nested ones, in document order.
+  // root's own and nested ones, in document order. They're cached for as
+  // long as the evaluator's other caches.
   _shadowRootsUnder(root) {
-    const shadowRoots = [];
+    let shadowRoots = this._evaluator._cacheShadowRoots.get(root);
+    if (shadowRoots)
+      return shadowRoots;
+    shadowRoots = [];
+    this._evaluator._cacheShadowRoots.set(root, shadowRoots);
     const visit = (node) => {
       const hosts = node.shadowRoot ? [node] : [];
       for (const element of node.querySelectorAll("*")) {
