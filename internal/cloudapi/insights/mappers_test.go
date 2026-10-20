@@ -29,6 +29,15 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
 			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-2", Method: "test-method-2", StatusCode: 401},
 		},
+		{
+			TraceID:       "test-trace-id-3",
+			Start:         time.Unix(29, 0),
+			End:           time.Unix(30, 0),
+			TestRunLabels: TestRunLabels{ID: 1337, Scenario: "test-scenario-3", Group: "test-group-3"},
+			ProtocolLabels: ProtocolGRPCLabels{
+				URL: "test-url-3", Service: "test-service-3", Method: "test-method-3", StatusCode: 14,
+			},
+		},
 	}
 
 	// When
@@ -62,9 +71,22 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 				},
 			},
 		},
+		{
+			RequestMetadata: &k6.RequestMetadata{
+				TraceID:           "test-trace-id-3",
+				StartTimeUnixNano: time.Unix(29, 0).UnixNano(),
+				EndTimeUnixNano:   time.Unix(30, 0).UnixNano(),
+				TestRunLabels:     &k6.TestRunLabels{ID: 1337, Scenario: "test-scenario-3", Group: "test-group-3"},
+				ProtocolLabels: &k6.RequestMetadata_GRPCLabels{
+					GRPCLabels: &k6.GRPCLabels{
+						Url: "test-url-3", Service: "test-service-3", Method: "test-method-3", StatusCode: 14,
+					},
+				},
+			},
+		},
 	}
 
 	require.NoError(t, err)
-	require.Len(t, got.Requests, 2)
+	require.Len(t, got.Requests, 3)
 	require.ElementsMatch(t, got.Requests, expected)
 }
