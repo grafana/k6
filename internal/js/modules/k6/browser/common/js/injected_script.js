@@ -2257,6 +2257,7 @@ function cssEscapeCharacter(s, i) {
 var kListInteractiveRoles = ["button", "checkbox", "combobox", "gridcell", "link", "listbox", "menuitem", "menuitemcheckbox", "menuitemradio", "option", "radio", "searchbox", "slider", "spinbutton", "switch", "tab", "textbox", "treeitem"];
 var kListContentRoles = ["alert", "alertdialog", "cell", "dialog", "heading", "listitem", "paragraph", "status"];
 var kListCheckedRoles = ["checkbox", "menuitemcheckbox", "menuitemradio", "radio", "switch"];
+var kListTextLength = 200;
 
 function listSelectorsKind(element) {
   if (!isVisible(element))
@@ -3330,15 +3331,17 @@ class InjectedScript {
           continue;
         seen.add(target);
         const role = getAriaRole(target) || "";
-        const entry = {
-          kind: targetKind,
-          role,
-          name: getElementAccessibleName(target, false),
-          locator: selectorToLocatorCode(selector),
-          selector,
-        };
+        const entry = { kind: targetKind, role, name: getElementAccessibleName(target, false) };
+        // Without a name, the visible text is what tells the reader what the element is.
+        if (!entry.name) {
+          const text = elementText(this._evaluator._cacheText, target).normalized;
+          if (text)
+            entry.text = text.length <= kListTextLength ? text : (trimWordBoundary(text, kListTextLength) || text.substring(0, kListTextLength)) + "…";
+        }
         if (kListCheckedRoles.includes(role))
           entry.checked = getAriaChecked(target);
+        entry.locator = selectorToLocatorCode(selector);
+        entry.selector = selector;
         entries.push(entry);
       }
     } finally {

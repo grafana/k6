@@ -5,7 +5,9 @@ package tests
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
@@ -56,6 +58,7 @@ func TestPageListSelectors(t *testing.T) {
 		Kind        string   `json:"kind"`
 		Role        string   `json:"role"`
 		Name        string   `json:"name"`
+		Text        string   `json:"text"`
 		Checked     any      `json:"checked"`
 		Locator     string   `json:"locator"`
 		Selector    string   `json:"selector"`
@@ -85,11 +88,11 @@ func TestPageListSelectors(t *testing.T) {
 		"email", "search", "remember", "subscribe", "select-all", "size", "notes", "dark-mode",
 		"sign-in", "help", "add-margherita", "add-pepperoni", "promo", "editor",
 	}
-	content := []string{"heading", "paragraph", "logo", "cart-total", "status", "margherita", "pepperoni", "cell"}
+	content := []string{"heading", "paragraph", "terms", "logo", "cart-total", "status", "margherita", "pepperoni", "cell"}
 	assert.Equal(t, interactive, marks(result.Interactive))
 	assert.Equal(t, content, marks(result.Content))
 	assert.Equal(t, []string{
-		"heading", "paragraph", "logo", "email", "search", "remember", "subscribe", "select-all",
+		"heading", "paragraph", "terms", "logo", "email", "search", "remember", "subscribe", "select-all",
 		"size", "notes", "dark-mode", "sign-in", "help", "cart-total", "status", "margherita", "add-margherita",
 		"pepperoni", "add-pepperoni", "promo", "editor", "cell",
 	}, marks(result.All))
@@ -111,6 +114,7 @@ func TestPageListSelectors(t *testing.T) {
 	assert.Equal(t, "page.getByRole('button', { name: 'Sign in' })", signIn.Locator)
 	assert.Equal(t, `internal:role=button[name="Sign in"i]`, signIn.Selector)
 	assert.Nil(t, signIn.Checked)
+	assert.Empty(t, signIn.Text, "an entry with a name has no text")
 	assert.Equal(t, "page.getByRole('link', { name: 'Help' })", byCheck["help"].Locator)
 	assert.Equal(t, "page.getByRole('textbox', { name: 'Email' })", byCheck["email"].Locator)
 	assert.Equal(t, "page.getByRole('heading', { name: 'Pizza shop' })", byCheck["heading"].Locator)
@@ -123,6 +127,15 @@ func TestPageListSelectors(t *testing.T) {
 
 	assert.Empty(t, byCheck["promo"].Role)
 	assert.Empty(t, byCheck["promo"].Name)
+
+	// Entries with no accessible name have their visible text, cut to 200 characters.
+	assert.Equal(t, "Free delivery", byCheck["paragraph"].Text)
+	assert.Equal(t, "Deal of the day", byCheck["promo"].Text)
+	assert.Equal(t, "Margherita Add", byCheck["margherita"].Text)
+	terms := byCheck["terms"].Text
+	assert.True(t, strings.HasPrefix(terms, "Delivery is free for every order over twenty pounds"), terms)
+	assert.True(t, strings.HasSuffix(terms, "…"), terms)
+	assert.LessOrEqual(t, utf8.RuneCountInString(terms), 201, terms)
 
 	var interactiveSelectors []string
 	for _, e := range result.Interactive {
