@@ -85,7 +85,7 @@ func TestPageListSelectors(t *testing.T) {
 	}
 	// A label with its own pointer cursor isn't listed, only its control.
 	interactive := []string{
-		"email", "search", "remember", "subscribe", "select-all", "size", "notes", "dark-mode", "coupon",
+		"email", "search", "remember", "subscribe", "select-all", "size", "notes", "dark-mode", "coupon", "newsletter",
 		"sign-in", "help", "add-margherita", "add-pepperoni", "promo", "editor",
 	}
 	content := []string{"heading", "paragraph", "terms", "logo", "unlinked-label", "cart-total", "status", "margherita", "pepperoni", "cell"}
@@ -93,7 +93,7 @@ func TestPageListSelectors(t *testing.T) {
 	assert.Equal(t, content, marks(result.Content))
 	assert.Equal(t, []string{
 		"heading", "paragraph", "terms", "logo", "email", "search", "remember", "subscribe", "select-all",
-		"size", "notes", "dark-mode", "unlinked-label", "coupon", "sign-in", "help", "cart-total", "status", "margherita", "add-margherita",
+		"size", "notes", "dark-mode", "unlinked-label", "coupon", "newsletter", "sign-in", "help", "cart-total", "status", "margherita", "add-margherita",
 		"pepperoni", "add-pepperoni", "promo", "editor", "cell",
 	}, marks(result.All))
 
@@ -140,6 +140,10 @@ func TestPageListSelectors(t *testing.T) {
 	// A label that isn't linked to a control is the only place its text shows up.
 	assert.Equal(t, "Coupon (hint: PIZZA)", byCheck["unlinked-label"].Text)
 	assert.Equal(t, "page.locator('#coupon')", byCheck["coupon"].Locator)
+
+	// A label whose control is hidden, such as a custom-styled checkbox, is what users click.
+	assert.Equal(t, "Send me the newsletter", byCheck["newsletter"].Text)
+	assert.Equal(t, "page.getByText('Send me the newsletter')", byCheck["newsletter"].Locator)
 
 	var interactiveSelectors []string
 	for _, e := range result.Interactive {
