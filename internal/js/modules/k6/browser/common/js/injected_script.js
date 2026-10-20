@@ -2268,6 +2268,9 @@ function listSelectorsKind(element) {
     return "interactive";
   if (element.getAttribute(kTestIdAttributeName) || kListContentRoles.includes(role) || (role === "img" && !!getElementAccessibleName(element, false)))
     return "content";
+  // A label that isn't linked to a control is the only place its text shows up.
+  if (element.nodeName === "LABEL" && !element.control)
+    return "content";
   return null;
 }
 
