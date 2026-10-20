@@ -58,28 +58,9 @@ func (c *Collector) CollectRequestMetadatas(sampleContainers []metrics.SampleCon
 			continue
 		}
 
-		traceID, found := trail.Metadata[metadataTraceIDKey]
-		if !found {
-			continue
+		if m, ok := c.requestMetadataFromHTTPTrail(trail); ok {
+			newBuffer = append(newBuffer, m)
 		}
-
-		m := insights.RequestMetadata{
-			TraceID: traceID,
-			Start:   trail.EndTime.Add(-trail.Duration),
-			End:     trail.EndTime,
-			TestRunLabels: insights.TestRunLabels{
-				ID:       c.testRunID,
-				Scenario: getStringTag(trail.Tags, scenarioTag),
-				Group:    getStringTag(trail.Tags, groupTag),
-			},
-			ProtocolLabels: insights.ProtocolHTTPLabels{
-				URL:        getStringTag(trail.Tags, nameTag),
-				Method:     getStringTag(trail.Tags, methodTag),
-				StatusCode: getIntTag(trail.Tags, statusTag),
-			},
-		}
-
-		newBuffer = append(newBuffer, m)
 	}
 
 	if len(newBuffer) < 1 {
@@ -100,6 +81,29 @@ func (c *Collector) PopAll() insights.RequestMetadatas {
 	b := c.buffer
 	c.buffer = nil
 	return b
+}
+
+func (c *Collector) requestMetadataFromHTTPTrail(trail *httpext.Trail) (insights.RequestMetadata, bool) {
+	traceID, found := trail.Metadata[metadataTraceIDKey]
+	if !found {
+		return insights.RequestMetadata{}, false
+	}
+
+	return insights.RequestMetadata{
+		TraceID: traceID,
+		Start:   trail.EndTime.Add(-trail.Duration),
+		End:     trail.EndTime,
+		TestRunLabels: insights.TestRunLabels{
+			ID:       c.testRunID,
+			Scenario: getStringTag(trail.Tags, scenarioTag),
+			Group:    getStringTag(trail.Tags, groupTag),
+		},
+		ProtocolLabels: insights.ProtocolHTTPLabels{
+			URL:        getStringTag(trail.Tags, nameTag),
+			Method:     getStringTag(trail.Tags, methodTag),
+			StatusCode: getIntTag(trail.Tags, statusTag),
+		},
+	}, true
 }
 
 func getStringTag(tags *metrics.TagSet, key string) string {
