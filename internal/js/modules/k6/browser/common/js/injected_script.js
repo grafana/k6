@@ -1958,10 +1958,14 @@ function buildNoTextCandidates(injectedScript, element, options) {
   candidates.push({ engine: "css", selector: escapeNodeName(element), score: kCSSTagNameScore });
 
   if (element.nodeName === "IFRAME" || element.nodeName === "FRAME") {
-    for (const attribute of ["name", "title"]) {
-      if (element.getAttribute(attribute))
-        candidates.push({ engine: "css", selector: `${escapeNodeName(element)}[${attribute}=${quoteCSSAttributeValue(element.getAttribute(attribute))}]`, score: kIframeByAttributeScore });
-    }
+    // Unlike Playwright, prefer the title to the name, and skip names that look
+    // generated, such as "__privateFrame5": they can change between loads.
+    const title = element.getAttribute("title");
+    if (title)
+      candidates.push({ engine: "css", selector: `${escapeNodeName(element)}[title=${quoteCSSAttributeValue(title)}]`, score: kIframeByAttributeScore });
+    const name = element.getAttribute("name");
+    if (name && !/\d$/.test(name) && !isGuidLike(name))
+      candidates.push({ engine: "css", selector: `${escapeNodeName(element)}[name=${quoteCSSAttributeValue(name)}]`, score: kIframeByAttributeScore + 1 });
     if (element.getAttribute(kTestIdAttributeName))
       candidates.push({ engine: "css", selector: `[${kTestIdAttributeName}=${quoteCSSAttributeValue(element.getAttribute(kTestIdAttributeName))}]`, score: kTestIdScore });
     penalizeScoreForLength([candidates]);
@@ -3252,8 +3256,16 @@ class InjectedScript {
     return elements.length;
   }
 
+  // frameSelector returns the selector of an iframe element, and the
+  // frameLocator() code that enters the iframe.
+  frameSelector(element) {
+    const { selector } = generateSelector(this, element, {});
+    return { frameSelector: selector, frameLocator: `.frameLocator(${escapeWithQuotes(selector)})` };
+  }
+
   // listSelectors returns an entry for each element under root of the given
-  // kind ("interactive", "content" or "all"), in document order.
+  // kind ("interactive", "content" or "all"), in document order. A visible
+  // iframe gets a frameSelector() marker instead, where its entries go.
   listSelectors(root, kind) {
     const elements = [];
     const collect = (node) => {
@@ -3272,6 +3284,10 @@ class InjectedScript {
     beginAriaCaches();
     try {
       for (const element of elements) {
+        if ((element.nodeName === "IFRAME" || element.nodeName === "FRAME") && isVisible(element)) {
+          entries.push(this.frameSelector(element));
+          continue;
+        }
         const elementKind = listSelectorsKind(element);
         if (!elementKind || kind !== "all" && kind !== elementKind)
           continue;

@@ -664,6 +664,7 @@ type frameAPI interface { //nolint:interfacebloat
 	IsEnabled(selector string, opts sobek.Value) (bool, error)
 	IsHidden(selector string, opts sobek.Value) (bool, error)
 	IsVisible(selector string, opts sobek.Value) (bool, error)
+	ListSelectors(opts sobek.Value) ([]any, error)
 	ID() string
 	LoaderID() string
 	Locator(selector string, opts sobek.Value) *common.Locator

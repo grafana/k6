@@ -130,3 +130,98 @@ func TestPageListSelectors(t *testing.T) {
 	assert.Equal(t, interactiveSelectors, result.DefaultKind, "the default kind is interactive")
 	assert.Contains(t, result.BadKindError, "kind")
 }
+
+func TestListSelectorsFrames(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		await page.goto('%s');
+		await page.frameLocator('iframe[title="Payment"]').frameLocator('iframe[title="Nested"]').getByRole('button').waitFor();
+
+		const resolve = async (loc) => {
+			const count = await loc.count();
+			return { count, check: count ? await loc.first().getAttribute('data-check') : '' };
+		};
+		const withResolved = async (entries) => {
+			const out = [];
+			for (const e of entries) {
+				const viaSelector = await resolve(page.locator(e.selector));
+				const viaLocator = await resolve(new Function('page', 'return ' + e.locator)(page));
+				out.push({ ...e, viaSelector, viaLocator });
+			}
+			return out;
+		};
+
+		const result = {};
+		result.page = await withResolved(await page.listSelectors());
+		const payment = page.frames().find((f) => f.name() === '__privateFrame5');
+		result.payment = await withResolved(await payment.listSelectors());
+		result.paymentURL = payment.url();
+		const hidden = page.frames().find((f) => f.name() === 'hidden');
+		result.hidden = await hidden.listSelectors();
+		await page.evaluate(() => document.querySelector('iframe[name="hidden"]').remove());
+		try {
+			await hidden.listSelectors();
+		} catch (e) {
+			result.detachedError = String(e);
+		}
+		return JSON.stringify(result);
+	`, tb.staticURL("list_selectors_frames.html"))
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State(), "%v", got.Result())
+
+	type resolved struct {
+		Count int    `json:"count"`
+		Check string `json:"check"`
+	}
+	type entry struct {
+		Locator     string   `json:"locator"`
+		Selector    string   `json:"selector"`
+		ViaSelector resolved `json:"viaSelector"`
+		ViaLocator  resolved `json:"viaLocator"`
+	}
+	var result struct {
+		Page          []entry `json:"page"`
+		Payment       []entry `json:"payment"`
+		PaymentURL    string  `json:"paymentURL"`
+		Hidden        []any   `json:"hidden"`
+		DetachedError string  `json:"detachedError"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &result))
+
+	marks := func(entries []entry) []string {
+		var marks []string
+		for _, e := range entries {
+			assert.Equal(t, 1, e.ViaSelector.Count, "selector %s", e.Selector)
+			assert.Equal(t, e.ViaSelector, e.ViaLocator, "locator %s", e.Locator)
+			marks = append(marks, e.ViaSelector.Check)
+		}
+		return marks
+	}
+	// A frame's entries go where its iframe is, and the hidden iframe is skipped.
+	require.Equal(t, []string{"before", "card", "pay", "after"}, marks(result.Page))
+
+	// The iframe is found by its title, not by its generated-looking name.
+	card, pay := result.Page[1], result.Page[2]
+	assert.Equal(t, `page.frameLocator('iframe[title="Payment"]').getByRole('textbox', { name: 'Card number' })`, card.Locator)
+	assert.Equal(t, `iframe[title="Payment"] >> internal:control=enter-frame >> internal:role=textbox[name="Card number"i]`, card.Selector)
+	assert.Equal(t,
+		`page.frameLocator('iframe[title="Payment"]').frameLocator('iframe[title="Nested"]').getByRole('button', { name: 'Pay' })`,
+		pay.Locator)
+	assert.Equal(t,
+		`iframe[title="Payment"] >> internal:control=enter-frame >> iframe[title="Nested"] >> internal:control=enter-frame >> internal:role=button[name="Pay"i]`,
+		pay.Selector)
+
+	assert.Contains(t, result.PaymentURL, "localhost", "the payment frame should come from another site")
+
+	// frame.listSelectors() lists that frame, with locators starting from the page.
+	assert.Equal(t, []string{"card", "pay"}, marks(result.Payment))
+	assert.Equal(t, []entry{card, pay}, result.Payment)
+
+	assert.Empty(t, result.Hidden, "elements in a hidden iframe aren't visible")
+	assert.NotEmpty(t, result.DetachedError, "listing a detached frame should fail")
+}

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>List selectors in frames</title>
+</head>
+<body>
+  <button data-check="before">Before</button>
+  <iframe name="__privateFrame5" title="Payment"></iframe>
+  <iframe name="hidden" title="Hidden" style="display: none" src="list_selectors_frame.html"></iframe>
+  <button data-check="after">After</button>
+
+  <script>
+    // Load the payment frame from another site (localhost vs 127.0.0.1), so
+    // that Chromium runs it in its own process.
+    const url = new URL('list_selectors_frame.html', location.href);
+    url.hostname = url.hostname === 'localhost' ? '127.0.0.1' : 'localhost';
+    document.querySelector('iframe[title="Payment"]').src = url.href;
+  </script>
+</body>
+</html>
