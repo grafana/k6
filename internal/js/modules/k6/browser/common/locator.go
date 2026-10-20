@@ -443,6 +443,54 @@ func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 	return l.Locator(l.frame.buildAttributeSelector("title", title, opts), nil)
 }
 
+// ListSelectors returns an entry for each element inside the element that the
+// locator matches, or inside its frame if it's an iframe. Like other locator
+// methods, it waits for exactly one matching element. The selectors and the
+// locator code start from the page. See Frame.ListSelectors.
+func (l *Locator) ListSelectors(kind string) ([]any, error) {
+	l.log.Debugf(
+		"Locator:ListSelectors", "fid:%s furl:%q sel:%q kind:%q",
+		l.frame.ID(), l.frame.URL(), l.selector, kind,
+	)
+
+	kind, err := normalizeListSelectorsKind(kind)
+	if err != nil {
+		return nil, err
+	}
+	opts := NewFrameWaitForSelectorOptions(l.frame.defaultTimeout())
+	opts.State = DOMElementStateAttached
+	opts.Strict = true
+	element, err := l.frame.WaitForSelector(l.selector, opts)
+	if err != nil {
+		return nil, fmt.Errorf("listing selectors in %q: %w", l.selector, err)
+	}
+	defer func() { _ = element.Dispose() }()
+
+	var entries []any
+	scope := l.selector
+	if frame, ferr := element.ContentFrame(); ferr == nil {
+		scope += " >> internal:control=enter-frame"
+		entries, err = frame.listSelectors(kind)
+	} else {
+		entries, err = listSelectorsIn(element, kind)
+	}
+	if err != nil {
+		return nil, err
+	}
+	code, err := locatorCode(element, scope)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		prefixListedEntry(e, scope+" >> ", code)
+	}
+	if err = l.frame.prefixWithFramePath(entries); err != nil {
+		return nil, err
+	}
+
+	return entries, nil
+}
+
 // Locator creates and returns a new locator chained/relative to the current locator.
 func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 	return NewLocator(l.ctx, opts, l.selector+" >> "+selector, l.frame, l.log)

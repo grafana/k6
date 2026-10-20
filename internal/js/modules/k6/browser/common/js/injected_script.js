@@ -2290,12 +2290,30 @@ function isListedInteractive(element, role, style) {
 function selectorToLocatorCode(selector) {
   const fallback = `page.locator(${escapeWithQuotes(selector)})`;
   let code = "page";
+  let last;
+  // After entering an iframe there's a FrameLocator, which only has getBy*,
+  // locator() and frameLocator().
+  let inFrame = false;
   try {
     for (const part of parseSelector(selector).parts) {
+      if (part.name === "internal:control" && part.body === "enter-frame") {
+        if (!last || inFrame)
+          return fallback;
+        if (last.part.name === "css")
+          code = code.substring(0, code.length - last.code.length) + `.frameLocator(${escapeWithQuotes(last.part.body)})`;
+        else
+          code += ".contentFrame()";
+        inFrame = true;
+        continue;
+      }
+      if (inFrame && (part.name === "nth" || part.name === "internal:has-text"))
+        return fallback;
       const next = locatorCodeForPart(part);
       if (next === undefined)
         return fallback;
       code += next;
+      last = { part, code: next };
+      inFrame = false;
     }
   } catch (e) {
     return fallback;
@@ -3258,15 +3276,23 @@ class InjectedScript {
 
   // frameSelector returns the selector of an iframe element, and the
   // frameLocator() code that enters the iframe.
-  frameSelector(element) {
-    const { selector } = generateSelector(this, element, {});
+  frameSelector(element, options = {}) {
+    const { selector } = generateSelector(this, element, options);
     return { frameSelector: selector, frameLocator: `.frameLocator(${escapeWithQuotes(selector)})` };
+  }
+
+  // locatorCode returns the k6 locator code for a selector, such as
+  // page.getByRole('dialog').
+  locatorCode(selector) {
+    return selectorToLocatorCode(selector);
   }
 
   // listSelectors returns an entry for each element under root of the given
   // kind ("interactive", "content" or "all"), in document order. A visible
-  // iframe gets a frameSelector() marker instead, where its entries go.
+  // iframe gets a frameSelector() marker instead, where its entries go. Under
+  // an element, selectors are relative to that element.
   listSelectors(root, kind) {
+    const options = root.nodeType === Node.DOCUMENT_NODE ? {} : { root };
     const elements = [];
     const collect = (node) => {
       for (const child of node.children) {
@@ -3285,14 +3311,14 @@ class InjectedScript {
     try {
       for (const element of elements) {
         if ((element.nodeName === "IFRAME" || element.nodeName === "FRAME") && isVisible(element)) {
-          entries.push(this.frameSelector(element));
+          entries.push(this.frameSelector(element, options));
           continue;
         }
         const elementKind = listSelectorsKind(element);
         if (!elementKind || kind !== "all" && kind !== elementKind)
           continue;
         // The generator may pick an ancestor, e.g. the button around a span.
-        const { selector, elements: matches } = generateSelector(this, element, {});
+        const { selector, elements: matches } = generateSelector(this, element, options);
         if (!Array.isArray(matches) || matches.length !== 1 || seen.has(matches[0]))
           continue;
         const target = matches[0];

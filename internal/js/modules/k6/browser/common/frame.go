@@ -1620,12 +1620,9 @@ func (f *Frame) ID() string {
 func (f *Frame) ListSelectors(kind string) ([]any, error) {
 	f.log.Debugf("Frame:ListSelectors", "fid:%s furl:%q kind:%q", f.ID(), f.URL(), kind)
 
-	switch kind {
-	case "":
-		kind = "interactive"
-	case "interactive", "content", "all":
-	default:
-		return nil, fmt.Errorf("kind must be one of interactive, content or all, got %q", kind)
+	kind, err := normalizeListSelectorsKind(kind)
+	if err != nil {
+		return nil, err
 	}
 	if f.IsDetached() {
 		return nil, errors.New("listing selectors: frame is detached")
@@ -1642,15 +1639,34 @@ func (f *Frame) ListSelectors(kind string) ([]any, error) {
 	return entries, nil
 }
 
-// listSelectors lists the elements of this frame, relative to it. The entries
-// of each visible child frame go where its iframe is.
+// normalizeListSelectorsKind checks a listSelectors kind, and returns
+// "interactive" for an empty one.
+func normalizeListSelectorsKind(kind string) (string, error) {
+	switch kind {
+	case "":
+		return "interactive", nil
+	case "interactive", "content", "all":
+		return kind, nil
+	}
+	return "", fmt.Errorf("kind must be one of interactive, content or all, got %q", kind)
+}
+
+// listSelectors lists the elements of this frame, relative to it.
 func (f *Frame) listSelectors(kind string) ([]any, error) {
 	document, err := f.document()
 	if err != nil {
 		return nil, fmt.Errorf("getting document: %w", err)
 	}
-	result, err := document.evalWithScript(
-		f.ctx,
+
+	return listSelectorsIn(document, kind)
+}
+
+// listSelectorsIn lists the elements under root, a document or an element,
+// relative to root. The entries of each visible child frame go where its
+// iframe is.
+func listSelectorsIn(root *ElementHandle, kind string) ([]any, error) {
+	result, err := root.evalWithScript(
+		root.ctx,
 		evalOptions{forceCallable: true, returnByValue: true},
 		`(node, injected, kind) => injected.listSelectors(node, kind)`,
 		kind,
@@ -1672,36 +1688,37 @@ func (f *Frame) listSelectors(kind string) ([]any, error) {
 			continue
 		}
 		frameLocator, _ := m["frameLocator"].(string)
-		entries = append(entries, f.listChildFrame(frameSelector, frameLocator, kind)...)
+		entries = append(entries, listChildFrame(root, frameSelector, frameLocator, kind)...)
 	}
 
 	return entries, nil
 }
 
 // listChildFrame lists the elements of the child frame whose iframe matches
-// frameSelector, relative to this frame. Frames that haven't loaded yet, or
-// that go away during the call, are skipped.
-func (f *Frame) listChildFrame(frameSelector, frameLocator, kind string) []any {
-	child, err := f.childFrame(frameSelector)
+// frameSelector under root, relative to root. Frames that haven't loaded yet,
+// or that go away during the call, are skipped.
+func listChildFrame(root *ElementHandle, frameSelector, frameLocator, kind string) []any {
+	child, err := childFrame(root, frameSelector)
 	if err != nil || !child.hasContext(mainWorld) {
-		f.log.Debugf("Frame:listChildFrame", "fid:%s skipping frame %q: %v", f.ID(), frameSelector, err)
+		root.logger.Debugf("listChildFrame", "skipping frame %q: %v", frameSelector, err)
 		return nil
 	}
 	entries, err := child.listSelectors(kind)
 	if err != nil {
-		f.log.Debugf("Frame:listChildFrame", "fid:%s skipping frame %q: %v", f.ID(), frameSelector, err)
+		root.logger.Debugf("listChildFrame", "skipping frame %q: %v", frameSelector, err)
 		return nil
 	}
 	for _, e := range entries {
-		prefixListedEntry(e, frameSelector, frameLocator)
+		prefixListedEntry(e, frameSelector+enterFrameSeparator, "page"+frameLocator)
 	}
 
 	return entries
 }
 
-// childFrame returns the frame of the iframe element that matches selector.
-func (f *Frame) childFrame(selector string) (*Frame, error) {
-	element, err := f.Query(selector, true)
+// childFrame returns the frame of the iframe element that matches selector
+// under root.
+func childFrame(root *ElementHandle, selector string) (*Frame, error) {
+	element, err := root.Query(selector, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1722,7 +1739,7 @@ func (f *Frame) prefixWithFramePath(entries []any) error {
 			return err
 		}
 		for _, e := range entries {
-			prefixListedEntry(e, frameSelector, frameLocator)
+			prefixListedEntry(e, frameSelector+enterFrameSeparator, "page"+frameLocator)
 		}
 	}
 
@@ -1753,17 +1770,40 @@ func (f *Frame) selectorInParent() (string, string, error) {
 	return frameSelector, frameLocator, nil
 }
 
-// prefixListedEntry makes an entry listed in a child frame relative to its
-// parent frame.
-func prefixListedEntry(entry any, frameSelector, frameLocator string) {
+// enterFrameSeparator joins an iframe's selector to a selector in its frame.
+const enterFrameSeparator = " >> internal:control=enter-frame >> "
+
+// prefixListedEntry puts selectorPrefix in front of an entry's selector, and
+// codePrefix in place of the "page" that its locator code starts with.
+func prefixListedEntry(entry any, selectorPrefix, codePrefix string) {
 	m, ok := entry.(map[string]any)
 	if !ok {
 		return
 	}
 	selector, _ := m["selector"].(string)
-	m["selector"] = frameSelector + " >> internal:control=enter-frame >> " + selector
+	m["selector"] = selectorPrefix + selector
 	locator, _ := m["locator"].(string)
-	m["locator"] = "page" + frameLocator + strings.TrimPrefix(locator, "page")
+	m["locator"] = codePrefix + strings.TrimPrefix(locator, "page")
+}
+
+// locatorCode returns the k6 locator code for selector, such as
+// page.getByRole('dialog').
+func locatorCode(h *ElementHandle, selector string) (string, error) {
+	result, err := h.evalWithScript(
+		h.ctx,
+		evalOptions{forceCallable: true, returnByValue: true},
+		`(node, injected, selector) => injected.locatorCode(selector)`,
+		selector,
+	)
+	if err != nil {
+		return "", fmt.Errorf("getting the locator code of %q: %w", selector, err)
+	}
+	code, ok := result.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected locator code: %T", result)
+	}
+
+	return code, nil
 }
 
 // Locator creates and returns a new locator for this frame.

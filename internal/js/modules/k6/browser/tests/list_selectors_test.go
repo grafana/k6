@@ -225,3 +225,103 @@ func TestListSelectorsFrames(t *testing.T) {
 	assert.Empty(t, result.Hidden, "elements in a hidden iframe aren't visible")
 	assert.NotEmpty(t, result.DetachedError, "listing a detached frame should fail")
 }
+
+func TestLocatorListSelectors(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		await page.goto('%s');
+		await page.frameLocator('iframe[title="Promo"]').getByRole('link').waitFor();
+
+		const resolve = async (loc) => {
+			const count = await loc.count();
+			return { count, check: count ? await loc.first().getAttribute('data-check') : '' };
+		};
+		const withResolved = async (entries) => {
+			const out = [];
+			for (const e of entries) {
+				const viaSelector = await resolve(page.locator(e.selector));
+				const viaLocator = await resolve(new Function('page', 'return ' + e.locator)(page));
+				out.push({ ...e, viaSelector, viaLocator });
+			}
+			return out;
+		};
+
+		const result = {};
+		result.dialog = await withResolved(await page.getByRole('dialog').listSelectors());
+		result.iframe = await withResolved(await page.locator('iframe[title="Promo"]').listSelectors());
+		result.inFrameLocator = await withResolved(await page.frameLocator('iframe[title="Promo"]').locator('body').listSelectors());
+		const promo = page.frames().find((f) => f.url() === 'about:srcdoc');
+		result.inFrame = await withResolved(await promo.locator('body').listSelectors());
+		page.setDefaultTimeout(500);
+		for (const [key, selector] of [['strictError', 'section'], ['missingError', '#missing']]) {
+			try {
+				await page.locator(selector).listSelectors();
+			} catch (e) {
+				result[key] = String(e);
+			}
+		}
+		return JSON.stringify(result);
+	`, tb.staticURL("list_selectors_scoped.html"))
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State(), "%v", got.Result())
+
+	type resolved struct {
+		Count int    `json:"count"`
+		Check string `json:"check"`
+	}
+	type entry struct {
+		Locator     string   `json:"locator"`
+		Selector    string   `json:"selector"`
+		ViaSelector resolved `json:"viaSelector"`
+		ViaLocator  resolved `json:"viaLocator"`
+	}
+	var result struct {
+		Dialog         []entry `json:"dialog"`
+		Iframe         []entry `json:"iframe"`
+		InFrameLocator []entry `json:"inFrameLocator"`
+		InFrame        []entry `json:"inFrame"`
+		StrictError    string  `json:"strictError"`
+		MissingError   string  `json:"missingError"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &result))
+
+	marks := func(entries []entry) []string {
+		var marks []string
+		for _, e := range entries {
+			assert.Equal(t, 1, e.ViaSelector.Count, "selector %s", e.Selector)
+			assert.Equal(t, e.ViaSelector, e.ViaLocator, "locator %s", e.Locator)
+			marks = append(marks, e.ViaSelector.Check)
+		}
+		return marks
+	}
+
+	// Only what's inside the dialog, with the dialog's own locator in front.
+	require.Equal(t, []string{"close", "checkout", "promo"}, marks(result.Dialog))
+	assert.Equal(t, "page.getByRole('dialog').getByRole('button', { name: 'Close' })", result.Dialog[0].Locator)
+	assert.Equal(t, `internal:role=dialog >> internal:role=button[name="Close"i]`, result.Dialog[0].Selector)
+	assert.Equal(t,
+		`page.getByRole('dialog').frameLocator('iframe[title="Promo"]').getByRole('link', { name: 'Promo' })`,
+		result.Dialog[2].Locator)
+
+	// A locator that points at an iframe lists the iframe's content.
+	require.Equal(t, []string{"promo"}, marks(result.Iframe))
+	assert.Equal(t, `page.frameLocator('iframe[title="Promo"]').getByRole('link', { name: 'Promo' })`, result.Iframe[0].Locator)
+
+	// Inside a frame locator, and from a child frame, entries start from the page.
+	require.Equal(t, []string{"promo"}, marks(result.InFrameLocator))
+	assert.Equal(t,
+		`page.frameLocator('iframe[title="Promo"]').locator('body').getByRole('link', { name: 'Promo' })`,
+		result.InFrameLocator[0].Locator)
+	assert.Equal(t,
+		`iframe[title="Promo"] >> internal:control=enter-frame >> body >> internal:role=link[name="Promo"i]`,
+		result.InFrameLocator[0].Selector)
+	assert.Equal(t, result.InFrameLocator, result.InFrame)
+
+	assert.Contains(t, result.StrictError, "strict")
+	assert.NotEmpty(t, result.MissingError, "a locator that matches nothing should fail")
+}
