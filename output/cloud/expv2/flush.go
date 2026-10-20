@@ -2,6 +2,7 @@ package expv2
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -87,6 +88,17 @@ func (f *metricsFlusher) flush(ctx context.Context) error {
 }
 
 func (f *metricsFlusher) flushBatches(ctx context.Context, batches []*pbcloud.MetricSet) error {
+	if len(batches) == 0 {
+		return nil
+	}
+	// workers=0 deadlocks on the feed send (no receivers); workers<0 panics in
+	// make(chan error, workers). Defend here in case a flusher is constructed
+	// without going through New()'s validation.
+	if f.batchPushConcurrency < 1 {
+		return fmt.Errorf("batch push concurrency must be a positive number but is %d",
+			f.batchPushConcurrency)
+	}
+
 	var (
 		workers  = min(len(batches), f.batchPushConcurrency)
 		errs     = make(chan error, workers)
