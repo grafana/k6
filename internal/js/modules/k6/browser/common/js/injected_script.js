@@ -2273,6 +2273,9 @@ function listSelectorsKind(element) {
 function isListedInteractive(element, role, style) {
   if (kListInteractiveRoles.includes(role) || element.matches("input,select,textarea,button,a[href],summary"))
     return true;
+  // A label is listed through the control that it labels.
+  if (element.nodeName === "LABEL")
+    return false;
   const parent = parentElementOrShadowHost(element);
   // Only the root of an editable region, not every element inside it.
   if (element.isContentEditable)

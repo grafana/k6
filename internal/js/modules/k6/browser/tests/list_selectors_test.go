@@ -80,8 +80,9 @@ func TestPageListSelectors(t *testing.T) {
 		}
 		return marks
 	}
+	// A label with its own pointer cursor isn't listed, only its control.
 	interactive := []string{
-		"email", "search", "remember", "subscribe", "select-all", "size", "notes",
+		"email", "search", "remember", "subscribe", "select-all", "size", "notes", "dark-mode",
 		"sign-in", "help", "add-margherita", "add-pepperoni", "promo", "editor",
 	}
 	content := []string{"heading", "paragraph", "logo", "cart-total", "status", "margherita", "pepperoni", "cell"}
@@ -89,7 +90,7 @@ func TestPageListSelectors(t *testing.T) {
 	assert.Equal(t, content, marks(result.Content))
 	assert.Equal(t, []string{
 		"heading", "paragraph", "logo", "email", "search", "remember", "subscribe", "select-all",
-		"size", "notes", "sign-in", "help", "cart-total", "status", "margherita", "add-margherita",
+		"size", "notes", "dark-mode", "sign-in", "help", "cart-total", "status", "margherita", "add-margherita",
 		"pepperoni", "add-pepperoni", "promo", "editor", "cell",
 	}, marks(result.All))
 
