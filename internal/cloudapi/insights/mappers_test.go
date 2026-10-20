@@ -90,3 +90,25 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 	require.Len(t, got.Requests, 3)
 	require.ElementsMatch(t, got.Requests, expected)
 }
+
+func Test_newBatchCreateRequestMetadatasRequest_FailsOnUnknownProtocolLabels(t *testing.T) {
+	t.Parallel()
+
+	// Given
+	rms := RequestMetadatas{
+		{
+			TraceID:        "test-trace-id-1",
+			Start:          time.Unix(9, 0),
+			End:            time.Unix(10, 0),
+			TestRunLabels:  TestRunLabels{ID: 1337},
+			ProtocolLabels: nil,
+		},
+	}
+
+	// When
+	got, err := newBatchCreateRequestMetadatasRequest(rms)
+
+	// Then
+	require.ErrorContains(t, err, "unknown protocol labels type")
+	require.Nil(t, got)
+}
