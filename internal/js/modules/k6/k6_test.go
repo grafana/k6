@@ -2,17 +2,23 @@ package k6
 
 import (
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/js/common"
+	k6http "go.k6.io/k6/v2/js/modules/k6/http"
 	"go.k6.io/k6/v2/js/modulestest"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -398,6 +404,76 @@ func TestCheckTags(t *testing.T) {
 		"a":     "1",
 		"b":     "2",
 	}, sample.Tags.Map())
+}
+
+func TestCheckLogFailedResponses(t *testing.T) {
+	t.Parallel()
+
+	setup := func(t *testing.T, enabled bool) (*testCase, *testutils.SimpleLogrusHook) {
+		tc := testCaseRuntime(t)
+		hook := testutils.NewLogHook(logrus.WarnLevel)
+		logger := logrus.New()
+		logger.AddHook(hook)
+		logger.Out = io.Discard
+		state := tc.testRuntime.VU.State()
+		state.Logger = logger
+		state.Options.LogFailedResponses = null.BoolFrom(enabled)
+		state.VUID = 2
+		state.Iteration = 5
+
+		res := &k6http.Response{Response: &httpext.Response{
+			URL:     "https://example.com/api",
+			Status:  500,
+			Headers: map[string]string{"Content-Type": "text/plain"},
+			Body:    "server exploded",
+			Request: &httpext.Request{Method: "POST"},
+		}}
+		require.NoError(t, tc.testRuntime.VU.RuntimeField.Set("res", res))
+		return tc, hook
+	}
+
+	t.Run("failed check on response is logged", func(t *testing.T) {
+		t.Parallel()
+		tc, hook := setup(t, true)
+
+		_, err := tc.testRuntime.RunOnEventLoop(
+			`k6.check(res, { "is 200": (r) => r.status === 200, "has body": (r) => r.body.length > 0 })`)
+		require.NoError(t, err)
+
+		entries := hook.Drain()
+		require.Len(t, entries, 1)
+		e := entries[0]
+		assert.Equal(t, "Failed HTTP response", e.Message)
+		assert.Equal(t, "failed-response", e.Data["source"])
+		assert.Equal(t, httpext.FailedResponseReasonCheckFailed, e.Data["reason"])
+		assert.Equal(t, "is 200", e.Data["check"])
+		assert.Equal(t, 500, e.Data["status"])
+		assert.Equal(t, "POST", e.Data["method"])
+		assert.Equal(t, "https://example.com/api", e.Data["url"])
+		assert.Equal(t, "server exploded", e.Data["body"])
+		assert.Equal(t, map[string]string{"Content-Type": "text/plain"}, e.Data["headers"])
+		assert.Equal(t, uint64(2), e.Data["vu"])
+		assert.Equal(t, int64(5), e.Data["iter"])
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		t.Parallel()
+		tc, hook := setup(t, false)
+
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.check(res, { "is 200": (r) => r.status === 200 })`)
+		require.NoError(t, err)
+		assert.Empty(t, hook.Drain())
+	})
+
+	t.Run("non-response values are not logged", func(t *testing.T) {
+		t.Parallel()
+		tc, hook := setup(t, true)
+
+		_, err := tc.testRuntime.RunOnEventLoop(
+			`k6.check(null, { "a": false }); k6.check({status: 500}, { "b": (r) => r.status === 200 })`)
+		require.NoError(t, err)
+		assert.Empty(t, hook.Drain())
+	})
 }
 
 type testCase struct {

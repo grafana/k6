@@ -337,6 +337,10 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
+	if state.Options.LogFailedResponses.Bool {
+		logFailedRequest(ctx, state, resp, finishedReq, resErr)
+	}
+
 	if resErr != nil {
 		if preq.Throw { // if we are going to throw, we shouldn't log it
 			return nil, resErr

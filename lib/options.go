@@ -274,6 +274,10 @@ type Options struct {
 	// Should all HTTP requests and responses be logged (excluding body)?
 	HTTPDebug null.String `json:"httpDebug" envconfig:"K6_HTTP_DEBUG"`
 
+	// Should the headers and body of failed HTTP responses (transport errors, unexpected statuses
+	// and failed checks on HTTP responses) be logged?
+	LogFailedResponses null.Bool `json:"logFailedResponses" envconfig:"K6_LOG_FAILED_RESPONSES"`
+
 	// Accept invalid or untrusted TLS certificates.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_INSECURE_SKIP_TLS_VERIFY"`
 
@@ -448,6 +452,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.HTTPDebug.Valid {
 		o.HTTPDebug = opts.HTTPDebug
+	}
+	if opts.LogFailedResponses.Valid {
+		o.LogFailedResponses = opts.LogFailedResponses
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify

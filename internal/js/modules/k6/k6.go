@@ -8,10 +8,13 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	k6http "go.k6.io/k6/v2/js/modules/k6/http"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -243,6 +246,9 @@ func (mi *K6) Check(arg0, checks sobek.Value, extras ...sobek.Value) (bool, erro
 		if !booleanVal {
 			// A single failure makes the return value false.
 			succ = false
+			if state.Options.LogFailedResponses.Bool {
+				logFailedCheckResponse(state, arg0, name)
+			}
 		}
 
 		sample := metrics.Sample{
@@ -265,4 +271,20 @@ func (mi *K6) Check(arg0, checks sobek.Value, extras ...sobek.Value) (bool, erro
 	}
 
 	return succ, nil
+}
+
+// logFailedCheckResponse logs the details of the checked value, if it is an HTTP response.
+func logFailedCheckResponse(state *lib.State, arg0 sobek.Value, checkName string) {
+	if common.IsNullish(arg0) {
+		return
+	}
+	res, ok := arg0.Export().(*k6http.Response)
+	if !ok || res == nil || res.Response == nil {
+		return
+	}
+	httpext.LogFailedResponse(state.Logger, res.Response, httpext.FailedResponseReasonCheckFailed, logrus.Fields{
+		"check": checkName,
+		"vu":    state.VUID,
+		"iter":  state.Iteration,
+	})
 }
