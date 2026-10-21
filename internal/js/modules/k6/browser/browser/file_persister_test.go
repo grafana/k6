@@ -48,6 +48,22 @@ func Test_newScreenshotPersister(t *testing.T) {
 			wantType: &storage.DirectFilePersister{},
 		},
 		{
+			name: "remote_async",
+			envLookup: env.ConstLookup(
+				env.ScreenshotsOutput,
+				"url=https://127.0.0.1/,async=true",
+			),
+			wantType: &storage.AsyncPersister{},
+		},
+		{
+			name: "remote_direct_async",
+			envLookup: env.ConstLookup(
+				env.ScreenshotsOutput,
+				"url=https://127.0.0.1/,upload=direct,async=true",
+			),
+			wantType: &storage.AsyncPersister{},
+		},
+		{
 			name: "remote_parse_failed",
 			envLookup: env.ConstLookup(
 				env.ScreenshotsOutput,
@@ -169,6 +185,20 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 					"x":            "c=d",
 				},
 			},
+		},
+		{
+			name:        "async",
+			envVarValue: "url=https://127.0.0.1/,async=true",
+			want: presignedURLConfig{
+				getterURL: "https://127.0.0.1/",
+				headers:   map[string]string{},
+				async:     true,
+			},
+		},
+		{
+			name:        "invalid_async",
+			envVarValue: "url=https://127.0.0.1/,async=yes",
+			wantErr:     "async must be true or false",
 		},
 		{
 			name:        "invalid_upload",

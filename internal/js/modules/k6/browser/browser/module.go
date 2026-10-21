@@ -10,13 +10,17 @@ import (
 	"context"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/sirupsen/logrus"
 
+	k6event "go.k6.io/k6/v2/internal/event"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/storage"
 
 	k6modules "go.k6.io/k6/v2/js/modules"
 )
@@ -128,7 +132,35 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if err != nil {
 		k6ext.Abortf(vu.Context(), "failed to create file persister: %v", err)
 	}
+	if ap, ok := m.filePersister.(*storage.AsyncPersister); ok {
+		flushOnTestEnd(vu, ap, initEnv.Logger)
+	}
 	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
 		m.testRunID = e
 	}
+}
+
+// screenshotsFlushTimeout is how long the test end waits for queued screenshot
+// uploads to finish.
+const screenshotsFlushTimeout = 60 * time.Second
+
+// flushOnTestEnd waits for the queued screenshot uploads when the test ends. The
+// test end event is handled before outputs are stopped, so the uploads finish
+// before the test run is reported as finished.
+func flushOnTestEnd(vu k6modules.VU, p *storage.AsyncPersister, logger logrus.FieldLogger) {
+	subID, events := vu.Events().Global.Subscribe(k6event.TestEnd)
+	go func() {
+		e := <-events
+		defer vu.Events().Global.Unsubscribe(subID)
+		if e == nil {
+			return
+		}
+		defer e.Done()
+
+		ctx, cancel := context.WithTimeout(context.Background(), screenshotsFlushTimeout)
+		defer cancel()
+		if err := p.Flush(ctx); err != nil {
+			logger.Warnf("waiting for screenshot uploads: %v", err)
+		}
+	}()
 }

@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -18,11 +20,17 @@ type presignedURLConfig struct {
 	basePath   string
 	upload     string // empty means uploadPresign
 	formFields map[string]string
+	async      bool
 }
 
 const (
 	uploadPresign = "presign"
 	uploadDirect  = "direct"
+)
+
+const (
+	asyncUploadQueueSize = 50
+	asyncUploadTimeout   = 30 * time.Second
 )
 
 // newScreenshotPersister will return either a persister that persists file to the local
@@ -39,13 +47,20 @@ func newScreenshotPersister(envLookup env.LookupFunc, logger logrus.FieldLogger)
 		return nil, fmt.Errorf("parsing %s: %w", env.ScreenshotsOutput, err)
 	}
 
+	var p interface {
+		filePersister
+		storage.Uploader
+	}
 	if popts.upload == uploadDirect {
-		return storage.NewDirectFilePersister(
-			popts.getterURL, popts.headers, popts.formFields, popts.basePath, logger,
-		), nil
+		p = storage.NewDirectFilePersister(popts.getterURL, popts.headers, popts.formFields, popts.basePath, logger)
+	} else {
+		p = storage.NewRemoteFilePersister(popts.getterURL, popts.headers, popts.basePath, logger)
+	}
+	if popts.async {
+		return storage.NewAsyncPersister(p, logger, asyncUploadQueueSize, asyncUploadTimeout), nil
 	}
 
-	return storage.NewRemoteFilePersister(popts.getterURL, popts.headers, popts.basePath, logger), nil
+	return p, nil
 }
 
 // parsePresignedURLEnvVar will parse a value such as:
@@ -56,6 +71,9 @@ func newScreenshotPersister(envLookup env.LookupFunc, logger logrus.FieldLogger)
 // metadata in a single request, and field.k=v entries are sent as multipart
 // form fields. The default, upload=presign, requests a presigned URL from url
 // first and then uploads the file to it.
+//
+// With async=true, files are uploaded in the background instead of while the
+// screenshot call waits.
 //
 
 func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
@@ -122,6 +140,12 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 				return presignedURLConfig{}, fmt.Errorf("upload must be %q or %q", uploadPresign, uploadDirect)
 			}
 			presignedURL.upload = v
+		case "async":
+			async, err := strconv.ParseBool(v)
+			if err != nil {
+				return presignedURLConfig{}, errors.New("async must be true or false")
+			}
+			presignedURL.async = async
 		case "header":
 			presignedURL.headers[hk] = hv
 		default:
