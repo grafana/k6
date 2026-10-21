@@ -88,8 +88,8 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260106090513-285631296b5d h1:fb0Y2ejWxOv0f/VlMLyE7GErwM499C3+ct3JlYHi9IA=
 github.com/grafana/k6-cloud-openapi-client-go v0.0.0-20260106090513-285631296b5d/go.mod h1:RBPBP7qIR/K6qzQEQYESVhp/XJspiBTOyBEBCbPXrvI=
-github.com/grafana/k6provider v0.5.0 h1:SwItWPOMQHfRytezQBKpeXLxjNmcyD/x9PTA28pEbwg=
-github.com/grafana/k6provider v0.5.0/go.mod h1:R9WKthnwk96E47m6w/mnC13hhBYTn5iMdP5caFt/t5k=
+github.com/grafana/k6provider v0.5.1 h1:cm9jT0k4PTGJQvK3uPlOMz6GYWKAztUyrbhNDMemXuw=
+github.com/grafana/k6provider v0.5.1/go.mod h1:B/nAJTk+2qXxGrt/MG9c0cYAfxAQn6oTNl0/eZvZKZ0=
 github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f h1:YNPYRCa0yVIPtLYrzNzsfObrRZJQDupuGL3zW3SWn0M=
 github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f/go.mod h1:Sza3zAy+gfXCTtzbPuijuT5odA6N3lQxMTVpCP8sC/4=
 github.com/grafana/xk6-dashboard v0.8.1 h1:QTEXPhkSYxiSN1lnl/cIlrnA97dUvOW+0yxQQCa9AAU=
