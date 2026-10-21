@@ -87,6 +87,14 @@ type FrameIsVisibleOptions struct {
 	Strict bool `json:"strict"`
 }
 
+// ListSelectorsOptions are the options of page, frame and locator listSelectors.
+type ListSelectorsOptions struct {
+	// Kind is "interactive" (the default when empty), "content" or "all".
+	Kind string
+	// WaitForStable waits until the page stops changing before listing.
+	WaitForStable bool
+}
+
 type FramePressOptions struct {
 	ElementHandlePressOptions
 	Strict bool `json:"strict"`

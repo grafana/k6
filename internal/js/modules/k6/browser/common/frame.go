@@ -194,6 +194,13 @@ func (f *Frame) deleteRequest(id network.RequestID) {
 	delete(f.inflightRequests, id)
 }
 
+func (f *Frame) hasInflightRequests() bool {
+	f.inflightRequestsMu.RLock()
+	defer f.inflightRequestsMu.RUnlock()
+
+	return len(f.inflightRequests) > 0
+}
+
 func (f *Frame) clearLifecycle() {
 	f.log.Debugf("Frame:clearLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -1617,10 +1624,10 @@ func (f *Frame) ID() string {
 // child frames, of the given kind: "interactive" (the default when kind is
 // empty), "content" or "all". Each entry has a selector that matches only that
 // element, and the equivalent locator code, both starting from the page.
-func (f *Frame) ListSelectors(kind string) ([]any, error) {
-	f.log.Debugf("Frame:ListSelectors", "fid:%s furl:%q kind:%q", f.ID(), f.URL(), kind)
+func (f *Frame) ListSelectors(opts ListSelectorsOptions) ([]any, error) {
+	f.log.Debugf("Frame:ListSelectors", "fid:%s furl:%q opts:%+v", f.ID(), f.URL(), opts)
 
-	kind, err := normalizeListSelectorsKind(kind)
+	kind, err := normalizeListSelectorsKind(opts.Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -1628,7 +1635,7 @@ func (f *Frame) ListSelectors(kind string) ([]any, error) {
 		return nil, errors.New("listing selectors: frame is detached")
 	}
 
-	entries, err := f.listSelectors(kind)
+	entries, err := f.listSelectors(kind, opts.WaitForStable)
 	if err != nil {
 		return nil, err
 	}
@@ -1651,14 +1658,54 @@ func normalizeListSelectorsKind(kind string) (string, error) {
 	return "", fmt.Errorf("kind must be one of interactive, content or all, got %q", kind)
 }
 
-// listSelectors lists the elements of this frame, relative to it.
-func (f *Frame) listSelectors(kind string) ([]any, error) {
+// listSelectors lists the elements of this frame, relative to it. With wait,
+// it first waits for the frame to stop changing.
+func (f *Frame) listSelectors(kind string, wait bool) ([]any, error) {
 	document, err := f.document()
 	if err != nil {
 		return nil, fmt.Errorf("getting document: %w", err)
 	}
+	if wait {
+		waitForStable(document, f)
+	}
 
 	return listSelectorsIn(document, kind)
+}
+
+// waitForStable waits until neither the DOM under root nor the requests of
+// frame have changed for a while, so that a listing doesn't catch the page in
+// the middle of an update. It gives up quietly, and the listing goes ahead.
+//
+// shortcut: a fixed 500 ms quiet period and 5 s limit; make them options if
+// users need other values.
+func waitForStable(root *ElementHandle, frame *Frame) {
+	const (
+		quiet = 500 * time.Millisecond
+		poll  = 100 * time.Millisecond
+		limit = 5 * time.Second
+	)
+	var last any
+	since := time.Now()
+	for deadline := since.Add(limit); time.Now().Before(deadline); {
+		changes, err := root.evalWithScript(
+			root.ctx,
+			evalOptions{forceCallable: true, returnByValue: true},
+			`(node, injected) => injected.domChanges(node)`,
+		)
+		if err != nil {
+			return
+		}
+		if changes != last || frame.hasInflightRequests() {
+			last, since = changes, time.Now()
+		} else if time.Since(since) >= quiet {
+			return
+		}
+		select {
+		case <-root.ctx.Done():
+			return
+		case <-time.After(poll):
+		}
+	}
 }
 
 // listSelectorsIn lists the elements under root, a document or an element,
@@ -1703,7 +1750,7 @@ func listChildFrame(root *ElementHandle, frameSelector, frameLocator, kind strin
 		root.logger.Debugf("listChildFrame", "skipping frame %q: %v", frameSelector, err)
 		return nil
 	}
-	entries, err := child.listSelectors(kind)
+	entries, err := child.listSelectors(kind, false)
 	if err != nil {
 		root.logger.Debugf("listChildFrame", "skipping frame %q: %v", frameSelector, err)
 		return nil

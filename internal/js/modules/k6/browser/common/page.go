@@ -1458,10 +1458,10 @@ func (p *Page) IsVisible(selector string, opts *FrameIsVisibleOptions) (bool, er
 
 // ListSelectors returns an entry for each element on the page of the given
 // kind. See Frame.ListSelectors.
-func (p *Page) ListSelectors(kind string) ([]any, error) {
-	p.logger.Debugf("Page:ListSelectors", "sid:%v kind:%q", p.sessionID(), kind)
+func (p *Page) ListSelectors(opts ListSelectorsOptions) ([]any, error) {
+	p.logger.Debugf("Page:ListSelectors", "sid:%v opts:%+v", p.sessionID(), opts)
 
-	return p.MainFrame().ListSelectors(kind)
+	return p.MainFrame().ListSelectors(opts)
 }
 
 // Locator creates and returns a new locator for this page (main frame).

@@ -343,9 +343,9 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		}),
 		"keyboard": newKeyboardMapping(vu, p.GetKeyboard()),
 		"listSelectors": passiveCall(func(opts sobek.Value) *sobek.Promise {
-			kind := parseListSelectorsKind(rt, opts)
+			lopts := parseListSelectorsOptions(rt, opts)
 			return promise(vu, func() (any, error) {
-				return p.ListSelectors(kind) //nolint:wrapcheck
+				return p.ListSelectors(lopts) //nolint:wrapcheck
 			})
 		}),
 		"locator": passiveCall(func(selector string, opts sobek.Value) *sobek.Object {
@@ -1310,15 +1310,19 @@ func parsePageScreenshotOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Pa
 	return popts, nil
 }
 
-// parseListSelectorsKind returns the kind option of listSelectors, or "" if it
-// isn't set.
-func parseListSelectorsKind(rt *sobek.Runtime, opts sobek.Value) string {
+// parseListSelectorsOptions returns the options of listSelectors.
+func parseListSelectorsOptions(rt *sobek.Runtime, opts sobek.Value) common.ListSelectorsOptions {
+	var lopts common.ListSelectorsOptions
 	if k6common.IsNullish(opts) {
-		return ""
+		return lopts
 	}
-	kind := opts.ToObject(rt).Get("kind")
-	if k6common.IsNullish(kind) {
-		return ""
+	obj := opts.ToObject(rt)
+	if kind := obj.Get("kind"); !k6common.IsNullish(kind) {
+		lopts.Kind = kind.String()
 	}
-	return kind.String()
+	if wait := obj.Get("waitForStable"); !k6common.IsNullish(wait) {
+		lopts.WaitForStable = wait.ToBoolean()
+	}
+
+	return lopts
 }

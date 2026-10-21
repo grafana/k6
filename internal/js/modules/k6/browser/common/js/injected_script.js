@@ -2373,6 +2373,7 @@ function textSelectorToCode(body) {
 
 class InjectedScript {
   constructor() {
+    this._domChanges = new k6BrowserNative.Map();
     this._replaceRafWithTimeout = false;
     this._stableRafCount = 10;
     this._evaluator = new SelectorEvaluatorImpl();
@@ -3299,6 +3300,20 @@ class InjectedScript {
   // kind ("interactive", "content" or "all"), in document order. A visible
   // iframe gets a frameSelector() marker instead, where its entries go. Under
   // an element, selectors are relative to that element.
+  // domChanges returns how many times the DOM under node has changed since the
+  // first call for that node. Attribute changes, such as animated styles, don't
+  // count.
+  domChanges(node) {
+    let changes = this._domChanges.get(node);
+    if (!changes) {
+      changes = { count: 0 };
+      new MutationObserver((records) => { changes.count += records.length; })
+        .observe(node, { childList: true, characterData: true, subtree: true });
+      this._domChanges.set(node, changes);
+    }
+    return changes.count;
+  }
+
   listSelectors(root, kind) {
     const options = root.nodeType === Node.DOCUMENT_NODE ? {} : { root };
     const elements = [];

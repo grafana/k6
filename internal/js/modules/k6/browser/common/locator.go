@@ -447,20 +447,20 @@ func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 // locator matches, or inside its frame if it's an iframe. Like other locator
 // methods, it waits for exactly one matching element. The selectors and the
 // locator code start from the page. See Frame.ListSelectors.
-func (l *Locator) ListSelectors(kind string) ([]any, error) {
+func (l *Locator) ListSelectors(opts ListSelectorsOptions) ([]any, error) {
 	l.log.Debugf(
-		"Locator:ListSelectors", "fid:%s furl:%q sel:%q kind:%q",
-		l.frame.ID(), l.frame.URL(), l.selector, kind,
+		"Locator:ListSelectors", "fid:%s furl:%q sel:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, opts,
 	)
 
-	kind, err := normalizeListSelectorsKind(kind)
+	kind, err := normalizeListSelectorsKind(opts.Kind)
 	if err != nil {
 		return nil, err
 	}
-	opts := NewFrameWaitForSelectorOptions(l.frame.defaultTimeout())
-	opts.State = DOMElementStateAttached
-	opts.Strict = true
-	element, err := l.frame.WaitForSelector(l.selector, opts)
+	wopts := NewFrameWaitForSelectorOptions(l.frame.defaultTimeout())
+	wopts.State = DOMElementStateAttached
+	wopts.Strict = true
+	element, err := l.frame.WaitForSelector(l.selector, wopts)
 	if err != nil {
 		return nil, fmt.Errorf("listing selectors in %q: %w", l.selector, err)
 	}
@@ -470,8 +470,11 @@ func (l *Locator) ListSelectors(kind string) ([]any, error) {
 	scope := l.selector
 	if frame, ferr := element.ContentFrame(); ferr == nil {
 		scope += " >> internal:control=enter-frame"
-		entries, err = frame.listSelectors(kind)
+		entries, err = frame.listSelectors(kind, opts.WaitForStable)
 	} else {
+		if opts.WaitForStable {
+			waitForStable(element, l.frame)
+		}
 		entries, err = listSelectorsIn(element, kind)
 	}
 	if err != nil {

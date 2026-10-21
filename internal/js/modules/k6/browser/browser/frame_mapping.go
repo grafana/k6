@@ -305,9 +305,9 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}), nil
 		}),
 		"listSelectors": passiveCall(func(opts sobek.Value) *sobek.Promise {
-			kind := parseListSelectorsKind(rt, opts)
+			lopts := parseListSelectorsOptions(rt, opts)
 			return promise(vu, func() (any, error) {
-				return f.ListSelectors(kind) //nolint:wrapcheck
+				return f.ListSelectors(lopts) //nolint:wrapcheck
 			})
 		}),
 		"locator": passiveCall(func(selector string, opts sobek.Value) mapping {

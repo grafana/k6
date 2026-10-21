@@ -298,9 +298,9 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			return rt.ToValue(ml).ToObject(rt), nil
 		}),
 		"listSelectors": passiveCall(func(opts sobek.Value) *sobek.Promise {
-			kind := parseListSelectorsKind(rt, opts)
+			lopts := parseListSelectorsOptions(rt, opts)
 			return promise(vu, func() (any, error) {
-				return lo.ListSelectors(kind) //nolint:wrapcheck
+				return lo.ListSelectors(lopts) //nolint:wrapcheck
 			})
 		}),
 		"locator": passiveCall(func(selector string, opts sobek.Value) mapping {

@@ -5,8 +5,11 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/grafana/sobek"
@@ -346,4 +349,71 @@ func TestLocatorListSelectors(t *testing.T) {
 
 	assert.Contains(t, result.StrictError, "strict")
 	assert.NotEmpty(t, result.MissingError, "a locator that matches nothing should fail")
+}
+
+func TestListSelectorsWaitForStable(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	serve := func(path, body string) {
+		tb.withHandler(path, func(w http.ResponseWriter, _ *http.Request) {
+			_, err := fmt.Fprint(w, body)
+			require.NoError(t, err)
+		})
+	}
+	// The status changes every 100 ms for 1.5 s, then a button appears.
+	serve("/ticking", `<!DOCTYPE html><p id="status">Loading</p><script>
+		let n = 0;
+		const tick = setInterval(() => {
+			document.getElementById('status').textContent = 'Loading ' + ++n;
+			if (n === 15) {
+				clearInterval(tick);
+				document.body.insertAdjacentHTML('beforeend', '<button>Ticked</button>');
+			}
+		}, 100);
+	</script>`)
+	// Nothing changes while a slow request is in flight, then a button appears.
+	serve("/fetching", `<!DOCTYPE html><p>Loading</p><script>
+		fetch('/slow').then(() => document.body.insertAdjacentHTML('beforeend', '<button>Fetched</button>'));
+	</script>`)
+	tb.withHandler("/slow", func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(time.Second)
+		_, err := fmt.Fprint(w, "ok")
+		require.NoError(t, err)
+	})
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		const names = async (list) => (await list).map((e) => e.name);
+		const result = {};
+		for (const [path, url] of [['ticking', '%s'], ['fetching', '%s']]) {
+			await page.goto(url);
+			result[path] = {
+				now: await names(page.listSelectors()),
+				stable: await names(page.listSelectors({ waitForStable: true })),
+			};
+		}
+		const started = Date.now();
+		result.inLocator = await names(page.locator('body').listSelectors({ waitForStable: true }));
+		result.quietMs = Date.now() - started;
+		return JSON.stringify(result);
+	`, tb.url("/ticking"), tb.url("/fetching"))
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State(), "%v", got.Result())
+
+	var result struct {
+		Ticking   struct{ Now, Stable []string } `json:"ticking"`
+		Fetching  struct{ Now, Stable []string } `json:"fetching"`
+		InLocator []string                       `json:"inLocator"`
+		QuietMs   int                            `json:"quietMs"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &result))
+
+	assert.NotContains(t, result.Ticking.Now, "Ticked", "without waiting, the listing comes before the button")
+	assert.Contains(t, result.Ticking.Stable, "Ticked", "waits while the DOM keeps changing")
+	assert.NotContains(t, result.Fetching.Now, "Fetched")
+	assert.Contains(t, result.Fetching.Stable, "Fetched", "waits while a request is in flight")
+	assert.Equal(t, []string{"Fetched"}, result.InLocator, "locator.listSelectors waits too")
+	assert.Less(t, result.QuietMs, 2000, "on a quiet page, the wait ends well before its 5 s limit")
 }
