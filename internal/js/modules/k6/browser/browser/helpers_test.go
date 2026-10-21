@@ -15,7 +15,7 @@ import (
 func awaitResult(t *testing.T, rt *sobek.Runtime, retVal sobek.Value) error {
 	t.Helper()
 	result := make(chan error, 1)
-	awaitHandlerResult(rt, retVal, result)
+	awaitHandlerResult(rt, retVal, result, nil)
 	// Flush microtasks: any pending .then callbacks are scheduled as microtasks
 	// and run when the runtime executes the next statement.
 	_, _ = rt.RunString("undefined")
@@ -57,7 +57,7 @@ func TestAwaitHandlerResultFulfilledPromise(t *testing.T) {
 	require.NoError(t, err)
 	// Already-fulfilled Promise: awaitHandlerResult sends nil immediately.
 	result := make(chan error, 1)
-	awaitHandlerResult(rt, v, result)
+	awaitHandlerResult(rt, v, result, nil)
 	select {
 	case err := <-result:
 		assert.NoError(t, err)
@@ -76,7 +76,7 @@ func TestAwaitHandlerResultRejectedPromise(t *testing.T) {
 	// Already-rejected Promise: awaitHandlerResult attaches .then/.catch so Sobek
 	// marks it handled; the callback fires after a microtask flush.
 	result := make(chan error, 1)
-	awaitHandlerResult(rt, v, result)
+	awaitHandlerResult(rt, v, result, nil)
 	_, _ = rt.RunString("undefined") // flush microtasks
 	select {
 	case err := <-result:
@@ -106,7 +106,7 @@ func TestAwaitHandlerResultPendingPromiseFulfilled(t *testing.T) {
 	require.True(t, ok)
 
 	result := make(chan error, 1)
-	awaitHandlerResult(rt, v, result)
+	awaitHandlerResult(rt, v, result, nil)
 
 	// result channel is still empty — Promise is pending.
 	select {
@@ -147,7 +147,7 @@ func TestAwaitHandlerResultPendingPromiseRejected(t *testing.T) {
 	require.True(t, ok)
 
 	result := make(chan error, 1)
-	awaitHandlerResult(rt, v, result)
+	awaitHandlerResult(rt, v, result, nil)
 
 	select {
 	case <-result:
@@ -166,6 +166,37 @@ func TestAwaitHandlerResultPendingPromiseRejected(t *testing.T) {
 	default:
 		t.Fatal("awaitHandlerResult did not fire after Promise rejected")
 	}
+}
+
+func TestAwaitHandlerResultOnReject(t *testing.T) {
+	t.Parallel()
+	rt := sobek.New()
+	rt.SetPromiseRejectionTracker(func(*sobek.Promise, sobek.PromiseRejectionOperation) {})
+	v, err := rt.RunString(`Promise.reject(new Error("boom"))`)
+	require.NoError(t, err)
+
+	var rejected error
+	result := make(chan error, 1)
+	awaitHandlerResult(rt, v, result, func(err error) { rejected = err })
+	_, _ = rt.RunString("undefined")
+	<-result
+
+	require.Error(t, rejected)
+	assert.Contains(t, rejected.Error(), "boom")
+}
+
+func TestAwaitHandlerResultOnRejectNotCalledOnSuccess(t *testing.T) {
+	t.Parallel()
+	rt := sobek.New()
+	v, err := rt.RunString(`Promise.resolve("ok")`)
+	require.NoError(t, err)
+
+	called := false
+	result := make(chan error, 1)
+	awaitHandlerResult(rt, v, result, func(error) { called = true })
+	<-result
+
+	assert.False(t, called)
 }
 
 func TestSobekEmptyString(t *testing.T) {

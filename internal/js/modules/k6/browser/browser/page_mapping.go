@@ -851,7 +851,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 					}
 					return nil
 				}
-				awaitHandlerResult(rt, retVal, result)
+				var onReject func(error)
+				if pageEvent.propagateErr {
+					onReject = func(err error) { tq.Queue(func() error { return err }) }
+				}
+				awaitHandlerResult(rt, retVal, result, onReject)
 				return nil
 			})
 
