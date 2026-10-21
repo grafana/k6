@@ -9,15 +9,16 @@ import (
 	cdppage "github.com/chromedp/cdproto/page"
 )
 
-// errDialogAlreadyHandled is returned when Accept or Dismiss is called on a
-// dialog that has already been accepted or dismissed.
-var errDialogAlreadyHandled = errors.New("dialog has already been accepted or dismissed")
+// ErrDialogAlreadyHandled is returned when Accept or Dismiss is called on a
+// dialog that has already been claimed, accepted, or dismissed.
+var ErrDialogAlreadyHandled = errors.New("dialog has already been accepted or dismissed")
 
 type Dialog struct {
 	ctx          context.Context
 	session      session
 	page         *Page
 	mu           sync.Mutex
+	claimed      bool
 	handled      bool
 	dialogType   string
 	message      string
@@ -47,6 +48,24 @@ func (d *Dialog) Handled() bool {
 	return d.handled
 }
 
+// Claim marks the dialog as claimed; it reports false if already claimed.
+func (d *Dialog) Claim() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.claimed {
+		return false
+	}
+	d.claimed = true
+	return true
+}
+
+// Claimed reports whether a caller has already claimed the dialog via Claim.
+func (d *Dialog) Claimed() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.claimed
+}
+
 func (d *Dialog) Accept(promptText ...string) error {
 	return d.handle(true, promptText)
 }
@@ -59,7 +78,7 @@ func (d *Dialog) handle(accept bool, promptText []string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	if d.handled {
-		return errDialogAlreadyHandled
+		return ErrDialogAlreadyHandled
 	}
 	action := cdppage.HandleJavaScriptDialog(accept)
 	if len(promptText) > 0 {

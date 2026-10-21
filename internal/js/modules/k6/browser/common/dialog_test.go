@@ -154,7 +154,7 @@ func TestDialogAcceptAlreadyHandledErrors(t *testing.T) {
 	require.NoError(t, d.Accept())
 	ms.lastMethod = ""
 	err := d.Accept()
-	require.ErrorIs(t, err, errDialogAlreadyHandled)
+	require.ErrorIs(t, err, ErrDialogAlreadyHandled)
 	assert.Empty(t, ms.lastMethod, "no CDP call should be made on a handled dialog")
 }
 
@@ -168,7 +168,7 @@ func TestDialogDismissAlreadyHandledErrors(t *testing.T) {
 	require.NoError(t, d.Dismiss())
 	ms.lastMethod = ""
 	err := d.Dismiss()
-	require.ErrorIs(t, err, errDialogAlreadyHandled)
+	require.ErrorIs(t, err, ErrDialogAlreadyHandled)
 	assert.Empty(t, ms.lastMethod, "no CDP call should be made on a handled dialog")
 }
 
@@ -182,6 +182,19 @@ func TestDialogHandled(t *testing.T) {
 	assert.False(t, d.Handled())
 	require.NoError(t, d.Accept())
 	assert.True(t, d.Handled())
+}
+
+func TestDialogClaim(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	d := newTestDialog(ctx, ms)
+
+	assert.False(t, d.Claimed())
+	assert.True(t, d.Claim())
+	assert.True(t, d.Claimed())
+	assert.False(t, d.Claim())
 }
 
 func TestDialogPage(t *testing.T) {

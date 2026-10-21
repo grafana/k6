@@ -480,8 +480,8 @@ func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavas
 	dialog := newDialog(fs.ctx, fs.session, fs.page, event)
 	fs.page.onDialog(dialog)
 
-	// Auto-dismiss only if the handler did not already accept or dismiss.
-	if !dialog.Handled() {
+	// Auto-dismiss only if the handler did not already claim, accept, or dismiss.
+	if !dialog.Claimed() && !dialog.Handled() {
 		if err := dialog.Dismiss(); err != nil {
 			fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening",
 				"failed to dismiss dialog box: %v", err)
