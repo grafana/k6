@@ -292,7 +292,7 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 			engineOut := make(chan metrics.SampleContainer, 1000)
 			defer close(engineOut)
 			go func() {
-				for range engineOut { //nolint:revive // we want to discard samples
+				for range engineOut { // we want to discard samples
 				}
 			}()
 
