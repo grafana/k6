@@ -151,18 +151,24 @@ func queueTaskWithMetricContext[T any](
 // Must be called from the event-loop goroutine (e.g., inside a tq.Queue task)
 // so that the .then/.catch callbacks are registered while the runtime is in a
 // safe state to accept them.
-func awaitHandlerResult(rt *sobek.Runtime, retVal sobek.Value, result chan<- error) {
+func awaitHandlerResult(rt *sobek.Runtime, retVal sobek.Value, result chan<- error, onReject func(error)) {
+	send := func(err error) {
+		result <- err
+		if err != nil && onReject != nil {
+			onReject(err)
+		}
+	}
 	if k6common.IsNullish(retVal) {
-		result <- nil
+		send(nil)
 		return
 	}
 	p, ok := retVal.Export().(*sobek.Promise)
 	if !ok {
-		result <- nil
+		send(nil)
 		return
 	}
 	if p.State() == sobek.PromiseStateFulfilled {
-		result <- nil
+		send(nil)
 		return
 	}
 	// For both pending and already-rejected Promises, attach .then/.catch so
@@ -174,22 +180,22 @@ func awaitHandlerResult(rt *sobek.Runtime, retVal sobek.Value, result chan<- err
 		pObj := retVal.ToObject(rt)
 		thenFn, ok := sobek.AssertFunction(pObj.Get("then"))
 		if !ok {
-			result <- fmt.Errorf("page.on handler returned a non-thenable value")
+			send(fmt.Errorf("page.on handler returned a non-thenable value"))
 			return
 		}
-		onFulfilled := rt.ToValue(func(sobek.Value) { result <- nil })
+		onFulfilled := rt.ToValue(func(sobek.Value) { send(nil) })
 		onRejected := rt.ToValue(func(v sobek.Value) {
 			if err, ok := v.Export().(error); ok {
-				result <- err
+				send(err)
 			} else {
-				result <- fmt.Errorf("%v", v)
+				send(fmt.Errorf("%v", v))
 			}
 		})
 		if _, err := thenFn(retVal, onFulfilled, onRejected); err != nil {
-			result <- err
+			send(err)
 		}
 	}); err != nil {
-		result <- fmt.Errorf("page.on handler Promise inspection failed: %w", err)
+		send(fmt.Errorf("page.on handler Promise inspection failed: %w", err))
 	}
 }
 
