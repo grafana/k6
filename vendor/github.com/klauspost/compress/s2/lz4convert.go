@@ -13,6 +13,7 @@ import (
 // LZ4Converter provides conversion from LZ4 blocks as defined here:
 // https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md
 type LZ4Converter struct {
+	noAsm bool
 }
 
 // ErrDstTooSmall is returned when provided destination is too small.
@@ -32,7 +33,7 @@ func (l *LZ4Converter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 
 	s, d := 0, len(dst)
 	dst = dst[:cap(dst)]
-	if !debug && hasAsm {
+	if !debug && hasAsm && !l.noAsm {
 		res, sz := cvtLZ4BlockAsm(dst[d:], src)
 		if res < 0 {
 			const (
@@ -96,7 +97,8 @@ func (l *LZ4Converter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 		}
 		s++
 		if ll > 0 {
-			if d+ll > dLimit {
+			// Leave room for a 5-byte literal header and an 8-byte copy.
+			if d+ll > len(dst)-13 {
 				return nil, 0, ErrDstTooSmall
 			}
 			if debug {
@@ -209,11 +211,13 @@ func (l *LZ4Converter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 					dst[2] = uint8(length >> 0)
 					dst[1] = 0
 					dst[0] = 7<<2 | tagCopy1
-					if left > 0 {
-						d += 5 + emitRepeat16(dst[5:], offset, left)
-						break
-					}
 					d += 5
+					if left > 0 {
+						// The loop condition checks room for the next chunk.
+						dst = dst[5:]
+						length = left
+						continue
+					}
 					break
 				}
 			}
@@ -288,7 +292,7 @@ func (l *LZ4Converter) ConvertBlockSnappy(dst, src []byte) ([]byte, int, error) 
 	s, d := 0, len(dst)
 	dst = dst[:cap(dst)]
 	// Use assembly when possible
-	if !debug && hasAsm {
+	if !debug && hasAsm && !l.noAsm {
 		res, sz := cvtLZ4BlockSnappyAsm(dst[d:], src)
 		if res < 0 {
 			const (
@@ -488,6 +492,11 @@ func emitRepeat16(dst []byte, offset uint16, length int) int {
 	length -= 1 << 16
 	left := 0
 	if length > maxRepeat {
+		if len(dst) < 10 {
+			// No room for this and the next chunk.
+			// Report more than len(dst) so the caller sees dst is full.
+			return len(dst) + 1
+		}
 		left = length - maxRepeat + 4
 		length = maxRepeat - 4
 	}
