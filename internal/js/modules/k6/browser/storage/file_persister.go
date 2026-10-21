@@ -100,34 +100,45 @@ func NewRemoteFilePersister(
 }
 
 // Persist will upload the contents of data to a remote location.
-func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) (err error) {
+func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) error {
+	capturedAt := time.Now()
+	uuid, err := r.Upload(ctx, path, capturedAt, data)
+	if err != nil {
+		return err
+	}
+	logUploadedUUID(r.logger, capturedAt, uuid)
+
+	return nil
+}
+
+// Upload uploads the contents of data to a remote location, and returns the
+// UUID the remote store assigned to it, if any.
+func (r *RemoteFilePersister) Upload(ctx context.Context, path string, _ time.Time, data io.Reader) (string, error) {
 	psResp, err := r.requestPresignedURL(ctx, path)
 	if err != nil {
-		return fmt.Errorf("requesting presigned url: %w", err)
+		return "", fmt.Errorf("requesting presigned url: %w", err)
 	}
 
 	req, err := newFileUploadRequest(ctx, psResp, data)
 	if err != nil {
-		return fmt.Errorf("creating upload request: %w", err)
+		return "", fmt.Errorf("creating upload request: %w", err)
 	}
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("performing upload request: %w", newRequestError(err))
+		return "", fmt.Errorf("performing upload request: %w", newRequestError(err))
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		return fmt.Errorf("draining upload response body: %w", err)
+		return "", fmt.Errorf("draining upload response body: %w", err)
 	}
 
 	if err := checkStatusCode(resp); err != nil {
-		return fmt.Errorf("uploading: %w", err)
+		return "", fmt.Errorf("uploading: %w", err)
 	}
 
-	logUploadedUUID(r.logger, psResp.UUID)
-
-	return nil
+	return psResp.UUID, nil
 }
 
 // requestPresignedURL will request a new presigned URL from the remote server
@@ -295,11 +306,12 @@ func newRequestError(err error) error {
 }
 
 // logUploadedUUID logs the UUID the remote store returned for an uploaded file,
-// so that the upload can be correlated with the test's logs. Stores that don't
-// return a UUID log nothing.
-func logUploadedUUID(logger logrus.FieldLogger, uuid string) {
+// so that the upload can be correlated with the test's logs. The log entry is
+// timestamped with capturedAt, so it sorts where the file was captured even when
+// it's logged later. Stores that don't return a UUID log nothing.
+func logUploadedUUID(logger logrus.FieldLogger, capturedAt time.Time, uuid string) {
 	if uuid == "" || logger == nil {
 		return
 	}
-	logger.Info("screenshot:" + uuid)
+	logger.WithFields(logrus.Fields{}).WithTime(capturedAt).Info("screenshot:" + uuid)
 }
