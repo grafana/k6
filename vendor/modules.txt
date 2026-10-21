@@ -18,8 +18,8 @@ github.com/PuerkitoBio/goquery
 ## explicit; go 1.22
 github.com/andybalholm/brotli
 github.com/andybalholm/brotli/matchfinder
-# github.com/andybalholm/cascadia v1.3.3
-## explicit; go 1.16
+# github.com/andybalholm/cascadia v1.3.5
+## explicit; go 1.25.0
 github.com/andybalholm/cascadia
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11

@@ -11,8 +11,9 @@ import (
 
 // a parser for CSS selectors
 type parser struct {
-	s string // the source text
-	i int    // the current position
+	s     string // the source text
+	i     int    // the current position
+	depth int    // current nesting depth
 
 	// if `false`, parsing a pseudo-element
 	// returns an error.
@@ -866,8 +867,16 @@ func (p *parser) parseSelector() (Sel, error) {
 	}
 }
 
+const maxParseDepth = 1000
+
 // parseSelectorGroup parses a group of selectors, separated by commas.
 func (p *parser) parseSelectorGroup() (SelectorGroup, error) {
+	if p.depth > maxParseDepth {
+		return nil, fmt.Errorf("selector nesting too deep (max %d)", maxParseDepth)
+	}
+	p.depth++
+	defer func() { p.depth-- }()
+
 	current, err := p.parseSelector()
 	if err != nil {
 		return nil, err
