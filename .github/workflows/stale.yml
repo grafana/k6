@@ -6,6 +6,7 @@ on:
     - cron: "0 8 * * 1" # once per week, at 08:00 on Mondays
 
 permissions:
+  actions: write
   pull-requests: write
   issues: write
 
@@ -17,7 +18,7 @@ jobs:
         uses: actions/stale@4391f3da665fdf50b6810c1a66712fb9ba21aa93 # v11
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          operations-per-run: 50
+          operations-per-run: 400
           ascending: true # process oldest issues/PRs first
 
           days-before-issue-stale: 365
