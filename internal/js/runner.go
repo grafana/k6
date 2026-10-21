@@ -373,7 +373,7 @@ func (r *Runner) HandleSummary(
 	defer close(out)
 
 	go func() { // discard all metrics
-		for range out { //nolint:revive
+		for range out {
 		}
 	}()
 
