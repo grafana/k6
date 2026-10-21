@@ -8,22 +8,28 @@ import (
 
 func mapDialog(vu moduleVU, event common.PageEvent) mapping {
 	d := event.Dialog
-	return mapping{
-		"accept": func(promptText ...string) *sobek.Promise {
+	return finishMapping(mapping{
+		"accept": networkCall(func(promptText ...string) *sobek.Promise {
+			if !d.Claim() {
+				return promise(vu, func() (any, error) { return nil, common.ErrDialogAlreadyHandled })
+			}
 			return promise(vu, func() (any, error) {
 				return nil, d.Accept(promptText...) //nolint:wrapcheck
 			})
-		},
-		"dismiss": func() *sobek.Promise {
+		}),
+		"dismiss": networkCall(func() *sobek.Promise {
+			if !d.Claim() {
+				return promise(vu, func() (any, error) { return nil, common.ErrDialogAlreadyHandled })
+			}
 			return promise(vu, func() (any, error) {
 				return nil, d.Dismiss() //nolint:wrapcheck
 			})
-		},
-		"type":         d.Type,
-		"message":      d.Message,
-		"defaultValue": d.DefaultValue,
-		"page": func() mapping {
+		}),
+		"type":         passiveCall(d.Type),
+		"message":      passiveCall(d.Message),
+		"defaultValue": passiveCall(d.DefaultValue),
+		"page": passiveCall(func() mapping {
 			return mapPage(vu, d.Page())
-		},
-	}
+		}),
+	})
 }
