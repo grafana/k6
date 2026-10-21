@@ -152,6 +152,29 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 			envVarValue: "url=https://127.0.0.1/,header..asd=a",
 			wantErr:     "format of header must be header.k=v",
 		},
+		// Regression: previously `err != nil && u.Scheme != ""` nil-dereferenced
+		// when ParseRequestURI returned (nil, err), panicking during module init
+		// for K6_BROWSER_SCREENSHOTS_OUTPUT=url=<bad>.
+		{
+			name:        "invalid_url_not_uri",
+			envVarValue: "url=not-a-valid-uri",
+			wantErr:     "invalid url",
+		},
+		{
+			name:        "invalid_url_missing_scheme",
+			envVarValue: "url=://example.com",
+			wantErr:     "invalid url",
+		},
+		{
+			name:        "invalid_url_empty",
+			envVarValue: "url=",
+			wantErr:     "invalid url",
+		},
+		{
+			name:        "invalid_url_missing_host",
+			envVarValue: "url=http://",
+			wantErr:     "invalid url",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
