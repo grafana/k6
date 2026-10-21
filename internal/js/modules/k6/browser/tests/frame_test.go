@@ -16,6 +16,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 )
 
 func TestFramePress(t *testing.T) {
@@ -159,6 +160,56 @@ func TestPageOnDialogAutoDismissWhenHandlerDoesNotHandle(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.EqualValues(t, "alert dismissed", result)
+}
+
+func TestPageOnDialogAcceptWithoutAwait(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		try {
+			page.on('dialog', (dialog) => { dialog.accept(); });
+			await page.goto(%q, { waitUntil: 'networkidle' });
+			return await page.textContent('#textField');
+		} finally {
+			await page.close();
+		}
+	`, tb.staticURL("dialog.html?dialogType=confirm"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+	assert.Equal(t, "confirm accepted", got.Result().String())
+}
+
+func TestPageOnDialogAsyncHandlerErrorFailsIteration(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	_, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		try {
+			page.on('dialog', async (dialog) => {
+				await dialog.accept();
+				throw new Error('boom');
+			});
+			await page.goto(%q, { waitUntil: 'networkidle' });
+		} finally {
+			await page.close();
+		}
+	`, tb.staticURL("dialog.html?dialogType=confirm"))
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "boom")
 }
 
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
