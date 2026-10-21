@@ -3359,6 +3359,9 @@ class InjectedScript {
         }
         if (kListCheckedRoles.includes(role))
           entry.checked = getAriaChecked(target);
+        const placeholder = (target.getAttribute("placeholder") || "").trim();
+        if (placeholder)
+          entry.placeholder = placeholder;
         entry.locator = selectorToLocatorCode(selector);
         entry.selector = selector;
         entries.push(entry);

@@ -63,6 +63,7 @@ func TestPageListSelectors(t *testing.T) {
 		Name        string   `json:"name"`
 		Text        string   `json:"text"`
 		Checked     any      `json:"checked"`
+		Placeholder string   `json:"placeholder"`
 		Locator     string   `json:"locator"`
 		Selector    string   `json:"selector"`
 		ViaSelector resolved `json:"viaSelector"`
@@ -120,6 +121,10 @@ func TestPageListSelectors(t *testing.T) {
 	assert.Empty(t, signIn.Text, "an entry with a name has no text")
 	assert.Equal(t, "page.getByRole('link', { name: 'Help' })", byCheck["help"].Locator)
 	assert.Equal(t, "page.getByRole('textbox', { name: 'Email' })", byCheck["email"].Locator)
+	// A placeholder hints at the value or its format, beyond what the name says.
+	assert.Equal(t, "name@example.com", byCheck["email"].Placeholder)
+	assert.Equal(t, "Search", byCheck["search"].Placeholder)
+	assert.Empty(t, byCheck["sign-in"].Placeholder)
 	assert.Equal(t, "page.getByRole('heading', { name: 'Pizza shop' })", byCheck["heading"].Locator)
 	assert.Equal(t, "page.getByTestId('cart-total')", byCheck["cart-total"].Locator)
 
