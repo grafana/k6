@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !appengine
-// +build gc
-// +build !noasm
+//go:build !noasm && gc
 
 #include "textflag.h"
 
