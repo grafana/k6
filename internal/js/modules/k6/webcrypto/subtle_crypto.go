@@ -730,7 +730,8 @@ func getKeyInteractors(
 // for the derivation function: for example, for PBKDF2 it might be a password, imported as a `CryptoKey`
 // using `SubtleCrypto.ImportKey`.
 //
-// The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
+// The `length` parameter is the number of bits to derive. For PBKDF2, the number should be a
+// multiple of 8.
 func (sc *SubtleCrypto) DeriveBits(
 	algorithm sobek.Value,
 	baseKey sobek.Value,
@@ -783,10 +784,9 @@ func (sc *SubtleCrypto) DeriveBits(
 				return nil, NewError(OperationError, "length can not be 0")
 			}
 
-			// currently we don't support lengths that are not multiples of 8
-			// https://github.com/grafana/xk6-webcrypto/issues/80
-			if length%8 != 0 {
-				return nil, NewError(OperationError, "currently only multiples of 8 are supported for length")
+			// A negative length would make the derivers index out of range and panic.
+			if length < 0 {
+				return nil, NewError(OperationError, "length can not be negative")
 			}
 
 			b, err := deriver.DeriveBits(privateKey, length)
