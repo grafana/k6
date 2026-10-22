@@ -27,13 +27,7 @@ func TestVUAndIterationSpans(t *testing.T) {
 	t.Parallel()
 
 	tp, rec := tracetest.NewProvider()
-	r, err := getSimpleRunner(t, "/script.js", `exports.default = function() {}`)
-	require.NoError(t, err)
-	r.preInitState.TracerProvider = tp
-	r.preInitState.FeatureFlags = nativeTracing()
-
-	samples := make(chan metrics.SampleContainer, 100)
-	defer close(samples)
+	vu := newTracedVU(t, `exports.default = function() {}`, tp, nativeTracing())
 
 	// Emulate what the scheduler does for a scenario.
 	scenarioCtx, scenarioSpan := k6trace.StartScenario(
@@ -41,8 +35,6 @@ func TestVUAndIterationSpans(t *testing.T) {
 	)
 	runCtx, cancel := context.WithCancel(scenarioCtx)
 
-	vu, err := r.newVU(t.Context(), 7, 8, samples)
-	require.NoError(t, err)
 	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: runCtx, Scenario: "sc"})
 	require.NoError(t, activeVU.RunOnce())
 	require.NoError(t, activeVU.RunOnce())
@@ -66,38 +58,38 @@ func TestVUAndIterationSpans(t *testing.T) {
 			attrs[string(kv.Key)] = kv.Value.AsInterface()
 		}
 		assert.Equal(t, int64(i), attrs["test.iteration.number"])
-		assert.Equal(t, int64(7), attrs["test.vu"])
-		assert.Equal(t, int64(8), attrs["k6.vu.id_in_test"])
+		assert.Equal(t, int64(1), attrs["test.vu"])
+		assert.Equal(t, int64(2), attrs["k6.vu.id_in_test"])
 		assert.Equal(t, "sc", attrs["test.scenario"])
 		assert.Equal(t, int64(i), attrs["k6.vu.iteration_in_scenario"])
 		assert.NotContains(t, attrs, "k6.scenario.iteration_in_test", "no counters without an executor")
 	}
 }
 
-func TestIterationSpanIsInTheVUContext(t *testing.T) {
+func TestIterationSpanIsInTheVUContextDuringTheIteration(t *testing.T) {
 	t.Parallel()
 
 	tp, rec := tracetest.NewProvider()
-	r, err := getSimpleRunner(t, "/script.js", `exports.default = function() {}`)
-	require.NoError(t, err)
-	r.preInitState.TracerProvider = tp
-	r.preInitState.FeatureFlags = nativeTracing()
-
-	samples := make(chan metrics.SampleContainer, 100)
-	defer close(samples)
-
-	vu, err := r.newVU(t.Context(), 1, 1, samples)
-	require.NoError(t, err)
+	vu := newTracedVU(t, `exports.default = function() {}`, tp, nativeTracing())
 
 	// Modules, e.g. the browser, read the iteration span from the VU context on IterStart.
 	seen := spanContextOnIterStart(vu)
 
-	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: t.Context(), Scenario: "sc"})
-	require.NoError(t, activeVU.RunOnce())
+	runCtx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: runCtx, Scenario: "sc"})
+	vuSpanCtx := oteltrace.SpanContextFromContext(vu.moduleVUImpl.Context())
+	require.True(t, vuSpanCtx.IsValid())
 
+	require.NoError(t, activeVU.RunOnce())
 	iterations := rec.ByName(k6trace.SpanIteration)
 	require.Len(t, iterations, 1)
 	assert.Equal(t, iterations[0].SpanContext().SpanID(), (<-seen).SpanID())
+
+	// Between iterations, modules see the VU span, not the iteration span that has ended, in
+	// the iteration context, which is done.
+	assert.Equal(t, vuSpanCtx, oteltrace.SpanContextFromContext(vu.moduleVUImpl.Context()))
+	assert.ErrorIs(t, vu.moduleVUImpl.Context().Err(), context.Canceled)
 }
 
 func TestNoSpansWhenNativeTracingIsDisabled(t *testing.T) {
@@ -119,16 +111,7 @@ func TestNoSpansWhenNativeTracingIsDisabled(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			r, err := getSimpleRunner(t, "/script.js", `exports.default = function() {}`)
-			require.NoError(t, err)
-			r.preInitState.TracerProvider = tc.tp
-			r.preInitState.FeatureFlags = tc.flags
-
-			samples := make(chan metrics.SampleContainer, 100)
-			defer close(samples)
-
-			vu, err := r.newVU(t.Context(), 1, 1, samples)
-			require.NoError(t, err)
+			vu := newTracedVU(t, `exports.default = function() {}`, tc.tp, tc.flags)
 			assert.Nil(t, vu.tracer, "no spans are started on the hot path when native tracing is disabled")
 			seen := spanContextOnIterStart(vu)
 			runCtx, cancel := context.WithCancel(t.Context())
@@ -143,19 +126,10 @@ func TestInterruptedIterationSpanIsNotAnError(t *testing.T) {
 	t.Parallel()
 
 	tp, rec := tracetest.NewProvider()
-	r, err := getSimpleRunner(t, "/script.js", `
+	vu := newTracedVU(t, `
 		const k6 = require("k6");
 		exports.default = function() { k6.sleep(10); }
-	`)
-	require.NoError(t, err)
-	r.preInitState.TracerProvider = tp
-	r.preInitState.FeatureFlags = nativeTracing()
-
-	samples := make(chan metrics.SampleContainer, 100)
-	defer close(samples)
-
-	vu, err := r.newVU(t.Context(), 1, 1, samples)
-	require.NoError(t, err)
+	`, tp, nativeTracing())
 
 	// Cancel the activation, as an executor does at the end of a scenario, while the
 	// iteration is running.
@@ -180,34 +154,22 @@ func TestInterruptedIterationSpanIsNotAnError(t *testing.T) {
 	assert.Contains(t, iterations[0].Attributes(), attribute.Bool("k6.iteration.interrupted", true))
 }
 
-func TestIterationSpanIsOnlyInTheVUContextDuringTheIteration(t *testing.T) {
-	t.Parallel()
+// newTracedVU returns a VU running script, with the ids 1 in the instance and 2 in the test,
+// tracing with tp when the flags enable native tracing.
+func newTracedVU(t *testing.T, script string, tp *k6trace.TracerProvider, flags *features.Flags) *VU {
+	t.Helper()
 
-	tp, rec := tracetest.NewProvider()
-	r, err := getSimpleRunner(t, "/script.js", `exports.default = function() {}`)
+	r, err := getSimpleRunner(t, "/script.js", script)
 	require.NoError(t, err)
 	r.preInitState.TracerProvider = tp
-	r.preInitState.FeatureFlags = nativeTracing()
+	r.preInitState.FeatureFlags = flags
 
 	samples := make(chan metrics.SampleContainer, 100)
-	defer close(samples)
+	t.Cleanup(func() { close(samples) })
 
-	vu, err := r.newVU(t.Context(), 1, 1, samples)
+	vu, err := r.newVU(t.Context(), 1, 2, samples)
 	require.NoError(t, err)
-
-	runCtx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	activeVU := vu.Activate(&lib.VUActivationParams{RunContext: runCtx, Scenario: "sc"})
-	vuSpanCtx := oteltrace.SpanContextFromContext(vu.moduleVUImpl.Context())
-	require.True(t, vuSpanCtx.IsValid())
-
-	require.NoError(t, activeVU.RunOnce())
-	require.Len(t, rec.ByName(k6trace.SpanIteration), 1)
-
-	// Between iterations, modules see the VU span, not the iteration span that has ended, in
-	// the iteration context, which is done.
-	assert.Equal(t, vuSpanCtx, oteltrace.SpanContextFromContext(vu.moduleVUImpl.Context()))
-	assert.ErrorIs(t, vu.moduleVUImpl.Context().Err(), context.Canceled)
+	return vu
 }
 
 // nativeTracing returns the feature flags enabling the k6 execution hierarchy spans.

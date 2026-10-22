@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/proto"
 
@@ -136,98 +137,104 @@ func TestTracesOutputExportsRunHierarchy(t *testing.T) {
 	}
 	for _, s := range iterations {
 		assert.Equal(t, "vu", ids[string(s.GetParentSpanId())])
-		assert.True(t, hasAttribute(s, "k6.scenario.iteration_in_test"), "executors provide the scenario iteration counters")
+		assert.NotNil(t, attr(s, "k6.scenario.iteration_in_test"), "executors provide the scenario iteration counters")
 	}
 }
 
-func TestTracesOutputRecordsIterationErrors(t *testing.T) {
+func TestTracesOutputRecordsFailures(t *testing.T) {
 	t.Parallel()
 
-	collector, endpoint := newOTLPCollector(t)
-	script := `export default function () { throw new Error("boom"); }`
-	ts := getSingleFileTestState(t, script, []string{nativeTracingFlag, "--traces-output=otel=" + endpoint}, 0)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	tests := []struct {
+		name     string
+		script   string
+		exitCode exitcodes.ExitCode
+		// wantRunErr is the error message of the run span, empty when the run must not fail.
+		wantRunErr string
+		// wantIterationErrs are the error messages of the failed iterations.
+		wantIterationErrs []string
+		wantIterations    int
+	}{
+		{
+			// A failing iteration doesn't fail the test run.
+			name:              "iteration error",
+			script:            `export default function () { throw new Error("boom"); }`,
+			wantIterationErrs: []string{"boom"},
+			wantIterations:    1,
+		},
+		{
+			// Only the iteration calling test.fail() failed, the test goes on and fails at the end.
+			name: "test marked as failed",
+			script: `
+				import exec from 'k6/execution';
+				export const options = { iterations: 2 };
+				export default function () {
+					if (exec.scenario.iterationInTest === 0) {
+						exec.test.fail('oops');
+					}
+				}
+			`,
+			exitCode:          exitcodes.MarkedAsFailed,
+			wantRunErr:        "test run was marked as failed",
+			wantIterationErrs: []string{"oops"},
+			wantIterations:    2,
+		},
+		{
+			// The iteration aborting the test failed, as did the run.
+			name: "test aborted",
+			script: `
+				import exec from 'k6/execution';
+				export default function () { exec.test.abort('stop'); }
+			`,
+			exitCode:          exitcodes.ScriptAborted,
+			wantRunErr:        "stop",
+			wantIterationErrs: []string{"stop"},
+			wantIterations:    1,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	// A failing iteration doesn't fail the test run.
-	runs := collector.byName("k6.run")
-	require.Len(t, runs, 1)
-	assert.Equal(t, tracepb.Status_STATUS_CODE_UNSET, runs[0].GetStatus().GetCode())
+			collector, endpoint := newOTLPCollector(t)
+			ts := getSingleFileTestState(t, tc.script, []string{nativeTracingFlag, "--traces-output=otel=" + endpoint}, tc.exitCode)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	iterations := collector.byName("iteration")
-	require.Len(t, iterations, 1)
-	assert.Equal(t, tracepb.Status_STATUS_CODE_ERROR, iterations[0].GetStatus().GetCode())
-	assert.Contains(t, iterations[0].GetStatus().GetMessage(), "boom")
-}
+			runs := collector.byName("k6.run")
+			require.Len(t, runs, 1)
 
-func TestTracesOutputRecordsIterationsMarkingTheTestAsFailed(t *testing.T) {
-	t.Parallel()
-
-	collector, endpoint := newOTLPCollector(t)
-	script := `
-		import exec from 'k6/execution';
-		export const options = { iterations: 2 };
-		export default function () {
-			if (exec.scenario.iterationInTest === 0) {
-				exec.test.fail('oops');
+			span := runs[0]
+			if tc.wantRunErr == "" {
+				assert.Equal(t, tracepb.Status_STATUS_CODE_UNSET, span.GetStatus().GetCode())
+				return
 			}
-		}
-	`
-	ts := getSingleFileTestState(t, script, []string{nativeTracingFlag, "--traces-output=otel=" + endpoint}, exitcodes.MarkedAsFailed)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+			assert.Equal(t, tracepb.Status_STATUS_CODE_ERROR, span.GetStatus().GetCode())
+			assert.Contains(t, span.GetStatus().GetMessage(), tc.wantRunErr)
 
-	// Only the iteration calling test.fail() failed, the test goes on.
-	iterations := collector.byName("iteration")
-	require.Len(t, iterations, 2)
-	var failed []*tracepb.Span
-	for _, s := range iterations {
-		if s.GetStatus().GetCode() == tracepb.Status_STATUS_CODE_ERROR {
-			failed = append(failed, s)
-		}
+			iterations := collector.byName("iteration")
+			require.Len(t, iterations, tc.wantIterations)
+			var errs []string
+			for _, s := range iterations {
+				if s.GetStatus().GetCode() == tracepb.Status_STATUS_CODE_ERROR {
+					errs = append(errs, s.GetStatus().GetMessage())
+				}
+				assert.Nil(t, attr(s, "k6.iteration.interrupted"), "a failed iteration isn't interrupted")
+			}
+			require.Len(t, errs, len(tc.wantIterationErrs))
+			for i, want := range tc.wantIterationErrs {
+				assert.Contains(t, errs[i], want)
+			}
+		})
 	}
-	require.Len(t, failed, 1)
-	assert.Contains(t, failed[0].GetStatus().GetMessage(), "oops")
 }
 
-func TestTracesOutputRecordsRunFailure(t *testing.T) {
-	t.Parallel()
-
-	collector, endpoint := newOTLPCollector(t)
-	script := `
-		import exec from 'k6/execution';
-		export default function () { exec.test.abort('stop'); }
-	`
-	ts := getSingleFileTestState(t, script, []string{nativeTracingFlag, "--traces-output=otel=" + endpoint}, exitcodes.ScriptAborted)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	runs := collector.byName("k6.run")
-	require.Len(t, runs, 1)
-	assert.Equal(t, tracepb.Status_STATUS_CODE_ERROR, runs[0].GetStatus().GetCode())
-	assert.Contains(t, runs[0].GetStatus().GetMessage(), "stop")
-
-	// The iteration aborting the test failed.
-	iterations := collector.byName("iteration")
-	require.Len(t, iterations, 1)
-	assert.Equal(t, tracepb.Status_STATUS_CODE_ERROR, iterations[0].GetStatus().GetCode())
-	assert.Contains(t, iterations[0].GetStatus().GetMessage(), "stop")
-	assert.False(t, hasBoolAttribute(iterations[0], "k6.iteration.interrupted"))
-}
-
-func hasAttribute(span *tracepb.Span, key string) bool {
+// attr returns the value of the attribute of span with the given key, or nil when it has none.
+func attr(span *tracepb.Span, key string) *commonpb.AnyValue {
 	for _, kv := range span.GetAttributes() {
 		if kv.GetKey() == key {
-			return true
+			return kv.GetValue()
 		}
 	}
-	return false
-}
-
-func hasBoolAttribute(span *tracepb.Span, key string) bool {
-	for _, kv := range span.GetAttributes() {
-		if kv.GetKey() == key {
-			return kv.GetValue().GetBoolValue()
-		}
-	}
-	return false
+	return nil
 }
 
 // TestTracesOutputBrowserIterationSpans runs a real browser, so it is skipped when Chromium

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.k6.io/k6/v2/internal/features"
@@ -42,40 +43,52 @@ func TestSpanHierarchy(t *testing.T) {
 	}
 	runSpan.End()
 
-	byName := map[string]oteltrace.SpanContext{}
-	parents := map[string]oteltrace.SpanID{}
-	attrs := map[string]map[string]attribute.Value{}
+	spans := map[string]sdktrace.ReadOnlySpan{}
 	for _, s := range rec.Ended() {
-		byName[s.Name()] = s.SpanContext()
-		parents[s.Name()] = s.Parent().SpanID()
-		attrs[s.Name()] = map[string]attribute.Value{}
-		for _, kv := range s.Attributes() {
-			attrs[s.Name()][string(kv.Key)] = kv.Value
-		}
+		spans[s.Name()] = s
 	}
-	require.Len(t, byName, 4)
+	require.Len(t, spans, 4)
+	run, scenario, vu, iteration := spans[k6trace.SpanRun], spans[k6trace.SpanScenario],
+		spans[k6trace.SpanVU], spans[k6trace.SpanIteration]
 
-	assert.False(t, rec.ByName(k6trace.SpanRun)[0].Parent().IsValid(), "the run span is a root")
-	assert.Equal(t, byName[k6trace.SpanRun].SpanID(), parents[k6trace.SpanScenario])
-	assert.Equal(t, byName[k6trace.SpanScenario].SpanID(), parents[k6trace.SpanVU])
-	assert.Equal(t, byName[k6trace.SpanVU].SpanID(), parents[k6trace.SpanIteration])
-	for name, sc := range byName {
-		assert.Equal(t, byName[k6trace.SpanRun].TraceID(), sc.TraceID(), "%s must be in the run trace", name)
+	assert.False(t, run.Parent().IsValid(), "the run span is a root")
+	assert.Equal(t, run.SpanContext().SpanID(), scenario.Parent().SpanID())
+	assert.Equal(t, scenario.SpanContext().SpanID(), vu.Parent().SpanID())
+	assert.Equal(t, vu.SpanContext().SpanID(), iteration.Parent().SpanID())
+	for name, s := range spans {
+		assert.Equal(t, run.SpanContext().TraceID(), s.SpanContext().TraceID(), "%s must be in the run trace", name)
 	}
 
-	assert.Equal(t, "sc", attrs[k6trace.SpanScenario]["test.scenario"].AsString())
-	assert.Equal(t, "constant-vus", attrs[k6trace.SpanScenario]["k6.scenario.executor"].AsString())
-	assert.Equal(t, int64(2), attrs[k6trace.SpanVU]["test.vu"].AsInt64())
-	assert.Equal(t, int64(2), attrs[k6trace.SpanVU]["k6.vu.id_in_instance"].AsInt64())
-	assert.Equal(t, int64(3), attrs[k6trace.SpanVU]["k6.vu.id_in_test"].AsInt64())
-	assert.Equal(t, int64(4), attrs[k6trace.SpanIteration]["test.iteration.number"].AsInt64())
-	assert.Equal(t, int64(2), attrs[k6trace.SpanIteration]["test.vu"].AsInt64())
-	assert.Equal(t, "sc", attrs[k6trace.SpanIteration]["test.scenario"].AsString())
-	assert.Equal(t, int64(2), attrs[k6trace.SpanIteration]["k6.vu.id_in_instance"].AsInt64())
-	assert.Equal(t, int64(3), attrs[k6trace.SpanIteration]["k6.vu.id_in_test"].AsInt64())
-	assert.Equal(t, int64(5), attrs[k6trace.SpanIteration]["k6.vu.iteration_in_scenario"].AsInt64())
-	assert.Equal(t, int64(6), attrs[k6trace.SpanIteration]["k6.scenario.iteration_in_instance"].AsInt64())
-	assert.Equal(t, int64(7), attrs[k6trace.SpanIteration]["k6.scenario.iteration_in_test"].AsInt64())
+	assert.Empty(t, attributes(run))
+	assert.Equal(t, map[string]any{
+		"test.scenario":        "sc",
+		"k6.scenario.executor": "constant-vus",
+	}, attributes(scenario))
+	assert.Equal(t, map[string]any{
+		"test.vu":              int64(2),
+		"k6.vu.id_in_instance": int64(2),
+		"k6.vu.id_in_test":     int64(3),
+		"test.scenario":        "sc",
+	}, attributes(vu))
+	assert.Equal(t, map[string]any{
+		"test.iteration.number":             int64(4),
+		"test.vu":                           int64(2),
+		"test.scenario":                     "sc",
+		"k6.vu.id_in_instance":              int64(2),
+		"k6.vu.id_in_test":                  int64(3),
+		"k6.vu.iteration_in_scenario":       int64(5),
+		"k6.scenario.iteration_in_instance": int64(6),
+		"k6.scenario.iteration_in_test":     int64(7),
+	}, attributes(iteration))
+}
+
+// attributes returns the attributes of span by key.
+func attributes(span sdktrace.ReadOnlySpan) map[string]any {
+	attrs := map[string]any{}
+	for _, kv := range span.Attributes() {
+		attrs[string(kv.Key)] = kv.Value.AsInterface()
+	}
+	return attrs
 }
 
 func TestStartTestRunStartsNewTrace(t *testing.T) {
@@ -185,7 +198,6 @@ func TestTracer(t *testing.T) {
 	t.Parallel()
 
 	tp, _ := tracetest.NewProvider()
-	var nilProvider *k6trace.TracerProvider
 	tests := []struct {
 		name    string
 		tp      *k6trace.TracerProvider
@@ -193,7 +205,7 @@ func TestTracer(t *testing.T) {
 		wantNil bool
 	}{
 		{name: "enabled", tp: tp, flags: nativeTracing()},
-		{name: "nil provider", tp: nilProvider, flags: nativeTracing(), wantNil: true},
+		{name: "nil provider", flags: nativeTracing(), wantNil: true},
 		{name: "noop provider", tp: k6trace.NewNoopTracerProvider(), flags: nativeTracing(), wantNil: true},
 		{name: "nil flags", tp: tp, flags: nil, wantNil: true},
 		{name: "feature flag disabled", tp: tp, flags: &features.Flags{}, wantNil: true},
