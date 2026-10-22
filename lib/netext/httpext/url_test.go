@@ -12,7 +12,7 @@ import (
 func TestToURLReturnsOwnedURLCopy(t *testing.T) {
 	t.Parallel()
 
-	shared, err := NewURL("http://user:secret@example.com/path", "name")
+	shared, err := NewURL("http://user:secret@example.com/path", "name") // trufflehog:ignore
 	require.NoError(t, err)
 
 	first, err := ToURL(shared)
@@ -58,9 +58,9 @@ func TestToURLReturnsOwnedURLCopyWithoutUser(t *testing.T) {
 func TestToURLStringBranchIsNotShared(t *testing.T) {
 	t.Parallel()
 
-	first, err := ToURL("http://user:secret@example.com/")
+	first, err := ToURL("http://user:secret@example.com/") // trufflehog:ignore
 	require.NoError(t, err)
-	second, err := ToURL("http://user:secret@example.com/")
+	second, err := ToURL("http://user:secret@example.com/") // trufflehog:ignore
 	require.NoError(t, err)
 
 	require.NotSame(t, first.GetURL(), second.GetURL())
