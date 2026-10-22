@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
       - name: Resolve Go versions
         id: go_versions
-        uses: grafana/k6-ci/.github/actions/go-versions@bc53c239916ae45b50a0bdea2a37698589219c84 # v0.5.3
+        uses: grafana/k6-ci/.github/actions/go-versions@7dc7a71c57a30eddd3f1591ee0cc5abaeedafa14 # v0.5.4
       - name: Install Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
