@@ -398,6 +398,19 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 		_, err := fmt.Fprint(w, "ok")
 		require.NoError(t, err)
 	})
+	// Like a game revealing tiles, an ARIA name keeps changing for a while, and a
+	// spinner keeps changing its style for ever.
+	serve("/revealing", `<!DOCTYPE html><body><div role="img" aria-label="Tile, hidden" id="tile">A</div>
+		<div id="spinner">*</div><script>
+		let n = 0;
+		const reveal = setInterval(() => {
+			n++;
+			document.getElementById('tile').setAttribute('aria-label', n < 12 ? 'Tile, flipping ' + n : 'Tile, revealed');
+			if (n === 12) clearInterval(reveal);
+		}, 100);
+		let deg = 0;
+		setInterval(() => { document.getElementById('spinner').style.transform = 'rotate(' + (deg += 10) + 'deg)'; }, 50);
+	</script></body>`)
 	// Like some shops, the page reloads itself just after it loads.
 	serve("/reloading", `<!DOCTYPE html><body><script>
 		if (sessionStorage.getItem('reloaded')) {
@@ -426,8 +439,12 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 		result.quietMs = Date.now() - started;
 		await page.goto('%s');
 		result.reloaded = await names(page.listSelectors({ waitForStable: true }));
+		await page.goto('%s');
+		const revealStarted = Date.now();
+		result.revealed = await names(page.listSelectors({ kind: 'content', waitForStable: true }));
+		result.revealMs = Date.now() - revealStarted;
 		return JSON.stringify(result);
-	`, tb.url("/ticking"), tb.url("/fetching"), tb.url("/reloading"))
+	`, tb.url("/ticking"), tb.url("/fetching"), tb.url("/reloading"), tb.url("/revealing"))
 	require.Equal(t, sobek.PromiseStateFulfilled, got.State(), "%v", got.Result())
 
 	var result struct {
@@ -436,6 +453,8 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 		InLocator []string                       `json:"inLocator"`
 		QuietMs   int                            `json:"quietMs"`
 		Reloaded  []string                       `json:"reloaded"`
+		Revealed  []string                       `json:"revealed"`
+		RevealMs  int                            `json:"revealMs"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &result))
 
@@ -446,4 +465,6 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 	assert.Equal(t, []string{"Fetched"}, result.InLocator, "locator.listSelectors waits too")
 	assert.Less(t, result.QuietMs, 2000, "on a quiet page, the wait ends well before its 5 s limit")
 	assert.Equal(t, []string{"Reloaded"}, result.Reloaded, "follows the page to its new document when it navigates")
+	assert.Equal(t, []string{"Tile, revealed"}, result.Revealed, "waits while an ARIA name keeps changing")
+	assert.Less(t, result.RevealMs, 3000, "style changes don't keep the page busy")
 }

@@ -2258,6 +2258,10 @@ var kListInteractiveRoles = ["button", "checkbox", "combobox", "gridcell", "link
 var kListContentRoles = ["alert", "alertdialog", "cell", "dialog", "heading", "listitem", "paragraph", "status"];
 var kListCheckedRoles = ["checkbox", "menuitemcheckbox", "menuitemradio", "radio", "switch"];
 var kListTextLength = 200;
+// ARIA changes that count as the page changing. Style and class changes don't,
+// since animations make them all the time, and neither do aria-valuenow and
+// aria-valuetext, which a playing video's progress bar updates constantly.
+var kStableAriaAttributes = ["aria-busy", "aria-checked", "aria-current", "aria-disabled", "aria-expanded", "aria-hidden", "aria-invalid", "aria-label", "aria-pressed", "aria-selected"];
 
 // hasOwnText reports whether element has text of its own, rather than only in
 // its child elements, with at least one letter or digit.
@@ -3312,14 +3316,13 @@ class InjectedScript {
   // iframe gets a frameSelector() marker instead, where its entries go. Under
   // an element, selectors are relative to that element.
   // domChanges returns how many times the DOM under node has changed since the
-  // first call for that node. Attribute changes, such as animated styles, don't
-  // count.
+  // first call for that node. Of attribute changes, only ARIA ones count.
   domChanges(node) {
     let changes = this._domChanges.get(node);
     if (!changes) {
       changes = { count: 0 };
       new MutationObserver((records) => { changes.count += records.length; })
-        .observe(node, { childList: true, characterData: true, subtree: true });
+        .observe(node, { childList: true, characterData: true, subtree: true, attributeFilter: kStableAriaAttributes });
       this._domChanges.set(node, changes);
     }
     return changes.count;
