@@ -35,7 +35,7 @@ func TestPageListSelectors(t *testing.T) {
 			return { count, check: count ? await loc.first().getAttribute('data-check') : '' };
 		};
 		const result = {};
-		for (const kind of ['interactive', 'content', 'all']) {
+		for (const kind of ['interactive', 'content', 'all', 'text']) {
 			result[kind] = [];
 			for (const e of await page.listSelectors({ kind })) {
 				const viaSelector = await resolve(page.locator(e.selector));
@@ -44,6 +44,7 @@ func TestPageListSelectors(t *testing.T) {
 			}
 		}
 		result.defaultKind = (await page.listSelectors()).map((e) => e.selector);
+		result.inTotal = (await page.getByTestId('cart-total').listSelectors({ kind: 'text' })).map((e) => e.text);
 		try {
 			await page.listSelectors({ kind: 'nope' });
 		} catch (e) {
@@ -73,6 +74,8 @@ func TestPageListSelectors(t *testing.T) {
 		Interactive  []entry  `json:"interactive"`
 		Content      []entry  `json:"content"`
 		All          []entry  `json:"all"`
+		TextKind     []entry  `json:"text"`
+		InTotal      []string `json:"inTotal"`
 		DefaultKind  []string `json:"defaultKind"`
 		BadKindError string   `json:"badKindError"`
 	}
@@ -152,6 +155,15 @@ func TestPageListSelectors(t *testing.T) {
 	// A label whose control is hidden, such as a custom-styled checkbox, is what users click.
 	assert.Equal(t, "Send me the newsletter", byCheck["newsletter"].Text)
 	assert.Equal(t, "page.getByText('Send me the newsletter')", byCheck["newsletter"].Locator)
+
+	// Plain text that no listed element contains, such as a toast; not punctuation,
+	// linked labels or text inside listed elements. "all" doesn't include it.
+	assert.Equal(t, []string{"toast", "age", "source", "no-pointer", "focusable"}, marks(result.TextKind))
+	for _, e := range result.TextKind {
+		assert.Equal(t, "text", e.Kind, e.ViaSelector.Check)
+	}
+	assert.Equal(t, "Saved 3 items to your basket", result.TextKind[0].Text)
+	assert.Equal(t, []string{"£12.50"}, result.InTotal, "inside a listed element, its own text is listed")
 
 	var interactiveSelectors []string
 	for _, e := range result.Interactive {

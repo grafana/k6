@@ -89,7 +89,7 @@ type FrameIsVisibleOptions struct {
 
 // ListSelectorsOptions are the options of page, frame and locator listSelectors.
 type ListSelectorsOptions struct {
-	// Kind is "interactive" (the default when empty), "content" or "all".
+	// Kind is "interactive" (the default when empty), "content", "text" or "all".
 	Kind string
 	// WaitForStable waits until the page stops changing before listing.
 	WaitForStable bool

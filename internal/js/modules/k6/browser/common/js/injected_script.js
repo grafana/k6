@@ -2259,6 +2259,17 @@ var kListContentRoles = ["alert", "alertdialog", "cell", "dialog", "heading", "l
 var kListCheckedRoles = ["checkbox", "menuitemcheckbox", "menuitemradio", "radio", "switch"];
 var kListTextLength = 200;
 
+// hasOwnText reports whether element has text of its own, rather than only in
+// its child elements, with at least one letter or digit.
+function hasOwnText(element) {
+  let text = "";
+  for (const node of element.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE)
+      text += node.nodeValue;
+  }
+  return /[\p{L}\p{N}]/u.test(text);
+}
+
 function listSelectorsKind(element) {
   if (!isVisible(element))
     return null;
@@ -3327,6 +3338,31 @@ class InjectedScript {
     };
     collect(root);
 
+    // With kind "text", list visible text that no listed element contains,
+    // such as a toast or a badge.
+    const kinds = new k6BrowserNative.Map();
+    const withText = (element) => {
+      if (kinds.has(element))
+        return kinds.get(element);
+      let elementKind = listSelectorsKind(element);
+      // A linked label's text is already its control's name; it isn't listed,
+      // but it covers the text inside it.
+      if (!elementKind && element.nodeName === "LABEL" && element.control)
+        elementKind = "label";
+      else if (!elementKind && hasOwnText(element) && isVisible(element)) {
+        elementKind = "text";
+        for (let p = parentElementOrShadowHost(element); p && p !== root; p = parentElementOrShadowHost(p)) {
+          if (withText(p)) {
+            elementKind = null;
+            break;
+          }
+        }
+      }
+      kinds.set(element, elementKind);
+      return elementKind;
+    };
+    const kindOf = kind === "text" ? withText : listSelectorsKind;
+
     const entries = [];
     const seen = new k6BrowserNative.Set();
     this._evaluator.begin();
@@ -3337,7 +3373,7 @@ class InjectedScript {
           entries.push(this.frameSelector(element, options));
           continue;
         }
-        const elementKind = listSelectorsKind(element);
+        const elementKind = kindOf(element);
         if (!elementKind || kind !== "all" && kind !== elementKind)
           continue;
         // The generator may pick an ancestor, e.g. the button around a span.
@@ -3345,7 +3381,7 @@ class InjectedScript {
         if (!Array.isArray(matches) || matches.length !== 1 || seen.has(matches[0]))
           continue;
         const target = matches[0];
-        const targetKind = target === element ? elementKind : listSelectorsKind(target);
+        const targetKind = target === element ? elementKind : kindOf(target);
         if (!targetKind || kind !== "all" && kind !== targetKind)
           continue;
         seen.add(target);

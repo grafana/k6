@@ -1622,8 +1622,9 @@ func (f *Frame) ID() string {
 
 // ListSelectors returns an entry for each element in the frame and its visible
 // child frames, of the given kind: "interactive" (the default when kind is
-// empty), "content" or "all". Each entry has a selector that matches only that
-// element, and the equivalent locator code, both starting from the page.
+// empty), "content", "text" or "all" (interactive and content). Each entry has
+// a selector that matches only that element, and the equivalent locator code,
+// both starting from the page.
 func (f *Frame) ListSelectors(opts ListSelectorsOptions) ([]any, error) {
 	f.log.Debugf("Frame:ListSelectors", "fid:%s furl:%q opts:%+v", f.ID(), f.URL(), opts)
 
@@ -1652,10 +1653,10 @@ func normalizeListSelectorsKind(kind string) (string, error) {
 	switch kind {
 	case "":
 		return "interactive", nil
-	case "interactive", "content", "all":
+	case "interactive", "content", "text", "all":
 		return kind, nil
 	}
-	return "", fmt.Errorf("kind must be one of interactive, content or all, got %q", kind)
+	return "", fmt.Errorf("kind must be one of interactive, content, text or all, got %q", kind)
 }
 
 // listSelectors lists the elements of this frame, relative to it. With wait,

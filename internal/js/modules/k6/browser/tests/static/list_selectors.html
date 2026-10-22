@@ -29,8 +29,10 @@
   </form>
 
   <a href="#help" data-check="help">Help</a>
-  <div data-testid="cart-total" data-check="cart-total">Total</div>
+  <div data-testid="cart-total" data-check="cart-total">Total <span data-check="amount">£12.50</span></div>
   <div role="status" data-check="status">Ready</div>
+  <div data-check="toast">Saved <b>3 items</b> to your basket</div>
+  <div><span data-check="age">2h ago</span><span>·</span><span data-check="source">Pizza News</span></div>
 
   <ul>
     <li data-check="margherita">Margherita <button data-check="add-margherita">Add</button></li>
@@ -45,8 +47,8 @@
   <button hidden>Hidden attribute</button>
   <button style="display: none">Display none</button>
   <button style="visibility: hidden">Visibility hidden</button>
-  <button style="pointer-events: none">No pointer events</button>
-  <div tabindex="0">Focusable only</div>
+  <button style="pointer-events: none" data-check="no-pointer">No pointer events</button>
+  <div tabindex="0" data-check="focusable">Focusable only</div>
 
   <script>document.getElementById('select-all').indeterminate = true;</script>
 </body>
