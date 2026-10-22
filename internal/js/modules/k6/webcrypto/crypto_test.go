@@ -117,3 +117,59 @@ func TestGetRandomValuesRejectsBadInput(t *testing.T) {
 		})
 	}
 }
+
+func TestDigestDetachedBufferSources(t *testing.T) {
+	t.Parallel()
+
+	const emptySHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	testCases := []struct {
+		name   string
+		script string
+		isView bool
+	}{
+		{name: "ArrayBuffer", script: `new ArrayBuffer(8)`},
+		{name: "Uint8Array offset", script: `new Uint8Array(new ArrayBuffer(8), 2)`, isView: true},
+		{name: "DataView offset", script: `new DataView(new ArrayBuffer(8), 2, 4)`, isView: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			testRuntime := modulestest.NewRuntime(t)
+			rt := testRuntime.VU.Runtime()
+			input, err := rt.RunString(tc.script)
+			require.NoError(t, err)
+
+			bufferValue := input
+			if tc.isView {
+				bufferValue = input.ToObject(rt).Get("buffer")
+			}
+			buffer, ok := bufferValue.Export().(sobek.ArrayBuffer)
+			require.True(t, ok)
+			require.True(t, buffer.Detach())
+			require.NoError(t, rt.Set("input", input))
+
+			require.NotPanics(t, func() {
+				_, err = testRuntime.RunOnEventLoop(`
+					globalThis.digestRejected = false;
+					globalThis.digestError = "";
+					globalThis.digestHex = "";
+					crypto.subtle.digest("SHA-256", input).then(
+						result => {
+							globalThis.digestHex = Array.from(new Uint8Array(result), byte =>
+								byte.toString(16).padStart(2, "0")).join("");
+						},
+						error => {
+							globalThis.digestRejected = true;
+							globalThis.digestError = String(error);
+						},
+					);
+				`)
+			})
+			require.NoError(t, err)
+			require.False(t, rt.Get("digestRejected").ToBoolean(), rt.Get("digestError").String())
+			assert.Equal(t, emptySHA256, rt.Get("digestHex").String())
+		})
+	}
+}
