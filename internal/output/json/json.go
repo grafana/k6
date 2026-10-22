@@ -5,6 +5,7 @@ package json
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -31,6 +32,7 @@ type Output struct {
 	logger      logrus.FieldLogger
 	filename    string
 	out         io.Writer
+	flushFn     func() error
 	closeFn     func() error
 	seenMetrics map[string]struct{}
 	thresholds  map[string]metrics.Thresholds
@@ -85,11 +87,11 @@ func (o *Output) Start() error {
 			}
 			o.out = outfile
 		} else {
+			o.flushFn = w.Flush
 			o.closeFn = func() error {
-				_ = w.Flush()
-				return logfile.Close()
+				return errors.Join(w.Flush(), logfile.Close())
 			}
-			o.out = logfile
+			o.out = w
 		}
 	}
 
@@ -149,6 +151,12 @@ func (o *Output) flushMetrics() {
 	if firstErr != nil {
 		// Skip metric if it can't be made into JSON or envelope is null.
 		o.logger.WithError(firstErr).WithField("failed", errCount).Error("Sample(s) couldn't be marshalled to JSON")
+	}
+	if o.flushFn != nil {
+		// Write out what was buffered in this tick, so the file can be read while the test is running.
+		if err := o.flushFn(); err != nil {
+			o.logger.WithError(err).Error("Couldn't write the buffered samples to the JSON output file")
+		}
 	}
 	if count > 0 {
 		o.logger.WithField("t", time.Since(start)).WithField("count", count).Debug("Wrote metrics to JSON")
