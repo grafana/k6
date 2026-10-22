@@ -28,14 +28,36 @@ type SourceData struct {
 const (
 	httpsSchemeCouldntBeLoadedMsg = `The moduleSpecifier "%s" couldn't be retrieved from` +
 		` the resolved url "%s". Error : "%s"`
-	fileSchemeCouldntBeLoadedMsg = `The moduleSpecifier "%s" couldn't be found on ` +
-		`local disk. Make sure that you've specified the right path to the file. If you're ` +
+	fileNotFoundHint = `. Make sure that you've specified the right path to the file. If you're ` +
 		`running k6 using the Docker image make sure you have mounted the ` +
 		`local directory (-v /local/path/:/inside/docker/path) containing ` +
 		`your script and modules so that they're accessible by k6 from ` +
 		`inside of the container, see ` +
 		`https://grafana.com/docs/k6/latest/using-k6/modules/#use-modules-with-docker.`
+	// fileSchemeCouldntBeLoadedMsg is for a specifier that never resolved to a filesystem lookup.
+	fileSchemeCouldntBeLoadedMsg = `The moduleSpecifier "%s" couldn't be found on local disk` +
+		fileNotFoundHint
+	fileSchemeCouldntBeLoadedAtMsg = `The moduleSpecifier "%s" couldn't be found on local disk at "%s"` +
+		fileNotFoundHint
 )
+
+// fileNotFoundError reports that moduleSpecifier was missing at the path k6 looked up.
+// Filesystem paths keep a leading separator so Windows volumes can be stored as
+// \C:\dir\file.js; that prefix is removed when it only exists to mark the volume.
+func fileNotFoundError(moduleSpecifier, lookedUpPath string) error {
+	//nolint:staticcheck
+	return fmt.Errorf(fileSchemeCouldntBeLoadedAtMsg, moduleSpecifier, localPathForError(lookedUpPath))
+}
+
+func localPathForError(p string) string {
+	if len(p) < 2 || (p[0] != '/' && p[0] != '\\') {
+		return p
+	}
+	if filepath.VolumeName(p[1:]) == "" {
+		return p
+	}
+	return p[1:]
+}
 
 type unresolvableURLError string
 
@@ -138,7 +160,9 @@ func Load(
 	scheme := moduleSpecifier.Scheme
 	if scheme == "" {
 		if moduleSpecifier.Opaque == "" {
-			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier) //nolint:staticcheck
+			// This specifier never resolved to a filesystem path.
+			//nolint:staticcheck
+			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier)
 		}
 		scheme = "https"
 	}
@@ -157,7 +181,7 @@ func Load(
 		return nil, err
 	}
 	if scheme != "https" {
-		return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, originalModuleSpecifier) //nolint:staticcheck
+		return nil, fileNotFoundError(originalModuleSpecifier, pathOnFs)
 	}
 
 	finalModuleSpecifierURL := moduleSpecifier

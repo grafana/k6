@@ -267,10 +267,10 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	}
 	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags = tags.With("method", req.method)
+		tags = tags.With("method", req.Method())
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.eventInterceptor, req.URL(), req.method, tags)
+		tags = handleURLTag(m.eventInterceptor, req.URL(), req.Method(), tags)
 	}
 	tags = tags.With("resource_type", req.ResourceType())
 
@@ -299,7 +299,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //n
 		status, bodySize                    int64
 		ipAddress, protocol                 string
 		fromCache, fromPreCache, fromSvcWrk bool
-		url                                 = req.url.String()
+		url                                 = req.URL()
 		wallTime                            = time.Now()
 		failed                              float64
 	)
@@ -320,7 +320,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //n
 		}
 	} else {
 		m.logger.Debugf("NetworkManager:emitResponseMetrics",
-			"response is nil url:%s method:%s", req.url, req.method)
+			"response is nil url:%s method:%s", req.URL(), req.Method())
 	}
 
 	tagsAndMeta := req.tagsAndMeta
@@ -329,10 +329,10 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //n
 	}
 	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags = tags.With("method", req.method)
+		tags = tags.With("method", req.Method())
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.eventInterceptor, url, req.method, tags)
+		tags = handleURLTag(m.eventInterceptor, url, req.Method(), tags)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags = tags.With("ip", ipAddress)
@@ -532,7 +532,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	m.eventInterceptor.onRequestFinished(req)
 
 	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
-	if isInternalURL(req.url) {
+	if isInternalURL(req.parsedURL()) {
 		return
 	}
 	// Emit the response metrics in a separate goroutine, once the raw headers
