@@ -20,6 +20,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
 	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/metrics"
 
 	"google.golang.org/grpc"
@@ -1485,8 +1486,61 @@ func TestDebugStat(t *testing.T) {
 			logger := logrus.New()
 			logger.Out = &b
 
-			grpcext.DebugStat(logger.WithField("source", "test"), tt.stat, "full")
+			grpcext.DebugStat(logger.WithField("source", "test"), tt.stat, httpdebug.Config{Body: true})
 			assert.Contains(t, b.String(), tt.expected)
+		})
+	}
+}
+
+func TestDebugStatRedaction(t *testing.T) {
+	t.Parallel()
+
+	md := metadata.MD{
+		"authorization": []string{"Bearer secret-token"},
+		"x-api-key":     []string{"secret-key"},
+		"x-head":        []string{"in"},
+	}
+	stats := []grpcstats.RPCStats{
+		&grpcstats.OutHeader{Header: md},
+		&grpcstats.InHeader{Header: md},
+	}
+
+	tests := [...]struct {
+		name        string
+		cfg         httpdebug.Config
+		expected    []string
+		notExpected []string
+	}{
+		{
+			name:        "redacted by default",
+			cfg:         httpdebug.Config{Body: true},
+			expected:    []string{"authorization: Bearer ***REDACTED***", "x-api-key: ***REDACTED***", "x-head: in"},
+			notExpected: []string{"secret-token", "secret-key"},
+		},
+		{
+			name:     "unredacted",
+			cfg:      httpdebug.Config{Body: true, Unredacted: true},
+			expected: []string{"authorization: Bearer secret-token", "x-api-key: secret-key", "x-head: in"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var b bytes.Buffer
+			logger := logrus.New()
+			logger.Out = &b
+
+			for _, stat := range stats {
+				b.Reset()
+				grpcext.DebugStat(logger.WithField("source", "test"), stat, tt.cfg)
+				out := b.String()
+				for _, e := range tt.expected {
+					assert.Contains(t, out, e)
+				}
+				for _, e := range tt.notExpected {
+					assert.NotContains(t, out, e)
+				}
+			}
 		})
 	}
 }
