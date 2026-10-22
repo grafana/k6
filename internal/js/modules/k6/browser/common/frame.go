@@ -1659,54 +1659,80 @@ func normalizeListSelectorsKind(kind string) (string, error) {
 	return "", fmt.Errorf("kind must be one of interactive, content, text or all, got %q", kind)
 }
 
-// listSelectors lists the elements of this frame, relative to it. With wait,
-// it first waits for the frame to stop changing.
-func (f *Frame) listSelectors(kind string, wait bool) ([]any, error) {
-	document, err := f.document()
-	if err != nil {
-		return nil, fmt.Errorf("getting document: %w", err)
-	}
-	if wait {
-		waitForStable(document, f)
-	}
-
-	return listSelectorsIn(document, kind)
-}
-
-// waitForStable waits until neither the DOM under root nor the requests of
-// frame have changed for a while, so that a listing doesn't catch the page in
-// the middle of an update. It gives up quietly, and the listing goes ahead.
+// How listSelectors waits with waitForStable.
 //
 // shortcut: a fixed 500 ms quiet period and 5 s limit; make them options if
 // users need other values.
-func waitForStable(root *ElementHandle, frame *Frame) {
-	const (
-		quiet = 500 * time.Millisecond
-		poll  = 100 * time.Millisecond
-		limit = 5 * time.Second
-	)
+const (
+	stableQuiet = 500 * time.Millisecond
+	stablePoll  = 100 * time.Millisecond
+	stableLimit = 5 * time.Second
+)
+
+// listSelectors lists the elements of this frame, relative to it. With wait,
+// it first waits for the frame to stop changing, and follows the frame to its
+// new document if it navigates in the meantime.
+func (f *Frame) listSelectors(kind string, wait bool) ([]any, error) {
+	deadline := time.Now().Add(stableLimit)
+	for {
+		document, err := f.document()
+		if err != nil {
+			return nil, fmt.Errorf("getting document: %w", err)
+		}
+		if wait {
+			err = waitForStable(document, f, deadline)
+		}
+		var entries []any
+		if err == nil {
+			entries, err = listSelectorsIn(document, kind)
+		}
+		if err == nil || !wait || !navigatedAway(err) || time.Now().After(deadline) {
+			return entries, err
+		}
+		select {
+		case <-f.ctx.Done():
+			return nil, fmt.Errorf("listing selectors: %w", f.ctx.Err())
+		case <-time.After(stablePoll):
+		}
+	}
+}
+
+// navigatedAway reports whether err means that a document went away, as it
+// does when its frame navigates.
+func navigatedAway(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "Cannot find context with specified id") ||
+		strings.Contains(msg, "Execution context was destroyed") ||
+		strings.Contains(msg, "Inspected target navigated or closed")
+}
+
+// waitForStable waits until neither the DOM under root nor the requests of
+// frame have changed for a while, or until deadline, so that a listing doesn't
+// catch the page in the middle of an update.
+func waitForStable(root *ElementHandle, frame *Frame, deadline time.Time) error {
 	var last any
 	since := time.Now()
-	for deadline := since.Add(limit); time.Now().Before(deadline); {
+	for time.Now().Before(deadline) {
 		changes, err := root.evalWithScript(
 			root.ctx,
 			evalOptions{forceCallable: true, returnByValue: true},
 			`(node, injected) => injected.domChanges(node)`,
 		)
 		if err != nil {
-			return
+			return fmt.Errorf("waiting for the page to stop changing: %w", err)
 		}
 		if changes != last || frame.hasInflightRequests() {
 			last, since = changes, time.Now()
-		} else if time.Since(since) >= quiet {
-			return
+		} else if time.Since(since) >= stableQuiet {
+			return nil
 		}
 		select {
 		case <-root.ctx.Done():
-			return
-		case <-time.After(poll):
+			return fmt.Errorf("waiting for the page to stop changing: %w", root.ctx.Err())
+		case <-time.After(stablePoll):
 		}
 	}
+	return nil
 }
 
 // listSelectorsIn lists the elements under root, a document or an element,

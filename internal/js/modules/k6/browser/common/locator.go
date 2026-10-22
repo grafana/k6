@@ -473,9 +473,11 @@ func (l *Locator) ListSelectors(opts ListSelectorsOptions) ([]any, error) {
 		entries, err = frame.listSelectors(kind, opts.WaitForStable)
 	} else {
 		if opts.WaitForStable {
-			waitForStable(element, l.frame)
+			err = waitForStable(element, l.frame, time.Now().Add(stableLimit))
 		}
-		entries, err = listSelectorsIn(element, kind)
+		if err == nil {
+			entries, err = listSelectorsIn(element, kind)
+		}
 	}
 	if err != nil {
 		return nil, err

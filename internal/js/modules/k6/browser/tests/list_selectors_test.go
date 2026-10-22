@@ -398,6 +398,15 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 		_, err := fmt.Fprint(w, "ok")
 		require.NoError(t, err)
 	})
+	// Like some shops, the page reloads itself just after it loads.
+	serve("/reloading", `<!DOCTYPE html><body><script>
+		if (sessionStorage.getItem('reloaded')) {
+			document.body.insertAdjacentHTML('beforeend', '<button>Reloaded</button>');
+		} else {
+			sessionStorage.setItem('reloaded', '1');
+			setTimeout(() => location.reload(), 300);
+		}
+	</script></body>`)
 	tb.vu.ActivateVU()
 	tb.vu.StartIteration(t)
 
@@ -415,8 +424,10 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 		const started = Date.now();
 		result.inLocator = await names(page.locator('body').listSelectors({ waitForStable: true }));
 		result.quietMs = Date.now() - started;
+		await page.goto('%s');
+		result.reloaded = await names(page.listSelectors({ waitForStable: true }));
 		return JSON.stringify(result);
-	`, tb.url("/ticking"), tb.url("/fetching"))
+	`, tb.url("/ticking"), tb.url("/fetching"), tb.url("/reloading"))
 	require.Equal(t, sobek.PromiseStateFulfilled, got.State(), "%v", got.Result())
 
 	var result struct {
@@ -424,6 +435,7 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 		Fetching  struct{ Now, Stable []string } `json:"fetching"`
 		InLocator []string                       `json:"inLocator"`
 		QuietMs   int                            `json:"quietMs"`
+		Reloaded  []string                       `json:"reloaded"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(got.Result().String()), &result))
 
@@ -433,4 +445,5 @@ func TestListSelectorsWaitForStable(t *testing.T) {
 	assert.Contains(t, result.Fetching.Stable, "Fetched", "waits while a request is in flight")
 	assert.Equal(t, []string{"Fetched"}, result.InLocator, "locator.listSelectors waits too")
 	assert.Less(t, result.QuietMs, 2000, "on a quiet page, the wait ends well before its 5 s limit")
+	assert.Equal(t, []string{"Reloaded"}, result.Reloaded, "follows the page to its new document when it navigates")
 }
