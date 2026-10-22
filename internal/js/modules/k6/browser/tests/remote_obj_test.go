@@ -26,6 +26,12 @@ func TestConsoleLogParse(t *testing.T) {
 			name: "string", log: `"some string"`, want: "some string",
 		},
 		{
+			name: "non_ascii_string", log: `"Корзина не загрузилась"`, want: "Корзина не загрузилась",
+		},
+		{
+			name: "escaped_string", log: `"quote \" newline \n backslash \\"`, want: "quote \" newline \n backslash \\",
+		},
+		{
 			name: "bool", log: "true", want: "true",
 		},
 		{
