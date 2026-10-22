@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/errext"
@@ -79,21 +80,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// cancelled by globalCancel above, since it derives its own timeout from
 	// globalCtx.
 	var shutdownTracerProvider func()
+	// runSpan is the span of the whole test run, ended right before the tracer
+	// provider is shut down so it gets exported with the rest of the spans.
+	var runSpan oteltrace.Span
 	defer func() {
+		if runSpan != nil {
+			trace.EndSpan(runSpan, err)
+		}
 		if shutdownTracerProvider != nil {
 			shutdownTracerProvider()
 		}
 	}()
-
-	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
-	// k6 was started with the --linger option.
-	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
-	defer lingerCancel()
-
-	// runCtx is used for the test run execution and is created with the special
-	// execution.NewTestRunContext() function so that it can be aborted even
-	// from sub-contexts while also attaching a reason for the abort.
-	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
 
 	emitEvent := func(evt *event.Event) func() {
 		waitDone := c.gs.Events.Emit(evt)
@@ -138,6 +135,22 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			logger.Errorf("The tracer provider didn't stop gracefully: %v", tpErr)
 		}
 	}
+
+	// testCtx is globalCtx carrying the run span, so that the execution contexts derived
+	// from it below, and the teardown, are part of the test run trace.
+	tracer := trace.Tracer(test.preInitState.TracerProvider, test.preInitState.FeatureFlags)
+	var testCtx context.Context
+	testCtx, runSpan = trace.StartTestRun(globalCtx, tracer, logger)
+
+	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
+	// k6 was started with the --linger option.
+	lingerCtx, lingerCancel := context.WithCancel(testCtx)
+	defer lingerCancel()
+
+	// runCtx is used for the test run execution and is created with the special
+	// execution.NewTestRunContext() function so that it can be aborted even
+	// from sub-contexts while also attaching a reason for the abort.
+	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
 
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
@@ -449,7 +462,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
-	err = execScheduler.Run(globalCtx, runCtx, samples)
+	err = execScheduler.Run(testCtx, runCtx, samples)
 
 	waitTestEndDone := emitEvent(&event.Event{Type: event.TestEnd})
 	defer waitTestEndDone()

@@ -9,13 +9,17 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 
 	k6event "go.k6.io/k6/v2/internal/event"
+	"go.k6.io/k6/v2/internal/features"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 )
 
 func TestPidRegistry(t *testing.T) {
@@ -379,6 +383,51 @@ func TestStartConnectTraceAttributes(t *testing.T) {
 	require.True(t, ok, "expected an 'iteration' root span")
 	require.Equal(t, int64(42), span.AttrInt64(t, "test.vu"))
 	require.Equal(t, "default", span.AttrString(t, "test.scenario"))
+}
+
+func TestStartConnectTraceNativeTracing(t *testing.T) {
+	t.Parallel()
+
+	rec := k6test.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(rec))
+
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+	vu.ActivateVU()
+	vu.State().FeatureFlags = &features.Flags{NativeTracing: true}
+	// With the feature flag, k6 starts the iteration span and the VU context carries it.
+	_, iterSpan := tp.Tracer("k6").Start(context.Background(), k6trace.SpanIteration)
+	vu.CtxField = oteltrace.ContextWithSpan(vu.CtxField, iterSpan)
+
+	r := &browserRegistry{
+		vu:             vu,
+		tracesMetadata: map[string]string{"meta": "value"},
+		m:              make(map[int64]*common.Browser),
+		userManaged:    make(map[int64][]*common.Browser),
+	}
+	ctx := r.startConnectTrace(vu.Context(), vu.State().Iteration)
+	// Connecting again in the same iteration must not start a span either.
+	r.startConnectTrace(vu.Context(), vu.State().Iteration)
+	require.Equal(t, 0, r.tr.iterationTracesCount(), "the browser must not start iteration spans")
+
+	// The browser API spans are children of the k6 iteration span.
+	tracer := common.GetTracer(ctx)
+	require.NotNil(t, tracer, "tracer must be wired into the context")
+	_, apiSpan := tracer.TraceAPICall(ctx, "target", "browser.newPage")
+	apiSpan.End()
+	newPage, ok := rec.Find("browser.newPage")
+	require.True(t, ok)
+	assert.Equal(t, iterSpan.SpanContext().SpanID(), newPage.ParentID)
+	assert.Equal(t, iterSpan.SpanContext().TraceID(), newPage.TraceID)
+
+	// The traces metadata is added to the k6 iteration span.
+	ro, ok := iterSpan.(sdktrace.ReadOnlySpan)
+	require.True(t, ok)
+	assert.Contains(t, ro.Attributes(), attribute.String("meta", "value"))
+
+	// The iteration span is owned by k6, the browser must not end it at IterEnd.
+	r.tr.endIterationTrace(vu.State().Iteration)
+	assert.False(t, rec.IsEnded(iterSpan.SpanContext().SpanID()))
+	iterSpan.End()
 }
 
 func TestParseTracesMetadata(t *testing.T) {
