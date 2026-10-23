@@ -14,6 +14,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/internal/output/prometheusrw/remote"
+	"go.k6.io/k6/v2/internal/output/prometheusrw/sigv4"
 	"go.k6.io/k6/v2/lib/types"
 )
 
@@ -22,6 +23,7 @@ func TestConfigApply(t *testing.T) {
 
 	fullConfig := Config{
 		ServerURL:             null.StringFrom("some-url"),
+		Proxy:                 null.StringFrom("http://proxy.local:3128"),
 		InsecureSkipTLSVerify: null.BoolFrom(false),
 		Username:              null.StringFrom("user"),
 		Password:              null.StringFrom("pass"),
@@ -102,6 +104,42 @@ func TestConfigRemoteConfigClientCertificateError(t *testing.T) {
 	rcc, err := config.RemoteConfig()
 	assert.ErrorContains(t, err, "TLS certificate")
 	assert.Nil(t, rcc)
+}
+
+func TestConfigRemoteConfigProxy(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Valid", func(t *testing.T) {
+		t.Parallel()
+		config := NewConfig().Apply(Config{Proxy: null.StringFrom("http://proxy.local:3128")})
+		rcc, err := config.RemoteConfig()
+		require.NoError(t, err)
+		require.NotNil(t, rcc.ProxyURL)
+		assert.Equal(t, "http://proxy.local:3128", rcc.ProxyURL.String())
+	})
+
+	t.Run("Unset", func(t *testing.T) {
+		t.Parallel()
+		rcc, err := NewConfig().RemoteConfig()
+		require.NoError(t, err)
+		assert.Nil(t, rcc.ProxyURL)
+	})
+
+	t.Run("Empty", func(t *testing.T) {
+		t.Parallel()
+		config := NewConfig().Apply(Config{Proxy: null.StringFrom("")})
+		rcc, err := config.RemoteConfig()
+		require.NoError(t, err)
+		assert.Nil(t, rcc.ProxyURL)
+	})
+
+	t.Run("Invalid", func(t *testing.T) {
+		t.Parallel()
+		config := NewConfig().Apply(Config{Proxy: null.StringFrom("http://foo\x7f.com/")})
+		rcc, err := config.RemoteConfig()
+		assert.ErrorContains(t, err, "proxy URL")
+		assert.Nil(t, rcc)
+	})
 }
 
 func TestGetConsolidatedConfig(t *testing.T) {
@@ -231,6 +269,15 @@ func TestParseServerURL(t *testing.T) {
 // TODO: replace all the expconfigs below
 // with a function that returns the expected default values,
 // then override only the values to expect differently.
+
+func TestParseArgProxy(t *testing.T) {
+	t.Parallel()
+
+	c, err := parseArg("url=http://prometheus.remote:3412/write,proxy=http://proxy.local:3128")
+	require.NoError(t, err)
+	assert.Equal(t, null.StringFrom("http://prometheus.remote:3412/write"), c.ServerURL)
+	assert.Equal(t, null.StringFrom("http://proxy.local:3128"), c.Proxy)
+}
 
 func TestOptionServerURL(t *testing.T) {
 	t.Parallel()
@@ -550,6 +597,39 @@ func TestOptionBearerToken(t *testing.T) {
 	}
 }
 
+func TestOptionProxy(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"proxy":"http://proxy.local:3128"}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_PROXY": "http://proxy.local:3128"}},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+		Proxy:                 null.StringFrom("http://proxy.local:3128"),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
 func TestOptionClientCertificate(t *testing.T) {
 	t.Parallel()
 
@@ -725,9 +805,10 @@ func TestOptionSigV4(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]struct {
-		arg     string
-		env     map[string]string
-		jsonRaw json.RawMessage
+		arg           string
+		env           map[string]string
+		jsonRaw       json.RawMessage
+		expSigV4Token null.String
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`
 {
@@ -741,6 +822,20 @@ func TestOptionSigV4(t *testing.T) {
 			"K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY": "ASIAUZABC123456",
 			"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY": "5wfFi0FEaaaaacccc1111111111111",
 		}},
+		"JSON with session token": {jsonRaw: json.RawMessage(`
+{
+  "sigV4Region":"us-east-2",
+  "sigV4AccessKey":"ASIAUZABC123456",
+  "sigV4SecretKey":"5wfFi0FEaaaaacccc1111111111111",
+  "sigV4Token":"mock-session-token"
+}
+`), expSigV4Token: null.StringFrom("mock-session-token")},
+		"Env with session token": {env: map[string]string{
+			"K6_PROMETHEUS_RW_SIGV4_REGION":     "us-east-2",
+			"K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY": "ASIAUZABC123456",
+			"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY": "5wfFi0FEaaaaacccc1111111111111",
+			"K6_PROMETHEUS_RW_SIGV4_TOKEN":      "mock-session-token",
+		}, expSigV4Token: null.StringFrom("mock-session-token")},
 	}
 
 	expconfig := Config{
@@ -761,7 +856,79 @@ func TestOptionSigV4(t *testing.T) {
 			c, err := GetConsolidatedConfig(
 				tc.jsonRaw, tc.env, tc.arg)
 			require.NoError(t, err)
-			assert.Equal(t, expconfig, c)
+			exp := expconfig
+			exp.SigV4Token = tc.expSigV4Token
+			assert.Equal(t, exp, c)
+		})
+	}
+}
+
+func TestConfigRemoteConfigSigV4(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		config   Config
+		expSigV4 *sigv4.Config
+		expErr   bool
+	}{
+		{
+			name: "static credentials",
+			config: Config{
+				SigV4Region:    null.StringFrom("us-east-2"),
+				SigV4AccessKey: null.StringFrom("AKIAUZABC123456"),
+				SigV4SecretKey: null.StringFrom("5wfFi0FEaaaaacccc1111111111111"),
+			},
+			expSigV4: &sigv4.Config{
+				Region:             "us-east-2",
+				AwsAccessKeyID:     "AKIAUZABC123456",
+				AwsSecretAccessKey: "5wfFi0FEaaaaacccc1111111111111",
+			},
+		},
+		{
+			name: "temporary credentials with session token",
+			config: Config{
+				SigV4Region:    null.StringFrom("us-east-2"),
+				SigV4AccessKey: null.StringFrom("ASIAUZABC123456"),
+				SigV4SecretKey: null.StringFrom("5wfFi0FEaaaaacccc1111111111111"),
+				SigV4Token:     null.StringFrom("mock-session-token"),
+			},
+			expSigV4: &sigv4.Config{
+				Region:             "us-east-2",
+				AwsAccessKeyID:     "ASIAUZABC123456",
+				AwsSecretAccessKey: "5wfFi0FEaaaaacccc1111111111111",
+				AwsSessionToken:    "mock-session-token",
+			},
+		},
+		{
+			name: "session token without the other credentials",
+			config: Config{
+				SigV4Token: null.StringFrom("mock-session-token"),
+			},
+			expErr: true,
+		},
+		{
+			name: "session token with partially set credentials",
+			config: Config{
+				SigV4Region:    null.StringFrom("us-east-2"),
+				SigV4AccessKey: null.StringFrom("ASIAUZABC123456"),
+				SigV4Token:     null.StringFrom("mock-session-token"),
+			},
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rcc, err := tc.config.RemoteConfig()
+			if tc.expErr {
+				assert.Error(t, err)
+				assert.Nil(t, rcc)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expSigV4, rcc.SigV4)
 		})
 	}
 }
