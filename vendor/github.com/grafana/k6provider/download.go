@@ -16,13 +16,6 @@ import (
 	"time"
 )
 
-const (
-	// DefaultRetries number of retries for download requests
-	DefaultRetries = 3
-	// DefaultBackoff initial backoff time between retries. It is incremented exponentially between retries.
-	DefaultBackoff = 1 * time.Second
-)
-
 // DownloadConfig defines the configuration for downloading files
 type DownloadConfig struct {
 	// AuthType type of passed in the header "Authorization: <type> <auth>".
@@ -83,13 +76,19 @@ func newDownloader(config DownloadConfig, logger *slog.Logger) (*downloader, err
 	if downloadAuthType == "" {
 		downloadAuthType = "Bearer"
 	}
+
+	retries, backoff, err := resolveRetryConfig(config.Retries, config.Backoff)
+	if err != nil {
+		return nil, NewWrappedError(ErrConfig, fmt.Errorf("download %w", err))
+	}
+
 	return &downloader{
 		client:   httpClient,
 		auth:     downloadAuth,
 		authType: downloadAuthType,
 		headers:  config.Headers,
-		retries:  config.Retries,
-		backoff:  config.Backoff,
+		retries:  retries,
+		backoff:  backoff,
 		logger:   logger,
 	}, nil
 }
@@ -123,49 +122,10 @@ func (d *downloader) download(ctx context.Context, from string, path string, che
 		req.Header.Add(h, v)
 	}
 
-	var (
-		resp    *http.Response
-		backoff = d.backoff
-		retries = d.retries
-	)
-
-	if retries == 0 {
-		retries = DefaultRetries
-	}
-
-	if backoff == 0 {
-		backoff = DefaultBackoff
-	}
-
-	// try at least once
-	for {
-		// it is safe to reuse the request as it doesn't have a body
-		resp, err = d.client.Do(req) //nolint:gosec // G704: URL is from artifact, not user input
-
-		if retries == 0 || !shouldRetry(err, resp) {
-			break
-		}
-
-		d.logger.Debug("Download retry",
-			"retries_left", retries,
-			"backoff", backoff,
-			"error", err,
-		)
-		time.Sleep(backoff)
-
-		// increase backoff exponentially for next retry
-		backoff *= 2
-		retries--
-	}
-
+	resp, err := d.doWithRetry(ctx, req)
 	if err != nil {
 		return err
 	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("status %s", resp.Status)
-	}
-
 	defer resp.Body.Close() //nolint:errcheck
 
 	// write content to object file and copy to buffer to calculate checksum
@@ -192,23 +152,43 @@ func (d *downloader) download(ctx context.Context, from string, path string, che
 	return err
 }
 
-// shouldRetry returns true if the error or response indicates that the request should be retried
-func shouldRetry(err error, resp *http.Response) bool {
+// doWithRetry runs req, retrying with exponential backoff while shouldRetryDownload
+// classifies the failure as transient. It reuses req across attempts, which is safe
+// because a download request never has a body.
+func (d *downloader) doWithRetry(ctx context.Context, req *http.Request) (*http.Response, error) {
+	return withRetry(ctx, d.retries, d.backoff, d.logger, "Download", shouldRetryDownload,
+		func() (*http.Response, error) {
+			return d.doRequest(req)
+		})
+}
+
+func (d *downloader) doRequest(req *http.Request) (*http.Response, error) {
+	resp, err := d.client.Do(req)
 	if err != nil {
-		if errors.Is(err, io.EOF) { // assuming EOF is due to connection interrupted by network error
-			return true
-		}
-
-		var ne net.Error
-		if errors.As(err, &ne) {
-			return ne.Timeout()
-		}
-
-		return false
+		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == http.StatusInternalServerError {
+	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
+		return nil, &StatusError{StatusCode: resp.StatusCode, Status: resp.Status}
+	}
+
+	return resp, nil
+}
+
+// shouldRetryDownload returns true if the error indicates the download request should be retried:
+// a network error (assumed transient) or a 500/503 response status.
+func shouldRetryDownload(err error) bool {
+	if statusErr, ok := errors.AsType[*StatusError](err); ok {
+		return statusErr.StatusCode == http.StatusServiceUnavailable || statusErr.StatusCode == http.StatusInternalServerError
+	}
+
+	if errors.Is(err, io.EOF) { // assuming EOF is due to connection interrupted by network error
 		return true
+	}
+
+	if ne, ok := errors.AsType[net.Error](err); ok {
+		return ne.Timeout()
 	}
 
 	return false
