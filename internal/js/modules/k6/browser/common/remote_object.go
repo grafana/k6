@@ -239,9 +239,15 @@ func parseConsoleRemoteObjectValue(
 	case runtime.TypeFunction:
 		return "function()", nil
 	case runtime.TypeString:
-		if after, ok := strings.CutPrefix(val, `"`); ok {
-			val = after
-			val = strings.TrimSuffix(val, `"`)
+		// A remote object's value is raw JSON, so a string arrives quoted and
+		// JSON-escaped (non-ASCII as \uXXXX, quotes, newlines). Decode it to get
+		// the original text. Preview property values are plain, unquoted text.
+		if strings.HasPrefix(val, `"`) {
+			var s string
+			if err := json.Unmarshal([]byte(val), &s); err == nil {
+				return s, nil
+			}
+			val = strings.TrimSuffix(strings.TrimPrefix(val, `"`), `"`)
 		}
 	case runtime.TypeObject:
 		if op != nil {
