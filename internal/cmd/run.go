@@ -92,6 +92,16 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}
 	}()
 
+	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
+	// k6 was started with the --linger option.
+	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
+	defer lingerCancel()
+
+	// runCtx is used for the test run execution and is created with the special
+	// execution.NewTestRunContext() function so that it can be aborted even
+	// from sub-contexts while also attaching a reason for the abort.
+	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
+
 	emitEvent := func(evt *event.Event) func() {
 		waitDone := c.gs.Events.Emit(evt)
 		return func() {
@@ -136,21 +146,13 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	// testCtx is globalCtx carrying the run span, so that the execution contexts derived
-	// from it below, and the teardown, are part of the test run trace.
+	// testCtx is globalCtx carrying the run span. The span is also attached to runCtx,
+	// so that the execution contexts derived from them, and the teardown, are part of
+	// the test run trace.
 	tracer := trace.Tracer(test.preInitState.TracerProvider, test.preInitState.FeatureFlags)
 	var testCtx context.Context
 	testCtx, runSpan = trace.StartTestRun(globalCtx, tracer, logger)
-
-	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
-	// k6 was started with the --linger option.
-	lingerCtx, lingerCancel := context.WithCancel(testCtx)
-	defer lingerCancel()
-
-	// runCtx is used for the test run execution and is created with the special
-	// execution.NewTestRunContext() function so that it can be aborted even
-	// from sub-contexts while also attaching a reason for the abort.
-	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
+	runCtx = oteltrace.ContextWithSpan(runCtx, runSpan)
 
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
