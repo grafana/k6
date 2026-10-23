@@ -7,11 +7,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+
+	"go.k6.io/k6/v2/lib/netext/httpdebug"
 )
 
 type httpDebugTransport struct {
 	originalTransport http.RoundTripper
-	httpDebugOption   string
+	cfg               httpdebug.Config
 	logger            logrus.FieldLogger
 }
 
@@ -30,9 +32,12 @@ func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func (t httpDebugTransport) debugRequest(req *http.Request, requestID string) {
-	dump, err := httputil.DumpRequestOut(req, t.httpDebugOption == "full")
+	dump, err := httputil.DumpRequestOut(req, t.cfg.Body)
 	if err != nil {
 		t.logger.Error(err)
+	}
+	if !t.cfg.Unredacted {
+		dump = httpdebug.RedactDump(dump)
 	}
 	t.logger.WithField("request_id", requestID).Infof("Request:\n%s\n",
 		bytes.ReplaceAll(dump, []byte("\r\n"), []byte{'\n'}))
@@ -40,9 +45,12 @@ func (t httpDebugTransport) debugRequest(req *http.Request, requestID string) {
 
 func (t httpDebugTransport) debugResponse(res *http.Response, requestID string) {
 	if res != nil {
-		dump, err := httputil.DumpResponse(res, t.httpDebugOption == "full")
+		dump, err := httputil.DumpResponse(res, t.cfg.Body)
 		if err != nil {
 			t.logger.Error(err)
+		}
+		if !t.cfg.Unredacted {
+			dump = httpdebug.RedactDump(dump)
 		}
 		t.logger.WithField("request_id", requestID).Infof("Response:\n%s\n",
 			bytes.ReplaceAll(dump, []byte("\r\n"), []byte{'\n'}))
