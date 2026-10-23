@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -105,7 +106,7 @@ func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("performing upload request: %w", err)
+		return fmt.Errorf("performing upload request: %w", newRequestError(err))
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -135,7 +136,7 @@ func (r *RemoteFilePersister) requestPresignedURL(ctx context.Context, path stri
 		bytes.NewReader(b),
 	)
 	if err != nil {
-		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", newRequestError(err))
 	}
 
 	for k, v := range r.headers {
@@ -144,7 +145,7 @@ func (r *RemoteFilePersister) requestPresignedURL(ctx context.Context, path stri
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return PresignedURLResponse{}, fmt.Errorf("performing request: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("performing request: %w", newRequestError(err))
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
@@ -214,7 +215,7 @@ func newFileUploadRequest(
 	fw := multipart.NewWriter(&form)
 	for k, v := range psu.FormFields {
 		if err := fw.WriteField(k, v); err != nil {
-			return nil, fmt.Errorf("writing form field key %q and value %q: %w", k, v, err)
+			return nil, fmt.Errorf("writing form field key %q: %w", k, err)
 		}
 	}
 	// attach the file data to the form.
@@ -236,7 +237,7 @@ func newFileUploadRequest(
 		&form,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("creating new request: %w", err)
+		return nil, fmt.Errorf("creating new request: %w", newRequestError(err))
 	}
 	req.Header.Set("Content-Type", fw.FormDataContentType())
 
@@ -249,4 +250,37 @@ func checkStatusCode(resp *http.Response) error {
 	}
 
 	return nil
+}
+
+// requestError hides the details of a failed request, as they can include
+// internal URLs, hosts and credentials such as presigned URL signatures.
+// The original error is still available with [errors.Is] and [errors.As].
+type requestError struct {
+	msg string
+	err error
+}
+
+func (e *requestError) Error() string { return e.msg }
+
+func (e *requestError) Unwrap() error { return e.err }
+
+func newRequestError(err error) error {
+	var (
+		netErr net.Error
+		dnsErr *net.DNSError
+		opErr  *net.OpError
+	)
+	msg := "request failed"
+	switch {
+	case errors.Is(err, context.Canceled):
+		msg = "request canceled"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &netErr) && netErr.Timeout():
+		msg = "request timed out"
+	case errors.As(err, &dnsErr):
+		msg = "resolving host failed"
+	case errors.As(err, &opErr) && opErr.Op == "dial":
+		msg = "connecting to host failed"
+	}
+
+	return &requestError{msg: msg, err: err}
 }
