@@ -764,7 +764,7 @@ type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
 	busy chan struct{}
-	// vuCtx is the run context of this activation, carrying the VU span.
+	// vuCtx is the RunContext of this activation (from VUActivationParams above), but with a VU span.
 	vuCtx context.Context
 
 	scenarioName              string
