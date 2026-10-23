@@ -2517,6 +2517,48 @@ func TestBrowserPermissions(t *testing.T) {
 	}
 }
 
+func TestBrowserInvalidInitConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		env     map[string]string
+		wantErr string
+	}{
+		{
+			name:    "screenshots_output",
+			env:     map[string]string{"K6_BROWSER_SCREENSHOTS_OUTPUT": "basePath=/screenshots"},
+			wantErr: "failed to create file persister: parsing K6_BROWSER_SCREENSHOTS_OUTPUT: missing required url",
+		},
+		{
+			name:    "traces_metadata",
+			env:     map[string]string{"K6_BROWSER_TRACES_METADATA": "foo"},
+			wantErr: `parsing browser traces metadata: "foo" is not a valid key=value metadata`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			const script = `
+				import { browser } from 'k6/browser';
+
+				export default function() {};
+			`
+
+			ts := getSingleFileTestState(t, script, []string{}, exitcodes.ScriptException)
+			maps.Copy(ts.Env, tt.env)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			loglines := ts.LoggerHook.Drain()
+			require.NotEmpty(t, loglines)
+			assert.Contains(t, loglines[0].Message, tt.wantErr)
+			assert.NotContains(t, loglines[0].Message, "panic")
+		})
+	}
+}
+
 func TestBrowserExperimentalImport(t *testing.T) {
 	t.Parallel()
 
