@@ -880,6 +880,29 @@ func TestSelectOption(t *testing.T) {
 	assert.Equal(t, sobek.Undefined(), got.Result())
 }
 
+func TestTextSelector(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<div><button>Log in</button><span>Sign up</span></div>`, nil))
+
+	tests := []struct {
+		selector string
+		want     int
+	}{
+		{selector: `text=Log in`, want: 1},
+		{selector: `text=log IN`, want: 1}, // unquoted is a case-insensitive substring match
+		{selector: `"Log in"`, want: 1},    // quoted is a strict match
+		{selector: `"log in"`, want: 0},    // strict match is case-sensitive
+	}
+	for _, tt := range tests {
+		count, err := p.Locator(tt.selector, nil).Count()
+		require.NoError(t, err, tt.selector)
+		require.Equal(t, tt.want, count, tt.selector)
+	}
+}
+
 func TestCount(t *testing.T) {
 	t.Parallel()
 
@@ -1124,6 +1147,25 @@ func TestDetachedRetry(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestLocatorHasTextAfterTextChange(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`<div id="status">Loading</div>`, nil))
+
+	count, err := p.Locator("#status", &common.LocatorOptions{HasText: "Loading"}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count)
+
+	_, err = p.Evaluate(`() => { document.querySelector('#status').textContent = 'Done'; }`)
+	require.NoError(t, err)
+
+	count, err = p.Locator("#status", &common.LocatorOptions{HasText: "Done"}).Count()
+	require.NoError(t, err)
+	require.Equal(t, 1, count, "hasText should match the updated text")
+}
+
 func TestLocatorFilter(t *testing.T) {
 	t.Parallel()
 
@@ -1258,6 +1300,28 @@ func TestLocatorFilter(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 2, count)
 	})
+}
+
+func TestVisibleSelectorPart(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+	require.NoError(t, p.SetContent(`
+		<button>visible</button>
+		<button hidden>hidden 1</button>
+		<button style="display: none">hidden 2</button>
+		<div><span>a</span><span>b</span></div>`,
+		nil,
+	))
+
+	count, err := p.Locator("button >> visible=false", nil).Count()
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "visible=false should match the hidden buttons")
+
+	count, err = p.Locator("div >> visible=true >> span", nil).Count()
+	require.NoError(t, err)
+	require.Equal(t, 2, count, "parts after visible= should be evaluated")
 }
 
 func TestFrameLocatorLocatorOptions(t *testing.T) {
@@ -1710,4 +1774,58 @@ func TestFrameLocator(t *testing.T) {
 		require.NotNil(t, oldButton)
 		require.NotNil(t, newButton)
 	})
+}
+
+func TestLocatorHasTextSpecialCharacters(t *testing.T) { //nolint:tparallel
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+
+	tb.vu.SetVar(t, "page", &sobek.Object{})
+	_, err := tb.vu.RunAsync(t, `
+		page = await browser.newPage();
+		await page.setContent('<ul>' +
+			'<li>a >> b</li>' +
+			'<li>GET /api/users</li>' +
+			'<li>Status: "Done"</li>' +
+			'<li>Done</li>' +
+			'<li>Not "Done" yet</li>' +
+		'</ul>');
+	`)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		locator string
+		want    int
+	}{
+		{"hasText_separator", `page.locator('li', { hasText: 'a >> b' })`, 1},
+		{"hasText_slashes", `page.locator('li', { hasText: '/api/users' })`, 1},
+		{"hasText_quotes", `page.locator('li', { hasText: '"Done"' })`, 2},
+		{"filter_hasText_separator", `page.locator('li').filter({ hasText: 'a >> b' })`, 1},
+		{"filter_hasText_slashes", `page.locator('li').filter({ hasText: '/api/users' })`, 1},
+		{"filter_hasText_quotes", `page.locator('li').filter({ hasText: '"Done"' })`, 2},
+		{"hasNotText_separator", `page.locator('li', { hasNotText: 'a >> b' })`, 4},
+		{"hasNotText_slashes", `page.locator('li', { hasNotText: '/api/users' })`, 4},
+		{"hasNotText_quotes", `page.locator('li', { hasNotText: '"Done"' })`, 3},
+		{"locator_locator_hasText", `page.locator('ul').locator('li', { hasText: '/api/users' })`, 1},
+		{"frame_locator_hasText", `page.mainFrame().locator('li', { hasText: '/api/users' })`, 1},
+		{"hasText_regex", `page.locator('li', { hasText: /^Done$/ })`, 1},
+		{"hasText_regex_separator", `page.locator('li', { hasText: /a >> b/ })`, 1},
+		{"hasText_regex_quote", `page.locator('li', { hasText: /"Done/, hasNotText: 'yet' })`, 1},
+	}
+	for _, tt := range tests { //nolint:paralleltest
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tb.vu.RunAsync(t, `
+				const want = %d;
+				const got = await %s.count();
+				if (got !== want) {
+					throw new Error('expected ' + want + ' matches, got ' + got);
+				}
+			`, tt.want, tt.locator)
+			require.NoError(t, err)
+		})
+	}
 }
