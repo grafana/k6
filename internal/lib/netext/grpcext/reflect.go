@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jhump/protoreflect/desc" //nolint:staticcheck
 	"github.com/jhump/protoreflect/grpcreflect"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
@@ -37,18 +38,21 @@ func (rc *reflectionClient) Reflect(ctx context.Context) (*descriptorpb.FileDesc
 			return nil, fmt.Errorf("can't get method on service %q: %w", srv, err)
 		}
 
-		stack := []*desc.FileDescriptor{srvDescriptor.GetFile()}
+		stack := []protoreflect.FileDescriptor{srvDescriptor.GetFile().UnwrapFile()}
 
 		for len(stack) > 0 {
 			fdp := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 
 			fdkey := fileDescriptorLookupKey{
-				Package: fdp.GetPackage(),
-				Name:    fdp.GetName(),
+				Package: string(fdp.Package()),
+				Name:    fdp.Path(),
 			}
 
-			stack = append(stack, fdp.GetDependencies()...)
+			imports := fdp.Imports()
+			for i := 0; i < imports.Len(); i++ {
+				stack = append(stack, imports.Get(i).FileDescriptor)
+			}
 
 			if seen[fdkey] {
 				// When a proto file contains declarations for multiple services
@@ -57,7 +61,7 @@ func (rc *reflectionClient) Reflect(ctx context.Context) (*descriptorpb.FileDesc
 				continue
 			}
 			seen[fdkey] = true
-			fdset.File = append(fdset.File, fdp.AsFileDescriptorProto())
+			fdset.File = append(fdset.File, protodesc.ToFileDescriptorProto(fdp))
 		}
 	}
 
