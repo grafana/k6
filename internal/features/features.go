@@ -45,6 +45,7 @@ type Flags struct {
 	MergeRunTags       bool `lifecycle:"experimental" help:"Merge run tags across config layers instead of replacing"`
 	FreezeEnv          bool `lifecycle:"experimental" help:"Freeze __ENV object to prevent modifications from JS code"`
 	AsyncMetricContext bool `lifecycle:"experimental" help:"Propagate metric context through asynchronous operations"`
+	GRPCProxy          bool `lifecycle:"experimental" name:"grpc-proxy" help:"Use HTTPS_PROXY for gRPC connections"`
 	_                  noCopy
 	activated          []string
 }
