@@ -847,6 +847,9 @@ func parseFrameWaitForFunctionOptions(
 	obj := opts.ToObject(rt)
 	for _, k := range obj.Keys() {
 		v := obj.Get(k)
+		if k6common.IsNullish(v) {
+			continue
+		}
 		switch k {
 		case "timeout":
 			wfopts.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
