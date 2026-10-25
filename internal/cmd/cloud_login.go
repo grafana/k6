@@ -37,6 +37,12 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
   # Authenticate interactively with Grafana Cloud
   $ {{.}} cloud login
 
+  # Authenticate in the browser, entering a stack when prompted
+  $ {{.}} cloud login --oauth
+
+  # Authenticate in the browser against a given stack
+  $ {{.}} cloud login --oauth --stack <YOUR_STACK_URL_OR_SLUG>
+
   # Store a token in k6's persistent configuration and set the stack
   $ {{.}} cloud login -t <YOUR_TOKEN> --stack <YOUR_STACK_URL_OR_SLUG>
 
@@ -59,6 +65,7 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 	loginCloudCommand.Flags().BoolP("show", "s", false, "display saved token, stack info and exit")
 	loginCloudCommand.Flags().BoolP("reset", "r", false, "reset stored token and stack info")
 	loginCloudCommand.Flags().String("stack", "", "specify the stack (URL or slug) where commands will run by default")
+	loginCloudCommand.Flags().Bool("oauth", false, "authenticate in the browser instead of pasting a token")
 
 	return loginCloudCommand
 }
@@ -91,6 +98,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	reset := getNullBool(cmd.Flags(), "reset")
 	tokenInput := getNullString(cmd.Flags(), "token")
 	stackInput := getNullString(cmd.Flags(), "stack")
+	oauthInput := getNullBool(cmd.Flags(), "oauth")
 
 	switch {
 	case reset.Valid:
@@ -102,6 +110,20 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	case show.Bool:
 		printConfig(c.globalState, newCloudConf)
 		return nil
+	case oauthInput.Bool:
+		gs := c.globalState
+
+		if tokenInput.Valid {
+			return errors.New("--token cannot be combined with --oauth, which obtains a token for you")
+		}
+
+		token, stack, err := loginWithOAuth(gs, stackInput.String)
+		if err != nil {
+			return err
+		}
+		if err := authenticateUserToken(gs, &newCloudConf, currentJSONConfigRaw, token, stack); err != nil {
+			return err
+		}
 	case tokenInput.Valid || stackInput.Valid:
 		if !stackInput.Valid || stackInput.String == "" {
 			return errors.New("stack value is required but it was not passed or is empty")
@@ -183,7 +205,16 @@ func promptUserAuthForm(gs *state.GlobalState) (userAuthForm, error) {
 		return userAuthForm{}, errors.New("token cannot be empty")
 	}
 
-	/* Stack form */
+	stack, err := promptStack(gs)
+	if err != nil {
+		return userAuthForm{}, err
+	}
+
+	return userAuthForm{token: token, stack: stack}, nil
+}
+
+// promptStack asks for the stack where k6's commands should run by default.
+func promptStack(gs *state.GlobalState) (string, error) {
 	stackForm := ui.Form{
 		Banner: "\nEnter the stack where you want to run k6's commands by default.\n" +
 			"You can enter a full URL (e.g. https://my-team.grafana.net) or just the slug (e.g. my-team):",
@@ -196,14 +227,13 @@ func promptUserAuthForm(gs *state.GlobalState) (userAuthForm, error) {
 	}
 	stackVals, err := stackForm.Run(gs.Stdin, gs.Stdout)
 	if err != nil {
-		return userAuthForm{}, err
+		return "", err
 	}
 	stack := strings.TrimSpace(stackVals["Stack"])
 	if stack == "" {
-		return userAuthForm{}, errors.New("stack cannot be empty")
+		return "", errors.New("stack cannot be empty")
 	}
-
-	return userAuthForm{token: token, stack: stack}, nil
+	return stack, nil
 }
 
 func printConfig(gs *state.GlobalState, cloudConf cloudapi.Config) {
