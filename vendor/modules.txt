@@ -217,7 +217,7 @@ github.com/icholy/digest/internal/param
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
-# github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
+# github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 ## explicit
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
