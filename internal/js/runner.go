@@ -78,6 +78,20 @@ func New(
 	return NewFromBundle(piState, bundle)
 }
 
+// NewWithOptions returns a new Runner for the provided source that uses the given options,
+// as for --options-file. Like for archives, the script's options export is ignored.
+func NewWithOptions(
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
+	options lib.Options, mr *modules.ModuleResolver,
+) (*Runner, error) {
+	bundle, err := NewBundleWithOptions(piState, src, filesystems, options, mr)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewFromBundle(piState, bundle)
+}
+
 // NewFromArchive returns a new Runner from the source in the provided archive
 func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive, mr *modules.ModuleResolver) (*Runner, error) {
 	bundle, err := NewBundleFromArchive(piState, arc, mr)

@@ -36,18 +36,18 @@ func TestSelectScenarios(t *testing.T) {
 
 	all := lib.ScenarioConfigs{"ui": ui, "api": api, "db": executor.NewConstantVUsConfig("db")}
 
-	res, err := selectScenarios(lib.Options{Scenarios: all}, []string{"ui", "api"})
+	res, err := selectScenarios(lib.Options{Scenarios: all}, []string{"ui", "api"}, scriptLayerName)
 	require.NoError(t, err)
 	assert.Equal(t, lib.ScenarioConfigs{"ui": ui, "api": api}, res.Scenarios)
 	assert.Len(t, all, 3)
 
-	_, err = selectScenarios(lib.Options{Scenarios: all}, []string{"ui", "gone"})
+	_, err = selectScenarios(lib.Options{Scenarios: all}, []string{"ui", "gone"}, scriptLayerName)
 	require.EqualError(t, err, `scenario "gone" not found; available scenarios: api, db, ui`)
 	var ec errext.HasExitCode
 	require.ErrorAs(t, err, &ec)
 	assert.Equal(t, exitcodes.InvalidConfig, ec.ExitCode())
 
-	_, err = selectScenarios(lib.Options{}, []string{"default"})
+	_, err = selectScenarios(lib.Options{}, []string{"default"}, scriptLayerName)
 	require.EqualError(t, err, `scenario "default" not found; the script does not have any named scenario`)
 }
 

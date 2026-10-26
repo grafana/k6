@@ -55,6 +55,18 @@ type loadedTest struct {
 	imports                 []string
 	runnerContinuation      func() (lib.Runner, error)
 	dependencyErr           error
+
+	// optionsFile holds the options from --options-file, nil without the flag. They replace
+	// the options exported by the script.
+	optionsFile *lib.Options
+}
+
+// testLayerName names the test options layer in messages.
+func (lt *loadedTest) testLayerName() string {
+	if lt.optionsFile != nil {
+		return optionsFileLayerName
+	}
+	return scriptLayerName
 }
 
 func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
@@ -86,6 +98,15 @@ func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args 
 			lib.CompatibilityModeExperimentalEnhanced.String(), lib.CompatibilityModeBase.String())
 	}
 
+	var optionsFile *lib.Options
+	if path, ok := optionsFilePath(cmd.Flags()); ok {
+		opts, err := readOptionsFile(gs, path)
+		if err != nil {
+			return nil, err
+		}
+		optionsFile = &opts
+	}
+
 	registry := metrics.NewRegistry()
 	state := &lib.TestPreInitState{
 		Logger:         gs.Logger,
@@ -110,6 +131,7 @@ func loadLocalTestWithoutRunner(gs *state.GlobalState, cmd *cobra.Command, args 
 		fs:             gs.FS,
 		fileSystems:    fileSystems,
 		preInitState:   state,
+		optionsFile:    optionsFile,
 	}
 
 	if err := test.prepareFirstRunner(gs); err != nil {
@@ -133,7 +155,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		return nil, fmt.Errorf("could not initialize '%s': %w", test.sourceRootPath, err)
 	}
 
-	warnOnScriptOptionsFeatures(gs.Logger, test.initRunner.GetOptions())
+	warnOnOptionsFeatures(gs.Logger, test.initRunner.GetOptions(), test.testLayerName())
 
 	return test, nil
 }
@@ -187,7 +209,7 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, depErr)
 		}
 		lt.runnerContinuation = func() (lib.Runner, error) {
-			runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems, moduleResolver)
+			runner, err := lt.newJSRunner(moduleResolver)
 			if err != nil {
 				return nil, fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 			}
@@ -196,6 +218,11 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 		return nil
 
 	case testTypeArchive:
+		if lt.optionsFile != nil {
+			return errext.WithExitCodeIfNone(
+				errors.New("--options-file can't be used with an archive, which has its options in metadata.json"),
+				exitcodes.InvalidConfig)
+		}
 		logger.Debug("Trying to load test as an archive bundle...")
 
 		arc, err := lib.ReadArchive(bytes.NewReader(lt.source.Data))
@@ -241,6 +268,14 @@ func (lt *loadedTest) prepareFirstRunner(gs *state.GlobalState) error {
 	default:
 		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+}
+
+// newJSRunner creates the runner of a JS test, with the options from --options-file if given.
+func (lt *loadedTest) newJSRunner(mr *modules.ModuleResolver) (*js.Runner, error) {
+	if lt.optionsFile != nil {
+		return js.NewWithOptions(lt.preInitState, lt.source, lt.fileSystems, *lt.optionsFile, mr)
+	}
+	return js.New(lt.preInitState, lt.source, lt.fileSystems, mr)
 }
 
 func (lt *loadedTest) continueInitialization(gs *state.GlobalState) error {
@@ -527,18 +562,61 @@ func detectTestType(data []byte) string {
 	return testTypeJS
 }
 
-//nolint:funlen // Keep CLI feature ordering together.
 func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	gs *state.GlobalState, cmd *cobra.Command,
 	cliConfGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
 ) (*loadedAndConfiguredTest, error) {
+	consolidatedConfig, derivedConfig, err := consolidateDeriveAndValidate(gs, cmd, cliConfGetter, testConfigInputs{
+		options:      lt.initRunner.GetOptions(),
+		layerName:    lt.testLayerName(),
+		isExecutable: lt.initRunner.IsExecutable,
+		registry:     lt.preInitState.Registry,
+		noThresholds: lt.preInitState.RuntimeOptions.NoThresholds.Bool,
+		featureFlags: lt.preInitState.FeatureFlags,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &loadedAndConfiguredTest{
+		loadedTest:         lt,
+		consolidatedConfig: consolidatedConfig,
+		derivedConfig:      derivedConfig,
+	}, nil
+}
+
+// testConfigInputs is what consolidateDeriveAndValidate needs besides the CLI, -c config
+// and environment layers, so that it does not depend on a loaded test.
+type testConfigInputs struct {
+	// options is the test options layer.
+	options lib.Options
+	// layerName names the test options layer in messages.
+	layerName string
+	// isExecutable reports whether a scenario's exec is a callable export.
+	isExecutable func(string) bool
+	// registry validates thresholds against the known metrics. Nil only parses them.
+	registry *metrics.Registry
+	// noThresholds skips parsing and validating thresholds (--no-thresholds).
+	noThresholds bool
+	// featureFlags are the resolved feature flags, and must not be nil.
+	featureFlags *features.Flags
+}
+
+// consolidateDeriveAndValidate merges the test options layer with the CLI, -c config and
+// environment layers, derives the scenarios and validates the result.
+//
+//nolint:funlen // Keep CLI feature ordering together.
+func consolidateDeriveAndValidate(
+	gs *state.GlobalState, cmd *cobra.Command,
+	cliConfGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
+	in testConfigInputs,
+) (consolidatedConfig, derivedConfig Config, err error) {
 	var cliConfig Config
 	if cliConfGetter != nil {
 		gs.Logger.Debug("Parsing CLI flags...")
-		var err error
 		cliConfig, err = cliConfGetter(cmd.Flags())
 		if err != nil {
-			return nil, err
+			return Config{}, Config{}, err
 		}
 		// --once is CLI-only, so it rides on the CLI configuration layer.
 		cliConfig.once = getNullBool(cmd.Flags(), "once").Bool
@@ -546,13 +624,12 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 
 	var scenarioNames []string
 	if cmd.Flags().Changed("scenario") {
-		var err error
 		scenarioNames, err = cmd.Flags().GetStringSlice("scenario")
 		if err != nil {
-			return nil, err
+			return Config{}, Config{}, err
 		}
 		if len(scenarioNames) == 0 {
-			return nil, errext.WithExitCodeIfNone(
+			return Config{}, Config{}, errext.WithExitCodeIfNone(
 				errors.New("--scenario requires at least one scenario name"),
 				exitcodes.InvalidConfig)
 		}
@@ -561,60 +638,47 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 	gs.Logger.Debug("Consolidating config layers...")
 	fileConf, envConf, err := readConfigLayers(gs)
 	if err != nil {
-		return nil, err
+		return Config{}, Config{}, err
 	}
-	runnerOpts := lt.initRunner.GetOptions()
+	testOpts := in.options
 	// Lower layers drop their shortcuts before the merge; getOptions rejects the CLI ones.
-	layers := map[string]*lib.Options{
-		"config":      &fileConf.Options,
-		"script":      &runnerOpts,
-		"environment": &envConf.Options,
+	layers := []optionsLayer{
+		{name: "config", opts: &fileConf.Options},
+		{name: in.layerName, opts: &testOpts},
+		{name: "environment", opts: &envConf.Options},
 	}
 	if cliConfig.once {
-		err = dropOnceShortcuts(gs.Logger, layers)
+		dropOnceShortcuts(gs.Logger, layers)
 	} else if scenarioNames != nil {
-		err = dropScenarioShortcuts(gs.Logger, layers)
+		dropScenarioShortcuts(gs.Logger, layers)
 	}
+	consolidatedConfig, err = getConsolidatedConfig(
+		gs, cliConfig, fileConf, envConf, testOpts, in.layerName, in.featureFlags)
 	if err != nil {
-		return nil, err
-	}
-	consolidatedConfig, err := getConsolidatedConfig(
-		gs, cliConfig, fileConf, envConf, runnerOpts, lt.preInitState.FeatureFlags)
-	if err != nil {
-		return nil, err
+		return Config{}, Config{}, err
 	}
 
 	configuredScenarios := consolidatedConfig.Scenarios
 	switch {
 	case scenarioNames != nil:
-		consolidatedConfig.Options, err = selectScenarios(consolidatedConfig.Options, scenarioNames)
+		consolidatedConfig.Options, err = selectScenarios(consolidatedConfig.Options, scenarioNames, in.layerName)
 	case cliConfig.once:
 		err = rejectAmbiguousOnce(consolidatedConfig.Scenarios)
 	}
 	if err != nil {
-		return nil, err
+		return Config{}, Config{}, err
 	}
 	if cliConfig.once {
 		if consolidatedConfig.Options, err = applyOnce(consolidatedConfig.Options); err != nil {
-			return nil, err
+			return Config{}, Config{}, err
 		}
 	}
 
 	gs.Logger.Debug("Parsing thresholds and validating config...")
 	// Parse the thresholds, only if the --no-threshold flag is not set.
-	// If parsing the threshold expressions failed, consider it as an
-	// invalid configuration error.
-	if !lt.preInitState.RuntimeOptions.NoThresholds.Bool {
-		for metricName, thresholdsDefinition := range consolidatedConfig.Thresholds {
-			err = thresholdsDefinition.Parse()
-			if err != nil {
-				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-			}
-
-			err = thresholdsDefinition.Validate(metricName, lt.preInitState.Registry)
-			if err != nil {
-				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-			}
+	if !in.noThresholds {
+		if err = parseAndValidateThresholds(consolidatedConfig.Thresholds, in.registry); err != nil {
+			return Config{}, Config{}, err
 		}
 	}
 
@@ -622,19 +686,34 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 		dropScenarioThresholds(gs.Logger, &consolidatedConfig.Options, configuredScenarios)
 	}
 
-	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.Logger)
+	derivedConfig, err = deriveAndValidateConfig(consolidatedConfig, in.isExecutable, in.layerName, gs.Logger)
 	if err != nil {
-		return nil, err
+		return Config{}, Config{}, err
 	}
 
 	// tag only derived options; consolidated stays clean so cloud/archive don't serialize feature tags
-	applyFeatureRunTags(&derivedConfig.Options, lt.preInitState.FeatureFlags.Tags())
+	applyFeatureRunTags(&derivedConfig.Options, in.featureFlags.Tags())
 
-	return &loadedAndConfiguredTest{
-		loadedTest:         lt,
-		consolidatedConfig: consolidatedConfig,
-		derivedConfig:      derivedConfig,
-	}, nil
+	return consolidatedConfig, derivedConfig, nil
+}
+
+// parseAndValidateThresholds parses the threshold expressions and, with a registry, checks
+// them against the known metrics. A failure is an invalid configuration error.
+func parseAndValidateThresholds(thresholds map[string]metrics.Thresholds, registry *metrics.Registry) error {
+	for metricName, thresholdsDefinition := range thresholds {
+		if err := thresholdsDefinition.Parse(); err != nil {
+			return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
+
+		// Without a registry the metrics are unknown, and Validate panics on a nil registry.
+		if registry == nil {
+			continue
+		}
+		if err := thresholdsDefinition.Validate(metricName, registry); err != nil {
+			return errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+		}
+	}
+	return nil
 }
 
 // loadedAndConfiguredTest contains the whole loadedTest, as well as the

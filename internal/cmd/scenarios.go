@@ -28,14 +28,11 @@ func checkScenarioConflicts(flags *pflag.FlagSet) error {
 	return nil
 }
 
-func dropScenarioShortcuts(logger logrus.FieldLogger, layers map[string]*lib.Options) error {
+// The layers come in merge order, and the warnings follow it.
+func dropScenarioShortcuts(logger logrus.FieldLogger, layers []optionsLayer) {
 	var unset lib.Options
-	for _, name := range []string{"config", "script", "environment"} {
-		opts, ok := layers[name]
-		if !ok {
-			return fmt.Errorf("missing %q layer", name)
-		}
-
+	for _, layer := range layers {
+		opts := layer.opts
 		var dropped []string
 		if opts.VUs.Valid {
 			dropped = append(dropped, "vus")
@@ -54,13 +51,12 @@ func dropScenarioShortcuts(logger logrus.FieldLogger, layers map[string]*lib.Opt
 		opts.Iterations = unset.Iterations
 		opts.Stages = unset.Stages
 		if len(dropped) > 0 {
-			logger.Warnf("--scenario overrode %s in %q configuration", strings.Join(dropped, ", "), name)
+			logger.Warnf("--scenario overrode %s in %q configuration", strings.Join(dropped, ", "), layer.name)
 		}
 	}
-	return nil
 }
 
-func selectScenarios(opts lib.Options, names []string) (lib.Options, error) {
+func selectScenarios(opts lib.Options, names []string, testLayerName string) (lib.Options, error) {
 	selected := make(lib.ScenarioConfigs, len(names))
 	for _, name := range names {
 		if sc, ok := opts.Scenarios[name]; ok {
@@ -71,7 +67,7 @@ func selectScenarios(opts lib.Options, names []string) (lib.Options, error) {
 		available := strings.Join(slices.Sorted(maps.Keys(opts.Scenarios)), ", ")
 		err := fmt.Errorf("scenario %q not found; available scenarios: %s", name, available)
 		if len(opts.Scenarios) == 0 {
-			err = fmt.Errorf("scenario %q not found; the script does not have any named scenario", name)
+			err = fmt.Errorf("scenario %q not found; the %s does not have any named scenario", name, testLayerName)
 		}
 
 		return opts, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)

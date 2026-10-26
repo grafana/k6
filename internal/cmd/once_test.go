@@ -146,12 +146,12 @@ func TestGetConsolidatedConfigOnceDropsLowerLayerShortcuts(t *testing.T) {
 
 	fileConf, envConf, err := readConfigLayers(ts.GlobalState)
 	require.NoError(t, err)
-	require.NoError(t, dropOnceShortcuts(ts.Logger, map[string]*lib.Options{
-		"config":      &fileConf.Options,
-		"script":      &runnerOpts,
-		"environment": &envConf.Options,
-	}))
-	conf, err := getConsolidatedConfig(ts.GlobalState, Config{}, fileConf, envConf, runnerOpts, nil)
+	dropOnceShortcuts(ts.Logger, []optionsLayer{
+		{name: "config", opts: &fileConf.Options},
+		{name: "script", opts: &runnerOpts},
+		{name: "environment", opts: &envConf.Options},
+	})
+	conf, err := getConsolidatedConfig(ts.GlobalState, Config{}, fileConf, envConf, runnerOpts, scriptLayerName, nil)
 	require.NoError(t, err)
 
 	assert.False(t, conf.VUs.Valid)
@@ -177,12 +177,12 @@ func TestOncePreservesScenarioAcrossLayers(t *testing.T) {
 
 	fileConf, envConf, err := readConfigLayers(ts.GlobalState)
 	require.NoError(t, err)
-	require.NoError(t, dropOnceShortcuts(ts.Logger, map[string]*lib.Options{
-		"config":      &fileConf.Options,
-		"script":      &runnerOpts,
-		"environment": &envConf.Options,
-	}))
-	conf, err := getConsolidatedConfig(ts.GlobalState, Config{}, fileConf, envConf, runnerOpts, nil)
+	dropOnceShortcuts(ts.Logger, []optionsLayer{
+		{name: "config", opts: &fileConf.Options},
+		{name: "script", opts: &runnerOpts},
+		{name: "environment", opts: &envConf.Options},
+	})
+	conf, err := getConsolidatedConfig(ts.GlobalState, Config{}, fileConf, envConf, runnerOpts, scriptLayerName, nil)
 	require.NoError(t, err)
 
 	opts, err := applyOnce(conf.Options)
@@ -203,25 +203,25 @@ func TestDropOnceShortcutsWarnsOnlyWhenItDropsShortcuts(t *testing.T) {
 
 	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
 
-	require.NoError(t, dropOnceShortcuts(logger, map[string]*lib.Options{
-		"config":      {},
-		"script":      {},
-		"environment": {},
-	}))
+	dropOnceShortcuts(logger, []optionsLayer{
+		{name: "config", opts: &lib.Options{}},
+		{name: "script", opts: &lib.Options{}},
+		{name: "environment", opts: &lib.Options{}},
+	})
 	assert.Empty(t, hook.Drain())
 
 	segment, err := lib.NewExecutionSegmentFromString("0:1/2")
 	require.NoError(t, err)
-	require.NoError(t, dropOnceShortcuts(logger, map[string]*lib.Options{
-		"config": {VUs: null.IntFrom(1), Stages: []lib.Stage{
+	dropOnceShortcuts(logger, []optionsLayer{
+		{name: "config", opts: &lib.Options{VUs: null.IntFrom(1), Stages: []lib.Stage{
 			{Duration: types.NullDurationFrom(time.Second), Target: null.IntFrom(1)},
-		}},
-		"script": {
+		}}},
+		{name: "script", opts: &lib.Options{
 			VUs: null.IntFrom(1), Duration: types.NullDurationFrom(time.Second),
 			ExecutionSegment: segment,
-		},
-		"environment": {Iterations: null.IntFrom(1)},
-	}))
+		}},
+		{name: "environment", opts: &lib.Options{Iterations: null.IntFrom(1)}},
+	})
 
 	entries := hook.Drain()
 	require.Len(t, entries, 3)

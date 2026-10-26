@@ -611,7 +611,8 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	var consolidatedConfig Config
 	fileConf, envConf, err := readConfigLayers(ts.GlobalState)
 	if err == nil {
-		consolidatedConfig, err = getConsolidatedConfig(ts.GlobalState, cliConf, fileConf, envConf, opts, testCase.options.features)
+		consolidatedConfig, err = getConsolidatedConfig(
+			ts.GlobalState, cliConf, fileConf, envConf, opts, scriptLayerName, testCase.options.features)
 	}
 	if testCase.expected.consolidationError {
 		require.Error(t, err)

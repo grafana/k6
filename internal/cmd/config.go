@@ -207,6 +207,18 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 	return conf, err
 }
 
+// Names of the test options layer in messages.
+const (
+	scriptLayerName      = "script"
+	optionsFileLayerName = "options file"
+)
+
+// optionsLayer is a named options layer below the CLI flags.
+type optionsLayer struct {
+	name string
+	opts *lib.Options
+}
+
 // readConfigLayers reads file and environment options before merging them.
 func readConfigLayers(gs *state.GlobalState) (Config, Config, error) {
 	fileConf, err := readDiskConfig(gs)
@@ -226,18 +238,20 @@ func readConfigLayers(gs *state.GlobalState) (Config, Config, error) {
 // getConsolidatedConfig assemble the final consolidated configuration from all of the different sources:
 // - start with the CLI-provided options to get shadowed (non-Valid) defaults in there
 // - add the global file config options
-// - add the Runner-provided options (they may come from Bundle too if applicable)
+// - add the test options, from the Runner (script or archive) or from --options-file,
+// named testLayerName in messages
 // - add the environment variables
 // - merge the user-supplied CLI flags back in on top, to give them the greatest priority
 // - set some defaults if they weren't previously specified
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(
-	gs *state.GlobalState, cliConf, fileConf, envConf Config, runnerOpts lib.Options, flags *features.Flags,
+	gs *state.GlobalState, cliConf, fileConf, envConf Config, runnerOpts lib.Options, testLayerName string,
+	flags *features.Flags,
 ) (Config, error) {
 	conf := cliConf.Apply(fileConf)
 
-	warnOnShortHandOverride(conf.Options, runnerOpts, "script", gs.Logger)
+	warnOnShortHandOverride(conf.Options, runnerOpts, testLayerName, gs.Logger)
 	conf = conf.Apply(Config{Options: runnerOpts})
 
 	warnOnShortHandOverride(conf.Options, envConf.Options, "env", gs.Logger)
@@ -326,17 +340,17 @@ func applyDefault(conf Config) Config {
 }
 
 func deriveAndValidateConfig(
-	conf Config, isExecutable func(string) bool, logger logrus.FieldLogger,
+	conf Config, isExecutable func(string) bool, testLayerName string, logger logrus.FieldLogger,
 ) (result Config, err error) {
 	result = conf
 	result.Options, err = executor.DeriveScenariosFromShortcuts(conf.Options, logger)
 	if err == nil {
-		err = validateConfig(result, isExecutable)
+		err = validateConfig(result, isExecutable, testLayerName)
 	}
 	return result, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 }
 
-func validateConfig(conf Config, isExecutable func(string) bool) error {
+func validateConfig(conf Config, isExecutable func(string) bool, testLayerName string) error {
 	errList := conf.Validate()
 
 	for _, ec := range conf.Scenarios {
@@ -345,7 +359,8 @@ func validateConfig(conf Config, isExecutable func(string) bool) error {
 		}
 	}
 
-	return consolidateErrorMessage(errList, "There were problems with the specified script configuration:")
+	return consolidateErrorMessage(errList,
+		fmt.Sprintf("There were problems with the specified %s configuration:", testLayerName))
 }
 
 func consolidateErrorMessage(errList []error, title string) error {

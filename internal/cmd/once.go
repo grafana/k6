@@ -35,16 +35,12 @@ func checkOnceConflicts(flags *pflag.FlagSet) error {
 }
 
 // A shortcut left in a lower layer drops or rewrites the scenario applyOnce writes.
-func dropOnceShortcuts(logger logrus.FieldLogger, layers map[string]*lib.Options) error {
+// The layers come in merge order, and the warnings follow it.
+func dropOnceShortcuts(logger logrus.FieldLogger, layers []optionsLayer) {
 	var unset lib.Options
 
-	// k6 merges the layers in this order, and the warning follows it.
-	for _, name := range []string{"config", "script", "environment"} {
-		o, ok := layers[name]
-		if !ok {
-			return fmt.Errorf("missing %q layer", name)
-		}
-
+	for _, layer := range layers {
+		o := layer.opts
 		var dropped []string
 		drop := func(opt string, set bool) {
 			if set {
@@ -67,11 +63,9 @@ func dropOnceShortcuts(logger logrus.FieldLogger, layers map[string]*lib.Options
 		o.ExecutionSegmentSequence = unset.ExecutionSegmentSequence
 
 		if len(dropped) > 0 {
-			logger.Warnf("--once overrode %s in %q configuration", strings.Join(dropped, ", "), name)
+			logger.Warnf("--once overrode %s in %q configuration", strings.Join(dropped, ", "), layer.name)
 		}
 	}
-
-	return nil
 }
 
 // Bare --once never guesses which scenario runs, so several scenarios are ambiguous.

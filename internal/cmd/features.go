@@ -89,19 +89,33 @@ func (c *featuresCmd) printJSON(flags []features.Flag) error {
 }
 
 func resolveFeatureFlags(gs *state.GlobalState, cmd *cobra.Command, piState *lib.TestPreInitState) error {
+	flags, err := initFeatureFlags(gs, cmd, piState.RuntimeOptions.Env)
+	if err != nil {
+		return err
+	}
+	piState.FeatureFlags = flags
+	return nil
+}
+
+// initFeatureFlags resolves the feature flags from the CLI, the -c config and the
+// environment, without a loaded test. It adds K6_FEATURES to runtimeEnv, the env of the
+// test runtime (--env).
+func initFeatureFlags(
+	gs *state.GlobalState, cmd *cobra.Command, runtimeEnv map[string]string,
+) (*features.Flags, error) {
 	var cli features.Source
 	if cmd.Flags().Lookup("features") != nil {
 		cli.Supplied = cmd.Flags().Changed("features")
 		vals, err := cmd.Flags().GetStringArray("features")
 		if err != nil {
-			return fmt.Errorf("reading --features flag: %w", err)
+			return nil, fmt.Errorf("reading --features flag: %w", err)
 		}
 		cli.Values = vals
 	}
 
 	fileConf, err := readDiskConfig(gs)
 	if err != nil {
-		return errext.WithExitCodeIfNone(
+		return nil, errext.WithExitCodeIfNone(
 			fmt.Errorf("failed to load the configuration file from the local file system: %w", err),
 			exitcodes.InvalidConfig,
 		)
@@ -112,13 +126,12 @@ func resolveFeatureFlags(gs *state.GlobalState, cmd *cobra.Command, piState *lib
 	if envSurface == nil {
 		envSurface = make(map[string]string)
 	}
-	maps.Copy(envSurface, piState.RuntimeOptions.Env)
+	maps.Copy(envSurface, runtimeEnv)
 
 	flags, err := features.Init(gs.Logger, cli, jsonSurface, envSurface)
 	if err != nil {
-		return fmt.Errorf("initializing feature flags: %w", err)
+		return nil, fmt.Errorf("initializing feature flags: %w", err)
 	}
-	piState.FeatureFlags = flags
 
 	for _, name := range flags.Activated() {
 		if err := gs.Usage.Strings("features", name); err != nil {
@@ -126,16 +139,21 @@ func resolveFeatureFlags(gs *state.GlobalState, cmd *cobra.Command, piState *lib
 		}
 	}
 
-	propagateFeatureEnv(piState.RuntimeOptions.Env, flags.Activated())
-	return nil
+	propagateFeatureEnv(runtimeEnv, flags.Activated())
+	return flags, nil
 }
 
-func warnOnScriptOptionsFeatures(logger logrus.FieldLogger, opts lib.Options) {
+// warnOnOptionsFeatures warns that features in the test options layer are ignored.
+func warnOnOptionsFeatures(logger logrus.FieldLogger, opts lib.Options, testLayerName string) {
 	if len(opts.Features) == 0 {
 		return
 	}
+	where := "script options"
+	if testLayerName == optionsFileLayerName {
+		where = "the options file"
+	}
 	logger.WithField("source", "options").
-		Warn("Feature flags in script options are not supported; use --features, K6_FEATURES, or the JSON config")
+		Warnf("Feature flags in %s are not supported; use --features, K6_FEATURES, or the JSON config", where)
 }
 
 // applyFeatureRunTags rewrites RunTags via a fresh map (consolidated shares the original, must not mutate).

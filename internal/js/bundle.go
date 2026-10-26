@@ -83,13 +83,33 @@ func (bi *BundleInstance) getExported(name string) sobek.Value {
 func NewBundle(
 	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs, mr *modules.ModuleResolver,
 ) (*Bundle, error) {
-	return newBundle(piState, src, filesystems, lib.Options{}, true, mr)
+	return newBundle(piState, src, filesystems, lib.Options{}, optionsFromScript, mr)
+}
+
+// optionsSource says where the options of a Bundle come from.
+type optionsSource int
+
+const (
+	// optionsFromScript decodes the options from the script's options export.
+	optionsFromScript optionsSource = iota
+	// optionsFromArchive uses the archive's options and ignores the export.
+	optionsFromArchive
+	// optionsFromFile uses the options from --options-file and ignores the export with a warning.
+	optionsFromFile
+)
+
+// NewBundleWithOptions creates a new bundle from a source file and a filesystem that uses the
+// given options, as for --options-file. Like for archives, the script's options export is ignored.
+func NewBundleWithOptions(
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
+	options lib.Options, mr *modules.ModuleResolver,
+) (*Bundle, error) {
+	return newBundle(piState, src, filesystems, options, optionsFromFile, mr)
 }
 
 func newBundle(
 	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
-	options lib.Options, updateOptions bool, // TODO: try to figure out a way to not need both
-	moduleResolver *modules.ModuleResolver,
+	options lib.Options, source optionsSource, moduleResolver *modules.ModuleResolver,
 ) (*Bundle, error) {
 	compatMode, err := lib.ValidateCompatibilityMode(piState.RuntimeOptions.CompatibilityMode.String)
 	if err != nil {
@@ -130,7 +150,7 @@ func newBundle(
 	}
 	bundle.ModuleResolver.Lock()
 
-	err = bundle.populateExports(updateOptions, bi)
+	err = bundle.populateExports(source, bi)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +177,7 @@ func NewBundleFromArchive(
 	return newBundle(piState, &loader.SourceData{
 		Data: arc.Data,
 		URL:  arc.FilenameURL,
-	}, arc.Filesystems, arc.Options, false, mr)
+	}, arc.Filesystems, arc.Options, optionsFromArchive, mr)
 }
 
 func (b *Bundle) makeArchive() *lib.Archive {
@@ -183,7 +203,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 }
 
 // populateExports validates and extracts exported objects
-func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
+func (b *Bundle) populateExports(source optionsSource, bi *BundleInstance) error {
 	var err error
 	ch := make(chan struct{})
 	bi.mainModule.GetExportedNames(func(names []string) {
@@ -196,7 +216,10 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 			}
 			switch k {
 			case consts.Options:
-				if !updateOptions || v == nil {
+				if source == optionsFromFile && !common.IsNullish(v) {
+					b.preInitState.Logger.Warn("The script's options are ignored because of --options-file")
+				}
+				if source != optionsFromScript || v == nil {
 					continue
 				}
 				var data []byte
@@ -210,7 +233,7 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 				if err = dec.Decode(&b.Options); err != nil {
 					if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
 						// Beautify the error so we can try to show the user the key and potential value that is failing to parse
-						uerr = beautifyOptionsJSONUnmarshalError(data, uerr)
+						uerr = BeautifyOptionsJSONUnmarshalError(data, uerr, "script")
 						err = errext.WithAbortReasonIfNone(
 							errext.WithExitCodeIfNone(uerr, exitcodes.InvalidConfig),
 							errext.AbortedByScriptError,
@@ -241,7 +264,9 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 	return nil
 }
 
-func beautifyOptionsJSONUnmarshalError(data []byte, err error) error {
+// BeautifyOptionsJSONUnmarshalError adds the line of data that failed to decode to a type
+// error, so the user sees the key and the value. source names where the options come from.
+func BeautifyOptionsJSONUnmarshalError(data []byte, err error, source string) error {
 	unmarshalTypError := new(json.UnmarshalTypeError)
 	if errors.As(err, &unmarshalTypError) {
 		e := unmarshalTypError
@@ -249,7 +274,7 @@ func beautifyOptionsJSONUnmarshalError(data []byte, err error) error {
 		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), int(e.Offset))
 
 		info := strings.TrimSpace(string(data[previousNewLineIndex:nextNewLineIndex]))
-		err = fmt.Errorf("parsing options from script got error while parsing %q: %w", info, e)
+		err = fmt.Errorf("parsing options from %s got error while parsing %q: %w", source, info, e)
 	}
 	return err
 }

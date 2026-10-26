@@ -584,6 +584,8 @@ a commandline interface for interacting with it.`,
 
 	runCmd.Flags().SortFlags = false
 	runCmd.Flags().AddFlagSet(c.flagSet())
+	// Not in c.flagSet(), which k6 cloud run shares.
+	runCmd.Flags().AddFlagSet(optionsFileFlagSet())
 
 	return runCmd
 }
