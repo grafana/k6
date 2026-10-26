@@ -279,7 +279,10 @@ const (
 	CommandDOMGetQueryingDescendantsForContainer                     = dom.CommandGetQueryingDescendantsForContainer
 	CommandDOMGetAnchorElement                                       = dom.CommandGetAnchorElement
 	CommandDOMForceShowPopover                                       = dom.CommandForceShowPopover
+	CommandDOMGetImplicitAnchorCandidates                            = dom.CommandGetImplicitAnchorCandidates
 	CommandDOMForceShowInterest                                      = dom.CommandForceShowInterest
+	CommandDOMSetTextMarker                                          = dom.CommandSetTextMarker
+	CommandDOMClearTextMarkers                                       = dom.CommandClearTextMarkers
 	EventDOMAttributeModified                                        = "DOM.attributeModified"
 	EventDOMAdoptedStyleSheetsModified                               = "DOM.adoptedStyleSheetsModified"
 	EventDOMAttributeRemoved                                         = "DOM.attributeRemoved"
@@ -650,6 +653,8 @@ const (
 	CommandPageGetAppManifest                                        = page.CommandGetAppManifest
 	CommandPageGetInstallabilityErrors                               = page.CommandGetInstallabilityErrors
 	CommandPageGetAppID                                              = page.CommandGetAppID
+	CommandPageGetSubApps                                            = page.CommandGetSubApps
+	CommandPageGetSiblingSubApps                                     = page.CommandGetSiblingSubApps
 	CommandPageGetAdScriptAncestry                                   = page.CommandGetAdScriptAncestry
 	CommandPageGetFrameTree                                          = page.CommandGetFrameTree
 	CommandPageGetLayoutMetrics                                      = page.CommandGetLayoutMetrics
@@ -834,16 +839,20 @@ const (
 	CommandStorageUntrackIndexedDBForStorageKey                      = storage.CommandUntrackIndexedDBForStorageKey
 	CommandStorageGetTrustTokens                                     = storage.CommandGetTrustTokens
 	CommandStorageClearTrustTokens                                   = storage.CommandClearTrustTokens
+	CommandStorageGetPrivateVerificationTokens                       = storage.CommandGetPrivateVerificationTokens
+	CommandStorageClearPrivateVerificationTokens                     = storage.CommandClearPrivateVerificationTokens
+	CommandStorageDeletePrivateVerificationToken                     = storage.CommandDeletePrivateVerificationToken
+	CommandStorageSetPrivateVerificationTokensTracking               = storage.CommandSetPrivateVerificationTokensTracking
 	CommandStorageSetStorageBucketTracking                           = storage.CommandSetStorageBucketTracking
 	CommandStorageDeleteStorageBucket                                = storage.CommandDeleteStorageBucket
 	CommandStorageRunBounceTrackingMitigations                       = storage.CommandRunBounceTrackingMitigations
-	CommandStorageGetRelatedWebsiteSets                              = storage.CommandGetRelatedWebsiteSets
 	EventStorageCacheStorageContentUpdated                           = "Storage.cacheStorageContentUpdated"
 	EventStorageCacheStorageListUpdated                              = "Storage.cacheStorageListUpdated"
 	EventStorageIndexedDBContentUpdated                              = "Storage.indexedDBContentUpdated"
 	EventStorageIndexedDBListUpdated                                 = "Storage.indexedDBListUpdated"
 	EventStorageStorageBucketCreatedOrUpdated                        = "Storage.storageBucketCreatedOrUpdated"
 	EventStorageStorageBucketDeleted                                 = "Storage.storageBucketDeleted"
+	EventStoragePrivateVerificationTokensUpdated                     = "Storage.privateVerificationTokensUpdated"
 	CommandSystemInfoGetInfo                                         = systeminfo.CommandGetInfo
 	CommandSystemInfoGetFeatureState                                 = systeminfo.CommandGetFeatureState
 	CommandSystemInfoGetProcessInfo                                  = systeminfo.CommandGetProcessInfo
@@ -1337,7 +1346,13 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(dom.GetAnchorElementReturns)
 	case CommandDOMForceShowPopover:
 		v = new(dom.ForceShowPopoverReturns)
+	case CommandDOMGetImplicitAnchorCandidates:
+		v = new(dom.GetImplicitAnchorCandidatesReturns)
 	case CommandDOMForceShowInterest:
+		return emptyVal, nil
+	case CommandDOMSetTextMarker:
+		return emptyVal, nil
+	case CommandDOMClearTextMarkers:
 		return emptyVal, nil
 	case EventDOMAttributeModified:
 		v = new(dom.EventAttributeModified)
@@ -2079,6 +2094,10 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(page.GetInstallabilityErrorsReturns)
 	case CommandPageGetAppID:
 		v = new(page.GetAppIDReturns)
+	case CommandPageGetSubApps:
+		v = new(page.GetSubAppsReturns)
+	case CommandPageGetSiblingSubApps:
+		v = new(page.GetSiblingSubAppsReturns)
 	case CommandPageGetAdScriptAncestry:
 		v = new(page.GetAdScriptAncestryReturns)
 	case CommandPageGetFrameTree:
@@ -2447,14 +2466,20 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(storage.GetTrustTokensReturns)
 	case CommandStorageClearTrustTokens:
 		v = new(storage.ClearTrustTokensReturns)
+	case CommandStorageGetPrivateVerificationTokens:
+		v = new(storage.GetPrivateVerificationTokensReturns)
+	case CommandStorageClearPrivateVerificationTokens:
+		return emptyVal, nil
+	case CommandStorageDeletePrivateVerificationToken:
+		return emptyVal, nil
+	case CommandStorageSetPrivateVerificationTokensTracking:
+		return emptyVal, nil
 	case CommandStorageSetStorageBucketTracking:
 		return emptyVal, nil
 	case CommandStorageDeleteStorageBucket:
 		return emptyVal, nil
 	case CommandStorageRunBounceTrackingMitigations:
 		v = new(storage.RunBounceTrackingMitigationsReturns)
-	case CommandStorageGetRelatedWebsiteSets:
-		v = new(storage.GetRelatedWebsiteSetsReturns)
 	case EventStorageCacheStorageContentUpdated:
 		v = new(storage.EventCacheStorageContentUpdated)
 	case EventStorageCacheStorageListUpdated:
@@ -2467,6 +2492,8 @@ func UnmarshalMessage(msg *Message, opts ...jsonv2.Options) (any, error) {
 		v = new(storage.EventStorageBucketCreatedOrUpdated)
 	case EventStorageStorageBucketDeleted:
 		v = new(storage.EventStorageBucketDeleted)
+	case EventStoragePrivateVerificationTokensUpdated:
+		v = new(storage.EventPrivateVerificationTokensUpdated)
 	case CommandSystemInfoGetInfo:
 		v = new(systeminfo.GetInfoReturns)
 	case CommandSystemInfoGetFeatureState:

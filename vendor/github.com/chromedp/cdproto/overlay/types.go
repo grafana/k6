@@ -120,6 +120,22 @@ func (t *ContrastAlgorithm) UnmarshalJSON(buf []byte) error {
 	return nil
 }
 
+// ImcbHighlightConfig configuration for Inset-Modified Containing Block
+// (IMCB) and CSS Anchor Positioning highlight.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-ImcbHighlightConfig
+type ImcbHighlightConfig struct {
+	ImcbBorderColor               *cdp.RGBA `json:"imcbBorderColor,omitempty,omitzero"`               // Border color for the Inset-Modified Containing Block (default: transparent).
+	ImcbBackgroundColor           *cdp.RGBA `json:"imcbBackgroundColor,omitempty,omitzero"`           // Background fill color for the Inset-Modified Containing Block (default: transparent).
+	InsetsBackgroundColor         *cdp.RGBA `json:"insetsBackgroundColor,omitempty,omitzero"`         // Fill color for the inset modifiers area (difference between CB and IMCB).
+	InsetsHatchColor              *cdp.RGBA `json:"insetsHatchColor,omitempty,omitzero"`              // Hatch color for the inset modifiers area.
+	AnchorBorderColor             *cdp.RGBA `json:"anchorBorderColor,omitempty,omitzero"`             // Border color for the referenced target anchor element(s) (when element is anchor-positioned).
+	AnchorBackgroundColor         *cdp.RGBA `json:"anchorBackgroundColor,omitempty,omitzero"`         // Background fill color for the referenced target anchor element(s) (when element is anchor-positioned).
+	ShowPositionAreaGrid          bool      `json:"showPositionAreaGrid"`                             // Whether to render the 3x3 position-area grid lines when position-area is used.
+	PositionAreaGridLineColor     *cdp.RGBA `json:"positionAreaGridLineColor,omitempty,omitzero"`     // Line color for the 3x3 position-area grid lines.
+	PositionAreaActiveRegionColor *cdp.RGBA `json:"positionAreaActiveRegionColor,omitempty,omitzero"` // Fill color for the active region within the position-area grid.
+}
+
 // HighlightConfig configuration data for the highlighting of page elements.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Overlay#type-HighlightConfig
@@ -143,6 +159,7 @@ type HighlightConfig struct {
 	FlexItemHighlightConfig                *FlexItemHighlightConfig                `json:"flexItemHighlightConfig,omitempty,omitzero"`                // The flex item highlight configuration (default: all transparent).
 	ContrastAlgorithm                      ContrastAlgorithm                       `json:"contrastAlgorithm,omitempty,omitzero"`                      // The contrast algorithm to use for the contrast ratio (default: aa).
 	ContainerQueryContainerHighlightConfig *ContainerQueryContainerHighlightConfig `json:"containerQueryContainerHighlightConfig,omitempty,omitzero"` // The container query container highlight configuration (default: all transparent).
+	ImcbHighlightConfig                    *ImcbHighlightConfig                    `json:"imcbHighlightConfig,omitempty,omitzero"`                    // The IMCB highlight configuration (default: all transparent).
 }
 
 // ColorFormat [no description].
