@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/v2/internal/build"
 	"go.k6.io/k6/v2/internal/lib/summary"
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/lib"
@@ -640,6 +641,53 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
+}
+
+func TestMachineReadableHandleSummaryMetadata(t *testing.T) {
+	t.Parallel()
+
+	runner, err := getSimpleRunner(
+		t, "/script.js",
+		`
+		exports.default = function() {};
+		exports.handleSummary = function(data) {
+			return {'rawdata.json': JSON.stringify(data, null, 4)};
+		};
+		`,
+		lib.RuntimeOptions{
+			CompatibilityMode: null.NewString("base", true),
+			SummaryExport:     null.StringFrom("summary.json"),
+		},
+	)
+	require.NoError(t, err)
+
+	s := summary.New()
+	s.NewMachineReadableSummary = true
+	s.TestRunDuration = time.Second
+
+	result, err := runner.HandleSummary(t.Context(), nil, s, summary.Meta{Script: "export default function() {}\n"})
+	require.NoError(t, err)
+
+	for _, filename := range []string{"rawdata.json", "summary.json"} {
+		t.Run(filename, func(t *testing.T) {
+			t.Parallel()
+
+			raw, err := io.ReadAll(result[filename])
+			require.NoError(t, err)
+
+			var data struct {
+				Metadata map[string]string `json:"metadata"`
+			}
+			require.NoError(t, json.Unmarshal(raw, &data))
+			assert.Equal(t, build.Version, data.Metadata["k6Version"])
+			assert.Equal(t, data.Metadata["k6Version"], data.Metadata["k6_version"])
+			_, err = time.Parse(time.RFC3339Nano, data.Metadata["generatedAt"])
+			assert.NoError(t, err)
+			assert.Equal(t, data.Metadata["generatedAt"], data.Metadata["generated_at"])
+			assert.Contains(t, string(raw), `"script": "export default function() {}\n"`)
+			assert.Contains(t, string(raw), `"version": "1.0.0"`)
+		})
+	}
 }
 
 func TestWrongSummaryHandlerExportTypes(t *testing.T) {
