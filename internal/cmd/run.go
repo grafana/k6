@@ -566,10 +566,10 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
   {{.}} run -u 5 -d 10s script.js
 
   # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
-  {{.}} run -u 0 -s 10s:100 -s 60s:100 -s 10s:0
+  {{.}} run -u 0 -s 10s:100 -s 60s:100 -s 10s:0 script.js
 
   # Send metrics to a remote storage using the OpenTelemetry output.
-  {{.}} run -o opentelemetry`[1:])
+  {{.}} run -o opentelemetry script.js`[1:])
 
 	runCmd := &cobra.Command{
 		Use:   "run",
