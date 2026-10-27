@@ -16,7 +16,7 @@ func TestJSHandleAsElementNullClick(t *testing.T) {
 	got := tb.vu.RunPromise(t, `
 		const page = await browser.newPage();
 		try {
-			const handle = await page.evaluateHandle(() => document.querySelector('#missing'));
+			const handle = await page.evaluateHandle(() => { return {}; });
 			const element = handle.asElement();
 			try {
 				await element.click();
