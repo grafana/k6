@@ -20,7 +20,6 @@ import (
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin/grpc_wrappers_testing"
 	"go.k6.io/k6/v2/lib/fsext"
-	"go.k6.io/k6/v2/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/metrics"
 
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -1559,7 +1558,7 @@ func TestDebugStat(t *testing.T) {
 			logger := logrus.New()
 			logger.Out = &b
 
-			grpcext.DebugStat(logger.WithField("source", "test"), tt.stat, httpdebug.Config{Body: true})
+			grpcext.DebugStat(logger.WithField("source", "test"), tt.stat, "full", false)
 			assert.Contains(t, b.String(), tt.expected)
 		})
 	}
@@ -1580,18 +1579,17 @@ func TestDebugStatRedaction(t *testing.T) {
 
 	tests := [...]struct {
 		name        string
-		cfg         httpdebug.Config
+		redact      bool
 		expected    []string
 		notExpected []string
 	}{
 		{
 			name:     "unredacted by default",
-			cfg:      httpdebug.Config{Body: true},
 			expected: []string{"authorization: Bearer secret-token", "x-api-key: secret-key", "x-head: in"},
 		},
 		{
 			name:        "redacted",
-			cfg:         httpdebug.Config{Body: true, Redacted: true},
+			redact:      true,
 			expected:    []string{"authorization: Bearer ***REDACTED***", "x-api-key: ***REDACTED***", "x-head: in"},
 			notExpected: []string{"secret-token", "secret-key"},
 		},
@@ -1605,7 +1603,7 @@ func TestDebugStatRedaction(t *testing.T) {
 
 			for _, stat := range stats {
 				b.Reset()
-				grpcext.DebugStat(logger.WithField("source", "test"), stat, tt.cfg)
+				grpcext.DebugStat(logger.WithField("source", "test"), stat, "full", tt.redact)
 				out := b.String()
 				for _, e := range tt.expected {
 					assert.Contains(t, out, e)

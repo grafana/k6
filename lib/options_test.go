@@ -105,6 +105,12 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.HTTPDebug.Valid)
 		assert.Equal(t, "foo", opts.HTTPDebug.String)
 	})
+	t.Run("HTTPDebugRedact", func(t *testing.T) {
+		t.Parallel()
+		opts := Options{}.Apply(Options{HTTPDebugRedact: null.BoolFrom(true)})
+		assert.True(t, opts.HTTPDebugRedact.Valid)
+		assert.True(t, opts.HTTPDebugRedact.Bool)
+	})
 	t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
 		t.Parallel()
 		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})

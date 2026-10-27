@@ -12,8 +12,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/v2/internal/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/lib"
-	"go.k6.io/k6/v2/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/metrics"
 
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
@@ -371,36 +371,35 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	// (rogchap) Re-using --http-debug flag as gRPC is technically still HTTP
 	if state.Options.HTTPDebug.String != "" {
 		logger := state.Logger.WithField("source", "http-debug")
-		debugCfg, _ := httpdebug.Parse(state.Options.HTTPDebug.String)
-		DebugStat(logger, stat, debugCfg)
+		DebugStat(logger, stat, state.Options.HTTPDebug.String, state.Options.HTTPDebugRedact.Bool)
 	}
 }
 
 // DebugStat prints debugging information based on RPCStats.
-func DebugStat(logger logrus.FieldLogger, stat grpcstats.RPCStats, cfg httpdebug.Config) {
+func DebugStat(logger logrus.FieldLogger, stat grpcstats.RPCStats, httpDebugOption string, redact bool) {
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		logger.Infof("Out Header:\nFull Method: %s\nRemote Address: %s\n%s\n",
-			s.FullMethod, s.RemoteAddr, formatMetadata(s.Header, cfg.Redacted))
+			s.FullMethod, s.RemoteAddr, formatMetadata(s.Header, redact))
 	case *grpcstats.OutTrailer:
 		if len(s.Trailer) > 0 {
-			logger.Infof("Out Trailer:\n%s\n", formatMetadata(s.Trailer, cfg.Redacted))
+			logger.Infof("Out Trailer:\n%s\n", formatMetadata(s.Trailer, redact))
 		}
 	case *grpcstats.OutPayload:
-		if cfg.Body {
+		if httpDebugOption == "full" {
 			logger.Infof("Out Payload:\nWire Length: %d\nSent Time: %s\n%s\n\n",
 				s.WireLength, s.SentTime, formatPayload(s.Payload))
 		}
 	case *grpcstats.InHeader:
 		if len(s.Header) > 0 {
-			logger.Infof("In Header:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Header, cfg.Redacted))
+			logger.Infof("In Header:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Header, redact))
 		}
 	case *grpcstats.InTrailer:
 		if len(s.Trailer) > 0 {
-			logger.Infof("In Trailer:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Trailer, cfg.Redacted))
+			logger.Infof("In Trailer:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Trailer, redact))
 		}
 	case *grpcstats.InPayload:
-		if cfg.Body {
+		if httpDebugOption == "full" {
 			logger.Infof("In Payload:\nWire Length: %d\nReceived Time: %s\n%s\n\n",
 				s.WireLength, s.RecvTime, formatPayload(s.Payload))
 		}
@@ -413,7 +412,10 @@ func formatMetadata(md metadata.MD, redact bool) string {
 		if redact && httpdebug.IsSensitive(k) {
 			redacted := make([]string, len(v))
 			for i, value := range v {
-				redacted[i] = httpdebug.RedactValue(k, value)
+				if value != "" {
+					value = httpdebug.RedactValue(k, value)
+				}
+				redacted[i] = value
 			}
 			v = redacted
 		}

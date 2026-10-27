@@ -2368,12 +2368,12 @@ func TestHTTPDebugRedaction(t *testing.T) {
 	}{
 		{option: "headers"},
 		{option: "full", bodyDumped: true},
-		{option: "headers,redacted", redacted: true},
-		{option: "full,redacted", redacted: true, bodyDumped: true},
+		{option: "headers", redacted: true},
+		{option: "full", redacted: true, bodyDumped: true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.option, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s/redact=%t", tt.option, tt.redacted), func(t *testing.T) {
 			t.Parallel()
 			ts := newTestCase(t)
 			tb := ts.tb
@@ -2382,6 +2382,7 @@ func TestHTTPDebugRedaction(t *testing.T) {
 
 			state.Options.Throw = null.BoolFrom(true)
 			state.Options.HTTPDebug = null.StringFrom(tt.option)
+			state.Options.HTTPDebugRedact = null.BoolFrom(tt.redacted)
 			cookieJar, err := cookiejar.New(nil)
 			require.NoError(t, err)
 			state.CookieJar = cookieJar
