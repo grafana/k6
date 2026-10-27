@@ -13,6 +13,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/internal/js/taskqueue"
 	k6common "go.k6.io/k6/v2/js/common"
 )
 
@@ -779,6 +780,20 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	return withPageNetworkCalls(vu, p, maps)
 }
 
+type pageOnEvent struct {
+	mapp func(vu moduleVU, event common.PageEvent) mapping
+	wait bool // Whether to wait for the handler to complete.
+	// propagateErr, when true, re-queues the handler error through the
+	// task queue so it reaches the event loop and fails the iteration
+	// (e.g. metric). When false, the error is logged and ignored.
+	propagateErr bool
+	// waitTimeout, if non-nil, caps how long we wait for the handler
+	// to settle. Exceeding the timeout is not fatal: the On handler
+	// returns nil and the caller (e.g. frame_session) falls back to
+	// auto-dismiss. Nil means wait indefinitely (until ctx cancellation).
+	waitTimeout func() time.Duration
+}
+
 // mapPageOn enables using various page.on event handlers with the page.on method.
 // It provides a generic way to map different event types to their respective handler functions.
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Callable) error {
@@ -787,19 +802,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 			panic(vu.Runtime().NewTypeError(`The "listener" argument must be a function`))
 		}
 
-		pageEvents := map[common.PageEventName]struct {
-			mapp func(vu moduleVU, event common.PageEvent) mapping
-			wait bool // Whether to wait for the handler to complete.
-			// propagateErr, when true, re-queues the handler error through the
-			// task queue so it reaches the event loop and fails the iteration
-			// (e.g. metric). When false, the error is logged and ignored.
-			propagateErr bool
-			// waitTimeout, if non-nil, caps how long we wait for the handler
-			// to settle. Exceeding the timeout is not fatal: the On handler
-			// returns nil and the caller (e.g. frame_session) falls back to
-			// auto-dismiss. Nil means wait indefinitely (until ctx cancellation).
-			waitTimeout func() time.Duration
-		}{
+		pageEvents := map[common.PageEventName]pageOnEvent{
 			common.PageEventConsole:         {mapp: mapConsoleMessage},
 			common.PageEventDialog:          {mapp: mapDialog, wait: true, waitTimeout: p.Timeout, propagateErr: true},
 			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true, propagateErr: true},
@@ -818,65 +821,78 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 		captured := k6common.CaptureMetricContext(vu.State())
 
 		return p.On(eventName, func(event common.PageEvent) error {
-			if !pageEvent.wait {
-				// Fire-and-forget: queue the handler but don't block on it.
-				queueTaskWithMetricContext(ctx, tq, captured, func() (sobek.Value, error) {
-					_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
-					if err != nil {
-						return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
-					}
-					return nil, nil
-				})
-				return nil
-			}
-
-			// For wait events, block until the handler fully completes —
-			// including any asynchronous work if the handler is async and
-			// returns a Promise. Without this, async handlers that defer
-			// dialog.accept/dismiss past the first await would race against
-			// the auto-dismiss fallback in frame_session.
-			result := make(chan error, 1)
-			tq.Queue(func() error {
-				restore := captured.Enter()
-				defer restore()
-				rt := vu.Runtime()
-				retVal, err := handle(sobek.Undefined(), rt.ToValue(pageEvent.mapp(vu, event)))
-				if err != nil {
-					wrappedErr := fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
-					result <- wrappedErr
-					if pageEvent.propagateErr {
-						// Return the error from the task so it propagates through
-						// the event loop and fails the iteration (e.g. metric).
-						return wrappedErr
-					}
-					return nil
-				}
-				var onReject func(error)
-				if pageEvent.propagateErr {
-					onReject = func(err error) { tq.Queue(func() error { return err }) }
-				}
-				awaitHandlerResult(rt, retVal, result, onReject)
-				return nil
-			})
-
-			var timeoutCh <-chan time.Time
-			if pageEvent.waitTimeout != nil {
-				timer := time.NewTimer(pageEvent.waitTimeout())
-				defer timer.Stop()
-				timeoutCh = timer.C
-			}
-			select {
-			case err := <-result:
-				return err
-			case <-timeoutCh:
-				vu.State().Logger.Warnf(
-					"page.on('%s') handler did not settle within %s, falling back to auto-dismiss",
-					eventName, pageEvent.waitTimeout())
-				return nil
-			case <-ctx.Done():
-				return errors.New("iteration ended before page.on handler completed executing")
-			}
+			return runPageOnHandler(ctx, tq, captured, vu, eventName, pageEvent, handle, event)
 		})
+	}
+}
+
+func runPageOnHandler(
+	ctx context.Context,
+	tq *taskqueue.TaskQueue,
+	captured k6common.CapturedMetricContext,
+	vu moduleVU,
+	eventName common.PageEventName,
+	pageEvent pageOnEvent,
+	handle sobek.Callable,
+	event common.PageEvent,
+) error {
+	if !pageEvent.wait {
+		// Fire-and-forget: queue the handler but don't block on it.
+		queueTaskWithMetricContext(ctx, tq, captured, func() (sobek.Value, error) {
+			_, err := handle(sobek.Undefined(), vu.Runtime().ToValue(pageEvent.mapp(vu, event)))
+			if err != nil {
+				return nil, fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+			}
+			return sobek.Undefined(), nil
+		})
+		return nil
+	}
+
+	// For wait events, block until the handler fully completes —
+	// including any asynchronous work if the handler is async and
+	// returns a Promise. Without this, async handlers that defer
+	// dialog.accept/dismiss past the first await would race against
+	// the auto-dismiss fallback in frame_session.
+	result := make(chan error, 1)
+	tq.Queue(func() error {
+		restore := captured.Enter()
+		defer restore()
+		rt := vu.Runtime()
+		retVal, err := handle(sobek.Undefined(), rt.ToValue(pageEvent.mapp(vu, event)))
+		if err != nil {
+			wrappedErr := fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+			result <- wrappedErr
+			if pageEvent.propagateErr {
+				// Return the error from the task so it propagates through
+				// the event loop and fails the iteration (e.g. metric).
+				return wrappedErr
+			}
+			return nil
+		}
+		var onReject func(error)
+		if pageEvent.propagateErr {
+			onReject = func(err error) { tq.Queue(func() error { return err }) }
+		}
+		awaitHandlerResult(rt, retVal, result, onReject)
+		return nil
+	})
+
+	var timeoutCh <-chan time.Time
+	if pageEvent.waitTimeout != nil {
+		timer := time.NewTimer(pageEvent.waitTimeout())
+		defer timer.Stop()
+		timeoutCh = timer.C
+	}
+	select {
+	case err := <-result:
+		return err
+	case <-timeoutCh:
+		vu.State().Logger.Warnf(
+			"page.on('%s') handler did not settle within %s, falling back to auto-dismiss",
+			eventName, pageEvent.waitTimeout())
+		return nil
+	case <-ctx.Done():
+		return errors.New("iteration ended before page.on handler completed executing")
 	}
 }
 
