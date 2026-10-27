@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
@@ -501,7 +502,10 @@ func TestOutputStopWithStaleMarkers(t *testing.T) {
 func TestOutputSlowFlushWarning(t *testing.T) {
 	t.Parallel()
 
+	// a slow endpoint, so the write has a known minimum duration
+	const storeDelay = 20 * time.Millisecond
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(storeDelay)
 		w.WriteHeader(http.StatusOK)
 	}))
 	t.Cleanup(ts.Close)
@@ -540,8 +544,10 @@ func TestOutputSlowFlushWarning(t *testing.T) {
 
 	messages := buf.String()
 	require.Contains(t, messages, "level=warning")
-	assert.Contains(t, messages, "but it took")
-	assert.Contains(t, messages, "aggregating")
-	assert.Contains(t, messages, "flushing")
-	assert.Contains(t, messages, "Some samples may be dropped.")
+	m := regexp.MustCompile(`but it took \S+ \(aggregating \S+, flushing (\S+)\) while flush period is 1ns\. ` +
+		`Some samples may be dropped\.`).FindStringSubmatch(messages)
+	require.Len(t, m, 2, messages)
+	flushing, err := time.ParseDuration(m[1])
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, flushing, storeDelay)
 }
