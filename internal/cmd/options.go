@@ -40,7 +40,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.Int64("batch-per-host", 6, "max parallel batch reqs per host")
 	flags.Int64("rps", 0, "limit requests per second")
 	flags.String("user-agent", fmt.Sprintf("Grafana k6/%s", build.Version), "user agent for http requests")
-	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'") //nolint:lll
+	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full', to redact credential headers add 'redacted', e.g. '--http-debug=full,redacted'") //nolint:lll
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")

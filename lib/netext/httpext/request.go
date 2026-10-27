@@ -18,6 +18,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -197,9 +198,10 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 				combinedLogFields[k] = v
 			}
 		}
+		debugCfg, _ := httpdebug.Parse(state.Options.HTTPDebug.String)
 		transport = httpDebugTransport{
 			originalTransport: transport,
-			httpDebugOption:   state.Options.HTTPDebug.String,
+			cfg:               debugCfg,
 			logger:            state.Logger.WithFields(combinedLogFields),
 		}
 	}

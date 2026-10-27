@@ -22,6 +22,7 @@ import (
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/executor"
 	"go.k6.io/k6/v2/lib/fsext"
+	"go.k6.io/k6/v2/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/lib/types"
 	"go.k6.io/k6/v2/metrics"
 )
@@ -256,6 +257,7 @@ func getConsolidatedConfig(
 	}
 
 	conf = applyDefault(conf)
+	warnOnUnknownHTTPDebugValues(conf.Options, gs.Logger)
 
 	// TODO(imiric): Move this validation where it makes sense in the configuration
 	// refactor of #883. This repeats the trend stats validation already done
@@ -289,6 +291,18 @@ func warnOnShortHandOverride(a, b lib.Options, bName string, logger logrus.Field
 		logger.Warnf(
 			"%q level configuration overrode scenarios configuration entirely",
 			bName)
+	}
+}
+
+func warnOnUnknownHTTPDebugValues(opts lib.Options, logger logrus.FieldLogger) {
+	if opts.HTTPDebug.String == "" {
+		return
+	}
+	if _, unknown := httpdebug.Parse(opts.HTTPDebug.String); len(unknown) > 0 {
+		logger.Warnf(
+			"unknown http-debug values %q are ignored, HTTP debugging stays on; "+
+				"the supported values are 'headers', 'full' and 'redacted'",
+			unknown)
 	}
 }
 
