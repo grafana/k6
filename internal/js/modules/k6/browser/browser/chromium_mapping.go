@@ -14,7 +14,10 @@ func mapChromium(vu moduleVU, bt *chromium.BrowserType) mapping {
 	return finishMapping(mapping{
 		"connectOverCDP": passiveCall(func(wsEndpoint string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
-				iter := vu.State().Iteration
+				iter, err := vu.iteration()
+				if err != nil {
+					return nil, err
+				}
 
 				// Clone the BrowserType for this call so concurrent
 				// connectOverCDP calls in the same iteration (e.g., via
