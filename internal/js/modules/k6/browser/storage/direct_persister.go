@@ -14,6 +14,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// CapturedAtField is the multipart form field that carries the capture time.
+const CapturedAtField = "captured_at"
+
 // DirectFilePersister uploads files together with their metadata in a single
 // multipart request, without requesting a presigned URL first.
 type DirectFilePersister struct {
@@ -59,8 +62,8 @@ func (d *DirectFilePersister) Persist(ctx context.Context, path string, data io.
 			return fmt.Errorf("writing form field key %q: %w", k, err)
 		}
 	}
-	if err := fw.WriteField("captured_at", capturedAt.Format(time.RFC3339Nano)); err != nil {
-		return fmt.Errorf("writing form field key %q: %w", "captured_at", err)
+	if err := fw.WriteField(CapturedAtField, capturedAt.Format(time.RFC3339Nano)); err != nil {
+		return fmt.Errorf("writing form field key %q: %w", CapturedAtField, err)
 	}
 	ff, err := fw.CreateFormFile("file", filepath.ToSlash(filepath.Join(d.basePath, path)))
 	if err != nil {

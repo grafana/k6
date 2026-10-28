@@ -186,6 +186,11 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 			wantErr:     "empty field key, at entry 3",
 		},
 		{
+			name:        "reserved_field_key",
+			envVarValue: "url=https://127.0.0.1/,upload=direct,field.captured_at=2026-10-28T10:00:00Z",
+			wantErr:     `field "captured_at" is reserved, at entry 3`,
+		},
+		{
 			name:        "empty",
 			envVarValue: "",
 			wantErr:     "format of value must be k=v, at entry 1",
