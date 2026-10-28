@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
@@ -12,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/internal/features"
+	"go.k6.io/k6/v2/internal/output/prometheusrw/remote"
 	"go.k6.io/k6/v2/lib/types"
 	"go.k6.io/k6/v2/metrics"
 	"go.k6.io/k6/v2/output"
@@ -493,4 +497,57 @@ func TestOutputStopWithStaleMarkers(t *testing.T) {
 		}
 		assertfn(t, messages, msg)
 	}
+}
+
+func TestOutputSlowFlushWarning(t *testing.T) {
+	t.Parallel()
+
+	// a slow endpoint, so the write has a known minimum duration
+	const storeDelay = 20 * time.Millisecond
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(storeDelay)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(ts.Close)
+
+	wc, err := remote.NewWriteClient(ts.URL, nil)
+	require.NoError(t, err)
+
+	buf := bytes.NewBuffer(nil)
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	logger.SetOutput(buf)
+
+	registry := metrics.NewRegistry()
+	o := Output{
+		logger: logger,
+		client: wc,
+		config: Config{
+			// a tiny interval, so the flush is always slower
+			// and the warning is always logged
+			PushInterval: types.NullDurationFrom(1),
+		},
+		tsdb: make(map[metrics.TimeSeries]*seriesWithMeasure),
+	}
+	o.AddMetricSamples([]metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: registry.MustNewMetric("metric1", metrics.Counter),
+				Tags:   registry.RootTagSet(),
+			},
+			Time:  time.Now(),
+			Value: 1,
+		},
+	})
+
+	o.flush()
+
+	messages := buf.String()
+	require.Contains(t, messages, "level=warning")
+	m := regexp.MustCompile(`but it took \S+ \(aggregating \S+, flushing (\S+)\) while flush period is 1ns\. ` +
+		`Some samples may be dropped\.`).FindStringSubmatch(messages)
+	require.Len(t, m, 2, messages)
+	flushing, err := time.ParseDuration(m[1])
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, flushing, storeDelay)
 }
