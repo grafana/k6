@@ -659,3 +659,128 @@ func assertTags(t *testing.T, sample metrics.Sample, tags map[string]string) {
 		assert.Equal(t, v, tag)
 	}
 }
+
+// TestStream_WriteAfterServerCloseDoesNotHang checks that writing after the
+// server closes the stream (end event) does not deadlock the VU event loop.
+// writingState stayed opened after server-side EOF while writeData had exited,
+// so stream.write() blocked forever on the unbuffered writeQueueCh.
+func TestStream_WriteAfterServerCloseDoesNotHang(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	stub := &featureExplorerStub{}
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+		return stream.Send(&grpcservice.Feature{
+			Name: "foo",
+			Location: &grpcservice.Point{
+				Latitude:  1,
+				Longitude: 2,
+			},
+		})
+	}
+	grpcservice.RegisterFeatureExplorerServer(ts.httpBin.ServerGRPC, stub)
+
+	_, err := ts.Run(`
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`)
+	require.NoError(t, err)
+
+	ts.ToVUContext()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, err := ts.RunOnEventLoop(`
+		client.connect("GRPCBIN_ADDR");
+		let stream = new grpc.Stream(client, "main.FeatureExplorer/ListFeatures");
+		stream.on('data', function (data) {
+			call('Feature:' + data.name);
+		});
+		stream.on('end', function () {
+			call('End called');
+			// Server closed without client.end(); writingState must already be closed.
+			stream.write({
+				lo: { latitude: 1, longitude: 2 },
+				hi: { latitude: 1, longitude: 2 },
+			});
+			call('Write after end returned');
+		});
+
+		stream.write({
+			lo: { latitude: 1, longitude: 2 },
+			hi: { latitude: 1, longitude: 2 },
+		});
+		`)
+		require.NoError(t, err)
+	}()
+
+	select {
+	case <-done:
+		assert.Equal(t, []string{
+			"Feature:foo",
+			"End called",
+			"Write after end returned",
+		}, ts.callRecorder.Recorded())
+	case <-time.After(3 * time.Second):
+		t.Fatal("event loop hung: stream.write after server close blocked on writeQueueCh")
+	}
+}
+
+// TestStream_WriteAfterStreamErrorDoesNotHang covers the same writingState
+// gap on the error path (non-EOF close).
+func TestStream_WriteAfterStreamErrorDoesNotHang(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	stub := &featureExplorerStub{}
+	stub.listFeatures = func(_ *grpcservice.Rectangle, _ grpcservice.FeatureExplorer_ListFeaturesServer) error {
+		return status.Error(codes.PermissionDenied, "nope")
+	}
+	grpcservice.RegisterFeatureExplorerServer(ts.httpBin.ServerGRPC, stub)
+
+	_, err := ts.Run(`
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`)
+	require.NoError(t, err)
+
+	ts.ToVUContext()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, err := ts.RunOnEventLoop(`
+		client.connect("GRPCBIN_ADDR");
+		let stream = new grpc.Stream(client, "main.FeatureExplorer/ListFeatures");
+		stream.on('error', function (e) {
+			call('Error:' + e.message);
+			stream.write({
+				lo: { latitude: 1, longitude: 2 },
+				hi: { latitude: 1, longitude: 2 },
+			});
+			call('Write after error returned');
+		});
+		stream.on('end', function () {
+			call('End called');
+		});
+
+		stream.write({
+			lo: { latitude: 1, longitude: 2 },
+			hi: { latitude: 1, longitude: 2 },
+		});
+		`)
+		require.NoError(t, err)
+	}()
+
+	select {
+	case <-done:
+		assert.Equal(t, []string{
+			"Error:nope",
+			"Write after error returned",
+			"End called",
+		}, ts.callRecorder.Recorded())
+	case <-time.After(3 * time.Second):
+		t.Fatal("event loop hung: stream.write after stream error blocked on writeQueueCh")
+	}
+}
