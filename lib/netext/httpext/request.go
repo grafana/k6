@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Azure/go-ntlmssp"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
@@ -184,7 +185,12 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)
 	var transport http.RoundTripper = tracerTransport
 
+	var requestID string
 	if state.Options.HTTPDebug.String != "" {
+		requestID = uuid.NewString()
+	}
+
+	if httpDebug := state.Options.HTTPDebug.String; httpDebug != "" && httpDebug != "error" {
 		// Combine tags with common log fields
 		combinedLogFields := map[string]any{"source": "http-debug", "vu": state.VUID, "iter": state.Iteration}
 		for k, v := range preq.TagsAndMeta.Metadata {
@@ -201,6 +207,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 			originalTransport: transport,
 			httpDebugOption:   state.Options.HTTPDebug.String,
 			redact:            state.Options.HTTPDebugRedact.Bool,
+			requestID:         requestID,
 			logger:            state.Logger.WithFields(combinedLogFields),
 		}
 	}
@@ -301,6 +308,11 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		updateK6Response(resp, finishedReq)
 	}
 
+	if state.Options.HTTPDebug.String == "error" {
+		resp.tags = preq.TagsAndMeta.Tags.Map()
+		resp.requestID = requestID
+	}
+
 	if resErr == nil {
 		if preq.ActiveJar != nil {
 			if rc := res.Cookies(); len(rc) > 0 {
@@ -338,18 +350,10 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		}
 	}
 
-	if resErr != nil {
-		if preq.Throw { // if we are going to throw, we shouldn't log it
-			return nil, resErr
-		}
-
-		// Do *not* log errors about the context being cancelled.
-		select {
-		case <-ctx.Done():
-		default:
-			state.Logger.WithField("error", resErr).Warn("Request Failed")
-		}
+	if resErr != nil && preq.Throw { // if we are going to throw, we shouldn't log it
+		return nil, resErr
 	}
+	logFailedRequest(ctx, state, preq, requestID, res, resp, resErr)
 
 	return resp, nil
 }

@@ -2,17 +2,21 @@ package k6
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/sobek"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modulestest"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -439,4 +443,67 @@ func testCaseRuntimeWithAsyncMetricContext(t testing.TB, enabled bool) *testCase
 		samples:     samples,
 		testRuntime: testRuntime,
 	}
+}
+
+func TestCheckHTTPErrorDebug(t *testing.T) {
+	t.Parallel()
+
+	// Mirrors how the JS http.Response embeds *httpext.Response.
+	type jsResponse struct {
+		*httpext.Response
+	}
+
+	run := func(t *testing.T, enabled bool, script string) []string {
+		t.Helper()
+		tc := testCaseRuntime(t)
+		logger, hook := logtest.NewNullLogger()
+		state := tc.testRuntime.VU.StateField
+		state.Logger = logger
+		if enabled {
+			state.Options.HTTPDebug = null.StringFrom("error")
+		}
+
+		res := httpext.NewResponse()
+		res.Status = 200
+		res.StatusText = "200 OK"
+		res.Proto = "HTTP/1.1"
+		res.Body = "response body"
+		res.Request = &httpext.Request{Method: "POST", URL: "http://example.com/login", Body: "request body"}
+		require.NoError(t, tc.testRuntime.VU.RuntimeField.Set("res", &jsResponse{Response: res}))
+
+		_, err := tc.testRuntime.RunOnEventLoop(script)
+		require.NoError(t, err)
+
+		var messages []string
+		for _, e := range hook.AllEntries() {
+			messages = append(messages, e.Message)
+		}
+		return messages
+	}
+
+	t.Run("failed check", func(t *testing.T) {
+		t.Parallel()
+		messages := run(t, true, `k6.check(res, {"is 400": (r) => r.status === 400, "is 200": (r) => r.status === 200})`)
+		require.Len(t, messages, 1)
+		assert.True(t, strings.HasPrefix(messages[0],
+			"Check(s) Failed\nContext: failed_checks=\"is 400\" iter=0 vu=0\n\nRequest:\n"))
+		for _, s := range []string{"POST http://example.com/login", "request body", "HTTP/1.1 200 OK", "response body"} {
+			assert.Contains(t, messages[0], s)
+		}
+	})
+
+	t.Run("passed check", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, run(t, true, `k6.check(res, {"is 200": (r) => r.status === 200})`))
+	})
+
+	t.Run("disabled", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, run(t, false, `k6.check(res, {"is 400": (r) => r.status === 400})`))
+	})
+
+	t.Run("not a response", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, run(t, true, `k6.check(1, {"is 400": (v) => v === 400})`))
+	})
 }
