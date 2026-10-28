@@ -205,3 +205,55 @@ func TestSerializeBooleanAttributes(t *testing.T) {
 		assert.Equal(t, "checkbox_bare=a&checkbox_empty=b&radio_bare=c&text_enabled=g", v.String())
 	}
 }
+
+func TestSerializeTextValues(t *testing.T) {
+	t.Parallel()
+
+	// The value of a textarea, and of an option without a value attribute, is
+	// its text, so character references must be decoded and not re-escaped.
+	// An option's text also has its whitespace stripped and collapsed.
+	rt := getTestRuntimeWithDoc(t, `
+	<form>
+		<textarea name="notes">Fish &amp; Chips &lt;3</textarea>
+		<select name="dish">
+			<option>Salad</option>
+			<option selected>
+				Fish &amp;
+				Chips
+			</option>
+		</select>
+		<select name="sides" multiple>
+			<option selected>Peas &amp; Gravy</option>
+			<option selected>Ketchup</option>
+		</select>
+	</form>`)
+
+	v, err := rt.RunString(`doc.find("form").serialize()`)
+	if assert.NoError(t, err) {
+		assert.Equal(t,
+			"dish=Fish+%26+Chips"+
+				"&notes=Fish+%26+Chips+%3C3"+
+				"&sides=Peas+%26+Gravy"+
+				"&sides=Ketchup", v.String())
+	}
+
+	v, err = rt.RunString(`doc.find("textarea").val()`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "Fish & Chips <3", v.String())
+	}
+
+	v, err = rt.RunString(`doc.find("select[name=dish]").val()`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "Fish & Chips", v.String())
+	}
+
+	v, err = rt.RunString(`doc.find("option[selected]").get(0).value()`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "Fish & Chips", v.String())
+	}
+
+	v, err = rt.RunString(`doc.find("select[name=dish]").get(0).value()`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "Fish & Chips", v.String())
+	}
+}
