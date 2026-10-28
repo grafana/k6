@@ -141,6 +141,9 @@ func (c *presignedURLConfig) addFormField(key, value string, entry int) error {
 	if key == "" {
 		return fmt.Errorf("empty field key, at entry %d", entry)
 	}
+	if key == storage.CapturedAtField {
+		return fmt.Errorf("field %q is reserved, at entry %d", key, entry)
+	}
 	if c.formFields == nil {
 		c.formFields = make(map[string]string)
 	}
