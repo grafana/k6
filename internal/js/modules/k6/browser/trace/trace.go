@@ -91,9 +91,6 @@ func (t *Tracer) TraceNavigation(
 	t.liveSpansMu.Lock()
 	defer t.liveSpansMu.Unlock()
 
-	// TODO: Should we keep track of all spans, even ones that are closed, to
-	// ensure we associate web vitals to the spans in the current iteration?
-
 	ls := t.liveSpans[targetID]
 	if ls != nil {
 		// If there is a previous live span
@@ -112,34 +109,22 @@ func (t *Tracer) TraceNavigation(
 }
 
 // TraceEvent creates a new span representing the specified event and associates it with the current
-// liveSpan for the given targetID only if the spanID matches with the liveSpan.
-// It is the caller's responsibility to close the generated span.
+// liveSpan for the given targetID. It is the caller's responsibility to close the generated span.
 //
-// If no liveSpan is found for the given targetID, the action is ignored and a noopSpan is returned.
-// If the given spanID does not match the one for the current liveSpan associated with the targetID,
-// it means the specified target has navigated, generating a new span for that navigation, therefore
-// the event is not associated with that span, and instead a noopSpan is returned.
+// The event is attached to the target's current live navigation span. Callers buffer per-page
+// events (e.g. Web Vitals) and flush them at the navigation boundary while the owning navigation
+// span is still live, so the live span is the one the event belongs to.
+//
+// If no liveSpan is found for the given targetID, the action is ignored and a noopSpan is returned,
+// to avoid associating the event with an unrelated root span possibly wrapped in ctx.
 func (t *Tracer) TraceEvent(
-	ctx context.Context, targetID string, eventName string, spanID string, opts ...trace.SpanStartOption,
+	ctx context.Context, targetID string, eventName string, opts ...trace.SpanStartOption,
 ) (context.Context, trace.Span) {
 	t.liveSpansMu.Lock()
 	defer t.liveSpansMu.Unlock()
 
 	ls := t.liveSpans[targetID]
 	if ls == nil {
-		// If there is not a liveSpan for the given targetID,
-		// avoid associating the event with the root span possibly
-		// wrapped in ctx, and instead return a noopSpan
-		return ctx, NoopSpan{}
-	}
-
-	sid := ls.span.SpanContext().SpanID().String()
-	if sid != spanID {
-		// If the given spanID does not match the current liveSpan for
-		// targetID, it means the target has navigated to a different
-		// page than the one the event should be associated with.
-		// Therefore avoid associating the event with the current span,
-		// and return a noopSpan instead
 		return ctx, NoopSpan{}
 	}
 

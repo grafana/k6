@@ -2,9 +2,11 @@ package tests
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 
@@ -20,6 +23,7 @@ import (
 	browsertrace "go.k6.io/k6/v2/internal/js/modules/k6/browser/trace"
 
 	k6lib "go.k6.io/k6/v2/lib"
+	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
 const html = `
@@ -464,6 +468,147 @@ func TestNavigationSpanAfterNonCommittingLoad(t *testing.T) {
 				"navigating after a non-committing load should rotate a new navigation span; spans: %v", got)
 		})
 	}
+}
+
+// TestWebVitalSpanBelongsToItsPage asserts that web vitals buffered on page A
+// are flushed under A's navigation span when the page navigates to B, rather
+// than under B's. The correlation relies on the buffer being flushed before the
+// navigation span rotates; flushing after it would attribute A's vitals to B.
+func TestWebVitalSpanBelongsToItsPage(t *testing.T) {
+	t.Parallel()
+
+	tracer := &parentRecordingTracer{}
+	tp := &mockTracerProvider{tracer: tracer}
+	samples := make(chan k6metrics.SampleContainer, 1000)
+
+	ts := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := fmt.Fprint(w, html)
+			require.NoError(t, err)
+		},
+	))
+	t.Cleanup(ts.Close)
+
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp), k6test.WithSamples(samples))
+	rt := vu.Runtime()
+	root := browser.New()
+	mod := root.NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+	require.NoError(t, rt.Set("browser", jsMod.Browser))
+	vu.ActivateVU()
+	vu.StartIteration(t)
+	defer vu.EndIteration(t)
+
+	pageA, pageB := ts.URL+"/a", ts.URL+"/b"
+	assertJSInEventLoop(t, vu, fmt.Sprintf(`
+		page = await browser.newPage();
+		await page.goto('%s', {waitUntil:'load'});
+		await page.waitForTimeout(500);
+		await page.goto('%s', {waitUntil:'load'});
+		await page.waitForTimeout(500);
+		await page.close();
+		`, pageA, pageB))
+
+	// The number of web vitals emitted for each page.
+	want := map[string]int{}
+	for _, sc := range k6metrics.GetBufferedSamples(samples) {
+		for _, s := range sc.GetSamples() {
+			if !strings.HasPrefix(s.Metric.Name, "browser_web_vital_") {
+				continue
+			}
+			url, _ := s.Tags.Get("url")
+			want[url]++
+		}
+	}
+	require.Positivef(t, want[pageA], "no web vitals emitted for page A; got %v", want)
+	require.Positivef(t, want[pageB], "no web vitals emitted for page B; got %v", want)
+
+	// The number of web_vital spans parented by each page's navigation span.
+	navURL := map[trace.SpanID]string{}
+	for _, s := range tracer.recorded() {
+		if s.name == "navigation" {
+			navURL[s.id] = s.attr("navigation.url")
+		}
+	}
+	got := map[string]int{}
+	for _, s := range tracer.recorded() {
+		if s.name == "web_vital" {
+			got[navURL[s.parent]]++
+		}
+	}
+
+	assert.Equalf(t, want[pageA], got[pageA], "page A web_vital spans; got per page %v", got)
+	assert.Equalf(t, want[pageB], got[pageB], "page B web_vital spans; got per page %v", got)
+}
+
+// parentRecordingTracer records every started span with its parent span ID and
+// the attributes set on it, so tests can assert which span an event belongs to.
+type parentRecordingTracer struct {
+	embedded.Tracer
+
+	mu     sync.Mutex
+	nextID uint64
+	spans  []*recordedSpan
+}
+
+func (r *parentRecordingTracer) Start(
+	ctx context.Context, spanName string, _ ...trace.SpanStartOption,
+) (context.Context, trace.Span) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.nextID++
+	var id trace.SpanID
+	binary.BigEndian.PutUint64(id[:], r.nextID)
+	s := &recordedSpan{
+		name:   spanName,
+		id:     id,
+		parent: trace.SpanContextFromContext(ctx).SpanID(),
+		sc:     trace.NewSpanContext(trace.SpanContextConfig{TraceID: trace.TraceID{1}, SpanID: id}),
+		attrs:  map[string]string{},
+	}
+	r.spans = append(r.spans, s)
+
+	return trace.ContextWithSpanContext(ctx, s.sc), s
+}
+
+func (r *parentRecordingTracer) recorded() []*recordedSpan {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return append([]*recordedSpan(nil), r.spans...)
+}
+
+type recordedSpan struct {
+	browsertrace.NoopSpan
+
+	name   string
+	id     trace.SpanID
+	parent trace.SpanID
+	sc     trace.SpanContext
+
+	mu    sync.Mutex
+	attrs map[string]string
+}
+
+func (s *recordedSpan) SpanContext() trace.SpanContext { return s.sc }
+
+func (s *recordedSpan) SetAttributes(kv ...attribute.KeyValue) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, a := range kv {
+		s.attrs[string(a.Key)] = a.Value.String()
+	}
+}
+
+func (s *recordedSpan) attr(key string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.attrs[key]
 }
 
 func setupTestTracing(t *testing.T, rt *sobek.Runtime) {
