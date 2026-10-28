@@ -76,13 +76,9 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 		}
 
 		if fk, ok := strings.CutPrefix(k, "field."); ok {
-			if fk == "" {
-				return presignedURLConfig{}, fmt.Errorf("empty field key, at entry %d", i+1)
+			if err := presignedURL.addFormField(fk, v, i+1); err != nil {
+				return presignedURLConfig{}, err
 			}
-			if presignedURL.formFields == nil {
-				presignedURL.formFields = make(map[string]string)
-			}
-			presignedURL.formFields[fk] = v
 			continue
 		}
 
@@ -118,9 +114,6 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 		case "basePath":
 			presignedURL.basePath = v
 		case "upload":
-			if v != uploadPresign && v != uploadDirect {
-				return presignedURLConfig{}, fmt.Errorf("upload must be %q or %q", uploadPresign, uploadDirect)
-			}
 			presignedURL.upload = v
 		case "header":
 			presignedURL.headers[hk] = hv
@@ -132,9 +125,26 @@ func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 	if presignedURL.getterURL == "" {
 		return presignedURLConfig{}, errors.New("missing required url")
 	}
+	if presignedURL.upload != "" && presignedURL.upload != uploadPresign && presignedURL.upload != uploadDirect {
+		return presignedURLConfig{}, fmt.Errorf("upload must be %q or %q", uploadPresign, uploadDirect)
+	}
 	if presignedURL.upload != uploadDirect && len(presignedURL.formFields) > 0 {
 		return presignedURLConfig{}, errors.New("field options are only supported with upload=direct")
 	}
 
 	return presignedURL, nil
+}
+
+// addFormField adds a field.k=v entry, found at the given position of the
+// env var, as a multipart form field.
+func (c *presignedURLConfig) addFormField(key, value string, entry int) error {
+	if key == "" {
+		return fmt.Errorf("empty field key, at entry %d", entry)
+	}
+	if c.formFields == nil {
+		c.formFields = make(map[string]string)
+	}
+	c.formFields[key] = value
+
+	return nil
 }
