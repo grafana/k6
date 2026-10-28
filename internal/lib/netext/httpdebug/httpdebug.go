@@ -29,7 +29,7 @@ func IsSensitive(name string) bool {
 func RedactValue(name, value string) string {
 	switch strings.ToLower(strings.TrimSpace(name)) {
 	case "authorization", "proxy-authorization":
-		if scheme, _, found := strings.Cut(value, " "); found {
+		if scheme, _, found := strings.Cut(value, " "); found && isAuthScheme(scheme) {
 			return scheme + " " + Mask
 		}
 		return Mask
@@ -39,6 +39,17 @@ func RedactValue(name, value string) string {
 		return redactSetCookie(value)
 	default:
 		return Mask
+	}
+}
+
+// The list from https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Authentication#authentication_schemes
+func isAuthScheme(scheme string) bool {
+	switch strings.ToLower(scheme) {
+	case "basic", "bearer", "digest", "hoba", "mutual", "negotiate", "ntlm", "vapid",
+		"scram-sha-1", "scram-sha-256", "aws4-hmac-sha256":
+		return true
+	default:
+		return false
 	}
 }
 
