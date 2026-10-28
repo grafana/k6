@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -32,6 +33,10 @@ var defaultTrendStats = []string{"p(99)"}
 type Config struct {
 	// ServerURL contains the absolute ServerURL for the Write endpoint where to flush the time series.
 	ServerURL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_SERVER_URL"`
+
+	// Proxy is the URL of the HTTP proxy to use for the remote write requests.
+	// When unset, no proxy is used.
+	Proxy null.String `json:"proxy" envconfig:"K6_PROMETHEUS_RW_PROXY"`
 
 	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers"`
@@ -128,6 +133,14 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 		}
 	}
 
+	if conf.Proxy.Valid && conf.Proxy.String != "" {
+		proxyURL, err := url.Parse(conf.Proxy.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the proxy URL: %w", err)
+		}
+		hc.ProxyURL = proxyURL
+	}
+
 	tlsMinVersion := uint16(tls.VersionTLS13)
 	if conf.TLSMinVersion.Valid && conf.TLSMinVersion.String == "1.2" {
 		tlsMinVersion = tls.VersionTLS12
@@ -182,9 +195,15 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 }
 
 // Apply merges applied Config into base.
+//
+//nolint:funlen // flat list of per-field overrides
 func (conf Config) Apply(applied Config) Config {
 	if applied.ServerURL.Valid {
 		conf.ServerURL = applied.ServerURL
+	}
+
+	if applied.Proxy.Valid {
+		conf.Proxy = applied.Proxy
 	}
 
 	if applied.InsecureSkipTLSVerify.Valid {
@@ -373,6 +392,8 @@ func parseArg(text string) (Config, error) {
 		switch key {
 		case "url":
 			c.ServerURL = null.StringFrom(v)
+		case "proxy":
+			c.Proxy = null.StringFrom(v)
 		case "insecureSkipTLSVerify":
 			if err := c.InsecureSkipTLSVerify.UnmarshalText([]byte(v)); err != nil {
 				return c, fmt.Errorf("insecureSkipTLSVerify value must be true or false, not %q", v)

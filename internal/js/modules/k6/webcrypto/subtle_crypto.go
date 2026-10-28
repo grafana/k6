@@ -759,6 +759,15 @@ func (sc *SubtleCrypto) DeriveBits(
 			return err
 		}
 
+		keyAlgorithmNameValue, err := traverseObject(rt, baseKey, "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalized.Name != keyAlgorithmNameValue.String() {
+			return NewError(InvalidAccessError, "algorithm name does not match baseKey algorithm name")
+		}
+
 		return nil
 	}()
 
@@ -818,6 +827,8 @@ func (sc *SubtleCrypto) DeriveBits(
 //     `ALGORITHM` is the name of the algorithm.
 //   - for PBKDF2: pass the string "PBKDF2"
 //   - for HKDF: pass the string "HKDF"
+//   - for Ed25519: pass the string "Ed25519"
+//   - for X25519: pass the string "X25519"
 func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
 	keyData sobek.Value,
@@ -963,6 +974,10 @@ func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error han
 			keyExporter = exportECKey
 		case RSASsaPkcs1v15, RSAOaep, RSAPss:
 			keyExporter = exportRSAKey
+		case Ed25519:
+			keyExporter = exportEd25519Key
+		case X25519:
+			keyExporter = exportX25519Key
 		default:
 			return NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
 		}

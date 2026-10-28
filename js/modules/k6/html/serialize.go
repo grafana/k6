@@ -24,17 +24,18 @@ func (s Selection) SerializeArray() []FormValue {
 	formElements = formElements.FilterFunction(func(_ int, sel *goquery.Selection) bool {
 		name := sel.AttrOr("name", "")
 		inputType := sel.AttrOr("type", "")
-		disabled := sel.AttrOr("disabled", "")
-		checked := sel.AttrOr("checked", "")
+		// disabled and checked are boolean attributes, so only their presence matters
+		_, disabled := sel.Attr("disabled")
+		_, checked := sel.Attr("checked")
 
 		return name != "" && // Must have a non-empty name
-			disabled != "disabled" && // Must not be disabled
+			!disabled && // Must not be disabled
 			inputType != "submit" && // Must not be a button
 			inputType != "button" &&
 			inputType != "reset" &&
 			inputType != "image" && // Must not be an image or file
 			inputType != "file" &&
-			(checked == "checked" ||
+			(checked ||
 				(inputType != "checkbox" && inputType != "radio")) // Must be checked if it is an checkbox or radio
 	})
 
