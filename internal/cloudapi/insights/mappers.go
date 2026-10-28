@@ -49,12 +49,21 @@ func newCreateRequestMetadataRequest(requestMetadata RequestMetadata) (*ingester
 }
 
 func setProtocolLabels(rm *k6.RequestMetadata, labels ProtocolLabels) error {
-	// TODO(lukasz, other-proto-support): Set other protocol labels.
+	// TODO(other-proto-support): Set websocket protocol labels.
 	switch l := labels.(type) {
 	case ProtocolHTTPLabels:
 		rm.ProtocolLabels = &k6.RequestMetadata_HTTPLabels{
 			HTTPLabels: &k6.HTTPLabels{
 				Url:        l.URL,
+				Method:     l.Method,
+				StatusCode: l.StatusCode,
+			},
+		}
+	case ProtocolGRPCLabels:
+		rm.ProtocolLabels = &k6.RequestMetadata_GRPCLabels{
+			GRPCLabels: &k6.GRPCLabels{
+				Url:        l.URL,
+				Service:    l.Service,
 				Method:     l.Method,
 				StatusCode: l.StatusCode,
 			},

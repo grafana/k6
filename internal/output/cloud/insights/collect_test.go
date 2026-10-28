@@ -109,6 +109,102 @@ func Test_Collector_CollectRequestMetadatas_FiltersAndStoresHTTPTrailsAsRequestM
 	})
 }
 
+func Test_Collector_CollectRequestMetadatas_FiltersAndStoresGRPCSamplesAsRequestMetadatas(t *testing.T) {
+	t.Parallel()
+
+	// Given
+	testRunID := int64(1337)
+	col := NewCollector(testRunID)
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	data := []metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.GRPCReqDuration,
+				Tags: registry.RootTagSet().
+					With(scenarioTag, "test-scenario-1").
+					With(groupTag, "test-group-1").
+					With(urlTag, "test-url-1").
+					With(serviceTag, "test-service-1").
+					With(methodTag, "test-method-1").
+					With(statusTag, "0"),
+			},
+			Time:     time.Unix(10, 0),
+			Value:    metrics.D(time.Second),
+			Metadata: map[string]string{metadataTraceIDKey: "test-trace-id-1"},
+		},
+		metrics.Sample{
+			// gRPC sample without `trace_id` metadata key should be ignored
+			TimeSeries: metrics.TimeSeries{Metric: builtinMetrics.GRPCReqDuration, Tags: registry.RootTagSet()},
+			Time:       time.Unix(10, 0),
+			Value:      metrics.D(time.Second),
+		},
+		metrics.Sample{
+			// Samples of other metrics should be ignored, even when they carry a trace ID
+			TimeSeries: metrics.TimeSeries{Metric: builtinMetrics.HTTPReqDuration, Tags: registry.RootTagSet()},
+			Time:       time.Unix(10, 0),
+			Value:      1,
+			Metadata:   map[string]string{metadataTraceIDKey: "test-trace-id-ignored"},
+		},
+		metrics.Samples{
+			// Samples wrapped in other containers should be handled as well
+			metrics.Sample{
+				TimeSeries: metrics.TimeSeries{
+					Metric: builtinMetrics.GRPCReqDuration,
+					Tags: registry.RootTagSet().
+						With(scenarioTag, "test-scenario-2").
+						With(groupTag, "test-group-2").
+						With(urlTag, "test-url-2").
+						With(serviceTag, "test-service-2").
+						With(methodTag, "test-method-2").
+						With(statusTag, "14"),
+				},
+				Time:     time.Unix(20, 0),
+				Value:    metrics.D(time.Second),
+				Metadata: map[string]string{metadataTraceIDKey: "test-trace-id-2"},
+			},
+		},
+		metrics.Sample{
+			// If no tags are present, labels should be left empty
+			TimeSeries: metrics.TimeSeries{Metric: builtinMetrics.GRPCReqDuration},
+			Time:       time.Unix(20, 0),
+			Value:      metrics.D(time.Second),
+			Metadata:   map[string]string{metadataTraceIDKey: "test-trace-id-3"},
+		},
+	}
+
+	// When
+	col.CollectRequestMetadatas(data)
+
+	// Then
+	require.Len(t, col.buffer, 3)
+	require.Contains(t, col.buffer, insights.RequestMetadata{
+		TraceID:       "test-trace-id-1",
+		Start:         time.Unix(9, 0),
+		End:           time.Unix(10, 0),
+		TestRunLabels: insights.TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
+		ProtocolLabels: insights.ProtocolGRPCLabels{
+			URL: "test-url-1", Service: "test-service-1", Method: "test-method-1", StatusCode: 0,
+		},
+	})
+	require.Contains(t, col.buffer, insights.RequestMetadata{
+		TraceID:       "test-trace-id-2",
+		Start:         time.Unix(19, 0),
+		End:           time.Unix(20, 0),
+		TestRunLabels: insights.TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
+		ProtocolLabels: insights.ProtocolGRPCLabels{
+			URL: "test-url-2", Service: "test-service-2", Method: "test-method-2", StatusCode: 14,
+		},
+	})
+	require.Contains(t, col.buffer, insights.RequestMetadata{
+		TraceID:        "test-trace-id-3",
+		Start:          time.Unix(19, 0),
+		End:            time.Unix(20, 0),
+		TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "", Group: ""},
+		ProtocolLabels: insights.ProtocolGRPCLabels{URL: "", Service: "", Method: "", StatusCode: 0},
+	})
+}
+
 func Test_Collector_PopAll_DoesNothingWithEmptyData(t *testing.T) {
 	t.Parallel()
 
