@@ -187,6 +187,36 @@ func TestPageOnDialogAcceptWithoutAwait(t *testing.T) {
 	assert.Equal(t, "confirm accepted", got.Result().String())
 }
 
+func TestPageOnDialogZeroTimeoutWaitsForHandler(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	gv, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		try {
+			page.setDefaultTimeout(0);
+			page.on('dialog', async (dialog) => {
+				await new Promise((r) => setTimeout(r, 100));
+				await dialog.accept();
+			});
+			await page.goto(%q, { waitUntil: 'networkidle', timeout: 30000 });
+			return await page.textContent('#textField');
+		} finally {
+			page.setDefaultTimeout(30000);
+			await page.close();
+		}
+	`, tb.staticURL("dialog.html?dialogType=confirm"))
+	require.NoError(t, err)
+
+	got := k6test.ToPromise(t, gv)
+	require.Equal(t, sobek.PromiseStateFulfilled, got.State())
+	assert.Equal(t, "confirm accepted", got.Result().String())
+}
+
 func TestPageOnDialogAsyncHandlerErrorFailsIteration(t *testing.T) {
 	t.Parallel()
 

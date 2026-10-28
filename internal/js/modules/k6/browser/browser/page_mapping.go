@@ -879,9 +879,11 @@ func runPageOnHandler(
 
 	var timeoutCh <-chan time.Time
 	if pageEvent.waitTimeout != nil {
-		timer := time.NewTimer(pageEvent.waitTimeout())
-		defer timer.Stop()
-		timeoutCh = timer.C
+		if d := pageEvent.waitTimeout(); d > 0 {
+			timer := time.NewTimer(d)
+			defer timer.Stop()
+			timeoutCh = timer.C
+		}
 	}
 	select {
 	case err := <-result:
