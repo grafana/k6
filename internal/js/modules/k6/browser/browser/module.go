@@ -8,6 +8,7 @@ package browser
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -16,8 +17,8 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
-	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 )
 
@@ -118,15 +119,15 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	)
 	m.remoteRegistry, err = newRemoteRegistry(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abortf(vu.Context(), "failed to create remote registry: %v", err)
+		k6common.Throw(vu.Runtime(), fmt.Errorf("failed to create remote registry: %w", err))
 	}
 	m.tracesMetadata, err = parseTracesMetadata(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abortf(vu.Context(), "parsing browser traces metadata: %v", err)
+		k6common.Throw(vu.Runtime(), fmt.Errorf("parsing browser traces metadata: %w", err))
 	}
 	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv, initEnv.Logger)
 	if err != nil {
-		k6ext.Abortf(vu.Context(), "failed to create file persister: %v", err)
+		k6common.Throw(vu.Runtime(), fmt.Errorf("failed to create file persister: %w", err))
 	}
 	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
 		m.testRunID = e
