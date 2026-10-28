@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -204,6 +206,139 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 	require.NoError(t, err)
 	validateResults(reader)
 	assert.NoError(t, file.Close())
+}
+
+// writeCountingFs wraps an Fs and counts the Write calls made on the files it creates.
+type writeCountingFs struct {
+	fsext.Fs
+	writes *int
+}
+
+func (fs writeCountingFs) Create(name string) (afero.File, error) {
+	f, err := fs.Fs.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return writeCountingFile{File: f, writes: fs.writes}, nil
+}
+
+type writeCountingFile struct {
+	afero.File
+	writes *int
+}
+
+func (f writeCountingFile) Write(p []byte) (int, error) {
+	*f.writes++
+	return f.File.Write(p)
+}
+
+func TestJsonOutputFileIsBuffered(t *testing.T) {
+	t.Parallel()
+
+	var writes int
+	fs := writeCountingFs{Fs: fsext.NewMemMapFs(), writes: &writes}
+	out, err := New(output.Params{
+		Logger:         testutils.NewLogger(t),
+		StdOut:         new(bytes.Buffer),
+		FS:             fs,
+		ConfigArgument: "/json-output",
+	})
+	require.NoError(t, err)
+
+	setThresholds(t, out)
+	require.NoError(t, out.Start())
+
+	samples, validateResults := generateTestMetricSamples(t)
+	out.AddMetricSamples(samples[:2])
+	out.AddMetricSamples(samples[2:])
+	require.NoError(t, out.Stop())
+
+	content, err := fsext.ReadFile(fs, "/json-output")
+	require.NoError(t, err)
+	validateResults(bytes.NewReader(content))
+
+	// The buffer is written out once per flush, so the number of writes
+	// depends on how many flushes ran, but it has to stay below one write
+	// per encoded line.
+	lines := bytes.Count(content, []byte("\n"))
+	assert.Positive(t, writes)
+	assert.Less(t, writes, lines)
+}
+
+func TestJsonOutputFileIsWrittenWhileRunning(t *testing.T) {
+	t.Parallel()
+
+	fs := fsext.NewMemMapFs()
+	out, err := New(output.Params{
+		Logger:         testutils.NewLogger(t),
+		StdOut:         new(bytes.Buffer),
+		FS:             fs,
+		ConfigArgument: "/json-output",
+	})
+	require.NoError(t, err)
+
+	setThresholds(t, out)
+	require.NoError(t, out.Start())
+
+	samples, validateResults := generateTestMetricSamples(t)
+	out.AddMetricSamples(samples)
+
+	// The samples are much smaller than the buffer, so they only show up
+	// in the file before Stop if the buffer is flushed periodically.
+	require.Eventually(t, func() bool {
+		info, err := fs.Stat("/json-output")
+		return err == nil && info.Size() > 0
+	}, 5*time.Second, 10*time.Millisecond)
+
+	content, err := fsext.ReadFile(fs, "/json-output")
+	require.NoError(t, err)
+	validateResults(bytes.NewReader(content))
+
+	require.NoError(t, out.Stop())
+}
+
+// failingWriteFs wraps an Fs and makes every Write on the files it creates fail.
+type failingWriteFs struct {
+	fsext.Fs
+	err error
+}
+
+func (fs failingWriteFs) Create(name string) (afero.File, error) {
+	f, err := fs.Fs.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	return failingWriteFile{File: f, err: fs.err}, nil
+}
+
+type failingWriteFile struct {
+	afero.File
+	err error
+}
+
+func (f failingWriteFile) Write([]byte) (int, error) {
+	return 0, f.err
+}
+
+func TestJsonOutputFileStopReturnsFlushError(t *testing.T) {
+	t.Parallel()
+
+	errWrite := errors.New("no space left on device")
+	out, err := New(output.Params{
+		Logger:         testutils.NewLogger(t),
+		StdOut:         new(bytes.Buffer),
+		FS:             failingWriteFs{Fs: fsext.NewMemMapFs(), err: errWrite},
+		ConfigArgument: "/json-output",
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+
+	samples, _ := generateTestMetricSamples(t)
+	out.AddMetricSamples(samples)
+
+	// The samples only reach the file when the buffer is flushed on Stop,
+	// so that is where the write error has to be reported.
+	require.ErrorIs(t, out.Stop(), errWrite)
 }
 
 func TestWrapSampleWithSamplePointer(t *testing.T) {
