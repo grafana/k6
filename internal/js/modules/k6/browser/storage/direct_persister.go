@@ -91,13 +91,13 @@ func (d *DirectFilePersister) Persist(ctx context.Context, path string, data io.
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
+	if err := checkStatusCode(resp); err != nil {
+		return fmt.Errorf("uploading: %w", err)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("reading upload response body: %w", err)
-	}
-
-	if err := checkStatusCode(resp); err != nil {
-		return fmt.Errorf("uploading: %w", err)
 	}
 
 	// The upload succeeded, so a response body that isn't the expected
