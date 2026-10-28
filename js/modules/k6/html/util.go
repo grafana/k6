@@ -45,6 +45,27 @@ func valueOrHTML(s *goquery.Selection) string {
 	return ""
 }
 
+// optionValue returns the value of the first option in s: its value attribute
+// when present, otherwise its text with ASCII whitespace stripped and collapsed,
+// as browsers and jQuery do.
+func optionValue(s *goquery.Selection) string {
+	s = s.First()
+	if val, exists := s.Attr("value"); exists {
+		return val
+	}
+
+	return strings.Join(strings.FieldsFunc(s.Text(), isASCIIWhitespace), " ")
+}
+
+func isASCIIWhitespace(r rune) bool {
+	switch r {
+	case ' ', '\t', '\n', '\f', '\r':
+		return true
+	default:
+		return false
+	}
+}
+
 func getHTMLAttr(node *gohtml.Node, name string) *gohtml.Attribute {
 	for i := 0; i < len(node.Attr); i++ {
 		if node.Attr[i].Key == name {
