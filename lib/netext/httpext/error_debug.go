@@ -13,6 +13,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/v2/internal/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/lib"
 )
 
@@ -33,13 +34,20 @@ func logFailedRequest(
 		return
 	}
 
+	redact := func(dump []byte) []byte {
+		if state.Options.HTTPDebugRedact.Bool {
+			return httpdebug.RedactDump(dump)
+		}
+		return dump
+	}
+
 	meta := debugMeta(state, preq, requestID)
-	details := "Request:\n" + string(dumpRequest(ctx, state.Logger, preq))
+	details := "Request:\n" + string(redact(dumpRequest(ctx, state.Logger, preq)))
 	if resErr != nil {
 		meta["error"] = resErr
 		meta["error_code"] = resp.ErrorCode
 	} else {
-		details += "\nResponse:\n" + string(dumpResponse(state.Logger, res, resp.Body))
+		details += "\nResponse:\n" + string(redact(dumpResponse(state.Logger, res, resp.Body)))
 	}
 	state.Logger.Warn(DebugMessage("Request Failed", meta, details))
 }
@@ -117,7 +125,7 @@ type responseHolder interface {
 
 // DebugDump returns the request ID, tags and error code of v, along with a text dump of
 // its request and response, if v is an HTTP response. ok is false otherwise.
-func DebugDump(v any) (fields map[string]string, dump string, ok bool) {
+func DebugDump(v any, redact bool) (fields map[string]string, dump string, ok bool) {
 	holder, ok := v.(responseHolder)
 	if !ok {
 		return nil, "", false
@@ -136,16 +144,19 @@ func DebugDump(v any) (fields map[string]string, dump string, ok bool) {
 			fields["error_code"] = strconv.Itoa(res.ErrorCode)
 		}
 	}
-	return fields, res.debugDump(), true
+	return fields, res.debugDump(redact), true
 }
 
-func (res *Response) debugDump() string {
+func (res *Response) debugDump(redact bool) string {
 	var req, resp strings.Builder
 
 	if r := res.Request; r != nil {
 		fmt.Fprintf(&req, "%s %s\n", r.Method, r.URL)
 		for _, k := range slices.Sorted(maps.Keys(r.Headers)) {
 			for _, v := range r.Headers[k] {
+				if redact && httpdebug.IsSensitive(k) {
+					v = httpdebug.RedactValue(k, v)
+				}
 				fmt.Fprintf(&req, "%s: %s\n", k, v)
 			}
 		}
@@ -160,7 +171,11 @@ func (res *Response) debugDump() string {
 	if res.Status != 0 {
 		fmt.Fprintf(&resp, "%s %s\n", res.Proto, res.StatusText)
 		for _, k := range slices.Sorted(maps.Keys(res.Headers)) {
-			fmt.Fprintf(&resp, "%s: %s\n", k, res.Headers[k])
+			v := res.Headers[k]
+			if redact && httpdebug.IsSensitive(k) {
+				v = res.redactHeader(k, v)
+			}
+			fmt.Fprintf(&resp, "%s: %s\n", k, v)
 		}
 		var body string
 		switch v := res.Body.(type) {
@@ -176,6 +191,23 @@ func (res *Response) debugDump() string {
 
 	return "Request:\n" + strings.TrimRight(req.String(), "\n") +
 		"\nResponse:\n" + strings.TrimRight(resp.String(), "\n")
+}
+
+// redactHeader masks a sensitive response header. Several Set-Cookie headers are joined with ", "
+// in Headers, and a comma can also be part of Expires, so the cookie names are taken from Cookies.
+func (res *Response) redactHeader(name, value string) string {
+	if !strings.EqualFold(name, "Set-Cookie") {
+		return httpdebug.RedactValue(name, value)
+	}
+	if len(res.Cookies) == 0 {
+		return httpdebug.Mask
+	}
+	names := slices.Sorted(maps.Keys(res.Cookies))
+	pairs := make([]string, len(names))
+	for i, n := range names {
+		pairs[i] = n + "=" + httpdebug.Mask
+	}
+	return strings.Join(pairs, ", ")
 }
 
 // DebugMessage formats a debug log message: the title, then the non-empty meta values as

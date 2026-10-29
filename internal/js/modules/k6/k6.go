@@ -279,7 +279,7 @@ func logFailedCheck(state *lib.State, arg0 sobek.Value, failed []string, tags ma
 	if arg0 == nil {
 		return
 	}
-	requestFields, dump, ok := httpext.DebugDump(arg0.Export())
+	requestFields, dump, ok := httpext.DebugDump(arg0.Export(), state.Options.HTTPDebugRedact.Bool)
 	if !ok {
 		return
 	}

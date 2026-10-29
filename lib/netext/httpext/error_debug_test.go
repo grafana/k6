@@ -86,7 +86,7 @@ func TestMakeRequestHTTPErrorDebug(t *testing.T) {
 	t.Run("request tags for checks", func(t *testing.T) {
 		t.Parallel()
 		_, resp := makeRequestWithResponse(t, errorMode, srv.URL+"/ok")
-		tags, dump, ok := DebugDump(resp)
+		tags, dump, ok := DebugDump(resp, false)
 		require.True(t, ok)
 		assert.Equal(t, "Login", tags["name"])
 		assert.Equal(t, "auth", tags["team"])
@@ -94,7 +94,7 @@ func TestMakeRequestHTTPErrorDebug(t *testing.T) {
 		assert.Contains(t, dump, "POST http")
 
 		_, resp = makeRequestWithResponse(t, null.StringFrom("full"), srv.URL+"/ok")
-		tags, _, _ = DebugDump(resp)
+		tags, _, _ = DebugDump(resp, false)
 		assert.Nil(t, tags, "tags are only kept with --http-debug=error")
 	})
 
@@ -154,7 +154,7 @@ func TestMakeRequestHTTPErrorDebug(t *testing.T) {
 		assert.Contains(t, msg, "POST /fail HTTP/1.1")
 		assert.NotContains(t, msg, "\nResponse:\n", "there is no response")
 
-		fields, dump, ok := DebugDump(resp)
+		fields, dump, ok := DebugDump(resp, false)
 		require.True(t, ok)
 		assert.Equal(t, strconv.Itoa(int(tcpDialRefusedErrorCode)), fields["error_code"])
 		assert.Contains(t, dump, "\nResponse:\nerror: dial: connection refused")
