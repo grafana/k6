@@ -125,7 +125,7 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if err != nil {
 		k6common.Throw(vu.Runtime(), fmt.Errorf("parsing browser traces metadata: %w", err))
 	}
-	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv)
+	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv, initEnv.Logger)
 	if err != nil {
 		k6common.Throw(vu.Runtime(), fmt.Errorf("failed to create file persister: %w", err))
 	}
