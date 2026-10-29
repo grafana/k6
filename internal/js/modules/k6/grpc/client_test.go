@@ -22,6 +22,7 @@ import (
 	"go.k6.io/k6/v2/lib/fsext"
 	"go.k6.io/k6/v2/metrics"
 
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health"
@@ -663,6 +664,78 @@ func TestClient(t *testing.T) {
 				if (!resp.error || resp.error.message !== "foobar" || resp.error.code !== 15) {
 					throw new Error("unexpected error object: " + JSON.stringify(resp.error.code))
 				}`,
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
+					samplesBuf := metrics.GetBufferedSamples(samples)
+					assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+				},
+			},
+		},
+		{
+			name: "ResponseErrorWithDetails",
+			initString: codeBlock{
+				code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.EmptyCallFunc = func(_ context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+					// Create a status with error details
+					st := status.New(codes.InvalidArgument, "invalid request")
+
+					// Add structured error details using google.rpc.ErrorInfo
+					errInfo := &errdetails.ErrorInfo{
+						Reason: "FIELD_VALIDATION_ERROR",
+						Domain: "k6.io",
+						Metadata: map[string]string{
+							"field": "username",
+							"issue": "too_short",
+						},
+					}
+					st, err := st.WithDetails(errInfo)
+					if err != nil {
+						return nil, status.Error(codes.Internal, "failed to add error details")
+					}
+
+					return nil, st.Err()
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
+				
+				if (resp.status !== grpc.StatusInvalidArgument) {
+					throw new Error("unexpected error status: " + resp.status)
+				}
+				
+				if (!resp.error || resp.error.message !== "invalid request" || resp.error.code !== 3) {
+					throw new Error("unexpected error object: " + JSON.stringify(resp.error))
+				}
+				
+				// Check that error details are present
+				if (!resp.error.details || resp.error.details.length === 0) {
+					throw new Error("expected error details but got: " + JSON.stringify(resp.error))
+				}
+				
+				// Verify the error detail structure
+				const detail = resp.error.details[0]
+				if (!detail["@type"] || !detail["@type"].includes("ErrorInfo")) {
+					throw new Error("expected ErrorInfo detail but got: " + JSON.stringify(detail))
+				}
+				
+				// Check ErrorInfo fields
+				if (detail.reason !== "FIELD_VALIDATION_ERROR") {
+					throw new Error("unexpected reason: " + detail.reason)
+				}
+				
+				if (detail.domain !== "k6.io") {
+					throw new Error("unexpected domain: " + detail.domain)
+				}
+				
+				if (!detail.metadata || detail.metadata.field !== "username" || detail.metadata.issue !== "too_short") {
+					throw new Error("unexpected metadata: " + JSON.stringify(detail.metadata))
+				}
+				`,
 				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
 					samplesBuf := metrics.GetBufferedSamples(samples)
 					assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
@@ -1485,8 +1558,60 @@ func TestDebugStat(t *testing.T) {
 			logger := logrus.New()
 			logger.Out = &b
 
-			grpcext.DebugStat(logger.WithField("source", "test"), tt.stat, "full")
+			grpcext.DebugStat(logger.WithField("source", "test"), tt.stat, "full", false)
 			assert.Contains(t, b.String(), tt.expected)
+		})
+	}
+}
+
+func TestDebugStatRedaction(t *testing.T) {
+	t.Parallel()
+
+	md := metadata.MD{
+		"authorization": []string{"Bearer secret-token"},
+		"x-api-key":     []string{"secret-key"},
+		"x-head":        []string{"in"},
+	}
+	stats := []grpcstats.RPCStats{
+		&grpcstats.OutHeader{Header: md},
+		&grpcstats.InHeader{Header: md},
+	}
+
+	tests := [...]struct {
+		name        string
+		redact      bool
+		expected    []string
+		notExpected []string
+	}{
+		{
+			name:     "unredacted by default",
+			expected: []string{"authorization: Bearer secret-token", "x-api-key: secret-key", "x-head: in"},
+		},
+		{
+			name:        "redacted",
+			redact:      true,
+			expected:    []string{"authorization: Bearer ***REDACTED***", "x-api-key: ***REDACTED***", "x-head: in"},
+			notExpected: []string{"secret-token", "secret-key"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var b bytes.Buffer
+			logger := logrus.New()
+			logger.Out = &b
+
+			for _, stat := range stats {
+				b.Reset()
+				grpcext.DebugStat(logger.WithField("source", "test"), stat, "full", tt.redact)
+				out := b.String()
+				for _, e := range tt.expected {
+					assert.Contains(t, out, e)
+				}
+				for _, e := range tt.notExpected {
+					assert.NotContains(t, out, e)
+				}
+			}
 		})
 	}
 }

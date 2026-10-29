@@ -20,6 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/http/httpproxy"
 
+	"go.k6.io/k6/v2/internal/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
 
@@ -355,19 +356,7 @@ func (c *Conn) Invoke(
 	marshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: c.types}
 
 	if err != nil {
-		sterr := status.Convert(err)
-		response.Status = sterr.Code()
-
-		// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
-		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
-		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
-		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
-		// JSON.Stringify() shows the object to be correctly present.
-
-		raw, _ := marshaler.Marshal(sterr.Proto())
-		errMsg := make(map[string]any)
-		_ = json.Unmarshal(raw, &errMsg)
-		response.Error = errMsg
+		response.Status, response.Error = convertInvokeError(err, c.types)
 	}
 
 	if resp != nil && !req.DiscardResponseMessage {
@@ -379,6 +368,90 @@ func (c *Conn) Invoke(
 		response.Message = msg
 	}
 	return &response, nil
+}
+
+// combinedResolver checks user-loaded types first, then falls back to the global registry.
+// This ensures both standard Google types (google.rpc.ErrorInfo, etc.) and user-defined
+// types loaded via client.load() are resolved correctly when marshaling error details.
+type combinedResolver struct {
+	user *protoregistry.Types
+}
+
+func (r combinedResolver) FindMessageByName(msg protoreflect.FullName) (protoreflect.MessageType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindMessageByName(msg)
+	}
+	if t, err := r.user.FindMessageByName(msg); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindMessageByName(msg)
+}
+
+func (r combinedResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindMessageByURL(url)
+	}
+	if t, err := r.user.FindMessageByURL(url); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindMessageByURL(url)
+}
+
+func (r combinedResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindExtensionByName(field)
+	}
+	if t, err := r.user.FindExtensionByName(field); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindExtensionByName(field)
+}
+
+func (r combinedResolver) FindExtensionByNumber(
+	msg protoreflect.FullName, field protoreflect.FieldNumber,
+) (protoreflect.ExtensionType, error) {
+	if r.user == nil {
+		return protoregistry.GlobalTypes.FindExtensionByNumber(msg, field)
+	}
+	if t, err := r.user.FindExtensionByNumber(msg, field); err == nil {
+		return t, nil
+	}
+	return protoregistry.GlobalTypes.FindExtensionByNumber(msg, field)
+}
+
+// convertInvokeError converts a gRPC invocation error into a status code and
+// a JSON-serializable error map. Rich error details from the
+// grpc-status-details-bin trailer are already parsed by grpc-go on the client
+// side, so status.Convert(err) carries them.
+func convertInvokeError(err error, userTypes *protoregistry.Types) (codes.Code, map[string]any) {
+	sterr := status.Convert(err)
+
+	// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
+	// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
+	// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
+	// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
+	// JSON.Stringify() shows the object to be correctly present.
+
+	// combinedResolver checks user-loaded types first, then falls back to the global registry,
+	// so both standard Google types and user-defined types in error details are resolved correctly.
+	errorMarshaler := protojson.MarshalOptions{EmitUnpopulated: true, Resolver: combinedResolver{user: userTypes}}
+	raw, err := errorMarshaler.Marshal(sterr.Proto())
+	if err != nil {
+		return sterr.Code(), map[string]any{
+			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
+			"message": sterr.Message(),
+			"details": []any{},
+		}
+	}
+	errMsg := make(map[string]any)
+	if err = json.Unmarshal(raw, &errMsg); err != nil {
+		return sterr.Code(), map[string]any{
+			"code":    int32(sterr.Code()), //nolint:gosec // gRPC codes are 0-16, always within int32 range
+			"message": sterr.Message(),
+			"details": []any{},
+		}
+	}
+	return sterr.Code(), errMsg
 }
 
 // NewStream creates a new gRPC stream.
@@ -475,20 +548,19 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	// (rogchap) Re-using --http-debug flag as gRPC is technically still HTTP
 	if state.Options.HTTPDebug.String != "" {
 		logger := state.Logger.WithField("source", "http-debug")
-		httpDebugOption := state.Options.HTTPDebug.String
-		DebugStat(logger, stat, httpDebugOption)
+		DebugStat(logger, stat, state.Options.HTTPDebug.String, state.Options.HTTPDebugRedact.Bool)
 	}
 }
 
 // DebugStat prints debugging information based on RPCStats.
-func DebugStat(logger logrus.FieldLogger, stat grpcstats.RPCStats, httpDebugOption string) {
+func DebugStat(logger logrus.FieldLogger, stat grpcstats.RPCStats, httpDebugOption string, redact bool) {
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
 		logger.Infof("Out Header:\nFull Method: %s\nRemote Address: %s\n%s\n",
-			s.FullMethod, s.RemoteAddr, formatMetadata(s.Header))
+			s.FullMethod, s.RemoteAddr, formatMetadata(s.Header, redact))
 	case *grpcstats.OutTrailer:
 		if len(s.Trailer) > 0 {
-			logger.Infof("Out Trailer:\n%s\n", formatMetadata(s.Trailer))
+			logger.Infof("Out Trailer:\n%s\n", formatMetadata(s.Trailer, redact))
 		}
 	case *grpcstats.OutPayload:
 		if httpDebugOption == "full" {
@@ -497,11 +569,11 @@ func DebugStat(logger logrus.FieldLogger, stat grpcstats.RPCStats, httpDebugOpti
 		}
 	case *grpcstats.InHeader:
 		if len(s.Header) > 0 {
-			logger.Infof("In Header:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Header))
+			logger.Infof("In Header:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Header, redact))
 		}
 	case *grpcstats.InTrailer:
 		if len(s.Trailer) > 0 {
-			logger.Infof("In Trailer:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Trailer))
+			logger.Infof("In Trailer:\nWire Length: %d\n%s\n", s.WireLength, formatMetadata(s.Trailer, redact))
 		}
 	case *grpcstats.InPayload:
 		if httpDebugOption == "full" {
@@ -511,9 +583,19 @@ func DebugStat(logger logrus.FieldLogger, stat grpcstats.RPCStats, httpDebugOpti
 	}
 }
 
-func formatMetadata(md metadata.MD) string {
+func formatMetadata(md metadata.MD, redact bool) string {
 	var sb strings.Builder
 	for k, v := range md {
+		if redact && httpdebug.IsSensitive(k) {
+			redacted := make([]string, len(v))
+			for i, value := range v {
+				if value != "" {
+					value = httpdebug.RedactValue(k, value)
+				}
+				redacted[i] = value
+			}
+			v = redacted
+		}
 		sb.WriteString(k)
 		sb.WriteString(": ")
 		sb.WriteString(strings.Join(v, ", "))

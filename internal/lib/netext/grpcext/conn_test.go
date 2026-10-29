@@ -24,10 +24,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/v2/internal/features"
 	"go.k6.io/k6/v2/lib"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -36,7 +38,10 @@ import (
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
-const grpcProxyTargetAddr = "grpc.example:443"
+const (
+	grpcProxyTargetAddr = "grpc.example:443"
+	sayHelloMethod      = "/hello.HelloService/SayHello"
+)
 
 type healthcheckmock func(in *healthpb.HealthCheckRequest, out *healthpb.HealthCheckResponse, opts ...grpc.CallOption) error
 
@@ -376,7 +381,7 @@ func TestInvoke(t *testing.T) {
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
+		Method:           sayHelloMethod,
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
@@ -440,7 +445,7 @@ func TestInvokeReturnError(t *testing.T) {
 
 	c := Conn{raw: invokemock(helloReply)}
 	r := InvokeRequest{
-		Method:           "/hello.HelloService/SayHello",
+		Method:           sayHelloMethod,
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
 		Metadata:         metadata.New(nil),
@@ -819,4 +824,85 @@ func (d *recordingDialer) calls() []dialCall {
 	calls := make([]dialCall, len(d.dials))
 	copy(calls, d.dials)
 	return calls
+}
+
+func TestInvokeWithStatusDetails(t *testing.T) {
+	t.Parallel()
+
+	st := status.New(codes.InvalidArgument, "invalid request")
+	st, err := st.WithDetails(&errdetails.ErrorInfo{
+		Reason: "FIELD_VALIDATION_ERROR",
+		Domain: "k6.io",
+		Metadata: map[string]string{
+			"field": "username",
+			"issue": "too_short",
+		},
+	})
+	require.NoError(t, err)
+
+	// grpc-go parses the grpc-status-details-bin trailer on the client side,
+	// so the error returned by Invoke already carries the details.
+	helloReply := func(_, _ *dynamicpb.Message, _ ...grpc.CallOption) error {
+		return st.Err()
+	}
+
+	c := Conn{raw: invokemock(helloReply)}
+	r := InvokeRequest{
+		Method:           sayHelloMethod,
+		MethodDescriptor: methodFromProto("SayHello"),
+		Message:          []byte(`{"greeting":"text request"}`),
+		Metadata:         metadata.New(nil),
+	}
+	res, err := c.Invoke(context.Background(), r)
+	require.NoError(t, err)
+
+	assert.Equal(t, codes.InvalidArgument, res.Status)
+
+	errMap, ok := res.Error.(map[string]any)
+	require.True(t, ok, "error should be a map")
+	assert.Equal(t, float64(3), errMap["code"])
+	assert.Equal(t, "invalid request", errMap["message"])
+
+	details, ok := errMap["details"].([]any)
+	require.True(t, ok, "details should be a slice")
+	require.Len(t, details, 1)
+
+	detail, ok := details[0].(map[string]any)
+	require.True(t, ok, "detail should be a map")
+	assert.Contains(t, detail["@type"], "ErrorInfo")
+	assert.Equal(t, "FIELD_VALIDATION_ERROR", detail["reason"])
+	assert.Equal(t, "k6.io", detail["domain"])
+
+	meta, ok := detail["metadata"].(map[string]any)
+	require.True(t, ok, "metadata should be a map")
+	assert.Equal(t, "username", meta["field"])
+	assert.Equal(t, "too_short", meta["issue"])
+}
+
+func TestInvokeWithoutStatusDetails(t *testing.T) {
+	t.Parallel()
+
+	helloReply := func(_, _ *dynamicpb.Message, _ ...grpc.CallOption) error {
+		return status.Error(codes.NotFound, "not found")
+	}
+
+	c := Conn{raw: invokemock(helloReply)}
+	r := InvokeRequest{
+		Method:           sayHelloMethod,
+		MethodDescriptor: methodFromProto("SayHello"),
+		Message:          []byte(`{"greeting":"text request"}`),
+		Metadata:         metadata.New(nil),
+	}
+	res, err := c.Invoke(context.Background(), r)
+	require.NoError(t, err)
+
+	assert.Equal(t, codes.NotFound, res.Status)
+	assert.NotEmpty(t, res.Error)
+
+	errMap, ok := res.Error.(map[string]any)
+	require.True(t, ok, "error should be a map")
+
+	details, ok := errMap["details"]
+	require.True(t, ok, "details key should always be present")
+	assert.Empty(t, details, "details should be empty when not provided")
 }
