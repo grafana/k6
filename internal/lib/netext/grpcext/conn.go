@@ -2,15 +2,23 @@
 package grpcext
 
 import (
+	"bufio"
 	"context"
+	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/http/httpproxy"
 
 	"go.k6.io/k6/v2/internal/lib/netext/httpdebug"
 	"go.k6.io/k6/v2/lib"
@@ -32,6 +40,9 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+// proxyFunc returns the proxy URL to use for a target URL, or nil to connect directly.
+type proxyFunc func(*url.URL) (*url.URL, error)
 
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
@@ -83,7 +94,7 @@ type Conn struct {
 // with common options for requests from a VU.
 func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
-		return getState().Dialer.DialContext(ctx, "tcp", addr)
+		return dialGRPCContext(ctx, getState(), addr)
 	}
 
 	return []grpc.DialOption{
@@ -93,6 +104,172 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 		grpc.WithStatsHandler(statsHandler{getState: getState}),
 		grpc.WithContextDialer(dialer),
 	}
+}
+
+// dialGRPCContext dials addr with the VU's dialer. With the grpc-proxy feature flag on, it goes
+// through the proxy from HTTPS_PROXY (honoring NO_PROXY) when one applies to addr.
+func dialGRPCContext(ctx context.Context, state *lib.State, addr string) (net.Conn, error) {
+	if state.FeatureFlags == nil || !state.FeatureFlags.GRPCProxy {
+		return state.Dialer.DialContext(ctx, "tcp", addr)
+	}
+	return dialGRPCContextWithProxy(ctx, state, addr, proxyFuncFromEnvironment())
+}
+
+// proxyFuncFromEnvironment reads HTTPS_PROXY and NO_PROXY (and their lowercase forms) on every
+// call. Unlike http.ProxyFromEnvironment, it doesn't cache them for the life of the process, so a
+// change to the environment applies to the next dial.
+func proxyFuncFromEnvironment() proxyFunc {
+	return httpproxy.FromEnvironment().ProxyFunc()
+}
+
+func dialGRPCContextWithProxy(
+	ctx context.Context, state *lib.State, addr string, proxy proxyFunc,
+) (net.Conn, error) {
+	// gRPC runs over TLS or h2c; either way it is tunneled with CONNECT, so ask for the HTTPS proxy.
+	proxyURL, err := proxy(&url.URL{Scheme: "https", Host: addr})
+	if err != nil {
+		return nil, err
+	}
+	if proxyURL == nil {
+		return state.Dialer.DialContext(ctx, "tcp", addr)
+	}
+
+	return dialGRPCContextViaProxy(ctx, state, addr, proxyURL)
+}
+
+func dialGRPCContextViaProxy(
+	ctx context.Context, state *lib.State, addr string, proxyURL *url.URL,
+) (net.Conn, error) {
+	proxyAddr, useTLS, err := proxyDialAddress(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := state.Dialer.DialContext(ctx, "tcp", proxyAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	if useTLS {
+		tlsConn := tls.Client(conn, proxyTLSConfig(state.TLSConfig, proxyURL.Hostname()))
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("TLS handshake with grpc proxy %s failed: %w", proxyAddr, err)
+		}
+		conn = tlsConn
+	}
+
+	return doHTTPConnectHandshake(ctx, conn, addr, proxyURL.User)
+}
+
+// proxyTLSConfig returns the TLS config for talking to an https:// proxy. Like net/http, it starts
+// from the VU's TLS config (so options such as insecureSkipTLSVerify apply), with the proxy's
+// host as the server name. NextProtos is cleared because the CONNECT request is plain HTTP/1.1.
+func proxyTLSConfig(base *tls.Config, host string) *tls.Config {
+	var cfg *tls.Config
+	if base != nil {
+		cfg = base.Clone()
+	} else {
+		cfg = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	cfg.ServerName = host
+	cfg.NextProtos = nil
+	return cfg
+}
+
+// proxyDialAddress returns the host:port to dial for proxyURL, and whether the connection to the
+// proxy itself uses TLS (an https:// proxy).
+func proxyDialAddress(proxyURL *url.URL) (string, bool, error) {
+	var defaultPort string
+	var useTLS bool
+	switch proxyURL.Scheme {
+	case "", "http":
+		defaultPort = "80"
+	case "https":
+		defaultPort, useTLS = "443", true
+	default:
+		return "", false, fmt.Errorf("unsupported grpc proxy scheme %q", proxyURL.Scheme)
+	}
+
+	host := proxyURL.Hostname()
+	if host == "" {
+		return "", false, errors.New("proxy URL has no host")
+	}
+
+	port := proxyURL.Port()
+	if port == "" {
+		port = defaultPort
+	}
+
+	return net.JoinHostPort(host, port), useTLS, nil
+}
+
+type proxyBufferConn struct {
+	net.Conn
+	r io.Reader
+}
+
+func (c *proxyBufferConn) Read(b []byte) (int, error) {
+	return c.r.Read(b)
+}
+
+func doHTTPConnectHandshake(
+	ctx context.Context, conn net.Conn, addr string, user *url.Userinfo,
+) (result net.Conn, err error) {
+	stopCloseOnCancel := context.AfterFunc(ctx, func() {
+		_ = conn.Close()
+	})
+
+	defer func() {
+		// Once stopCloseOnCancel returns, the hook has either not run or already closed conn. The
+		// context can still have been canceled in between, so always check it afterwards: a
+		// canceled dial must not return a connection, even if the handshake raced to completion.
+		stopCloseOnCancel()
+		if err == nil && ctx.Err() != nil {
+			err = ctx.Err()
+		}
+		if err != nil {
+			_ = conn.Close()
+			result = nil
+		}
+	}()
+
+	req := (&http.Request{
+		Method: http.MethodConnect,
+		URL:    &url.URL{Host: addr},
+		Host:   addr,
+		Header: make(http.Header),
+	}).WithContext(ctx)
+	if user != nil {
+		username := user.Username()
+		password, _ := user.Password()
+		auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+		req.Header.Set("Proxy-Authorization", "Basic "+auth)
+	}
+
+	if err := req.Write(conn); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("failed to write proxy CONNECT request: %w", err)
+	}
+
+	reader := bufio.NewReader(conn)
+	resp, err := http.ReadResponse(reader, req) //nolint:bodyclose // CONNECT success returns the tunnel stream.
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("failed to read proxy CONNECT response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("proxy CONNECT failed: %s", resp.Status)
+	}
+	if reader.Buffered() > 0 {
+		// Bytes after the CONNECT response already belong to the tunnel; keep them.
+		return &proxyBufferConn{Conn: conn, r: reader}, nil
+	}
+	return conn, nil
 }
 
 // Dial establish a gRPC connection.
