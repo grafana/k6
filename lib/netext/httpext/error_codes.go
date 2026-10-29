@@ -270,6 +270,14 @@ func errorCodeForError(err error) (errCode, string) {
 	}
 }
 
+// ErrorCodeAndMessage returns the k6 error code and the user-readable message for err. They are
+// the values the HTTP module puts in the `error_code` and `error` tags, so other network modules
+// can classify their errors the same way.
+func ErrorCodeAndMessage(err error) (int, string) {
+	code, msg := errorCodeForError(err)
+	return int(code), msg
+}
+
 // K6Error is a helper struct that enhances Go errors with custom k6-specific
 // error-codes and more user-readable error messages.
 type K6Error struct {
