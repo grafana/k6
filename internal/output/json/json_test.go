@@ -4,10 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"errors"
 	"io"
 	"testing"
 	"time"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -224,4 +226,78 @@ func setThresholds(t *testing.T, out output.Output) {
 
 	ts := metrics.NewThresholds([]string{"rate<0.01", "p(99)<250"})
 	jout.SetThresholds(map[string]metrics.Thresholds{"my_metric1": ts})
+}
+
+// gzipErrorFS injects failures in writes and file closure without filling a real disk.
+type gzipErrorFS struct {
+	fsext.Fs
+	file *gzipErrorFile
+}
+
+func (fs gzipErrorFS) Create(name string) (afero.File, error) {
+	file, err := fs.Fs.Create(name)
+	if err != nil {
+		return nil, err
+	}
+	fs.file.File = file
+	return fs.file, nil
+}
+
+type gzipErrorFile struct {
+	afero.File
+	writeErr error
+	closeErr error
+	closed   bool
+}
+
+func (f *gzipErrorFile) Write(p []byte) (int, error) {
+	if f.writeErr != nil {
+		return 0, f.writeErr
+	}
+	return f.File.Write(p)
+}
+
+func (f *gzipErrorFile) Close() error {
+	f.closed = true
+	return errors.Join(f.File.Close(), f.closeErr)
+}
+
+func TestJsonOutputGzipStopReturnsErrors(t *testing.T) {
+	t.Parallel()
+
+	errWrite := errors.New("disk full")
+	errClose := errors.New("file close failed")
+	for _, tc := range []struct {
+		name     string
+		writeErr error
+		closeErr error
+	}{
+		{name: "write", writeErr: errWrite},
+		{name: "close", closeErr: errClose},
+		{name: "write and close", writeErr: errWrite, closeErr: errClose},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			file := &gzipErrorFile{closeErr: tc.closeErr}
+			out, err := New(output.Params{
+				Logger:         testutils.NewLogger(t),
+				FS:             gzipErrorFS{Fs: fsext.NewMemMapFs(), file: file},
+				ConfigArgument: "results.gz",
+			})
+			require.NoError(t, err)
+			require.NoError(t, out.Start())
+
+			// Writes succeed while starting the output, then fail during finalization.
+			file.writeErr = tc.writeErr
+			err = out.Stop()
+			if tc.writeErr != nil {
+				assert.ErrorIs(t, err, tc.writeErr)
+			}
+			if tc.closeErr != nil {
+				assert.ErrorIs(t, err, tc.closeErr)
+			}
+			assert.True(t, file.closed, "the file must be closed even when finalizing gzip fails")
+		})
+	}
 }
