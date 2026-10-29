@@ -69,6 +69,9 @@ type Response struct {
 	Error          string                   `json:"error"`
 	ErrorCode      int                      `json:"error_code"`
 	Request        *Request                 `json:"request"`
+
+	tags      map[string]string
+	requestID string
 }
 
 // NewResponse returns an empty Response instance.
