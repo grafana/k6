@@ -508,43 +508,54 @@ func TestSetupDataPromise(t *testing.T) {
 	};`)
 }
 
-// TestSetupDataPendingPromise checks that a setup() whose promise never settles is reported as an
-// error rather than crashing k6.
-func TestSetupDataPendingPromise(t *testing.T) {
+// TestSetupTeardownPendingPromise checks that a setup() or teardown() whose promise never settles
+// is reported as an error naming the function, rather than crashing k6.
+func TestSetupTeardownPendingPromise(t *testing.T) {
 	t.Parallel()
-	r, err := getSimpleRunner(t, "/script.js", `
-	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
-	exports.setup = async function() {
-		// Nothing that could ever settle this promise is registered with the event loop, so the
-		// loop runs dry with setup() still awaiting it. setupTimeout does not save us: there is no
-		// pending callback keeping the loop alive until the deadline, so it returns immediately.
-		await new Promise(function() {});
-		return {"data": "correct"};
+
+	// Nothing that could ever settle these promises is registered with the event loop, so the loop
+	// runs dry with the function still awaiting it. The timeouts do not save us: there is no pending
+	// callback keeping the loop alive until the deadline, so it returns immediately.
+	testCases := map[string]struct {
+		script string
+		run    func(*Runner) error
+	}{
+		"setup": {
+			script: `
+			export const options = { setupTimeout: "1s", teardownTimeout: "1s" };
+			export async function setup() {
+				await new Promise(() => {});
+				return { data: "correct" };
+			}
+			export default function () {}`,
+			run: func(r *Runner) error {
+				return r.Setup(t.Context(), make(chan metrics.SampleContainer, 100))
+			},
+		},
+		"teardown": {
+			script: `
+			export const options = { setupTimeout: "1s", teardownTimeout: "1s" };
+			export default function () {}
+			export async function teardown() {
+				await new Promise(() => {});
+			}`,
+			run: func(r *Runner) error {
+				return r.Teardown(t.Context(), make(chan metrics.SampleContainer, 100))
+			},
+		},
 	}
-	exports.default = function() {};`)
-	require.NoError(t, err)
 
-	err = r.Setup(t.Context(), make(chan metrics.SampleContainer, 100))
-	require.Error(t, err, "a setup() that never finishes must be reported as an error")
-	require.Contains(t, err.Error(), "setup()")
-	require.Contains(t, err.Error(), "did not finish")
-}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			r, err := getSimpleRunner(t, "/script.js", tc.script)
+			require.NoError(t, err)
 
-// TestTeardownPendingPromise checks that a teardown() whose promise never settles is reported as an
-// error, like setup().
-func TestTeardownPendingPromise(t *testing.T) {
-	t.Parallel()
-	r, err := getSimpleRunner(t, "/script.js", `
-	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
-	exports.default = function() {};
-	exports.teardown = async function() {
-		await new Promise(function() {});
-	};`)
-	require.NoError(t, err)
-
-	err = r.Teardown(t.Context(), make(chan metrics.SampleContainer, 100))
-	require.ErrorIs(t, err, errPromiseNotSettled)
-	require.Contains(t, err.Error(), "teardown()")
+			err = tc.run(r)
+			require.ErrorIs(t, err, errPromiseNotSettled)
+			require.Contains(t, err.Error(), name+"() did not finish")
+		})
+	}
 }
 
 // TestVUIterationPendingPromise checks how a default function whose promise never settles behaves:
@@ -558,23 +569,23 @@ func TestVUIterationPendingPromise(t *testing.T) {
 		wantErr bool
 	}{
 		"never settles": {
-			script: `exports.default = async function() {
-				await new Promise(function() {});
-			};`,
+			script: `export default async function () {
+				await new Promise(() => {});
+			}`,
 			wantErr: true,
 		},
 		"resolves": {
-			script: `exports.default = async function() {
+			script: `export default async function () {
 				await Promise.resolve(1);
-			};`,
+			}`,
 		},
 		"resolves after a timer": {
-			script: `exports.default = async function() {
-				await new Promise(function(resolve) { setTimeout(resolve, 10); });
-			};`,
+			script: `export default async function () {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+			}`,
 		},
 		"sync": {
-			script: `exports.default = function() {};`,
+			script: `export default function () {}`,
 		},
 	}
 
@@ -603,9 +614,9 @@ func TestVUIterationPendingPromise(t *testing.T) {
 func TestVUIterationPendingPromiseCanceled(t *testing.T) {
 	t.Parallel()
 	r, err := getSimpleRunner(t, "/script.js", `
-	exports.default = async function() {
-		await new Promise(function(resolve) { setTimeout(resolve, 60000); });
-	};`)
+	export default async function () {
+		await new Promise((resolve) => setTimeout(resolve, 60000));
+	}`)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)

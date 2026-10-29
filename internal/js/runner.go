@@ -1007,8 +1007,11 @@ func (u *VU) runFn(
 	}
 
 	v, promiseErr := unPromisify(v)
-	// An iteration cut short by its context (e.g. the scenario ending) can legitimately leave its
-	// promise pending, and an existing error (an exception, an interrupt) explains more than this.
+	// Only report a pending promise for a full iteration. When the context is done (the scenario
+	// ended, gracefulStop ran out, or the test was interrupted), the event loop stops with work still
+	// queued, so a pending promise is expected and isn't a script bug: without this check every
+	// iteration cut off at the end of a test would get this error. An existing error (an exception,
+	// an interrupt) also explains more than this one.
 	if promiseErr != nil && err == nil && isFullIteration {
 		err = promiseErr
 	}

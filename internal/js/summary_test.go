@@ -564,12 +564,12 @@ func TestHandleSummaryPendingPromise(t *testing.T) {
 	t.Parallel()
 	logger, hook := logtest.NewNullLogger()
 	runner, err := getSimpleRunner(t, "/script.js", `
-		exports.options = {handleSummaryTimeout: "1s"};
-		exports.default = function() { /* we don't run this, metrics are mocked */ };
-		exports.handleSummary = async function(data) {
-			await new Promise(function() {});
-			return {'never.json': '{}'};
-		};
+		export const options = { handleSummaryTimeout: "1s" };
+		export default function () { /* we don't run this, metrics are mocked */ }
+		export async function handleSummary(data) {
+			await new Promise(() => {});
+			return { "never.json": "{}" };
+		}
 		`, logger)
 	require.NoError(t, err)
 
