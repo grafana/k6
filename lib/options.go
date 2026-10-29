@@ -274,6 +274,9 @@ type Options struct {
 	// Should all HTTP requests and responses be logged (excluding body)?
 	HTTPDebug null.String `json:"httpDebug" envconfig:"K6_HTTP_DEBUG"`
 
+	// Should credential headers be masked in the HTTP debug output?
+	HTTPDebugRedact null.Bool `json:"httpDebugRedact" envconfig:"K6_HTTP_DEBUG_REDACT"`
+
 	// Accept invalid or untrusted TLS certificates.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_INSECURE_SKIP_TLS_VERIFY"`
 
@@ -448,6 +451,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.HTTPDebug.Valid {
 		o.HTTPDebug = opts.HTTPDebug
+	}
+	if opts.HTTPDebugRedact.Valid {
+		o.HTTPDebugRedact = opts.HTTPDebugRedact
 	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
