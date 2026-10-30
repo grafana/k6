@@ -186,33 +186,40 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 		// This will get a random unhandled rejection instead of the first one, for example.
 		// But that seems to be the case in other tools as well so it seems to not be that big of a problem.
 		for promise := range e.pendingPromiseRejections {
-			value := promise.Result()
-			if !common.IsNullish(value) {
-				if o := value.ToObject(e.vu.Runtime()); o != nil {
-					if stack := o.Get("stack"); stack != nil {
-						value = stack
-					}
-				}
-			}
-			return newRejectionError(promise.Result(), value)
+			return newRejectionError(e.vu.Runtime(), promise.Result())
 		}
 	}
 }
 
-func newRejectionError(res, v sobek.Value) error {
-	var s string
-	if v != nil {
-		s = v.String()
-	}
-	// this is the de facto wording in both firefox and deno at least
-	msg := "Uncaught (in promise) " + s
-	err := &rejectionError{msg: msg}
-	if !common.IsNullish(res) {
-		if cause, ok := res.Export().(error); ok {
-			err.cause = cause
+func newRejectionError(rt *sobek.Runtime, res sobek.Value) error {
+	var rejection *rejectionError
+	// Reading stack, converting to a string, and exporting can all execute JavaScript.
+	// Use a callable boundary since Runtime.Try does not catch interruptions.
+	call, _ := sobek.AssertFunction(rt.ToValue(func() {
+		v := res
+		if !common.IsNullish(v) {
+			if o := v.ToObject(rt); o != nil {
+				if stack := o.Get("stack"); stack != nil {
+					v = stack
+				}
+			}
 		}
+		var s string
+		if v != nil {
+			s = v.String()
+		}
+		// this is the de facto wording in both firefox and deno at least
+		rejection = &rejectionError{msg: "Uncaught (in promise) " + s}
+		if !common.IsNullish(res) {
+			if cause, ok := res.Export().(error); ok {
+				rejection.cause = cause
+			}
+		}
+	}))
+	if _, err := call(sobek.Undefined()); err != nil {
+		return err
 	}
-	return err
+	return rejection
 }
 
 // rejectionError is the error a rejected promise with no handler ends the event
@@ -233,7 +240,7 @@ var _ interface {
 func (e *rejectionError) Error() string { return e.msg }
 func (e *rejectionError) Unwrap() error { return e.cause }
 
-// StackTrace returns the message, which already carries the stack: the caller
+// StackTrace returns the message, which already carries the stack: newRejectionError
 // resolves the rejected value's `stack` property before building it, exactly as
 // a thrown exception's own String() carries its stack. A rejected value with no
 // stack -- `Promise.reject('some string')` -- has nothing better to give, and
