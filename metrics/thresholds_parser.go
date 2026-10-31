@@ -14,7 +14,7 @@ import (
 type thresholdExpression struct {
 	// AggregationMethod holds the aggregation method parsed
 	// from the threshold expression. Possible values are described
-	// by `aggregationMethodTokens`.
+	// by `aggregationMethodTokens` and `tokenPercentile`.
 	AggregationMethod string
 
 	// AggregationValue will hold the aggregation method's pivot value
@@ -171,7 +171,7 @@ const (
 // It is meant to be used during the parsing of threshold expressions.
 // Although declared as a `var`, being an array, it is effectively
 // immutable and can be considered constant.
-var aggregationMethodTokens = [8]string{ //nolint:gochecknoglobals
+var aggregationMethodTokens = [7]string{ //nolint:gochecknoglobals
 	tokenValue,
 	tokenCount,
 	tokenRate,
@@ -179,7 +179,6 @@ var aggregationMethodTokens = [8]string{ //nolint:gochecknoglobals
 	tokenMin,
 	tokenMed,
 	tokenMax,
-	tokenPercentile,
 }
 
 // parseThresholdAggregationMethod will parse a threshold condition expression's method.
