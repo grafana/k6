@@ -12,7 +12,7 @@ func newBitsDeriver(rt *sobek.Runtime, normalized Algorithm, algorithm sobek.Val
 	var err error
 
 	switch normalized.Name {
-	case ECDH:
+	case ECDH, X25519:
 		deriver, err = newECDHKeyDeriveParams(rt, normalized, algorithm)
 	case PBKDF2:
 		deriver, err = newPBKDF2DeriveParams(rt, normalized, algorithm)

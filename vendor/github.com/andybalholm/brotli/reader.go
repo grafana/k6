@@ -57,6 +57,7 @@ func (r *Reader) Reset(src io.Reader) error {
 	if r.buf == nil {
 		r.buf = make([]byte, readBufSize)
 	}
+	r.in = r.buf[:0]
 	return nil
 }
 

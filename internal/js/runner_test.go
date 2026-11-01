@@ -922,8 +922,9 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 					ctx := t.Context()
 					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool()
-					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)
+					rootCAs := x509.NewCertPool()
+					rootCAs.AddCert(cert)
+					setVURootCAs(initVU.(*VU), rootCAs)
 
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
@@ -937,6 +938,13 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 			}
 		})
 	}
+}
+
+// setVURootCAs makes the VU trust rootCAs. The HTTP transport has its own copy of the VU's TLS
+// config, so both have to be updated.
+func setVURootCAs(vu *VU, rootCAs *x509.CertPool) {
+	vu.TLSConfig.RootCAs = rootCAs
+	vu.Transport.TLSClientConfig.RootCAs = rootCAs
 }
 
 func TestVUIntegrationBlacklistOption(t *testing.T) {
@@ -1198,8 +1206,9 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 					ctx := t.Context()
 					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool()
-					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)
+					rootCAs := x509.NewCertPool()
+					rootCAs.AddCert(cert)
+					setVURootCAs(initVU.(*VU), rootCAs)
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
 					if data.errMsg != "" {
