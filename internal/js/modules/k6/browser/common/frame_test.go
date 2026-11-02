@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -223,4 +225,145 @@ func TestIsQuotedText(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFrameActionsReleaseHandle(t *testing.T) {
+	t.Parallel()
+	actionErr := errors.New("action failed")
+	lookupErr := errors.New("selector evaluation failed")
+	for _, pointer := range []bool{false, true} {
+		name := "action"
+		if pointer {
+			name = "pointer_action"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			for _, tc := range []struct {
+				name                 string
+				lookupErr, actionErr error
+			}{
+				{name: "success"},
+				{name: "action_error", actionErr: actionErr},
+				{name: "lookup_error", lookupErr: lookupErr},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
+					s := &handleReleaseSession{lookupErr: tc.lookupErr}
+					frame := newHandleReleaseFrame(t, s)
+					action := func(_ context.Context, handle *ElementHandle) (any, error) {
+						// Check lifetime while the callback is using the acquired handle.
+						s.events = append(s.events, "action")
+						if handle.disposed || len(s.released) != 0 {
+							return nil, errors.New("handle released before action")
+						}
+						return "result", tc.actionErr
+					}
+					run := frame.newAction("#target", DOMElementStateAttached, true, action,
+						nil, true, false, true, time.Second)
+					if pointer {
+						opts := &ElementHandleBasePointerOptions{}
+						opts.Force = true
+						opts.NoWaitAfter = true
+						opts.Timeout = time.Second
+						run = frame.newPointerAction("#target", DOMElementStateAttached, true,
+							func(ctx context.Context, handle *ElementHandle, _ *Position) (any, error) {
+								return action(ctx, handle)
+							}, opts)
+					}
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					results, errs := make(chan any, 1), make(chan error, 1)
+					done := make(chan struct{})
+					go func() {
+						defer close(done)
+						run(ctx, results, errs)
+					}()
+					// Result delivery can precede disposal. Wait for the whole wrapper to exit.
+					select {
+					case <-done:
+					case <-ctx.Done():
+						t.Fatal("action wrapper did not finish")
+					}
+					expectedErr := tc.actionErr
+					if tc.lookupErr != nil {
+						expectedErr = tc.lookupErr
+					}
+					if expectedErr != nil {
+						select {
+						case err := <-errs:
+							require.ErrorIs(t, err, expectedErr)
+						default:
+							t.Fatal("expected action error")
+						}
+						require.Empty(t, results)
+					} else {
+						select {
+						case result := <-results:
+							require.Equal(t, "result", result)
+						default:
+							t.Fatal("expected action result")
+						}
+						require.Empty(t, errs)
+					}
+					if tc.lookupErr != nil {
+						require.Empty(t, s.events)
+						require.Empty(t, s.released)
+					} else {
+						require.Equal(t, []string{"action", "release"}, s.events)
+						require.Equal(t, []runtime.RemoteObjectID{"temporary-element"}, s.released)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestFrameActionReleasesHandleAfterRetry(t *testing.T) {
+	t.Parallel()
+	s := &handleReleaseSession{}
+	frame := newHandleReleaseFrame(t, s)
+	var firstHandle *ElementHandle
+	attempts := 0
+	action := func(_ context.Context, handle *ElementHandle) (any, error) {
+		attempts++
+		s.events = append(s.events, "action")
+		if handle.disposed || len(s.released) != 0 {
+			return nil, errors.New("handle released before retry completed")
+		}
+		if attempts == 1 {
+			firstHandle = handle
+			// This sentinel triggers the real retry loop without relying on DOM timing.
+			return nil, ErrElementNotAttachedToDOM
+		}
+		if handle != firstHandle {
+			return nil, errors.New("retry did not reuse the acquired handle")
+		}
+		return "retried successfully", nil
+	}
+	// Force must be false: forcing an action disables retries.
+	run := frame.newAction("#target", DOMElementStateAttached, true, action,
+		[]string{"attached"}, false, true, true, time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	results, errs := make(chan any, 1), make(chan error, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		run(ctx, results, errs)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("retrying action did not finish")
+	}
+	require.Empty(t, errs)
+	select {
+	case result := <-results:
+		require.Equal(t, "retried successfully", result)
+	default:
+		t.Fatal("expected successful retry result")
+	}
+	require.Equal(t, 2, attempts)
+	require.Equal(t, []string{"action", "action", "release"}, s.events)
+	require.Equal(t, []runtime.RemoteObjectID{"temporary-element"}, s.released)
 }
