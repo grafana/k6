@@ -40,27 +40,30 @@ func _builtinOutputNoOp() {
 var _builtinOutputValues = []builtinOutput{builtinOutputCloud, builtinOutputCSV, builtinOutputDatadog, builtinOutputExperimentalPrometheusRW, builtinOutputInfluxdb, builtinOutputJSON, builtinOutputKafka, builtinOutputStatsd, builtinOutputExperimentalOpentelemetry, builtinOutputOpentelemetry, builtinOutputSummary}
 
 var _builtinOutputNameToValueMap = map[string]builtinOutput{
-	_builtinOutputName[0:5]:          builtinOutputCloud,
+	_builtinOutputName[0:5]:     builtinOutputCloud,
+	_builtinOutputName[5:8]:     builtinOutputCSV,
+	_builtinOutputName[8:15]:    builtinOutputDatadog,
+	_builtinOutputName[15:41]:   builtinOutputExperimentalPrometheusRW,
+	_builtinOutputName[41:49]:   builtinOutputInfluxdb,
+	_builtinOutputName[49:53]:   builtinOutputJSON,
+	_builtinOutputName[53:58]:   builtinOutputKafka,
+	_builtinOutputName[58:64]:   builtinOutputStatsd,
+	_builtinOutputName[64:90]:   builtinOutputExperimentalOpentelemetry,
+	_builtinOutputName[90:103]:  builtinOutputOpentelemetry,
+	_builtinOutputName[103:110]: builtinOutputSummary,
+}
+
+var _builtinOutputLowerNameToValueMap = map[string]builtinOutput{
 	_builtinOutputLowerName[0:5]:     builtinOutputCloud,
-	_builtinOutputName[5:8]:          builtinOutputCSV,
 	_builtinOutputLowerName[5:8]:     builtinOutputCSV,
-	_builtinOutputName[8:15]:         builtinOutputDatadog,
 	_builtinOutputLowerName[8:15]:    builtinOutputDatadog,
-	_builtinOutputName[15:41]:        builtinOutputExperimentalPrometheusRW,
 	_builtinOutputLowerName[15:41]:   builtinOutputExperimentalPrometheusRW,
-	_builtinOutputName[41:49]:        builtinOutputInfluxdb,
 	_builtinOutputLowerName[41:49]:   builtinOutputInfluxdb,
-	_builtinOutputName[49:53]:        builtinOutputJSON,
 	_builtinOutputLowerName[49:53]:   builtinOutputJSON,
-	_builtinOutputName[53:58]:        builtinOutputKafka,
 	_builtinOutputLowerName[53:58]:   builtinOutputKafka,
-	_builtinOutputName[58:64]:        builtinOutputStatsd,
 	_builtinOutputLowerName[58:64]:   builtinOutputStatsd,
-	_builtinOutputName[64:90]:        builtinOutputExperimentalOpentelemetry,
 	_builtinOutputLowerName[64:90]:   builtinOutputExperimentalOpentelemetry,
-	_builtinOutputName[90:103]:       builtinOutputOpentelemetry,
 	_builtinOutputLowerName[90:103]:  builtinOutputOpentelemetry,
-	_builtinOutputName[103:110]:      builtinOutputSummary,
 	_builtinOutputLowerName[103:110]: builtinOutputSummary,
 }
 
@@ -85,7 +88,7 @@ func builtinOutputString(s string) (builtinOutput, error) {
 		return val, nil
 	}
 
-	if val, ok := _builtinOutputNameToValueMap[strings.ToLower(s)]; ok {
+	if val, ok := _builtinOutputLowerNameToValueMap[strings.ToLower(s)]; ok {
 		return val, nil
 	}
 	return 0, fmt.Errorf("%s does not belong to builtinOutput values", s)

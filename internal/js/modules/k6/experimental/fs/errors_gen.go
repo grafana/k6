@@ -35,15 +35,18 @@ func _errorKindNoOp() {
 var _errorKindValues = []errorKind{NotFoundError, InvalidResourceError, ForbiddenError, TypeError, EOFError}
 
 var _errorKindNameToValueMap = map[string]errorKind{
-	_errorKindName[0:13]:       NotFoundError,
+	_errorKindName[0:13]:  NotFoundError,
+	_errorKindName[13:33]: InvalidResourceError,
+	_errorKindName[33:47]: ForbiddenError,
+	_errorKindName[47:56]: TypeError,
+	_errorKindName[56:64]: EOFError,
+}
+
+var _errorKindLowerNameToValueMap = map[string]errorKind{
 	_errorKindLowerName[0:13]:  NotFoundError,
-	_errorKindName[13:33]:      InvalidResourceError,
 	_errorKindLowerName[13:33]: InvalidResourceError,
-	_errorKindName[33:47]:      ForbiddenError,
 	_errorKindLowerName[33:47]: ForbiddenError,
-	_errorKindName[47:56]:      TypeError,
 	_errorKindLowerName[47:56]: TypeError,
-	_errorKindName[56:64]:      EOFError,
 	_errorKindLowerName[56:64]: EOFError,
 }
 
@@ -62,7 +65,7 @@ func errorKindString(s string) (errorKind, error) {
 		return val, nil
 	}
 
-	if val, ok := _errorKindNameToValueMap[strings.ToLower(s)]; ok {
+	if val, ok := _errorKindLowerNameToValueMap[strings.ToLower(s)]; ok {
 		return val, nil
 	}
 	return 0, fmt.Errorf("%s does not belong to errorKind values", s)
