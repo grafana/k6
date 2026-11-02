@@ -4,15 +4,33 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 const (
 	defaultAuthType = "Bearer"
 	buildPath       = "build"
 )
+
+// shouldRetryBuild reports whether a build request error indicates a transient
+// upstream failure (502/503/504) worth retrying.
+func shouldRetryBuild(err error) bool {
+	var statusErr *StatusError
+	if !errors.As(err, &statusErr) {
+		return false
+	}
+	switch statusErr.StatusCode {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
+}
 
 // dependency defines a dependency and its semantic version constraints
 type dependency struct {
@@ -49,10 +67,14 @@ type buildClient struct {
 	auth     string
 	authType string
 	headers  map[string]string
+	retries  int
+	backoff  time.Duration
+	logger   *slog.Logger
 }
 
 func newBuildServiceClient(
 	urlStr, authorization, authorizationType string, headers map[string]string,
+	retries int, backoff time.Duration, logger *slog.Logger,
 ) (*buildClient, error) {
 	srvURL, err := url.Parse(urlStr)
 	if err != nil {
@@ -64,11 +86,19 @@ func newBuildServiceClient(
 		authType = defaultAuthType
 	}
 
+	retries, backoff, err = resolveRetryConfig(retries, backoff)
+	if err != nil {
+		return nil, NewWrappedError(ErrConfig, fmt.Errorf("build service %w", err))
+	}
+
 	return &buildClient{
 		srvURL:   srvURL,
 		auth:     authorization,
 		authType: authType,
 		headers:  headers,
+		retries:  retries,
+		backoff:  backoff,
+		logger:   logger,
 	}, nil
 }
 
@@ -86,8 +116,18 @@ func (r *buildClient) Build(
 		Dependencies:  deps,
 	}
 
-	var resp buildResponse
-	if err := r.doRequest(ctx, buildPath, &req, &resp); err != nil {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return buildArtifact{}, NewWrappedError(ErrBuild, err)
+	}
+
+	resp, err := withRetry(ctx, r.retries, r.backoff, r.logger, "Build request", shouldRetryBuild,
+		func() (buildResponse, error) {
+			var resp buildResponse
+			err := r.doRequest(ctx, buildPath, body, &resp)
+			return resp, err
+		})
+	if err != nil {
 		return buildArtifact{}, err
 	}
 	if resp.Error != nil {
@@ -96,14 +136,9 @@ func (r *buildClient) Build(
 	return resp.Artifact, nil
 }
 
-func (r *buildClient) doRequest(ctx context.Context, path string, request, response any) error {
-	marshaled := &bytes.Buffer{}
-	if err := json.NewEncoder(marshaled).Encode(request); err != nil {
-		return NewWrappedError(ErrBuild, err)
-	}
-
+func (r *buildClient) doRequest(ctx context.Context, path string, body []byte, response any) error {
 	reqURL := r.srvURL.JoinPath(path)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL.String(), marshaled)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL.String(), bytes.NewReader(body))
 	if err != nil {
 		return NewWrappedError(ErrBuild, err)
 	}
@@ -117,7 +152,7 @@ func (r *buildClient) doRequest(ctx context.Context, path string, request, respo
 		req.Header.Set(h, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req) //nolint:gosec // G704: URL is from build service config, not user input
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return NewWrappedError(ErrBuild, err)
 	}
@@ -126,7 +161,7 @@ func (r *buildClient) doRequest(ctx context.Context, path string, request, respo
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return NewWrappedError(ErrBuild, fmt.Errorf("status %s", resp.Status))
+		return NewWrappedError(ErrBuild, &StatusError{StatusCode: resp.StatusCode, Status: resp.Status})
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(response); err != nil {
