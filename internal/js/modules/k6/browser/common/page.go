@@ -369,13 +369,13 @@ func NewPage(
 
 	p.initEvents()
 
-	action := target.SetAutoAttach(true, true).WithFlatten(true)
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	action := newCommand(target.SetAutoAttach, target.SetAutoAttachParams{AutoAttach: true, WaitForDebuggerOnStart: true, Flatten: ptr(true)})
+	if err := action.Do(p.ctx, p.session); err != nil {
 		return nil, fmt.Errorf("internal error while auto attaching to browser pages: %w", err)
 	}
 
-	add := runtime.AddBinding(webVitalBinding)
-	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	add := newCommand(runtime.AddBinding, runtime.AddBindingParams{Name: webVitalBinding})
+	if err := add.Do(p.ctx, p.session); err != nil {
 		return nil, fmt.Errorf("internal error while adding binding to page: %w", err)
 	}
 
@@ -651,8 +651,9 @@ func (p *Page) didClose() {
 func (p *Page) evaluateOnNewDocument(source string) error {
 	p.logger.Debugf("Page:evaluateOnNewDocument", "sid:%v", p.sessionID())
 
-	action := page.AddScriptToEvaluateOnNewDocument(source)
-	_, err := action.Do(cdp.WithExecutor(p.ctx, p.session))
+	action := newCommand(page.AddScriptToEvaluateOnNewDocument, page.AddScriptToEvaluateOnNewDocumentParams{Source: source})
+	_, err := action.Result(p.ctx, p.session)
+
 	if err != nil {
 		return fmt.Errorf("evaluating script on document: %w", err)
 	}
@@ -682,8 +683,9 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 		return nil, errors.New("parent frame has been detached")
 	}
 
-	action := dom.GetFrameOwner(cdp.FrameID(f.ID()))
-	backendNodeID, _, err := action.Do(cdp.WithExecutor(p.ctx, parentSession.session))
+	action := newCommand(dom.GetFrameOwner, dom.GetFrameOwnerParams{FrameID: cdp.FrameID(f.ID())})
+	result, err := action.Result(p.ctx, parentSession.session)
+	backendNodeID := result.BackendNodeID
 	if err != nil {
 		if strings.Contains(err.Error(), "frame with the given id was not found") {
 			return nil, errors.New("frame has been detached")
@@ -736,7 +738,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 		return "", nil
 	}
 
-	action := dom.DescribeNode().WithObjectID(documentElement.remoteObject.ObjectID)
+	action := newCommand(dom.DescribeNode, dom.DescribeNodeParams{ObjectID: documentElement.remoteObject.ObjectID})
 	// If the element is in an iframe, then using the page's session will not
 	// contain the element that we're looking for since frames do not
 	// share context between each other due to CORS.
@@ -744,7 +746,8 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	// Instead here we use the element's session to retrieve the description of
 	// itself, which works even when we're handling elements that are not in
 	// an iframe.
-	node, err := action.Do(cdp.WithExecutor(p.ctx, h.session))
+	commandResult, err := action.Result(p.ctx, h.session)
+	node := commandResult.Node
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:DescribeNode:return", "sid:%v err:%v", p.sessionID(), err)
 		return "", nil
@@ -823,8 +826,8 @@ func (p *Page) hasRoutes() bool {
 func (p *Page) resetViewport(ctx context.Context) error {
 	p.logger.Debugf("Page:resetViewport", "sid:%v", p.sessionID())
 
-	action := emulation.SetDeviceMetricsOverride(0, 0, 0, false)
-	return action.Do(cdp.WithExecutor(ctx, p.session))
+	action := newCommand(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: 0, Height: 0, DeviceScaleFactor: 0, Mobile: false})
+	return action.Do(ctx, p.session)
 }
 
 func (p *Page) setEmulatedSize(ctx context.Context, emulatedSize *EmulatedSize) error {
@@ -931,8 +934,8 @@ func (p *Page) viewportSize() Size {
 func (p *Page) BringToFront() error {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
 
-	action := page.BringToFront()
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	action := newCommand(page.BringToFront, cdp.Empty{})
+	if err := action.Do(p.ctx, p.session); err != nil {
 		return fmt.Errorf("bringing page to front: %w", err)
 	}
 
@@ -1017,20 +1020,20 @@ func (p *Page) Close() error {
 			p.logger.Warnf("Page:Close", "failed to trigger visibilitychange for web vitals: %v", err)
 		}
 
-		keyDown := input.DispatchKeyEvent(input.KeyDown).WithKey("Escape")
-		if err := keyDown.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
+		keyDown := newCommand(input.DispatchKeyEvent, input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeKeyDown, Key: "Escape"})
+		if err := keyDown.Do(teardownTimeoutCtx, p.session); err != nil {
 			p.logger.Warnf("Page:Close", "failed to dispatch keydown for web vitals: %v", err)
 		}
 
 		var closeErrs []error
 
-		add := runtime.RemoveBinding(webVitalBinding)
-		if err := add.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
+		add := newCommand(runtime.RemoveBinding, runtime.RemoveBindingParams{Name: webVitalBinding})
+		if err := add.Do(teardownTimeoutCtx, p.session); err != nil {
 			// continue so that we can shutdown the page even if we fail to remove the binding.
 			closeErrs = append(closeErrs, fmt.Errorf("internal error while removing binding from page: %w", err))
 		}
 
-		err := target.CloseTarget(p.targetID).Do(cdp.WithExecutor(teardownTimeoutCtx, p.session))
+		err := newCommand(target.CloseTarget, target.CloseTargetParams{TargetID: p.targetID}).Do(teardownTimeoutCtx, p.session)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			// When a close target command is sent to the browser via CDP,
 			// the browser will start to cleanup and the first thing it
@@ -1123,8 +1126,8 @@ func (p *Page) EmulateVisionDeficiency(typ string) error {
 		return fmt.Errorf("unsupported vision deficiency: %s", typ)
 	}
 
-	action := emulation.SetEmulatedVisionDeficiency(t)
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	action := newCommand(emulation.SetEmulatedVisionDeficiency, emulation.SetEmulatedVisionDeficiencyParams{Type: t})
+	if err := action.Do(p.ctx, p.session); err != nil {
 		return fmt.Errorf("setting emulated vision deficiency %q: %w", typ, err)
 	}
 
@@ -1685,8 +1688,8 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 		})
 	defer cancelWaitingForLifecycleEvent()
 
-	reloadAction := page.Reload()
-	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	reloadAction := newCommand(page.Reload, page.ReloadParams{})
+	if err := reloadAction.Do(p.ctx, p.session); err != nil {
 		return nil, err
 	}
 
@@ -1764,8 +1767,8 @@ func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Resp
 			rerr = spanRecordErrorf(span, "page going %s: %w", direction, rerr)
 		}
 	}()
-
-	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
+	result, err := newCommand(page.GetNavigationHistory, cdp.Empty{}).Result(p.ctx, p.session)
+	currentIndex, entries := result.CurrentIndex, result.Entries
 	if err != nil {
 		return nil, err
 	}
@@ -1783,8 +1786,8 @@ func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Resp
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
 
-	navAction := page.NavigateToHistoryEntry(historyEntryID)
-	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	navAction := newCommand(page.NavigateToHistoryEntry, page.NavigateToHistoryEntryParams{EntryID: historyEntryID})
+	if err := navAction.Do(p.ctx, p.session); err != nil {
 		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
 	}
 

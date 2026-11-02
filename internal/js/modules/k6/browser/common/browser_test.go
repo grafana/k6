@@ -56,8 +56,8 @@ func TestBrowserNewPageInContext(t *testing.T) {
 				// newPageInContext event handler will catch this target ID, and compare it to
 				// the new page's target ID to detect whether the page
 				// is loaded.
-				require.IsType(t, res, &target.CreateTargetReturns{})
-				v, _ := res.(*target.CreateTargetReturns)
+				require.IsType(t, res, &target.CreateTargetResult{})
+				v, _ := res.(*target.CreateTargetResult)
 				v.TargetID = targetID
 
 				// for the event handler to work, there needs to be an event called
@@ -328,8 +328,8 @@ func TestBrowserRejectedTarget(t *testing.T) {
 	evCh := make(chan Event)
 	conn.on(b.browserCtx, []string{cdproto.EventTargetAttachedToTarget}, evCh)
 
-	action := target.SetDiscoverTargets(true)
-	require.NoError(t, action.Do(cdp.WithExecutor(b.browserCtx, conn)))
+	action := newCommand(target.SetDiscoverTargets, target.SetDiscoverTargetsParams{Discover: true})
+	require.NoError(t, action.Do(b.browserCtx, conn))
 
 	select {
 	case event := <-evCh:

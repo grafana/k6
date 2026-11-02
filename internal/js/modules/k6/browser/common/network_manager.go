@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -401,7 +400,7 @@ func handleURLTag(mi eventInterceptor, url string, method string, tags *k6metric
 }
 
 func (m *NetworkManager) handleRequestRedirect(
-	req *Request, redirectResponse *network.Response, hasExtraInfo bool, timestamp *cdp.MonotonicTime,
+	req *Request, redirectResponse *network.Response, hasExtraInfo bool, timestamp cdp.MonotonicTime,
 ) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
 	m.extraInfoTracker.processResponse(req.requestID, resp, hasExtraInfo)
@@ -430,16 +429,16 @@ func (m *NetworkManager) handleRequestRedirect(
 }
 
 func (m *NetworkManager) initDomains() error {
-	actions := []Action{network.Enable()}
+	actions := []Action{newCommand(network.Enable, network.EnableParams{
 
-	// Only enable the Fetch domain if necessary, as it has a performance overhead.
+		// Only enable the Fetch domain if necessary, as it has a performance overhead.
+	})}
+
 	if m.userReqInterceptionEnabled {
-		actions = append(actions,
-			network.SetCacheDisabled(true),
-			fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}}))
+		actions = append(actions, newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable, fetch.EnableParams{Patterns: []*fetch.RequestPattern{{URLPattern: "*"}}}))
 	}
 	for _, action := range actions {
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		if err := action.Do(m.ctx, m.session); err != nil {
 			return fmt.Errorf("initializing networking %T: %w", action, err)
 		}
 	}
@@ -513,7 +512,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	}
 
 	req.setErrorText(event.ErrorText)
-	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	req.responseEndTiming = float64(protocolTime(float64(event.Timestamp)).Unix()-req.timestamp.Unix()) * 1000
 	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFailed(event.RequestID)
@@ -528,7 +527,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		return
 	}
 
-	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	req.responseEndTiming = float64(protocolTime(float64(event.Timestamp)).Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFinished(event.RequestID)
 	req.resolveRawHeaders()
@@ -731,8 +730,8 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		}
 
 		if failErr != nil {
-			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
-			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+			action := newCommand(fetch.FailRequest, fetch.FailRequestParams{RequestID: event.RequestID, ErrorReason: network.ErrorReasonBlockedByClient})
+			if err := action.Do(m.ctx, m.session); err != nil {
 				// Avoid logging as error when context is canceled.
 				// Most probably this happens when trying to fail a site's background request
 				// while the iteration is ending and therefore the browser context is being closed.
@@ -834,14 +833,12 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 		// See: https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#type-AuthChallengeResponse
 		username, password = m.credentials.Username, m.credentials.Password
 	}
-	err := fetch.ContinueWithAuth(
-		rid,
-		&fetch.AuthChallengeResponse{
-			Response: res,
-			Username: username,
-			Password: password,
-		},
-	).Do(cdp.WithExecutor(m.ctx, m.session))
+	err := newCommand(fetch.ContinueWithAuth, fetch.ContinueWithAuthParams{RequestID: rid, AuthChallengeResponse: &fetch.AuthChallengeResponse{
+		Response: res,
+		Username: username,
+		Password: password,
+	}}).
+		Do(m.ctx, m.session)
 	if err != nil {
 		m.logger.Debugf("NetworkManager:onAuthRequired", "continueWithAuth url:%q err:%v", event.Request.URL, err)
 	} else {
@@ -915,8 +912,8 @@ func (m *NetworkManager) setRequestInterception(value bool) error {
 }
 
 func (m *NetworkManager) updateProtocolCacheDisabled() error {
-	action := network.SetCacheDisabled(m.userCacheDisabled)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	action := newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: m.userCacheDisabled})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		errAction := "enabling"
 		if m.userCacheDisabled {
 			errAction = "disabling"
@@ -936,25 +933,18 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 	m.logger.Debugf("NetworkManager:updateProtocolRequestInterception",
 		"updating request interception to %t (session: %s)", enabled, m.session.ID())
 
-	actions := []Action{
-		network.SetCacheDisabled(true),
-		fetch.Enable().
-			WithHandleAuthRequests(true).
-			WithPatterns([]*fetch.RequestPattern{
-				{
-					URLPattern:   "*",
-					RequestStage: fetch.RequestStageRequest,
-				},
-			}),
+	actions := []Action{newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable, fetch.EnableParams{HandleAuthRequests: ptr(true), Patterns: []*fetch.RequestPattern{
+		{
+			URLPattern:   "*",
+			RequestStage: fetch.RequestStageRequest,
+		},
+	}}),
 	}
 	if !enabled {
-		actions = []Action{
-			network.SetCacheDisabled(false),
-			fetch.Disable(),
-		}
+		actions = []Action{newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: false}), newCommand(fetch.Disable, cdp.Empty{})}
 	}
 	for _, action := range actions {
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		if err := action.Do(m.ctx, m.session); err != nil {
 			return fmt.Errorf("internal error while updating protocol request interception %T: %w", action, err)
 		}
 	}
@@ -983,8 +973,8 @@ func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason str
 		return fmt.Errorf("unknown error code: %s", errorReason)
 	}
 
-	action := fetch.FailRequest(requestID, netErrorReason)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	action := newCommand(fetch.FailRequest, fetch.FailRequestParams{RequestID: requestID, ErrorReason: netErrorReason})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
 		// while the iteration is ending and therefore the browser context is being closed.
@@ -1004,23 +994,22 @@ func (m *NetworkManager) ContinueRequest(
 	originalHeaders []HTTPHeader,
 ) error {
 	m.logger.Debugf("NetworkManager:ContinueRequest", "continuing request (id: %s)", requestID)
-	action := fetch.ContinueRequest(requestID)
+	action := newCommand(fetch.ContinueRequest, fetch.ContinueRequestParams{RequestID: requestID})
 
 	if len(opts.Headers) > 0 {
-		action = action.WithHeaders(toFetchHeaders(opts.Headers))
+		action.params.Headers = toFetchHeaders(opts.Headers)
 	}
 	if opts.URL != "" {
-		action = action.WithURL(opts.URL)
+		action.params.URL = opts.URL
 	}
 	if opts.Method != "" {
-		action = action.WithMethod(opts.Method)
+		action.params.Method = opts.Method
 	}
 	if len(opts.PostData) > 0 {
-		b64PostData := base64.StdEncoding.EncodeToString(opts.PostData)
-		action = action.WithPostData(b64PostData)
+		action.params.PostData = opts.PostData
 	}
 
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := action.Do(m.ctx, m.session); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
 		// while the iteration is ending and therefore the browser context is being closed.
@@ -1051,7 +1040,7 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts FulfillOptions) e
 		responseCode = opts.Status
 	}
 
-	action := fetch.FulfillRequest(request.interceptionID, responseCode)
+	action := newCommand(fetch.FulfillRequest, fetch.FulfillRequestParams{RequestID: request.interceptionID, ResponseCode: responseCode})
 
 	if opts.ContentType != "" {
 		opts.Headers = append(opts.Headers, HTTPHeader{
@@ -1062,15 +1051,14 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts FulfillOptions) e
 
 	headers := toFetchHeaders(opts.Headers)
 	if len(headers) > 0 {
-		action = action.WithResponseHeaders(headers)
+		action.params.ResponseHeaders = headers
 	}
 
 	if len(opts.Body) > 0 {
-		b64Body := base64.StdEncoding.EncodeToString(opts.Body)
-		action = action.WithBody(b64Body)
+		action.params.Body = opts.Body
 	}
 
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := action.Do(m.ctx, m.session); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
 		// while the iteration is ending and therefore the browser context is being closed.
@@ -1103,9 +1091,9 @@ func toFetchHeaders(headers []HTTPHeader) []*fetch.HeaderEntry {
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) error {
-	err := network.
-		SetExtraHTTPHeaders(headers).
-		Do(cdp.WithExecutor(m.ctx, m.session))
+	err := newCommand(network.
+		SetExtraHTTPHeaders, network.SetExtraHTTPHeadersParams{Headers: headers}).
+		Do(m.ctx, m.session)
 	if err != nil {
 		return fmt.Errorf("setting extra HTTP headers: %w", err)
 	}
@@ -1118,26 +1106,29 @@ func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) error {
 // and overrideNetworkState updates the navigator.onLine/navigator.connection
 // state exposed to page JS.
 func (m *NetworkManager) emulateNetworkConditions() error {
-	byRule := network.EmulateNetworkConditionsByRule([]*network.Conditions{
-		{
-			// Empty URLPattern applies these as global conditions.
+	// Empty URLPattern applies these as global conditions.
+	byRule := newCommand(network.EmulateNetworkConditionsByRule, network.EmulateNetworkConditionsByRuleParams{
+		MatchedNetworkConditions: []*network.Conditions{{
 			Offline:            m.offline,
 			Latency:            m.networkProfile.Latency,
 			DownloadThroughput: m.networkProfile.Download,
 			UploadThroughput:   m.networkProfile.Upload,
-		},
+		}},
 	})
-	if _, err := byRule.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	_, err := byRule.Result(m.ctx, m.session)
+
+	if err != nil {
 		return fmt.Errorf("emulating network conditions by rule: %w", err)
 	}
 
-	override := network.OverrideNetworkState(
-		m.offline,
-		m.networkProfile.Latency,
-		m.networkProfile.Download,
-		m.networkProfile.Upload,
-	)
-	if err := override.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	override := newCommand(network.OverrideNetworkState, network.OverrideNetworkStateParams{
+		Offline:            m.offline,
+		Latency:            m.networkProfile.Latency,
+		DownloadThroughput: m.networkProfile.Download,
+		UploadThroughput:   m.networkProfile.Upload,
+	})
+
+	if err := override.Do(m.ctx, m.session); err != nil {
 		return fmt.Errorf("overriding network state: %w", err)
 	}
 
@@ -1175,8 +1166,8 @@ func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
 
 // SetUserAgent overrides the browser user agent string.
 func (m *NetworkManager) SetUserAgent(userAgent string) {
-	action := emulation.SetUserAgentOverride(userAgent)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	action := newCommand(emulation.SetUserAgentOverride, emulation.SetUserAgentOverrideParams{UserAgent: userAgent})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		k6ext.Panicf(m.ctx, "setting user agent: %w", err)
 	}
 }

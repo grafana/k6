@@ -12,7 +12,6 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/tests/ws"
 
 	"github.com/chromedp/cdproto"
-	"github.com/chromedp/cdproto/cdp"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	jsonv2 "github.com/go-json-experiment/json"
@@ -54,8 +53,8 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
 
 		if assert.NoError(t, err) {
-			action := target.SetDiscoverTargets(true)
-			err := action.Do(cdp.WithExecutor(ctx, conn))
+			action := newCommand(target.SetDiscoverTargets, target.SetDiscoverTargetsParams{Discover: true})
+			err := action.Do(ctx, conn)
 			require.ErrorContains(t, err, "websocket: close 1006 (abnormal closure): unexpected EOF")
 		}
 	})
@@ -75,8 +74,8 @@ func TestConnectionSendRecv(t *testing.T) {
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
 
 		if assert.NoError(t, err) {
-			action := target.SetDiscoverTargets(true)
-			err := action.Do(cdp.WithExecutor(ctx, conn))
+			action := newCommand(target.SetDiscoverTargets, target.SetDiscoverTargetsParams{Discover: true})
+			err := action.Do(ctx, conn)
 			require.NoError(t, err)
 		}
 	})
@@ -222,8 +221,8 @@ func TestConnectionRejectedTarget(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(conn.Close)
 
-	action := target.SetDiscoverTargets(true)
-	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
+	action := newCommand(target.SetDiscoverTargets, target.SetDiscoverTargetsParams{Discover: true})
+	require.NoError(t, action.Do(ctx, conn))
 
 	requireResumeThenDetach(t, received, rejectedSessionID)
 }
@@ -270,8 +269,8 @@ func TestConnectionRejectedTargetClosedLocallyOnDetachError(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(conn.Close)
 
-	action := target.SetDiscoverTargets(true)
-	require.NoError(t, action.Do(cdp.WithExecutor(ctx, conn)))
+	action := newCommand(target.SetDiscoverTargets, target.SetDiscoverTargetsParams{Discover: true})
+	require.NoError(t, action.Do(ctx, conn))
 
 	require.Eventually(t, func() bool {
 		return conn.getSession(rejectedSessionID) == nil

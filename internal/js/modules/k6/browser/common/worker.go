@@ -36,12 +36,10 @@ func NewWorker(ctx context.Context, s session, id target.ID, url string) (*Worke
 
 func (w *Worker) initEvents() error {
 	actions := []Action{
-		log.Enable(),
-		network.Enable(),
-		runtime.RunIfWaitingForDebugger(),
+		newCommand(log.Enable, cdp.Empty{}), newCommand(network.Enable, network.EnableParams{}), newCommand(runtime.RunIfWaitingForDebugger, cdp.Empty{}),
 	}
 	for _, action := range actions {
-		if err := action.Do(cdp.WithExecutor(w.ctx, w.session)); err != nil {
+		if err := action.Do(w.ctx, w.session); err != nil {
 			return fmt.Errorf("protocol error while initializing worker %T: %w", action, err)
 		}
 	}

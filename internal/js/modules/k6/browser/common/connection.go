@@ -13,7 +13,6 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
 	"github.com/chromedp/cdproto"
-	"github.com/chromedp/cdproto/cdp"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	jsonv2 "github.com/go-json-experiment/json"
@@ -49,7 +48,7 @@ type msgIDGenerator interface {
 }
 
 type executorEmitter interface {
-	cdp.Executor
+	executor
 	EventEmitter
 }
 
@@ -61,7 +60,7 @@ type connection interface {
 }
 
 type session interface {
-	cdp.Executor
+	executor
 	executorEmitter
 	ExecuteWithoutExpectationOnReply(context.Context, string, any, any) error
 	ID() target.SessionID
@@ -71,15 +70,15 @@ type session interface {
 
 // Action is the general interface of an CDP action.
 type Action interface {
-	Do(context.Context) error
+	Do(context.Context, executor) error
 }
 
 // ActionFunc is an adapter to allow regular functions to be used as an Action.
-type ActionFunc func(context.Context) error
+type ActionFunc func(context.Context, executor) error
 
 // Do executes the func f using the provided context.
-func (f ActionFunc) Do(ctx context.Context) error {
-	return f(ctx)
+func (f ActionFunc) Do(ctx context.Context, e executor) error {
+	return f(ctx, e)
 }
 
 // Connection represents a WebSocket connection and the root "Browser Session".
@@ -268,8 +267,10 @@ func (c *Connection) createSession(info *target.Info) (*Session, error) {
 
 	var sessionID target.SessionID
 	var err error
-	action := target.AttachToTarget(info.TargetID).WithFlatten(true)
-	if sessionID, err = action.Do(cdp.WithExecutor(c.ctx, c)); err != nil {
+	action := newCommand(target.AttachToTarget, target.AttachToTargetParams{TargetID: info.TargetID, Flatten: ptr(true)})
+	result, err := action.Result(c.ctx, c)
+	sessionID = result.SessionID
+	if err != nil {
 		c.logger.Debugf("Connection:createSession", "tid:%v bctxid:%v type:%s err:%v",
 			info.TargetID, info.BrowserContextID, info.Type, err)
 		return nil, err
