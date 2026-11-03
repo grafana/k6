@@ -916,7 +916,7 @@ func TestBrowserContextGrantPermissions(t *testing.T) {
 func TestBrowserContextClearPermissions(t *testing.T) {
 	t.Parallel()
 
-	hasPermission := func(_ *testBrowser, p *common.Page, perm string) bool {
+	permissionState := func(t *testing.T, p *common.Page, perm string) string {
 		t.Helper()
 
 		js := fmt.Sprintf(`
@@ -926,8 +926,13 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 		`, perm)
 		v, err := p.Evaluate(js)
 		require.NoError(t, err)
-		s := asString(t, v)
-		return s == "granted"
+		return asString(t, v)
+	}
+
+	hasPermission := func(_ *testBrowser, p *common.Page, perm string) bool {
+		t.Helper()
+
+		return permissionState(t, p, perm) == "granted"
 	}
 
 	t.Run("no_permissions_set", func(t *testing.T) {
@@ -967,6 +972,35 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 		err = bCtx.ClearPermissions()
 		assert.NoError(t, err)
 		require.False(t, hasPermission(tb, p, "geolocation"))
+	})
+
+	// Browser.grantPermissions granted the listed permissions and denied every
+	// other one, including permissions granted by an earlier call. setPermission
+	// only updates the permissions it is given.
+	t.Run("unlisted_permissions_are_denied", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		bCtx, err := tb.NewContext(nil)
+		require.NoError(t, err)
+		p, err := bCtx.NewPage()
+		require.NoError(t, err)
+
+		err = bCtx.GrantPermissions(
+			[]string{"geolocation"},
+			common.GrantPermissionsOptions{},
+		)
+		require.NoError(t, err)
+		require.True(t, hasPermission(tb, p, "geolocation"))
+		require.Equal(t, "denied", permissionState(t, p, "notifications"))
+
+		err = bCtx.GrantPermissions(
+			[]string{"notifications"},
+			common.GrantPermissionsOptions{},
+		)
+		require.NoError(t, err)
+		require.Equal(t, "denied", permissionState(t, p, "geolocation"))
+		require.Equal(t, "granted", permissionState(t, p, "notifications"))
 	})
 }
 
