@@ -39,6 +39,18 @@ func TestParseMouseClickOptions(t *testing.T) {
 			input:   `({delay: true})`,
 			wantErr: "delay must be an integer",
 		},
+		{
+			// Sobek's undefined/null ExportType() is a nil reflect.Type; calling
+			// .Kind() panics. Treat missing clickCount/delay like omitted keys.
+			name:  "undefined_clickCount",
+			input: `({clickCount: undefined})`,
+			want:  &common.MouseClickOptions{Button: "left", ClickCount: 1, Delay: 0},
+		},
+		{
+			name:  "null_delay",
+			input: `({delay: null})`,
+			want:  &common.MouseClickOptions{Button: "left", ClickCount: 1, Delay: 0},
+		},
 	}
 
 	for _, tt := range tests {
@@ -85,6 +97,11 @@ func TestParseMouseDblClickOptions(t *testing.T) {
 			name:    "invalid_delay",
 			input:   `({delay: "slow"})`,
 			wantErr: "delay must be an integer",
+		},
+		{
+			name:  "undefined_delay",
+			input: `({delay: undefined})`,
+			want:  &common.MouseDblClickOptions{Button: "left", Delay: 0},
 		},
 	}
 
@@ -133,6 +150,11 @@ func TestParseMouseDownUpOptions(t *testing.T) {
 			input:   `({clickCount: []})`,
 			wantErr: "clickCount must be an integer",
 		},
+		{
+			name:  "undefined_clickCount",
+			input: `({clickCount: undefined})`,
+			want:  &common.MouseDownUpOptions{Button: "left", ClickCount: 1},
+		},
 	}
 
 	for _, tt := range tests {
@@ -179,6 +201,11 @@ func TestParseMouseMoveOptions(t *testing.T) {
 			name:    "invalid_steps",
 			input:   `({steps: {}})`,
 			wantErr: "steps must be an integer",
+		},
+		{
+			name:  "undefined_steps",
+			input: `({steps: undefined})`,
+			want:  &common.MouseMoveOptions{Steps: 1},
 		},
 	}
 
