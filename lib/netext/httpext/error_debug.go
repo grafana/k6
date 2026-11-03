@@ -47,7 +47,7 @@ func logFailedRequest(
 		meta["error"] = resErr
 		meta["error_code"] = resp.ErrorCode
 	} else {
-		details += "\nResponse:\n" + string(redact(dumpResponse(state.Logger, res, resp.Body)))
+		details += "\n\nResponse:\n" + string(redact(dumpResponse(state.Logger, res, resp.Body)))
 	}
 	state.Logger.Warn(DebugMessage("Request Failed", meta, details))
 }
@@ -190,7 +190,7 @@ func (res *Response) debugDump(redact bool) string {
 	}
 
 	return "Request:\n" + strings.TrimRight(req.String(), "\n") +
-		"\nResponse:\n" + strings.TrimRight(resp.String(), "\n")
+		"\n\nResponse:\n" + strings.TrimRight(resp.String(), "\n")
 }
 
 // redactHeader masks a sensitive response header. Several Set-Cookie headers are joined with ", "

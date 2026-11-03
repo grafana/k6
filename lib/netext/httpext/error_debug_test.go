@@ -126,11 +126,11 @@ func TestMakeRequestHTTPErrorDebug(t *testing.T) {
 		msg := entries[0].Message
 		assert.True(t, strings.HasPrefix(msg, "Request Failed"))
 		assert.Regexp(t, ` request_id=[0-9a-f-]{36} `, msg)
-		// The metadata goes before the details, with no blank lines between the sections.
+		// The metadata goes before the details. A blank line separates the request from the
+		// response, so the request headers do not run into the response.
 		assert.Less(t, strings.Index(msg, " request_id="), strings.Index(msg, "\nRequest:\n"))
-		assert.Contains(t, msg, "\nResponse:\n")
+		assert.Contains(t, msg, "\n\nResponse:\n")
 		assert.NotContains(t, msg, "\n\n\n")
-		assert.NotContains(t, msg, "\n\nResponse:")
 		assert.Contains(t, entries[0].Message, "POST /fail HTTP/1.1")
 		assert.Contains(t, entries[0].Message, "500 Internal Server Error")
 		assert.Contains(t, entries[0].Message, `{"user":"bob"}`)
@@ -157,7 +157,7 @@ func TestMakeRequestHTTPErrorDebug(t *testing.T) {
 		fields, dump, ok := DebugDump(resp, false)
 		require.True(t, ok)
 		assert.Equal(t, strconv.Itoa(int(tcpDialRefusedErrorCode)), fields["error_code"])
-		assert.Contains(t, dump, "\nResponse:\nerror: dial: connection refused")
+		assert.Contains(t, dump, "\n\nResponse:\nerror: dial: connection refused")
 	})
 }
 
