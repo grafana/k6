@@ -124,51 +124,39 @@ func (nopCloser) Close() error { return nil }
 // based on the matchfinder package. It currently supports up to level 9;
 // if a higher level is specified, level 9 will be used.
 func NewWriterV2(dst io.Writer, level int) *matchfinder.Writer {
+	if level < 0 {
+		level = 0
+	} else if level > 9 {
+		level = 9
+	}
 	var mf matchfinder.MatchFinder
-	if level < 2 {
-		mf = matchfinder.M0{Lazy: level == 1}
-	} else if level < 8 {
-		hashLen := 6
-		if level >= 6 {
-			hashLen = 5
-		}
-		chainLen := 16
-		switch level {
-		case 2:
-			chainLen = 0
-		case 3:
-			chainLen = 1
-		case 4:
-			chainLen = 2
-		case 5:
-			chainLen = 4
-		case 6:
-			chainLen = 8
-		}
-		mf = &matchfinder.M4{
-			MaxDistance:     1 << 20,
-			ChainLength:     chainLen,
-			HashLen:         hashLen,
-			DistanceBitCost: 66,
-		}
-	} else {
-		chainLen := 32
-		hashLen := 5
-		if level == 8 {
-			chainLen = 4
-			hashLen = 6
-		}
-		mf = &matchfinder.Pathfinder{
-			MaxDistance: 1 << 20,
-			ChainLength: chainLen,
-			HashLen:     hashLen,
-		}
+	switch level {
+	case 0, 1:
+		mf = &matchfinder.ZFast{MaxDistance: 1 << 20}
+	case 2:
+		mf = &matchfinder.ZDFast{MaxDistance: 1 << 20}
+	case 3:
+		mf = &matchfinder.ZM{MaxDistance: 1 << 20}
+	case 4:
+		mf = &matchfinder.Trio{MaxDistance: 1 << 20}
+	case 5, 6:
+		mf = &matchfinder.Bargain1{MaxDistance: 1 << 20}
+	case 7:
+		mf = &matchfinder.Bargain2{MaxDistance: 1 << 20, Skip: true}
+	case 8:
+		mf = &matchfinder.Bargain2{MaxDistance: 1 << 20}
+	case 9:
+		mf = &matchfinder.Bargain3{MaxDistance: 1 << 20}
 	}
 
-	return &matchfinder.Writer{
+	w := &matchfinder.Writer{
 		Dest:        dst,
 		MatchFinder: mf,
 		Encoder:     &Encoder{},
 		BlockSize:   1 << 16,
 	}
+	if level < 1 {
+		w.Encoder = &FastEncoder{}
+	}
+	return w
 }

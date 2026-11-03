@@ -12,6 +12,10 @@ import (
 // WriteCloser that implements that compression. The Close method must be called
 // before the current HTTP handler returns.
 func HTTPCompressor(w http.ResponseWriter, r *http.Request) io.WriteCloser {
+	return HTTPCompressorWithLevel(w, r, 4)
+}
+
+func HTTPCompressorWithLevel(w http.ResponseWriter, r *http.Request, level int) io.WriteCloser {
 	if w.Header().Get("Vary") == "" {
 		w.Header().Set("Vary", "Accept-Encoding")
 	}
@@ -20,10 +24,15 @@ func HTTPCompressor(w http.ResponseWriter, r *http.Request) io.WriteCloser {
 	switch encoding {
 	case "br":
 		w.Header().Set("Content-Encoding", "br")
-		return NewWriterV2(w, DefaultCompression)
+		return NewWriterLevel(w, level)
 	case "gzip":
-		w.Header().Set("Content-Encoding", "gzip")
-		return gzip.NewWriter(w)
+		if level > 9 {
+			level = 9
+		}
+		if gzw, err := gzip.NewWriterLevel(w, level); err == nil {
+			w.Header().Set("Content-Encoding", "gzip")
+			return gzw
+		}
 	}
 	return nopCloser{w}
 }
@@ -38,15 +47,23 @@ func negotiateContentEncoding(r *http.Request, offers []string) string {
 	specs := parseAccept(r.Header, "Accept-Encoding")
 	for _, offer := range offers {
 		for _, spec := range specs {
-			if spec.Q > bestQ &&
-				(spec.Value == "*" || spec.Value == offer) {
+			if spec.Q > bestQ && strings.EqualFold(spec.Value, offer) {
 				bestQ = spec.Q
 				bestOffer = offer
 			}
 		}
 	}
-	if bestQ == 0 {
+	switch bestQ {
+	case 0:
 		bestOffer = ""
+	case -1.0:
+		// No specs matched, so we fall back to "*", if it is present.
+		for _, spec := range specs {
+			if spec.Value == "*" && spec.Q > bestQ {
+				bestQ = spec.Q
+				bestOffer = offers[0]
+			}
+		}
 	}
 	return bestOffer
 }
