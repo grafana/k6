@@ -1,15 +1,11 @@
 package sobek
 
 import (
-	"errors"
 	"fmt"
-	"regexp"
-	"regexp/syntax"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
-
-	"github.com/grafana/sobek/parser"
 )
 
 func (r *Runtime) newRegexpObject(proto *Object) *regexpObject {
@@ -187,7 +183,6 @@ func compileRegexpFromValueString(patternStr String, flags string) (*regexpPatte
 
 func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 	var global, ignoreCase, multiline, dotAll, sticky, unicode bool
-	var wrapper *regexpWrapper
 	var wrapper2 *regexp2Wrapper
 
 	if flags != "" {
@@ -244,50 +239,14 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 		patternStr = convertRegexpToUtf16(patternStr)
 	}
 
-	re2Str, err := parser.TransformRegExp(patternStr, dotAll, unicode)
-	if err == nil {
-		re2flags := ""
-		if multiline {
-			re2flags += "m"
-		}
-		if dotAll {
-			re2flags += "s"
-		}
-		if ignoreCase {
-			re2flags += "i"
-		}
-		if len(re2flags) > 0 {
-			re2Str = fmt.Sprintf("(?%s:%s)", re2flags, re2Str)
-		}
-
-		pattern, err1 := regexp.Compile(re2Str)
-		if err1 != nil {
-			var syntaxError *syntax.Error
-			if !errors.As(err1, &syntaxError) || syntaxError.Code != syntax.ErrInvalidRepeatSize {
-				err = fmt.Errorf("Invalid regular expression (re2): %s (%v)", re2Str, err1)
-				return
-			}
-		} else {
-			wrapper = (*regexpWrapper)(pattern)
-		}
-	} else {
-		var incompat parser.RegexpErrorIncompatible
-		if !errors.As(err, &incompat) {
-			return
-		}
-	}
-
-	if wrapper == nil {
-		wrapper2, err = compileRegexp2(patternStr, multiline, dotAll, ignoreCase, unicode)
-		if err != nil {
-			err = fmt.Errorf("Invalid regular expression (regexp2): %s (%v)", patternStr, err)
-			return
-		}
+	wrapper2, err = compileRegexp2(patternStr, multiline, dotAll, ignoreCase, unicode)
+	if err != nil {
+		err = fmt.Errorf("Invalid regular expression (regexp2): %s (%v)", patternStr, err)
+		return
 	}
 
 	p = &regexpPattern{
 		src:            patternStr,
-		regexpWrapper:  wrapper,
 		regexp2Wrapper: wrapper2,
 		global:         global,
 		ignoreCase:     ignoreCase,
@@ -370,6 +329,68 @@ func (r *Runtime) builtin_RegExp(call FunctionCall) Value {
 	return r.newRegExp(pattern, flags, r.getRegExpPrototype()).val
 }
 
+func (r *Runtime) regexp_escape(call FunctionCall) Value {
+	s, ok := call.Argument(0).(String)
+	if !ok {
+		panic(r.NewTypeError("RegExp.escape requires a string argument"))
+	}
+	var sb StringBuilder
+	sb.Grow(s.Length())
+	rd := &lenientUtf16Decoder{utf16Reader: s.utf16Reader()}
+	for first := true; ; first = false {
+		c, _, err := rd.ReadRune()
+		if err != nil {
+			break
+		}
+		// A leading digit or ASCII letter is escaped so that it cannot extend a preceding escape like \0 or \c.
+		if first && (c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z') {
+			writeRegExpHexEscape(&sb, c)
+		} else {
+			encodeForRegExpEscape(&sb, c)
+		}
+	}
+	return sb.String()
+}
+
+func encodeForRegExpEscape(sb *StringBuilder, c rune) {
+	switch c {
+	case '^', '$', '\\', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '/':
+		sb.WriteRune('\\')
+		sb.WriteRune(c)
+	case '\t':
+		sb.writeASCII(`\t`)
+	case '\n':
+		sb.writeASCII(`\n`)
+	case '\v':
+		sb.writeASCII(`\v`)
+	case '\f':
+		sb.writeASCII(`\f`)
+	case '\r':
+		sb.writeASCII(`\r`)
+	case ',', '-', '=', '<', '>', '#', '&', '!', '%', ':', ';', '@', '~', '\'', '`', '"':
+		writeRegExpHexEscape(sb, c)
+	default:
+		if c == '\ufeff' || c == '\u2028' || c == '\u2029' || unicode.Is(unicode.Zs, c) || utf16.IsSurrogate(c) {
+			writeRegExpHexEscape(sb, c)
+		} else {
+			sb.WriteRune(c)
+		}
+	}
+}
+
+// writeRegExpHexEscape writes c as \xHH if c <= 0xFF, otherwise as \uHHHH. c must be in the BMP.
+func writeRegExpHexEscape(sb *StringBuilder, c rune) {
+	if c <= 0xFF {
+		sb.writeASCII(`\x`)
+	} else {
+		sb.writeASCII(`\u`)
+		sb.WriteRune(rune(hex[c>>12]))
+		sb.WriteRune(rune(hex[(c>>8)&0xF]))
+	}
+	sb.WriteRune(rune(hex[(c>>4)&0xF]))
+	sb.WriteRune(rune(hex[c&0xF]))
+}
+
 func (r *Runtime) regexpproto_compile(call FunctionCall) Value {
 	if this, ok := r.toObject(call.This).self.(*regexpObject); ok {
 		var (
@@ -422,15 +443,19 @@ func (r *Runtime) regexpproto_exec(call FunctionCall) Value {
 }
 
 func (r *Runtime) regexpproto_test(call FunctionCall) Value {
-	if this, ok := r.toObject(call.This).self.(*regexpObject); ok {
-		if this.test(call.Argument(0).toString()) {
+	thisObj := r.toObject(call.This)
+	s := call.Argument(0).toString()
+	if this := r.checkStdRegexp(thisObj); this != nil {
+		if this.test(s) {
 			return valueTrue
 		} else {
 			return valueFalse
 		}
-	} else {
-		panic(r.NewTypeError("Method RegExp.prototype.test called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 	}
+	if regExpExec(thisObj, s) == _null {
+		return valueFalse
+	}
+	return valueTrue
 }
 
 func (r *Runtime) regexpproto_toString(call FunctionCall) Value {
@@ -700,13 +725,9 @@ func (r *Runtime) regExpExec(execFn func(FunctionCall) Value, rxObj *Object, arg
 
 func (r *Runtime) getGlobalRegexpMatches(rxObj *Object, s String, fullUnicode bool) []Value {
 	rxObj.self.setOwnStr("lastIndex", intToValue(0), true)
-	execFn, ok := r.toObject(rxObj.self.getStr("exec", nil)).self.assertCallable()
-	if !ok {
-		panic(r.NewTypeError("exec is not a function"))
-	}
 	var a []Value
 	for {
-		res := r.regExpExec(execFn, rxObj, s)
+		res := regExpExec(rxObj, s)
 		if res == _null {
 			break
 		}
@@ -739,12 +760,7 @@ func (r *Runtime) regexpproto_stdMatcherGeneric(rxObj *Object, s String) Value {
 		return r.newArrayValues(ar)
 	}
 
-	execFn, ok := r.toObject(rx.getStr("exec", nil)).self.assertCallable()
-	if !ok {
-		panic(r.NewTypeError("exec is not a function"))
-	}
-
-	return r.regExpExec(execFn, rxObj, s)
+	return regExpExec(rxObj, s)
 }
 
 func (r *Runtime) checkStdRegexp(rxObj *Object) *regexpObject {
@@ -794,12 +810,7 @@ func (r *Runtime) regexpproto_stdSearchGeneric(rxObj *Object, arg String) Value 
 	if !previousLastIndex.SameAs(zero) {
 		rx.setOwnStr("lastIndex", zero, true)
 	}
-	execFn, ok := r.toObject(rx.getStr("exec", nil)).self.assertCallable()
-	if !ok {
-		panic(r.NewTypeError("exec is not a function"))
-	}
-
-	result := r.regExpExec(execFn, rxObj, arg)
+	result := regExpExec(rxObj, arg)
 	currentLastIndex := nilSafe(rx.getStr("lastIndex", nil))
 	if !currentLastIndex.SameAs(previousLastIndex) {
 		rx.setOwnStr("lastIndex", previousLastIndex, true)
@@ -865,19 +876,19 @@ func regExpExec(r *Object, s String) Value {
 	panic(r.runtime.NewTypeError("no RegExpMatcher internal slot"))
 }
 
-func (ri *regExpStringIterObject) next() (v Value) {
+func (ri *regExpStringIterObject) nextResult(Value) (Value, bool) {
 	if ri.done {
-		return ri.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 
 	match := regExpExec(ri.matcher, ri.s)
 	if IsNull(match) {
 		ri.done = true
-		return ri.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 	if !ri.global {
 		ri.done = true
-		return ri.val.runtime.createIterResultObject(match, false)
+		return match, true
 	}
 
 	matchStr := nilSafe(ri.val.runtime.toObject(match).self.getIdx(valueInt(0), nil)).toString()
@@ -885,7 +896,12 @@ func (ri *regExpStringIterObject) next() (v Value) {
 		thisIndex := toLength(ri.matcher.self.getStr("lastIndex", nil))
 		ri.matcher.self.setOwnStr("lastIndex", valueInt(advanceStringIndex64(ri.s, thisIndex, ri.fullUnicode)), true)
 	}
-	return ri.val.runtime.createIterResultObject(match, false)
+	return match, true
+}
+
+func (ri *regExpStringIterObject) next() (v Value) {
+	value, valid := ri.nextResult(nil)
+	return ri.val.runtime.createIterResultObject(value, !valid)
 }
 
 func (r *Runtime) regexpproto_stdSearch(call FunctionCall) Value {
@@ -921,10 +937,9 @@ func (r *Runtime) regexpproto_stdSplitterGeneric(splitter *Object, s String, lim
 	}
 	size := s.Length()
 	p := 0
-	execFn := toMethod(splitter.ToObject(r).self.getStr("exec", nil)) // must be non-nil
 
 	if size == 0 {
-		if r.regExpExec(execFn, splitter, s) == _null {
+		if regExpExec(splitter, s) == _null {
 			a = append(a, s)
 		}
 		return r.newArrayValues(a)
@@ -933,7 +948,7 @@ func (r *Runtime) regexpproto_stdSplitterGeneric(splitter *Object, s String, lim
 	q := p
 	for q < size {
 		splitter.self.setOwnStr("lastIndex", intToValue(int64(q)), true)
-		z := r.regExpExec(execFn, splitter, s)
+		z := regExpExec(splitter, s)
 		if z == _null {
 			q = advanceStringIndex(s, q, unicodeMatching)
 		} else {
@@ -1050,7 +1065,7 @@ func (r *Runtime) regexpproto_stdSplitter(call FunctionCall) Value {
 	for _, result := range results {
 		if result.indexes[0] == result.indexes[1] {
 			// FIXME Ugh, this is a hack
-			if result.indexes[0] == 0 || result.indexes[0] == targetLength {
+			if result.indexes[0] == 0 || result.indexes[0] == targetLength || result.indexes[0] == lastIndex {
 				continue
 			}
 		}
@@ -1107,8 +1122,7 @@ func (r *Runtime) regexpproto_stdReplacerGeneric(rxObj *Object, s, replaceStr St
 	if isGlobal {
 		results = r.getGlobalRegexpMatches(rxObj, s, isUnicode)
 	} else {
-		execFn := toMethod(rxObj.self.getStr("exec", nil)) // must be non-nil
-		result := r.regExpExec(execFn, rxObj, s)
+		result := regExpExec(rxObj, s)
 		if result != _null {
 			results = append(results, result)
 		}
@@ -1297,7 +1311,12 @@ func (r *Runtime) regExpStringIteratorProto_next(call FunctionCall) Value {
 func (r *Runtime) createRegExpStringIteratorPrototype(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
-	o._putProp("next", r.newNativeFunc(r.regExpStringIteratorProto_next, "next", 0), true, false, true)
+	o._putProp("next", r.newIteratorNextFunc(r.regExpStringIteratorProto_next, 0, func(iterator *Object) func(Value) (Value, bool) {
+		if i, ok := iterator.self.(*regExpStringIterObject); ok {
+			return i.nextResult
+		}
+		return nil
+	}), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classRegExpStringIterator), false, false, true))
 
 	return o
@@ -1322,6 +1341,7 @@ func (r *Runtime) getRegExp() *Object {
 		r.newNativeFuncAndConstruct(ret, r.builtin_RegExp,
 			r.wrapNativeConstruct(r.builtin_newRegExp, ret, proto), proto, "RegExp", intToValue(2))
 		rx := ret.self
+		rx._putProp("escape", r.newNativeFunc(r.regexp_escape, "escape", 1), true, false, true)
 		r.putSpeciesReturnThis(rx)
 	}
 	return ret

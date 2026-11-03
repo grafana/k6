@@ -108,7 +108,7 @@ github.com/chromedp/cdproto/webmcp
 # github.com/chromedp/sysutil v1.1.0
 ## explicit; go 1.23
 github.com/chromedp/sysutil
-# github.com/dlclark/regexp2/v2 v2.7.2
+# github.com/dlclark/regexp2/v2 v2.11.0
 ## explicit; go 1.25
 github.com/dlclark/regexp2/v2
 github.com/dlclark/regexp2/v2/helpers
@@ -183,8 +183,8 @@ github.com/grafana/k6-cloud-openapi-client-go/k6
 # github.com/grafana/k6provider v0.5.0
 ## explicit; go 1.24.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20260908083152-4698bc773ae7
-## explicit; go 1.25.0
+# github.com/grafana/sobek v0.0.0-20261031082357-c1e3e36bfbc3
+## explicit; go 1.26.0
 github.com/grafana/sobek
 github.com/grafana/sobek/ast
 github.com/grafana/sobek/file
@@ -476,7 +476,7 @@ golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/httpsfv
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sync v0.23.0
+# golang.org/x/sync v0.24.0
 ## explicit; go 1.26.0
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
@@ -490,7 +490,7 @@ golang.org/x/sys/windows/registry
 # golang.org/x/term v0.46.0
 ## explicit; go 1.26.0
 golang.org/x/term
-# golang.org/x/text v0.42.0
+# golang.org/x/text v0.43.0
 ## explicit; go 1.26.0
 golang.org/x/text/cases
 golang.org/x/text/collate

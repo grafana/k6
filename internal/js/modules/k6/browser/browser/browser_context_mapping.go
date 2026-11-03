@@ -155,7 +155,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		}),
 		"pages": passiveCall(func() *sobek.Object {
 			var (
-				mpages []mapping
+				mpages = []mapping{}
 				pages  = bc.Pages()
 			)
 			for _, page := range pages {

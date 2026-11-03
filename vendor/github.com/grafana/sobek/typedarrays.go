@@ -1,9 +1,11 @@
 package sobek
 
 import (
+	"bytes"
 	"math"
 	"math/big"
 	"reflect"
+	"slices"
 	"strconv"
 	"unsafe"
 
@@ -45,14 +47,20 @@ type dataViewObject struct {
 }
 
 type typedArray interface {
-	toRaw(Value) uint64
 	get(idx int) Value
 	set(idx int, value Value)
-	getRaw(idx int) uint64
-	setRaw(idx int, raw uint64)
 	less(i, j int) bool
 	swap(i, j int)
-	typeMatch(v Value) bool
+	// indexOf searches for the first occurrence of v in [start, start+length) and returns
+	// the index relative to start, or -1 if not found.
+	indexOf(v Value, start, length int) int
+	// lastIndexOf searches for the last occurrence of v in [start, start+length) and returns
+	// the index relative to start, or -1 if not found.
+	lastIndexOf(v Value, start, length int) int
+	// includes searches for v in [start, start+length) using SameValueZero equality.
+	includes(v Value, start, length int) bool
+	// fill fills [start, start+length) with the value converted to the array's element type.
+	fill(v Value, start, length int)
 	export(offset int, length int) interface{}
 	exportType() reflect.Type
 }
@@ -127,8 +135,138 @@ func (r *Runtime) NewArrayBuffer(data []byte) ArrayBuffer {
 	}
 }
 
-func (a *uint8Array) toRaw(v Value) uint64 {
-	return uint64(toUint8(v))
+// The following to*Exact() helpers convert the search element of indexOf(), lastIndexOf() and
+// includes() to the corresponding element type. The conversion succeeds (returns true) only if
+// the value is a Number with an integral value that fits in the type's range. This mirrors
+// IsStrictlyEqual/SameValueZero comparison against an element of the given type: a Number
+// strictly equals an integer element if and only if it has the same integral value. Any other
+// value (non-numbers, non-integral or out of range numbers, NaN) cannot strictly equal an
+// element, in which case false is returned and no search is necessary.
+
+func toUint8Exact(v Value) (uint8, bool) {
+	switch v := v.(type) {
+	case valueInt:
+		if v >= 0 && v <= 255 {
+			return uint8(v), true
+		}
+	case valueFloat:
+		f := float64(v)
+		if f >= 0 && f <= 255 && f == math.Trunc(f) {
+			return uint8(f), true
+		}
+	}
+	return 0, false
+}
+
+func toInt8Exact(v Value) (int8, bool) {
+	switch v := v.(type) {
+	case valueInt:
+		if v >= math.MinInt8 && v <= math.MaxInt8 {
+			return int8(v), true
+		}
+	case valueFloat:
+		f := float64(v)
+		if f >= math.MinInt8 && f <= math.MaxInt8 && f == math.Trunc(f) {
+			return int8(f), true
+		}
+	}
+	return 0, false
+}
+
+func toUint16Exact(v Value) (uint16, bool) {
+	switch v := v.(type) {
+	case valueInt:
+		if v >= 0 && v <= math.MaxUint16 {
+			return uint16(v), true
+		}
+	case valueFloat:
+		f := float64(v)
+		if f >= 0 && f <= math.MaxUint16 && f == math.Trunc(f) {
+			return uint16(f), true
+		}
+	}
+	return 0, false
+}
+
+func toInt16Exact(v Value) (int16, bool) {
+	switch v := v.(type) {
+	case valueInt:
+		if v >= math.MinInt16 && v <= math.MaxInt16 {
+			return int16(v), true
+		}
+	case valueFloat:
+		f := float64(v)
+		if f >= math.MinInt16 && f <= math.MaxInt16 && f == math.Trunc(f) {
+			return int16(f), true
+		}
+	}
+	return 0, false
+}
+
+func toUint32Exact(v Value) (uint32, bool) {
+	switch v := v.(type) {
+	case valueInt:
+		if v >= 0 && v <= math.MaxUint32 {
+			return uint32(v), true
+		}
+	case valueFloat:
+		f := float64(v)
+		if f >= 0 && f <= math.MaxUint32 && f == math.Trunc(f) {
+			return uint32(f), true
+		}
+	}
+	return 0, false
+}
+
+func toInt32Exact(v Value) (int32, bool) {
+	switch v := v.(type) {
+	case valueInt:
+		if v >= math.MinInt32 && v <= math.MaxInt32 {
+			return int32(v), true
+		}
+	case valueFloat:
+		f := float64(v)
+		if f >= math.MinInt32 && f <= math.MaxInt32 && f == math.Trunc(f) {
+			return int32(f), true
+		}
+	}
+	return 0, false
+}
+
+// toFloat32Exact converts v (which must be a Number) to float32 if the value is exactly
+// representable as a float32. A float64 value that is not representable as a float32 cannot be
+// strictly equal to a float32Array element, as elements read back as their exact float32 values.
+// NaN is not representable (and never strictly equals anything), so false is returned.
+func toFloat32Exact(v Value) (float32, bool) {
+	var f float64
+	switch v := v.(type) {
+	case valueInt:
+		f = float64(v)
+	case valueFloat:
+		f = float64(v)
+	default:
+		return 0, false
+	}
+	f32 := float32(f)
+	if float64(f32) != f {
+		return 0, false
+	}
+	return f32, true
+}
+
+func lastIndex[S ~[]E, E comparable](s S, v E) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == v {
+			return i
+		}
+	}
+	return -1
+}
+
+func fillSlice[S ~[]E, E any](s S, v E) {
+	for i := range s {
+		s[i] = v
+	}
 }
 
 func (a *uint8Array) ptr(idx int) *uint8 {
@@ -144,14 +282,6 @@ func (a *uint8Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toUint8(value)
 }
 
-func (a *uint8Array) getRaw(idx int) uint64 {
-	return uint64(*(a.ptr(idx)))
-}
-
-func (a *uint8Array) setRaw(idx int, raw uint64) {
-	*(a.ptr(idx)) = uint8(raw)
-}
-
 func (a *uint8Array) less(i, j int) bool {
 	return *(a.ptr(i)) < *(a.ptr(j))
 }
@@ -161,11 +291,31 @@ func (a *uint8Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *uint8Array) typeMatch(v Value) bool {
-	if i, ok := v.(valueInt); ok {
-		return i >= 0 && i <= 255
+func (a *uint8Array) indexOf(v Value, start, length int) int {
+	i, ok := toUint8Exact(v)
+	if !ok {
+		return -1
 	}
-	return false
+	return bytes.IndexByte(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint8Array) lastIndexOf(v Value, start, length int) int {
+	i, ok := toUint8Exact(v)
+	if !ok {
+		return -1
+	}
+	// LastIndexByte is not currently SIMD-optimised (as of Go 1.26), but it is equivalent to the
+	// generic lastIndex() below and may get an optimised implementation in the
+	// future, in which case it will be picked up automatically.
+	return bytes.LastIndexByte(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint8Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *uint8Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toUint8(v))
 }
 
 func (a *uint8Array) export(offset int, length int) interface{} {
@@ -174,10 +324,6 @@ func (a *uint8Array) export(offset int, length int) interface{} {
 
 func (a *uint8Array) exportType() reflect.Type {
 	return typeBytes
-}
-
-func (a *uint8ClampedArray) toRaw(v Value) uint64 {
-	return uint64(toUint8Clamp(v))
 }
 
 func (a *uint8ClampedArray) ptr(idx int) *uint8 {
@@ -193,14 +339,6 @@ func (a *uint8ClampedArray) set(idx int, value Value) {
 	*(a.ptr(idx)) = toUint8Clamp(value)
 }
 
-func (a *uint8ClampedArray) getRaw(idx int) uint64 {
-	return uint64(*(a.ptr(idx)))
-}
-
-func (a *uint8ClampedArray) setRaw(idx int, raw uint64) {
-	*(a.ptr(idx)) = uint8(raw)
-}
-
 func (a *uint8ClampedArray) less(i, j int) bool {
 	return *(a.ptr(i)) < *(a.ptr(j))
 }
@@ -210,11 +348,31 @@ func (a *uint8ClampedArray) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *uint8ClampedArray) typeMatch(v Value) bool {
-	if i, ok := v.(valueInt); ok {
-		return i >= 0 && i <= 255
+func (a *uint8ClampedArray) indexOf(v Value, start, length int) int {
+	i, ok := toUint8Exact(v)
+	if !ok {
+		return -1
 	}
-	return false
+	return bytes.IndexByte(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint8ClampedArray) lastIndexOf(v Value, start, length int) int {
+	i, ok := toUint8Exact(v)
+	if !ok {
+		return -1
+	}
+	// LastIndexByte is not currently SIMD-optimised, but it is equivalent to the
+	// generic lastIndex() below and may get an optimised implementation in the
+	// future, in which case it will be picked up automatically.
+	return bytes.LastIndexByte(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint8ClampedArray) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *uint8ClampedArray) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toUint8Clamp(v))
 }
 
 func (a *uint8ClampedArray) export(offset int, length int) interface{} {
@@ -234,20 +392,8 @@ func (a *int8Array) get(idx int) Value {
 	return intToValue(int64(*(a.ptr(idx))))
 }
 
-func (a *int8Array) getRaw(idx int) uint64 {
-	return uint64(*(a.ptr(idx)))
-}
-
 func (a *int8Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toInt8(value)
-}
-
-func (a *int8Array) toRaw(v Value) uint64 {
-	return uint64(toInt8(v))
-}
-
-func (a *int8Array) setRaw(idx int, v uint64) {
-	*(a.ptr(idx)) = int8(v)
 }
 
 func (a *int8Array) less(i, j int) bool {
@@ -259,11 +405,36 @@ func (a *int8Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *int8Array) typeMatch(v Value) bool {
-	if i, ok := v.(valueInt); ok {
-		return i >= math.MinInt8 && i <= math.MaxInt8
+func (a *int8Array) indexOf(v Value, start, length int) int {
+	i, ok := toInt8Exact(v)
+	if !ok {
+		return -1
 	}
-	return false
+	// int8 elements are compared by their bit patterns, which are the same as the
+	// corresponding uint8 values, so the SIMD-optimised bytes.IndexByte can be
+	// used directly on the underlying byte data.
+	return bytes.IndexByte(unsafe.Slice((*byte)(unsafe.Pointer(a.ptr(start))), length), uint8(i))
+}
+
+func (a *int8Array) lastIndexOf(v Value, start, length int) int {
+	i, ok := toInt8Exact(v)
+	if !ok {
+		return -1
+	}
+	// int8 elements are compared by their bit patterns, which are the same as the
+	// corresponding uint8 values, so bytes.LastIndexByte can be used directly on
+	// the underlying byte data. LastIndexByte is not currently SIMD-optimised (as of Go 1.26), but
+	// it is equivalent to the generic lastIndex() below and may get an optimised
+	// implementation in the future, in which case it will be picked up automatically.
+	return bytes.LastIndexByte(unsafe.Slice((*byte)(unsafe.Pointer(a.ptr(start))), length), uint8(i))
+}
+
+func (a *int8Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *int8Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toInt8(v))
 }
 
 func (a *int8Array) export(offset int, length int) interface{} {
@@ -274,10 +445,6 @@ var typeInt8Array = reflect.TypeOf(([]int8)(nil))
 
 func (a *int8Array) exportType() reflect.Type {
 	return typeInt8Array
-}
-
-func (a *uint16Array) toRaw(v Value) uint64 {
-	return uint64(toUint16(v))
 }
 
 func (a *uint16Array) ptr(idx int) *uint16 {
@@ -293,14 +460,6 @@ func (a *uint16Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toUint16(value)
 }
 
-func (a *uint16Array) getRaw(idx int) uint64 {
-	return uint64(*(a.ptr(idx)))
-}
-
-func (a *uint16Array) setRaw(idx int, raw uint64) {
-	*(a.ptr(idx)) = uint16(raw)
-}
-
 func (a *uint16Array) less(i, j int) bool {
 	return *(a.ptr(i)) < *(a.ptr(j))
 }
@@ -310,11 +469,28 @@ func (a *uint16Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *uint16Array) typeMatch(v Value) bool {
-	if i, ok := v.(valueInt); ok {
-		return i >= 0 && i <= math.MaxUint16
+func (a *uint16Array) indexOf(v Value, start, length int) int {
+	i, ok := toUint16Exact(v)
+	if !ok {
+		return -1
 	}
-	return false
+	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint16Array) lastIndexOf(v Value, start, length int) int {
+	i, ok := toUint16Exact(v)
+	if !ok {
+		return -1
+	}
+	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint16Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *uint16Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toUint16(v))
 }
 
 var typeUint16Array = reflect.TypeOf(([]uint16)(nil))
@@ -336,20 +512,8 @@ func (a *int16Array) get(idx int) Value {
 	return intToValue(int64(*(a.ptr(idx))))
 }
 
-func (a *int16Array) getRaw(idx int) uint64 {
-	return uint64(*(a.ptr(idx)))
-}
-
 func (a *int16Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toInt16(value)
-}
-
-func (a *int16Array) toRaw(v Value) uint64 {
-	return uint64(toInt16(v))
-}
-
-func (a *int16Array) setRaw(idx int, v uint64) {
-	*(a.ptr(idx)) = int16(v)
 }
 
 func (a *int16Array) less(i, j int) bool {
@@ -361,11 +525,28 @@ func (a *int16Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *int16Array) typeMatch(v Value) bool {
-	if i, ok := v.(valueInt); ok {
-		return i >= math.MinInt16 && i <= math.MaxInt16
+func (a *int16Array) indexOf(v Value, start, length int) int {
+	i, ok := toInt16Exact(v)
+	if !ok {
+		return -1
 	}
-	return false
+	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *int16Array) lastIndexOf(v Value, start, length int) int {
+	i, ok := toInt16Exact(v)
+	if !ok {
+		return -1
+	}
+	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *int16Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *int16Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toInt16(v))
 }
 
 func (a *int16Array) export(offset int, length int) interface{} {
@@ -387,20 +568,8 @@ func (a *uint32Array) get(idx int) Value {
 	return intToValue(int64(*(a.ptr(idx))))
 }
 
-func (a *uint32Array) getRaw(idx int) uint64 {
-	return uint64(*(a.ptr(idx)))
-}
-
 func (a *uint32Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toUint32(value)
-}
-
-func (a *uint32Array) toRaw(v Value) uint64 {
-	return uint64(toUint32(v))
-}
-
-func (a *uint32Array) setRaw(idx int, v uint64) {
-	*(a.ptr(idx)) = uint32(v)
 }
 
 func (a *uint32Array) less(i, j int) bool {
@@ -412,11 +581,28 @@ func (a *uint32Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *uint32Array) typeMatch(v Value) bool {
-	if i, ok := v.(valueInt); ok {
-		return i >= 0 && i <= math.MaxUint32
+func (a *uint32Array) indexOf(v Value, start, length int) int {
+	i, ok := toUint32Exact(v)
+	if !ok {
+		return -1
 	}
-	return false
+	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint32Array) lastIndexOf(v Value, start, length int) int {
+	i, ok := toUint32Exact(v)
+	if !ok {
+		return -1
+	}
+	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *uint32Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *uint32Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toUint32(v))
 }
 
 func (a *uint32Array) export(offset int, length int) interface{} {
@@ -438,20 +624,8 @@ func (a *int32Array) get(idx int) Value {
 	return intToValue(int64(*(a.ptr(idx))))
 }
 
-func (a *int32Array) getRaw(idx int) uint64 {
-	return uint64(*(a.ptr(idx)))
-}
-
 func (a *int32Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toInt32(value)
-}
-
-func (a *int32Array) toRaw(v Value) uint64 {
-	return uint64(toInt32(v))
-}
-
-func (a *int32Array) setRaw(idx int, v uint64) {
-	*(a.ptr(idx)) = int32(v)
 }
 
 func (a *int32Array) less(i, j int) bool {
@@ -463,11 +637,28 @@ func (a *int32Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *int32Array) typeMatch(v Value) bool {
-	if i, ok := v.(valueInt); ok {
-		return i >= math.MinInt32 && i <= math.MaxInt32
+func (a *int32Array) indexOf(v Value, start, length int) int {
+	i, ok := toInt32Exact(v)
+	if !ok {
+		return -1
 	}
-	return false
+	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *int32Array) lastIndexOf(v Value, start, length int) int {
+	i, ok := toInt32Exact(v)
+	if !ok {
+		return -1
+	}
+	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+}
+
+func (a *int32Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *int32Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toInt32(v))
 }
 
 func (a *int32Array) export(offset int, length int) interface{} {
@@ -489,20 +680,8 @@ func (a *float32Array) get(idx int) Value {
 	return floatToValue(float64(*(a.ptr(idx))))
 }
 
-func (a *float32Array) getRaw(idx int) uint64 {
-	return uint64(math.Float32bits(*(a.ptr(idx))))
-}
-
 func (a *float32Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toFloat32(value)
-}
-
-func (a *float32Array) toRaw(v Value) uint64 {
-	return uint64(math.Float32bits(toFloat32(v)))
-}
-
-func (a *float32Array) setRaw(idx int, v uint64) {
-	*(a.ptr(idx)) = math.Float32frombits(uint32(v))
 }
 
 func typedFloatLess(x, y float64) bool {
@@ -528,12 +707,49 @@ func (a *float32Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *float32Array) typeMatch(v Value) bool {
+func (a *float32Array) indexOf(v Value, start, length int) int {
+	f, ok := toFloat32Exact(v)
+	if !ok {
+		return -1
+	}
+	return slices.Index(unsafe.Slice(a.ptr(start), length), f)
+}
+
+func (a *float32Array) lastIndexOf(v Value, start, length int) int {
+	f, ok := toFloat32Exact(v)
+	if !ok {
+		return -1
+	}
+	return lastIndex(unsafe.Slice(a.ptr(start), length), f)
+}
+
+func (a *float32Array) includes(v Value, start, length int) bool {
 	switch v.(type) {
 	case valueInt, valueFloat:
-		return true
+	default:
+		return false
 	}
-	return false
+	f := v.ToFloat()
+	s := unsafe.Slice(a.ptr(start), length)
+	if math.IsNaN(f) {
+		for _, e := range s {
+			if math.IsNaN(float64(e)) {
+				return true
+			}
+		}
+		return false
+	}
+	f32 := float32(f)
+	if float64(f32) != f {
+		// the search value is not representable as a float32, so it cannot be
+		// strictly equal to any element
+		return false
+	}
+	return slices.Contains(s, f32)
+}
+
+func (a *float32Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toFloat32(v))
 }
 
 func (a *float32Array) export(offset int, length int) interface{} {
@@ -555,20 +771,8 @@ func (a *float64Array) get(idx int) Value {
 	return floatToValue(*(a.ptr(idx)))
 }
 
-func (a *float64Array) getRaw(idx int) uint64 {
-	return math.Float64bits(*(a.ptr(idx)))
-}
-
 func (a *float64Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = value.ToFloat()
-}
-
-func (a *float64Array) toRaw(v Value) uint64 {
-	return math.Float64bits(v.ToFloat())
-}
-
-func (a *float64Array) setRaw(idx int, v uint64) {
-	*(a.ptr(idx)) = math.Float64frombits(v)
 }
 
 func (a *float64Array) less(i, j int) bool {
@@ -580,12 +784,45 @@ func (a *float64Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *float64Array) typeMatch(v Value) bool {
+func (a *float64Array) indexOf(v Value, start, length int) int {
 	switch v.(type) {
 	case valueInt, valueFloat:
-		return true
+	default:
+		return -1
 	}
-	return false
+	return slices.Index(unsafe.Slice(a.ptr(start), length), v.ToFloat())
+}
+
+func (a *float64Array) lastIndexOf(v Value, start, length int) int {
+	switch v.(type) {
+	case valueInt, valueFloat:
+	default:
+		return -1
+	}
+	return lastIndex(unsafe.Slice(a.ptr(start), length), v.ToFloat())
+}
+
+func (a *float64Array) includes(v Value, start, length int) bool {
+	switch v.(type) {
+	case valueInt, valueFloat:
+	default:
+		return false
+	}
+	s := unsafe.Slice(a.ptr(start), length)
+	f := v.ToFloat()
+	if math.IsNaN(f) {
+		for _, e := range s {
+			if math.IsNaN(e) {
+				return true
+			}
+		}
+		return false
+	}
+	return slices.Contains(s, f)
+}
+
+func (a *float64Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), v.ToFloat())
 }
 
 func (a *float64Array) export(offset int, length int) interface{} {
@@ -596,10 +833,6 @@ var typeFloat64Array = reflect.TypeOf(([]float64)(nil))
 
 func (a *float64Array) exportType() reflect.Type {
 	return typeFloat64Array
-}
-
-func (a *bigInt64Array) toRaw(value Value) uint64 {
-	return toBigInt64(value).Uint64()
 }
 
 func (a *bigInt64Array) ptr(idx int) *int64 {
@@ -614,26 +847,15 @@ func (a *bigInt64Array) get(idx int) Value {
 func toBigInt64(v Value) *big.Int {
 	n := (*big.Int)(toBigInt(v))
 
-	twoTo64 := new(big.Int).Lsh(big.NewInt(1), 64)
-	twoTo63 := new(big.Int).Lsh(big.NewInt(1), 63)
-
-	int64bit := new(big.Int).Mod(n, twoTo64)
-	if int64bit.Cmp(twoTo63) >= 0 {
-		return int64bit.Sub(int64bit, twoTo64)
+	int64bit := new(big.Int).Mod(n, bigTwoTo64)
+	if int64bit.Cmp(bigTwoTo63) >= 0 {
+		return int64bit.Sub(int64bit, bigTwoTo64)
 	}
 	return int64bit
 }
 
 func (a *bigInt64Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toBigInt64(value).Int64()
-}
-
-func (a *bigInt64Array) getRaw(idx int) uint64 {
-	return uint64(*a.ptr(idx))
-}
-
-func (a *bigInt64Array) setRaw(idx int, raw uint64) {
-	*(a.ptr(idx)) = int64(raw)
 }
 
 func (a *bigInt64Array) less(i, j int) bool {
@@ -645,11 +867,34 @@ func (a *bigInt64Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *bigInt64Array) typeMatch(v Value) bool {
-	if _, ok := v.(*valueBigInt); ok {
-		return true
+func (a *bigInt64Array) indexOf(v Value, start, length int) int {
+	bi, ok := v.(*valueBigInt)
+	if !ok {
+		return -1
 	}
-	return false
+	if b := (*big.Int)(bi); b.IsInt64() {
+		return slices.Index(unsafe.Slice(a.ptr(start), length), b.Int64())
+	}
+	return -1
+}
+
+func (a *bigInt64Array) lastIndexOf(v Value, start, length int) int {
+	bi, ok := v.(*valueBigInt)
+	if !ok {
+		return -1
+	}
+	if b := (*big.Int)(bi); b.IsInt64() {
+		return lastIndex(unsafe.Slice(a.ptr(start), length), b.Int64())
+	}
+	return -1
+}
+
+func (a *bigInt64Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *bigInt64Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toBigInt64(v).Int64())
 }
 
 func (a *bigInt64Array) export(offset int, length int) interface{} {
@@ -660,10 +905,6 @@ var typeBigInt64Array = reflect.TypeOf(([]int64)(nil))
 
 func (a *bigInt64Array) exportType() reflect.Type {
 	return typeBigInt64Array
-}
-
-func (a *bigUint64Array) toRaw(value Value) uint64 {
-	return toBigUint64(value).Uint64()
 }
 
 func (a *bigUint64Array) ptr(idx int) *uint64 {
@@ -677,19 +918,11 @@ func (a *bigUint64Array) get(idx int) Value {
 
 func toBigUint64(v Value) *big.Int {
 	n := (*big.Int)(toBigInt(v))
-	return new(big.Int).Mod(n, new(big.Int).Lsh(big.NewInt(1), 64))
+	return new(big.Int).Mod(n, bigTwoTo64)
 }
 
 func (a *bigUint64Array) set(idx int, value Value) {
 	*(a.ptr(idx)) = toBigUint64(value).Uint64()
-}
-
-func (a *bigUint64Array) getRaw(idx int) uint64 {
-	return *a.ptr(idx)
-}
-
-func (a *bigUint64Array) setRaw(idx int, raw uint64) {
-	*(a.ptr(idx)) = raw
 }
 
 func (a *bigUint64Array) less(i, j int) bool {
@@ -701,11 +934,34 @@ func (a *bigUint64Array) swap(i, j int) {
 	*pi, *pj = *pj, *pi
 }
 
-func (a *bigUint64Array) typeMatch(v Value) bool {
-	if _, ok := v.(*valueBigInt); ok {
-		return true
+func (a *bigUint64Array) indexOf(v Value, start, length int) int {
+	bi, ok := v.(*valueBigInt)
+	if !ok {
+		return -1
 	}
-	return false
+	if b := (*big.Int)(bi); b.IsUint64() {
+		return slices.Index(unsafe.Slice(a.ptr(start), length), b.Uint64())
+	}
+	return -1
+}
+
+func (a *bigUint64Array) lastIndexOf(v Value, start, length int) int {
+	bi, ok := v.(*valueBigInt)
+	if !ok {
+		return -1
+	}
+	if b := (*big.Int)(bi); b.IsUint64() {
+		return lastIndex(unsafe.Slice(a.ptr(start), length), b.Uint64())
+	}
+	return -1
+}
+
+func (a *bigUint64Array) includes(v Value, start, length int) bool {
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *bigUint64Array) fill(v Value, start, length int) {
+	fillSlice(unsafe.Slice(a.ptr(start), length), toBigUint64(v).Uint64())
 }
 
 func (a *bigUint64Array) export(offset int, length int) interface{} {
@@ -759,6 +1015,20 @@ func (a *typedArrayObject) getOwnPropIdx(idx valueInt) Value {
 		}
 	}
 	return nil
+}
+
+func (a *typedArrayObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	idx, ok := strToIntNum(name)
+	if ok {
+		if v := a._getIdx(idx); v != nil {
+			return v, true
+		}
+		return nil, false
+	}
+	if idx == 0 {
+		return nil, false
+	}
+	return a.hasAndGetOwnStr(name, a.baseObject.getOwnPropStr(name), receiver)
 }
 
 func (a *typedArrayObject) getStr(name unistring.String, receiver Value) Value {
@@ -874,7 +1144,7 @@ func (a *typedArrayObject) _defineIdxProperty(idx int, desc PropertyDescriptor, 
 		a.val.runtime.typeErrorResult(throw, "Cannot redefine property: %d", idx)
 		return false
 	}
-	_, ok := a._defineOwnProperty(unistring.String(strconv.Itoa(idx)), a.getOwnPropIdx(valueInt(idx)), desc, throw)
+	_, ok := a._defineOwnProperty("", func() unistring.String { return unistring.String(strconv.Itoa(idx)) }, a.getOwnPropIdx(valueInt(idx)), desc, throw)
 	if ok {
 		if !a.isValidIntegerIndex(idx) {
 			a.val.runtime.typeErrorResult(throw, "Invalid typed array index")

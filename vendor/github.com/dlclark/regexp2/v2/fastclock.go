@@ -46,10 +46,13 @@ func (t fasttime) reached() bool {
 func makeDeadline(d time.Duration) fasttime {
 	// Increase the deadline since the clock we are reading may be
 	// just about to tick forwards.
+	// Read clockEnd first: observing an extension also observes the refreshed
+	// current value that preceded it.
+	clockEnd := fast.clockEnd.read()
 	end := fast.current.read() + durationToTicks(d+clockPeriod)
 
 	// Start or extend clock if necessary.
-	if end > fast.clockEnd.read() {
+	if end > clockEnd {
 		// If time.Since(last use) > timeout, there's a chance that
 		// fast.current will no longer be updated, which can lead to
 		// incorrect 'end' calculations that can trigger a false timeout
@@ -57,9 +60,9 @@ func makeDeadline(d time.Duration) fasttime {
 		if !fast.running && !fast.start.IsZero() {
 			// update fast.current
 			fast.current.write(durationToTicks(time.Since(fast.start)))
-			// recalculate our end value
-			end = fast.current.read() + durationToTicks(d+clockPeriod)
 		}
+		// Another caller may have refreshed the clock while we waited for mu.
+		end = fast.current.read() + durationToTicks(d+clockPeriod)
 		fast.mu.Unlock()
 		extendClock(end)
 	}

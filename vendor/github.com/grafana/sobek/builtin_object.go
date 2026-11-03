@@ -509,6 +509,62 @@ func (r *Runtime) objectproto_setProto(call FunctionCall) Value {
 	return _undefined
 }
 
+func (r *Runtime) defineLegacyAccessor(call FunctionCall, setter bool) Value {
+	o := call.This.ToObject(r)
+	f := call.Argument(1)
+	if _, ok := assertCallable(f); !ok {
+		panic(r.NewTypeError("%s is not a function", f))
+	}
+	desc := PropertyDescriptor{
+		Enumerable:   FLAG_TRUE,
+		Configurable: FLAG_TRUE,
+	}
+	if setter {
+		desc.Setter = f
+	} else {
+		desc.Getter = f
+	}
+	o.defineOwnProperty(toPropertyKey(call.Argument(0)), desc, true)
+	return _undefined
+}
+
+func (r *Runtime) lookupLegacyAccessor(call FunctionCall, setter bool) Value {
+	o := call.This.ToObject(r)
+	key := toPropertyKey(call.Argument(0))
+	for o != nil {
+		if prop := o.getOwnProp(key); prop != nil {
+			if prop, ok := prop.(*valueProperty); ok && prop.accessor {
+				f := prop.getterFunc
+				if setter {
+					f = prop.setterFunc
+				}
+				if f != nil {
+					return f
+				}
+			}
+			return _undefined
+		}
+		o = o.self.proto()
+	}
+	return _undefined
+}
+
+func (r *Runtime) objectproto_defineGetter(call FunctionCall) Value {
+	return r.defineLegacyAccessor(call, false)
+}
+
+func (r *Runtime) objectproto_defineSetter(call FunctionCall) Value {
+	return r.defineLegacyAccessor(call, true)
+}
+
+func (r *Runtime) objectproto_lookupGetter(call FunctionCall) Value {
+	return r.lookupLegacyAccessor(call, false)
+}
+
+func (r *Runtime) objectproto_lookupSetter(call FunctionCall) Value {
+	return r.lookupLegacyAccessor(call, true)
+}
+
 func (r *Runtime) objectproto_valueOf(call FunctionCall) Value {
 	return call.This.ToObject(r)
 }
@@ -577,6 +633,48 @@ func (r *Runtime) object_fromEntries(call FunctionCall) Value {
 	return result
 }
 
+// groupBy implements the GroupBy abstract operation. If propertyKeys is true the keys are coerced
+// to property keys, otherwise they are used as collection keys. Returns the keys in the order
+// they were first encountered along with the corresponding groups of values.
+func (r *Runtime) groupBy(items, callback Value, propertyKeys bool) (keys []Value, groups [][]Value) {
+	r.checkObjectCoercible(items)
+	fn := r.toCallable(callback)
+	m := newOrderedMap(r.getHash())
+	iter := r.getIterator(items, nil)
+	var k int64
+	iter.iterate(func(value Value) {
+		key := fn(FunctionCall{This: _undefined, Arguments: []Value{value, intToValue(k)}})
+		if propertyKeys {
+			key = toPropertyKey(key)
+			if _, ok := key.(*Symbol); !ok {
+				// make sure equal keys (e.g. 1 and "1") end up in the same group
+				key = key.toString()
+			}
+		} else if key == _negativeZero {
+			key = intToValue(0)
+		}
+		if idx := m.get(key); idx != nil {
+			i := idx.ToInteger()
+			groups[i] = append(groups[i], value)
+		} else {
+			m.set(key, intToValue(int64(len(groups))))
+			keys = append(keys, key)
+			groups = append(groups, []Value{value})
+		}
+		k++
+	})
+	return
+}
+
+func (r *Runtime) object_groupBy(call FunctionCall) Value {
+	keys, groups := r.groupBy(call.Argument(0), call.Argument(1), true)
+	obj := r.newBaseObject(nil, classObject).val
+	for i, key := range keys {
+		createDataPropertyOrThrow(obj, key, r.newArrayValues(groups[i]))
+	}
+	return obj
+}
+
 func (r *Runtime) object_hasOwn(call FunctionCall) Value {
 	o := call.Argument(0)
 	obj := o.ToObject(r)
@@ -611,6 +709,7 @@ func createObjectTemplate() *objectTemplate {
 		return r.methodProp(r.object_getOwnPropertyDescriptors, "getOwnPropertyDescriptors", 1)
 	})
 	t.putStr("getPrototypeOf", func(r *Runtime) Value { return r.methodProp(r.object_getPrototypeOf, "getPrototypeOf", 1) })
+	t.putStr("groupBy", func(r *Runtime) Value { return r.methodProp(r.object_groupBy, "groupBy", 2) })
 	t.putStr("is", func(r *Runtime) Value { return r.methodProp(r.object_is, "is", 2) })
 	t.putStr("getOwnPropertyNames", func(r *Runtime) Value { return r.methodProp(r.object_getOwnPropertyNames, "getOwnPropertyNames", 1) })
 	t.putStr("getOwnPropertySymbols", func(r *Runtime) Value {
@@ -691,6 +790,10 @@ func createObjectProtoTemplate() *objectTemplate {
 	t.putStr("propertyIsEnumerable", func(r *Runtime) Value {
 		return r.methodProp(r.objectproto_propertyIsEnumerable, "propertyIsEnumerable", 1)
 	})
+	t.putStr("__defineGetter__", func(r *Runtime) Value { return r.methodProp(r.objectproto_defineGetter, "__defineGetter__", 2) })
+	t.putStr("__defineSetter__", func(r *Runtime) Value { return r.methodProp(r.objectproto_defineSetter, "__defineSetter__", 2) })
+	t.putStr("__lookupGetter__", func(r *Runtime) Value { return r.methodProp(r.objectproto_lookupGetter, "__lookupGetter__", 1) })
+	t.putStr("__lookupSetter__", func(r *Runtime) Value { return r.methodProp(r.objectproto_lookupSetter, "__lookupSetter__", 1) })
 	t.putStr(__proto__, func(r *Runtime) Value {
 		return &valueProperty{
 			accessor:     true,
