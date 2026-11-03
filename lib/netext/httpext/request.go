@@ -200,6 +200,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		transport = httpDebugTransport{
 			originalTransport: transport,
 			httpDebugOption:   state.Options.HTTPDebug.String,
+			redact:            state.Options.HTTPDebugRedact.Bool,
 			logger:            state.Logger.WithFields(combinedLogFields),
 		}
 	}
@@ -220,7 +221,8 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		password, _ := preq.URL.GetURL().User.Password()
 
 		// Remove the user data from the URL to avoid sending the Authorization
-		// header for basic auth
+		// header for basic auth. ToURL always hands out a per-request copy of the
+		// *url.URL, so this cannot mutate a URL shared via http.url (#6397).
 		preq.URL.GetURL().User = nil
 
 		transport = newDigestTransport(transport, username, password, state.Logger)

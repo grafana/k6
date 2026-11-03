@@ -2358,6 +2358,92 @@ func TestDigestAuthWithBody(t *testing.T) {
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, 200, "")
 }
 
+func TestHTTPDebugRedaction(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		option     string
+		redacted   bool
+		bodyDumped bool
+	}{
+		{option: "headers"},
+		{option: "full", bodyDumped: true},
+		{option: "headers", redacted: true},
+		{option: "full", redacted: true, bodyDumped: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s/redact=%t", tt.option, tt.redacted), func(t *testing.T) {
+			t.Parallel()
+			ts := newTestCase(t)
+			tb := ts.tb
+			rt := ts.runtime.VU.Runtime()
+			state := ts.runtime.VU.State()
+
+			state.Options.Throw = null.BoolFrom(true)
+			state.Options.HTTPDebug = null.StringFrom(tt.option)
+			state.Options.HTTPDebugRedact = null.BoolFrom(tt.redacted)
+			cookieJar, err := cookiejar.New(nil)
+			require.NoError(t, err)
+			state.CookieJar = cookieJar
+
+			tb.Mux.HandleFunc("/debug-redaction", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Add("Set-Cookie", "sid=server-session; Path=/; HttpOnly")
+				_, _ = w.Write([]byte("response body"))
+			}))
+			tb.Mux.HandleFunc("/digest-redaction/{qop}/{user}/{password}", httpbin.New().DigestAuth)
+
+			_, err = rt.RunString(tb.Replacer.Replace(`
+				http.cookieJar().set("HTTPBIN_URL", "jar-cookie", "jar-secret");
+				http.post("HTTPBIN_URL/debug-redaction", "request body", {
+					headers: { "Authorization": "Bearer bearer-secret", "X-Api-Key": "api-key-secret" },
+				});
+				http.get("http://user:basic-secret@HTTPBIN_IP:HTTPBIN_PORT/debug-redaction");
+				var res = http.get("http://user:digest-secret@HTTPBIN_IP:HTTPBIN_PORT/digest-redaction/auth/user/digest-secret",
+					{ auth: "digest" });
+				if (res.status !== 200) { throw new Error("wrong digest status: " + res.status); }
+			`))
+			require.NoError(t, err)
+
+			out := strings.Join(ts.hook.Lines(), "\n")
+
+			secrets := []string{
+				"bearer-secret", "api-key-secret", "jar-secret", "server-session",
+				"dXNlcjpiYXNpYy1zZWNyZXQ=", // base64 of user:basic-secret
+			}
+			masked := []string{
+				"Authorization: Bearer ***REDACTED***",
+				"Authorization: Basic ***REDACTED***",
+				"Authorization: Digest ***REDACTED***",
+				"X-Api-Key: ***REDACTED***",
+				"jar-cookie=***REDACTED***",
+				"Set-Cookie: sid=***REDACTED***; Path=/; HttpOnly",
+			}
+			for _, secret := range secrets {
+				if tt.redacted {
+					assert.NotContains(t, out, secret)
+				} else {
+					assert.Contains(t, out, secret)
+				}
+			}
+			for _, m := range masked {
+				if tt.redacted {
+					assert.Contains(t, out, m)
+				} else {
+					assert.NotContains(t, out, m)
+				}
+			}
+			if tt.bodyDumped {
+				assert.Contains(t, out, "request body")
+				assert.Contains(t, out, "response body")
+			} else {
+				assert.NotContains(t, out, "request body")
+				assert.NotContains(t, out, "response body")
+			}
+		})
+	}
+}
+
 // A server that answers a digest-authenticated request with a 401 carrying no
 // digest challenge (e.g. "Negotiate, NTLM", as IIS commonly sends) must not
 // crash k6 like the previous digest library did (index out of range panic), and
@@ -2439,6 +2525,41 @@ func TestDigestAuthWithSHA256(t *testing.T) {
 	sampleContainers := metrics.GetBufferedSamples(samples)
 	assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
+}
+
+// A URL created with http.url can be shared between requests, so the digest
+// credentials must survive across calls: the second request must not end up
+// authenticated with empty credentials after the first one removed the URL's
+// user info (#6397).
+func TestDigestAuthReusedURL(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	samples := ts.samples
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+
+	urlWithCreds := tb.Replacer.Replace(
+		"http://testuser:testpwd@HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd")
+
+	_, err := rt.RunString("var target = http.url`" + urlWithCreds + "`;" + `
+		for (var i = 0; i < 2; i++) {
+			var res = http.get(target, { auth: "digest" });
+			if (res.status !== 200) { throw new Error("wrong status: " + res.status); }
+			if (res.error_code !== 0) { throw new Error("wrong error code: " + res.error_code); }
+		}
+	`)
+	require.NoError(t, err)
+
+	urlRaw := tb.Replacer.Replace(
+		"http://HTTPBIN_IP:HTTPBIN_PORT/digest-auth/auth/testuser/testpwd")
+	sampleContainers := metrics.GetBufferedSamples(samples)
+	// Each call performs the full challenge handshake: 401 then 200.
+	assertRequestMetricsEmitted(t, sampleContainers[0:1], "GET", urlRaw, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[1:2], "GET", urlRaw, 200, "")
+	assertRequestMetricsEmitted(t, sampleContainers[2:3], "GET", urlRaw, 401, "")
+	assertRequestMetricsEmitted(t, sampleContainers[3:4], "GET", urlRaw, 200, "")
 }
 
 // A digest-authenticated request to a server that requires no authentication

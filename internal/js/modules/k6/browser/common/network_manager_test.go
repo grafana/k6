@@ -310,7 +310,7 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 				&network.Response{Timing: &network.ResourceTiming{}},
 				(*cdp.MonotonicTime)(&tt.res.ts),
 			)
-			nm.emitResponseMetrics(res, req)
+			nm.emitResponseMetrics(res, req, 1)
 			n = vu.AssertSamples(func(s k6metrics.Sample) {
 				assert.Equalf(t, tt.wantRes.wt, s.Time, "timing skew in %s", s.Metric.Name)
 			})
@@ -362,7 +362,7 @@ func TestNetworkManagerMetricsRetainRequestTagsAndMetadata(t *testing.T) {
 		URL:    req.URL(),
 		Timing: &network.ResourceTiming{},
 	}, (*cdp.MonotonicTime)(&now))
-	nm.emitResponseMetrics(resp, req)
+	nm.emitResponseMetrics(resp, req, 1)
 
 	n := vu.AssertSamples(func(sample k6metrics.Sample) {
 		group, ok := sample.Tags.Get(k6metrics.TagGroup.String())
@@ -374,6 +374,98 @@ func TestNetworkManagerMetricsRetainRequestTagsAndMetadata(t *testing.T) {
 		assert.Equal(t, "request", sample.Metadata["trace"])
 	})
 	assert.Equal(t, 4, n)
+}
+
+func TestBrowserDataReceivedUsesEncodedDataLength(t *testing.T) {
+	t.Parallel()
+
+	registry := k6metrics.NewRegistry()
+	k6m := k6ext.RegisterCustomMetrics(registry)
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+
+	nm := &NetworkManager{
+		ctx:              vu.Context(),
+		vu:               vu,
+		customMetrics:    k6m,
+		eventInterceptor: &EventInterceptorMock{},
+	}
+
+	now := time.Now()
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event: &network.EventRequestWillBeSent{
+			Request:   &network.Request{URL: "https://example.test/"},
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+		},
+		tagsAndMeta: vu.State().Tags.GetCurrentValues(),
+	})
+	require.NoError(t, err)
+
+	encodedDataLength := 12345.0
+	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
+		URL:    req.URL(),
+		Timing: &network.ResourceTiming{},
+	}, (*cdp.MonotonicTime)(&now))
+	nm.emitResponseMetrics(resp, req, encodedDataLength)
+
+	foundDataReceived := false
+	vu.AssertSamples(func(sample k6metrics.Sample) {
+		if sample.Metric == k6m.BrowserDataReceived {
+			foundDataReceived = true
+			assert.Equal(t, encodedDataLength, sample.Value)
+		}
+	})
+
+	assert.True(t, foundDataReceived)
+}
+
+func TestBrowserDataReceivedOmitsNegativeEncodedDataLength(t *testing.T) {
+	t.Parallel()
+
+	registry := k6metrics.NewRegistry()
+	k6m := k6ext.RegisterCustomMetrics(registry)
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+
+	nm := &NetworkManager{
+		ctx:              vu.Context(),
+		vu:               vu,
+		customMetrics:    k6m,
+		eventInterceptor: &EventInterceptorMock{},
+	}
+
+	now := time.Now()
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
+		event: &network.EventRequestWillBeSent{
+			Request:   &network.Request{URL: "https://example.test/"},
+			Timestamp: (*cdp.MonotonicTime)(&now),
+			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+		},
+		tagsAndMeta: vu.State().Tags.GetCurrentValues(),
+	})
+	require.NoError(t, err)
+
+	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
+		URL:    req.URL(),
+		Timing: &network.ResourceTiming{},
+	}, (*cdp.MonotonicTime)(&now))
+
+	nm.emitResponseMetrics(resp, req, -1)
+
+	foundDataReceived := false
+	foundDuration := false
+	vu.AssertSamples(func(sample k6metrics.Sample) {
+		if sample.Metric == k6m.BrowserDataReceived {
+			foundDataReceived = true
+		}
+		if sample.Metric == k6m.BrowserHTTPReqDuration {
+			foundDuration = true
+		}
+	})
+
+	assert.False(t, foundDataReceived)
+	assert.True(t, foundDuration)
 }
 
 func TestNetworkManagerRedirectKeepsLoaderOperation(t *testing.T) {

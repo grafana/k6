@@ -20,4 +20,8 @@ const (
 
 	// contentSHAKey is the SHA256 of request body
 	contentSHAKey = "X-Amz-Content-Sha256"
+
+	// securityTokenKey is the AWS session token, required when signing with
+	// temporary credentials (IAM roles, STS)
+	securityTokenKey = "X-Amz-Security-Token" //nolint:gosec // it is a header name, not a credential
 )

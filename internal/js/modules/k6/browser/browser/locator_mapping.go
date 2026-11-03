@@ -1,8 +1,10 @@
 package browser
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/grafana/sobek"
@@ -446,13 +448,61 @@ func parseLocatorOptions(rt *sobek.Runtime, opts sobek.Value) *common.LocatorOpt
 	for _, k := range obj.Keys() {
 		switch k {
 		case "hasText":
-			popts.HasText = obj.Get(k).String()
+			popts.HasText = escapeForTextSelector(obj.Get(k))
 		case "hasNotText":
-			popts.HasNotText = obj.Get(k).String()
+			popts.HasNotText = escapeForTextSelector(obj.Get(k))
 		}
 	}
 
 	return &popts
+}
+
+// escapeForTextSelector formats a hasText or hasNotText value as a selector
+// body the way Playwright does. A string becomes a quoted, case-insensitive
+// substring match, and an empty string means no filter.
+func escapeForTextSelector(v sobek.Value) string {
+	if re, ok := v.(*sobek.Object); ok && re.ClassName() == "RegExp" {
+		return escapeRegexForSelector(re)
+	}
+	s := v.String()
+	if s == "" {
+		return ""
+	}
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(s) //nolint:errchkjson // encoding a string cannot fail
+	return strings.TrimSuffix(b.String(), "\n") + "i"
+}
+
+// escapeRegexForSelector escapes the quotes and >> in a RegExp, so that the
+// selector parser in common/selectors.go doesn't read them as quotes or part
+// separators. It reads escapes the same way that parser does.
+func escapeRegexForSelector(re *sobek.Object) string {
+	s := re.String()
+	// Unicode-mode regexes reject identity escapes such as \", so keep them as is.
+	if strings.ContainsAny(re.Get("flags").String(), "uv") {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '\\' && i+1 < len(s):
+			b.WriteByte(c)
+			i++
+			b.WriteByte(s[i])
+		case c == '"' || c == '\'' || c == '`':
+			b.WriteByte('\\')
+			b.WriteByte(c)
+		case c == '>' && i+1 < len(s) && s[i+1] == '>':
+			b.WriteString(`\>\>`)
+			i++
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }
 
 // parseFrameIsInViewportOptions parses the frame isInViewport options from a Sobek value.

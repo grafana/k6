@@ -138,23 +138,39 @@ func (c *Chain) FullChainTLSCertificate(t testing.TB) tls.Certificate {
 	return cert
 }
 
-// AIAHandler serves the DER bytes set via SetCert with an application/pkix-cert Content-Type.
+// AIAHandler serves the AIA response configured via SetCert (bare DER),
+// SetPKCS7 (certs-only PKCS#7 bundle), or SetBody (arbitrary body and
+// Content-Type).
 type AIAHandler struct {
-	mu      sync.RWMutex
-	certDER []byte
+	mu          sync.RWMutex
+	contentType string
+	body        []byte
 }
 
 // SetCert atomically updates the DER bytes served by subsequent requests.
 func (h *AIAHandler) SetCert(der []byte) {
+	h.SetBody("application/pkix-cert", der)
+}
+
+// SetBody atomically updates the response body and Content-Type served by
+// subsequent requests.
+func (h *AIAHandler) SetBody(contentType string, body []byte) {
 	h.mu.Lock()
-	h.certDER = der
+	h.contentType, h.body = contentType, body
 	h.mu.Unlock()
 }
 
-// ServeHTTP writes the currently-set DER bytes as an AIA response.
+// SetPKCS7 serves a DER-encoded certs-only PKCS#7 bundle
+// (application/pkcs7-mime), the form public CAs such as Sectigo use for AIA
+// intermediates.
+func (h *AIAHandler) SetPKCS7(bundleDER []byte) {
+	h.SetBody("application/pkcs7-mime", bundleDER)
+}
+
+// ServeHTTP writes the currently-configured AIA response.
 func (h *AIAHandler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	w.Header().Set("Content-Type", "application/pkix-cert")
-	_, _ = w.Write(h.certDER)
+	w.Header().Set("Content-Type", h.contentType)
+	_, _ = w.Write(h.body)
 }

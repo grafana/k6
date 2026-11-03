@@ -267,10 +267,10 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	}
 	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags = tags.With("method", req.method)
+		tags = tags.With("method", req.Method())
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.eventInterceptor, req.URL(), req.method, tags)
+		tags = handleURLTag(m.eventInterceptor, req.URL(), req.Method(), tags)
 	}
 	tags = tags.With("resource_type", req.ResourceType())
 
@@ -286,7 +286,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	})
 }
 
-func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //nolint:funlen
+func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request, encodedDataLength float64) { //nolint:funlen
 	state := m.vu.State()
 	if state == nil {
 		return // CDP events can arrive after iteration teardown.
@@ -296,16 +296,15 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //n
 	// which case the response won't be created. So to emit as much metric data
 	// as possible we set some sensible defaults instead.
 	var (
-		status, bodySize                    int64
+		status                              int64
 		ipAddress, protocol                 string
 		fromCache, fromPreCache, fromSvcWrk bool
-		url                                 = req.url.String()
+		url                                 = req.URL()
 		wallTime                            = time.Now()
 		failed                              float64
 	)
 	if resp != nil {
 		status = resp.status
-		bodySize = resp.Size().Total()
 		ipAddress = resp.remoteAddress.IPAddress
 		protocol = resp.protocol
 		fromCache = resp.fromDiskCache
@@ -320,7 +319,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //n
 		}
 	} else {
 		m.logger.Debugf("NetworkManager:emitResponseMetrics",
-			"response is nil url:%s method:%s", req.url, req.method)
+			"response is nil url:%s method:%s", req.URL(), req.Method())
 	}
 
 	tagsAndMeta := req.tagsAndMeta
@@ -329,10 +328,10 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //n
 	}
 	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags = tags.With("method", req.method)
+		tags = tags.With("method", req.Method())
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.eventInterceptor, url, req.method, tags)
+		tags = handleURLTag(m.eventInterceptor, url, req.Method(), tags)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags = tags.With("ip", ipAddress)
@@ -349,21 +348,26 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) { //n
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 	tags = tags.With("resource_type", req.ResourceType())
 
-	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
-		Samples: []k6metrics.Sample{
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
-				Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
-				Time:       wallTime,
-				Metadata:   tagsAndMeta.Metadata,
-			},
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataReceived, Tags: tags},
-				Value:      float64(bodySize),
-				Time:       wallTime,
-				Metadata:   tagsAndMeta.Metadata,
-			},
+	samples := []k6metrics.Sample{
+		{
+			TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
+			Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
+			Time:       wallTime,
+			Metadata:   tagsAndMeta.Metadata,
 		},
+	}
+
+	if encodedDataLength >= 0 {
+		samples = append(samples, k6metrics.Sample{
+			TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataReceived, Tags: tags},
+			Value:      encodedDataLength,
+			Time:       wallTime,
+			Metadata:   tagsAndMeta.Metadata,
+		})
+	}
+
+	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
+		Samples: samples,
 	})
 
 	if resp != nil && resp.timing != nil {
@@ -411,7 +415,7 @@ func (m *NetworkManager) handleRequestRedirect(
 	// them (the redirect's ExtraInfo may still be in flight here).
 	m.wg.Go(func() {
 		resp.WaitForRawHeaders()
-		m.emitResponseMetrics(resp, req)
+		m.emitResponseMetrics(resp, req, redirectResponse.EncodedDataLength)
 	})
 	m.deleteRequestByID(req.requestID)
 
@@ -532,16 +536,15 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	m.eventInterceptor.onRequestFinished(req)
 
 	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
-	if isInternalURL(req.url) {
+	if isInternalURL(req.parsedURL()) {
 		return
 	}
 	// Emit the response metrics in a separate goroutine, once the raw headers
-	// are resolved, so the reported size is computed from a stable source.
-	// This must not run on the NetworkManager event goroutine: waiting for the
-	// raw headers there would block the goroutine that resolves them. Spawning
-	// a goroutine is also required for intercepted requests, so that CDP
-	// requestPaused messages can still be processed while a redirected main
-	// page request waits for its subrequest to finish loading.
+	// are resolved. This must not run on the NetworkManager event goroutine:
+	// waiting for the raw headers there would block the goroutine that resolves
+	// them. Spawning a goroutine is also required for intercepted requests, so
+	// that CDP requestPaused messages can still be processed while a redirected
+	// main page request waits for its subrequest to finish loading.
 	m.wg.Go(func() {
 		req.responseMu.RLock()
 		resp := req.response
@@ -549,7 +552,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		if resp != nil {
 			resp.WaitForRawHeaders()
 		}
-		m.emitResponseMetrics(resp, req)
+		m.emitResponseMetrics(resp, req, event.EncodedDataLength)
 	})
 }
 
