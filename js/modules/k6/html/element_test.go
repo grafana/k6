@@ -108,6 +108,21 @@ func TestElement(t *testing.T) {
 			assert.Contains(t, v.Export(), "innerfirst")
 		}
 	})
+	t.Run("FirstChild missing", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTMLElem)
+
+		v, err := rt.RunString(`doc.find("empty").get(0).firstChild()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, nil, v.Export())
+		}
+
+		// Text nodes have no children; walking from contents() used to panic.
+		v, err = rt.RunString(`doc.find("#top").get(0).firstChild().firstChild()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, nil, v.Export())
+		}
+	})
 	t.Run("LastChild", func(t *testing.T) {
 		t.Parallel()
 		rt := getTestRuntimeWithDoc(t, testHTMLElem)
@@ -115,6 +130,15 @@ func TestElement(t *testing.T) {
 		v, err := rt.RunString(`doc.find("div").get(0).lastChild().nodeValue()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "innerlast")
+		}
+	})
+	t.Run("LastChild missing", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTMLElem)
+
+		v, err := rt.RunString(`doc.find("empty").get(0).lastChild()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, nil, v.Export())
 		}
 	})
 	t.Run("ChildElementCount", func(t *testing.T) {
@@ -153,6 +177,15 @@ func TestElement(t *testing.T) {
 			assert.Contains(t, v.Export(), "pretext")
 		}
 	})
+	t.Run("PreviousSibling missing", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTMLElem)
+
+		v, err := rt.RunString(`doc.find("html").get(0).previousSibling()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, nil, v.Export())
+		}
+	})
 	t.Run("NextSibling", func(t *testing.T) {
 		t.Parallel()
 		rt := getTestRuntimeWithDoc(t, testHTMLElem)
@@ -160,6 +193,15 @@ func TestElement(t *testing.T) {
 		v, err := rt.RunString(`doc.find("div").get(0).nextSibling().textContent()`)
 		if assert.NoError(t, err) {
 			assert.Contains(t, v.Export(), "aftertext")
+		}
+	})
+	t.Run("NextSibling missing", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTMLElem)
+
+		v, err := rt.RunString(`doc.find("html").get(0).nextSibling()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, nil, v.Export())
 		}
 	})
 	t.Run("PreviousElementSibling", func(t *testing.T) {
