@@ -49,7 +49,8 @@ type Browser struct {
 	context        *BrowserContext
 	defaultContext *BrowserContext
 
-	// pagesMu protects pages and their attachment order from concurrent VU and CDP access.
+	// Needed as the targets map will be accessed from multiple Go routines,
+	// the main VU/JS go routine and the Go routine listening for CDP messages.
 	pagesMu   sync.RWMutex
 	pages     map[target.ID]*Page
 	pageOrder []target.ID
