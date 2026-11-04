@@ -1,4 +1,5 @@
 ## Project Overview
+- Security issues should be reported via [Grafana's security issue reporting page](https://grafana.com/legal/report-a-security-issue/) and not directly in this repository.
 
 k6 is a modern load testing tool built in Go. It allows developers to write JavaScript test scripts to simulate user behavior and measure system performance. The tool features configurable load generation, multiple protocol support (HTTP, WebSockets, gRPC, Browser), and flexible metrics output.
 
