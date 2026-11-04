@@ -108,6 +108,17 @@ type FrameSession struct {
 	// mainframe never again create a navigation span.
 	initialNavDone bool
 
+	// mainFrameLoadingRotated is true once a main-frame frameStartedLoading has
+	// rotated the navigation span and neither a document commit
+	// (onFrameNavigated), a within-document navigation
+	// (onPageNavigatedWithinDocument) nor the end of loading
+	// (onFrameStoppedLoading) has happened since. Chrome emits multiple
+	// consecutive frameStartedLoading events for a single main-frame navigation
+	// (e.g. client-initiated redirects fire two); rotating on each would create
+	// a spurious phantom navigation span. Only touched on the FrameSession
+	// event-loop goroutine, so it needs no synchronization.
+	mainFrameLoadingRotated bool
+
 	// Web vital metrics are buffered per (url, metric name) and flushed once
 	// per page: at each main-frame navigation boundary and at page close. This
 	// keeps a single sample per page and metric even when a page reports a
@@ -863,6 +874,12 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 			frame.URL+frame.URLFragment, err)
 	}
 
+	// A main-frame document commit ends the current loading episode, so the
+	// next frameStartedLoading rotates a fresh navigation span.
+	if fs.isMainFrameID(frame.ID) {
+		fs.mainFrameLoadingRotated = false
+	}
+
 	// Only create a navigation span once from here, since a new page navigating
 	// to about:blank doesn't call onFrameStartedLoading. All subsequent
 	// navigations call onFrameStartedLoading.
@@ -944,12 +961,32 @@ func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequ
 	}
 }
 
+// isMainFrameID reports whether frameID identifies the page's main frame.
+func (fs *FrameSession) isMainFrameID(frameID cdp.FrameID) bool {
+	mf := fs.manager.MainFrame()
+	return mf != nil && mf.ID() == frameID.String()
+}
+
 func (fs *FrameSession) onFrameStartedLoading(frameID cdp.FrameID) {
 	fs.logger.Debugf("FrameSession:onFrameStartedLoading",
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, frameID)
 
-	fs.processNavigationSpan(frameID)
+	// Chrome can emit multiple consecutive frameStartedLoading events for a
+	// single main-frame navigation (e.g. client-initiated redirects fire two).
+	// Rotate the navigation span only on the first of an episode; the flag is
+	// reset on a document commit (onFrameNavigated), a within-document
+	// navigation (onPageNavigatedWithinDocument) or when loading stops
+	// (onFrameStoppedLoading). Non-main frames are
+	// unaffected: processNavigationSpan already ignores them.
+	isMain := fs.isMainFrameID(frameID)
+	suppressPhantom := isMain && fs.mainFrameLoadingRotated
+	if !suppressPhantom {
+		fs.processNavigationSpan(frameID)
+	}
+	if isMain {
+		fs.mainFrameLoadingRotated = true
+	}
 
 	fs.manager.frameLoadingStarted(frameID)
 }
@@ -958,6 +995,15 @@ func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
 	fs.logger.Debugf("FrameSession:onFrameStoppedLoading",
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, frameID)
+
+	// Loads that never commit a document (e.g. a download or a 204 response)
+	// stop loading without a frameNavigated. End the loading episode here so
+	// the next navigation rotates a fresh span. A client-initiated redirect's
+	// frameStartedLoading events arrive back to back, with no stop between
+	// them, so its phantom rotation is still suppressed.
+	if fs.isMainFrameID(frameID) {
+		fs.mainFrameLoadingRotated = false
+	}
 
 	fs.manager.frameLoadingStopped(frameID)
 }
@@ -1003,6 +1049,12 @@ func (fs *FrameSession) onPageNavigatedWithinDocument(event *cdppage.EventNaviga
 	fs.logger.Debugf("FrameSession:onPageNavigatedWithinDocument",
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, event.FrameID)
+
+	// A within-document (same-page) navigation ends the current loading
+	// episode, so the next frameStartedLoading rotates a fresh span.
+	if fs.isMainFrameID(event.FrameID) {
+		fs.mainFrameLoadingRotated = false
+	}
 
 	fs.manager.frameNavigatedWithinDocument(event.FrameID, event.URL)
 }
