@@ -77,7 +77,15 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		}),
 		"cookies": passiveCall(func(urls ...string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
-				return bc.Cookies(urls...) //nolint:wrapcheck
+				cookies, err := bc.Cookies(urls...)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				// A nil slice would be exported to JS as null, but users expect an empty array.
+				if cookies == nil {
+					cookies = []*common.Cookie{}
+				}
+				return cookies, nil
 			})
 		}),
 		"grantPermissions": passiveCall(func(permissions []string, opts sobek.Value) (*sobek.Promise, error) {
