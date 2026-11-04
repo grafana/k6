@@ -23,7 +23,7 @@ FROM release as with-browser
 USER root
 
 COPY --from=release /usr/bin/k6 /usr/bin/k6
-RUN apk --no-cache add chromium chromium-swiftshader
+RUN apk --no-cache add chromium chromium-swiftshader tini
 
 USER 12345
 
@@ -35,4 +35,6 @@ ENV K6_BROWSER_HEADLESS=true
 # alpine and avoids the usage of SYS_ADMIN Docker capability
 ENV K6_BROWSER_ARGS=no-sandbox
 
-ENTRYPOINT ["k6"]
+# tini reaps Chromium descendants that get reparented to PID 1, which would
+# otherwise accumulate as zombies. -s keeps it working when not run as PID 1.
+ENTRYPOINT ["/sbin/tini", "-s", "--", "k6"]
