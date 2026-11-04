@@ -42,6 +42,8 @@ type (
 type TracerProvider struct {
 	trace.TracerProvider
 	shutdown tracerProvShutdownFunc
+	// enabled is false for the noop provider used when tracing is disabled.
+	enabled bool
 }
 
 type tracerProviderParams struct {
@@ -85,6 +87,7 @@ func NewTracerProvider(ctx context.Context, params tracerProviderParams) (*Trace
 	return &TracerProvider{
 		TracerProvider: prov,
 		shutdown:       prov.Shutdown,
+		enabled:        true,
 	}, nil
 }
 
@@ -248,4 +251,14 @@ func (p *tracerProviderParams) parseProto(proto string) error {
 func (p *tracerProviderParams) parseHeader(header, value string) {
 	headerName := strings.TrimPrefix(header, "header.")
 	p.headers[headerName] = value
+}
+
+// WrapTracerProvider wraps an existing OpenTelemetry tracer provider, e.g. one using an
+// in-memory span processor in tests. Shutdown on the result is a noop.
+func WrapTracerProvider(prov trace.TracerProvider) *TracerProvider {
+	return &TracerProvider{
+		TracerProvider: prov,
+		shutdown:       func(context.Context) error { return nil },
+		enabled:        true,
+	}
 }
