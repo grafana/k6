@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/netext/grpcext"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/js/promises"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/netext"
 
@@ -350,22 +351,20 @@ func (c *Client) AsyncInvoke(
 ) (*sobek.Promise, error) {
 	grpcReq, err := c.buildInvokeRequest(method, req, params)
 
-	promise, resolve, reject := c.vu.Runtime().NewPromise()
+	promise, resolve, reject := promises.New(c.vu)
 	if err != nil {
-		err = reject(err)
-		return promise, err
+		reject(err)
+		return promise, nil
 	}
 
-	callback := c.vu.RegisterCallback()
 	go func() {
 		res, err := c.conn.Invoke(c.vu.Context(), grpcReq)
 
-		callback(func() error {
-			if err != nil {
-				return reject(err)
-			}
-			return resolve(res)
-		})
+		if err != nil {
+			reject(err)
+			return
+		}
+		resolve(res)
 	}()
 
 	return promise, nil

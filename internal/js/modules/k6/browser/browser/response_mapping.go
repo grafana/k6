@@ -4,6 +4,8 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/v2/js/promises"
 )
 
 func mapResponseEvent(vu moduleVU, event common.PageEvent) mapping {
@@ -25,20 +27,18 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			})
 		}),
 		"body": passiveCall(func() *sobek.Promise {
-			rt := vu.Runtime()
-			promise, res, rej := rt.NewPromise()
+			promise, res, rej := promises.New(vu)
 			callback := vu.RegisterCallback()
 			go func() {
 				body, err := r.Body()
-				if err != nil {
-					callback(func() error {
-						return rej(err)
-					})
-					return
-				}
 				callback(func() error {
+					if err != nil {
+						rej(k6ext.BrowserError(err))
+						return nil
+					}
 					buf := vu.Runtime().NewArrayBuffer(body)
-					return res(&buf)
+					res(&buf)
+					return nil
 				})
 			}()
 			return promise
