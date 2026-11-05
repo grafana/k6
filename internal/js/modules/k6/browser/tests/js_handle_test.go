@@ -7,6 +7,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestJSHandleAsElementNullClick(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.StartIteration(t)
+
+	got := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		try {
+			const handle = await page.evaluateHandle(() => { return {}; });
+			const element = handle.asElement();
+			try {
+				await element.click();
+			} catch (error) {
+				return element === null && error instanceof TypeError;
+			}
+			return false;
+		} finally {
+			await page.close();
+		}
+	`)
+	assert.True(t, got.Result().ToBoolean(), "clicking a null element should throw a JavaScript TypeError")
+}
+
 func TestJSHandleEvaluate(t *testing.T) {
 	t.Parallel()
 
