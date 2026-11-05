@@ -517,9 +517,15 @@ func prepareHandleWrapperArgs(
 	noColor, enableColors, newMachineReadableSummary bool,
 	callbackResult, handleSummaryData, summaryData sobek.Value,
 ) []sobek.Value {
+	// A nil slice is exported as undefined to the JS runtime, which would override the defaults.
+	summaryTrendStats := vu.Runner.Bundle.Options.SummaryTrendStats
+	if summaryTrendStats == nil {
+		summaryTrendStats = []string{}
+	}
+
 	options := map[string]any{
 		// TODO: improve when we can easily export all option values, including defaults?
-		"summaryTrendStats":         vu.Runner.Bundle.Options.SummaryTrendStats,
+		"summaryTrendStats":         summaryTrendStats,
 		"summaryTimeUnit":           vu.Runner.Bundle.Options.SummaryTimeUnit.String,
 		"noColor":                   noColor, // TODO: move to the (runtime) options
 		"enableColors":              enableColors,

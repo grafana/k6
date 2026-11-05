@@ -30,6 +30,8 @@ const (
 	classGlobal        = "global"
 	classPromise       = "Promise"
 
+	classIterator             = "Iterator"
+	classIteratorHelper       = "Iterator Helper"
 	classArrayIterator        = "Array Iterator"
 	classMapIterator          = "Map Iterator"
 	classSetIterator          = "Set Iterator"
@@ -49,6 +51,11 @@ var (
 type Object struct {
 	self    objectImpl
 	runtime *Runtime
+
+	// As Go does not have ephemerons, the only way to ensure the correct WeakMap semantics is to make the
+	// value reachable only through the key. This unfortunately bumps the size of Object from 24 to 32 bytes,
+	// but I could not find a better alternative.
+	weakMapRefs *weakMapRefs
 }
 
 type iterNextFunc func() (propIterItem, iterNextFunc)
@@ -157,6 +164,14 @@ type objectImpl interface {
 	getOwnPropStr(unistring.String) Value
 	getOwnPropIdx(valueInt) Value
 	getOwnPropSym(*Symbol) Value
+
+	// hasAndGetStr combines HasProperty and Get for a string property. It returns (value, true)
+	// if the property exists and (nil, false) otherwise, the same as
+	//   hasPropertyStr(name) && getStr(name, receiver)
+	// but may fuse the two into a single lookup when doing so cannot cause observable effects.
+	// The receiver has the same meaning as in getStr: if nil, the property accessor (if any) is
+	// called with the object where the property is found.
+	hasAndGetStr(name unistring.String, receiver Value) (Value, bool)
 
 	setOwnStr(p unistring.String, v Value, throw bool) bool
 	setOwnIdx(p valueInt, v Value, throw bool) bool
@@ -362,6 +377,61 @@ func (o *baseObject) getStr(name unistring.String, receiver Value) Value {
 		return prop.get(receiver)
 	}
 	return prop
+}
+
+func (o *baseObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	prop := o.values[name]
+	if prop != nil {
+		if vp, ok := prop.(*valueProperty); ok {
+			if vp.getterFunc == nil {
+				// own data property: reading it is not observable and implies HasProperty.
+				return nilSafe(vp.value), true
+			}
+			// accessor: Get may run user code, with the same receiver semantics as getStr
+			if receiver == nil {
+				receiver = o.val
+			}
+			return vp.get(receiver), true
+		}
+		return prop, true
+	}
+	// own property is absent: walk the prototype chain, fusing has+get per level.
+	// The recursion must go through o.prototype.self so that overrides in embedding types
+	// (e.g. lazily materialising objects) are correctly dispatched. Note, the receiver is
+	// substituted at the first hop, mirroring getStr's prototype walk.
+	if o.prototype != nil {
+		if receiver == nil {
+			receiver = o.val
+		}
+		return o.prototype.self.hasAndGetStr(name, receiver)
+	}
+	return nil, false
+}
+
+// hasAndGetOwnStr implements the hasAndGetStr fast path for objects whose own property lookup must
+// go through their getOwnPropStr override (e.g. properties served from Go structures, recomputed
+// properties such as array 'length', or lazily materialised properties).
+// own must be the result of o.getOwnPropStr(name).
+func (o *baseObject) hasAndGetOwnStr(name unistring.String, own Value, receiver Value) (Value, bool) {
+	if own != nil {
+		if vp, ok := own.(*valueProperty); ok {
+			if vp.getterFunc == nil {
+				return nilSafe(vp.value), true
+			}
+			if receiver == nil {
+				receiver = o.val
+			}
+			return vp.get(receiver), true
+		}
+		return own, true
+	}
+	if o.prototype != nil {
+		if receiver == nil {
+			receiver = o.val
+		}
+		return o.prototype.self.hasAndGetStr(name, receiver)
+	}
+	return nil, false
 }
 
 func (o *baseObject) getOwnPropIdx(idx valueInt) Value {
@@ -654,59 +724,77 @@ func (o *baseObject) hasOwnPropertyIdx(idx valueInt) bool {
 	return o.val.self.hasOwnPropertyStr(idx.string())
 }
 
-func (o *baseObject) _defineOwnProperty(name unistring.String, existingValue Value, descr PropertyDescriptor, throw bool) (val Value, ok bool) {
-
-	getterObj, _ := descr.Getter.(*Object)
-	setterObj, _ := descr.Setter.(*Object)
-
-	var existing *valueProperty
-
-	if existingValue == nil {
-		if !o.extensible {
-			o.val.runtime.typeErrorResult(throw, "Cannot define property %s, object is not extensible", name)
-			return nil, false
-		}
-		existing = &valueProperty{}
-	} else {
-		if existing, ok = existingValue.(*valueProperty); !ok {
-			existing = &valueProperty{
-				writable:     true,
-				enumerable:   true,
-				configurable: true,
-				value:        existingValue,
+func (r *Runtime) isCompatiblePropertyDescriptor(name unistring.String, getName func() unistring.String, extensible bool, desc *PropertyDescriptor, current *valueProperty, throw bool) bool {
+	if current == nil {
+		if !extensible && throw {
+			if getName != nil {
+				name = getName()
 			}
+			panic(r.NewTypeError("Cannot define property %s, object is not extensible", name))
+		}
+		return extensible
+	}
+
+	if !current.configurable {
+		if desc.Configurable == FLAG_TRUE {
+			goto reject
 		}
 
-		if !existing.configurable {
-			if descr.Configurable == FLAG_TRUE {
-				goto Reject
-			}
-			if descr.Enumerable != FLAG_NOT_SET && descr.Enumerable.Bool() != existing.enumerable {
-				goto Reject
-			}
+		if desc.Enumerable != FLAG_NOT_SET && desc.Enumerable.Bool() != current.enumerable {
+			goto reject
 		}
-		if existing.accessor && descr.Value != nil || !existing.accessor && (getterObj != nil || setterObj != nil) {
-			if !existing.configurable {
-				goto Reject
+
+		if !desc.IsGeneric() && desc.IsAccessor() != current.accessor {
+			goto reject
+		}
+
+		if current.accessor {
+			if desc.Getter != nil {
+				if !(desc.Getter == _undefined && current.getterFunc == nil) && !desc.Getter.SameAs(current.getterFunc) {
+					goto reject
+				}
 			}
-		} else if !existing.accessor {
-			if !existing.configurable {
-				if !existing.writable {
-					if descr.Writable == FLAG_TRUE {
-						goto Reject
-					}
-					if descr.Value != nil && !descr.Value.SameAs(existing.value) {
-						goto Reject
-					}
+
+			if desc.Setter != nil {
+				if !(desc.Setter == _undefined && current.setterFunc == nil) && !desc.Setter.SameAs(current.setterFunc) {
+					goto reject
 				}
 			}
 		} else {
-			if !existing.configurable {
-				if descr.Getter != nil && existing.getterFunc != getterObj || descr.Setter != nil && existing.setterFunc != setterObj {
-					goto Reject
+			if !current.writable {
+				if desc.Writable == FLAG_TRUE {
+					goto reject
+				}
+				if desc.Value != nil {
+					if !desc.Value.SameAs(current.value) {
+						goto reject
+					}
 				}
 			}
 		}
+	}
+	return true
+reject:
+	if throw {
+		if getName != nil {
+			name = getName()
+		}
+		panic(r.NewTypeError("Cannot redefine property: %s", name))
+	}
+	return false
+}
+
+func (o *baseObject) _defineOwnProperty(name unistring.String, getName func() unistring.String, existingValue Value, descr PropertyDescriptor, throw bool) (val Value, ok bool) {
+	var existing *valueProperty
+	if existingValue != nil {
+		existing = propToValueProp(existingValue)
+	}
+	if !o.val.runtime.isCompatiblePropertyDescriptor(name, getName, o.extensible, &descr, existing, throw) {
+		return nil, false
+	}
+
+	if existing == nil {
+		existing = &valueProperty{}
 	}
 
 	if descr.Writable == FLAG_TRUE && descr.Enumerable == FLAG_TRUE && descr.Configurable == FLAG_TRUE && descr.Value != nil {
@@ -750,16 +838,11 @@ func (o *baseObject) _defineOwnProperty(name unistring.String, existingValue Val
 	}
 
 	return existing, true
-
-Reject:
-	o.val.runtime.typeErrorResult(throw, "Cannot redefine property: %s", name)
-	return nil, false
-
 }
 
 func (o *baseObject) defineOwnPropertyStr(name unistring.String, descr PropertyDescriptor, throw bool) bool {
 	existingVal := o.values[name]
-	if v, ok := o._defineOwnProperty(name, existingVal, descr, throw); ok {
+	if v, ok := o._defineOwnProperty(name, nil, existingVal, descr, throw); ok {
 		o.values[name] = v
 		if existingVal == nil {
 			names := copyNamesIfNeeded(o.propNames, 1)
@@ -779,7 +862,7 @@ func (o *baseObject) defineOwnPropertySym(s *Symbol, descr PropertyDescriptor, t
 	if o.symValues != nil {
 		existingVal = o.symValues.get(s)
 	}
-	if v, ok := o._defineOwnProperty(s.descriptiveString().string(), existingVal, descr, throw); ok {
+	if v, ok := o._defineOwnProperty("", func() unistring.String { return s.descriptiveString().string() }, existingVal, descr, throw); ok {
 		if o.symValues == nil {
 			o.symValues = newOrderedMap(nil)
 		}
@@ -1028,19 +1111,18 @@ func (o *baseObject) exportToMap(m reflect.Value, typ reflect.Type, ctx *objectE
 	return genericExportToMap(o.val, m, typ, ctx)
 }
 
-func genericExportToArrayOrSlice(o *Object, dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) (err error) {
+func exportToArrayOrSliceWithIterator(ir *iteratorRecord, o *Object, dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) (err error) {
 	r := o.runtime
-
-	if method := toMethod(r.getV(o, SymIterator)); method != nil {
-		// iterable
-
+	if ir != nil {
 		var values []Value
 		// cannot change (append to) the slice once it's been put into the cache, so we need to know its length beforehand
-		ex := r.try(func() {
-			values = r.iterableToList(o, method)
+		err = r.try(func() {
+			ir.iterate(func(item Value) {
+				values = append(values, item)
+			})
 		})
-		if ex != nil {
-			return ex
+		if err != nil {
+			return
 		}
 		if typ.Kind() == reflect.Array {
 			if dst.Len() != len(values) {
@@ -1069,9 +1151,9 @@ func genericExportToArrayOrSlice(o *Object, dst reflect.Value, typ reflect.Type,
 		if dst.Len() != l {
 			if typ.Kind() == reflect.Array {
 				return fmt.Errorf("cannot convert an array-like object into an array, lengths mismatch (have %d, need %d)", l, dst.Len())
-			} else {
-				dst.Set(reflect.MakeSlice(typ, l, l))
 			}
+
+			dst.Set(reflect.MakeSlice(typ, l, l))
 		}
 		ctx.putTyped(o, typ, dst.Interface())
 		for i := 0; i < l; i++ {
@@ -1082,8 +1164,17 @@ func genericExportToArrayOrSlice(o *Object, dst reflect.Value, typ reflect.Type,
 			}
 		}
 	}
-
 	return
+}
+
+func genericExportToArrayOrSlice(o *Object, dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) (err error) {
+	r := o.runtime
+	ir, err := r.getOptionalIterator(o, nil)
+	if err != nil {
+		return err
+	}
+
+	return exportToArrayOrSliceWithIterator(ir, o, dst, typ, ctx)
 }
 
 func (o *baseObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
@@ -1621,6 +1712,13 @@ func (o *Object) defineOwnProperty(n Value, desc PropertyDescriptor, throw bool)
 	default:
 		return o.self.defineOwnPropertyStr(n.string(), desc, throw)
 	}
+}
+
+func (o *Object) getWeakMapRefs(create bool) *weakMapRefs {
+	if o.weakMapRefs == nil && create {
+		o.weakMapRefs = newWeakMapRefs()
+	}
+	return o.weakMapRefs
 }
 
 func (o *guardedObject) guard(props ...unistring.String) {

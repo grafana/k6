@@ -10,12 +10,13 @@ import (
 // look behind a candidate start, the slice may begin at that candidate instead
 // of byte 0.
 type decodedInput struct {
-	runes      []rune
-	pooled     *[]rune
-	runeStart  int  // index in runes of the requested startAt; -1 if not a rune boundary
-	runeOffset int  // original-string rune index of runes[0]
-	byteOffset int  // original-string byte index of runes[0]
-	ascii      bool // every decoded rune is ASCII; invalid UTF-8 is not ASCII
+	runes       []rune
+	pooled      *[]rune
+	runeStart   int  // index in runes of the requested startAt; -1 if not a rune boundary
+	runeOffset  int  // original-string rune index of runes[0]
+	byteOffset  int  // original-string byte index of runes[0]
+	ascii       bool // every decoded rune is ASCII; invalid UTF-8 is not ASCII
+	matchBuffer bool // pooled in exact-size storage that can be transferred to a Match
 }
 
 // decodeFrom is the first original-string byte that must be decoded. 0 means
@@ -71,51 +72,54 @@ func decodeString(s string, maxCachedLength int) ([]rune, *[]rune) {
 	return buf[:n], pooled
 }
 
+// decodeStringInput decodes into exact-size storage a returned match can own.
 func (re *Regexp) decodeStringInput(s string, startAt int, pooled bool) decodedInput {
 	maxCachedLength := 0
 	if pooled {
 		maxCachedLength = re.optimizations.MaxCachedRuneBufferLength
 	}
-	return decodeInput(s, startAt, re.decodeFrom(s, startAt), maxCachedLength, true)
+	decodeFrom := max(0, min(re.decodeFrom(s, startAt), len(s)))
+	substr := s[decodeFrom:]
+	buf, pooledBuffer := pooledMatchRuneBuffers.getExact(len(substr), maxCachedLength)
+	n, ascii := helpers.DecodeString(substr, buf)
+	out := decodedInput{
+		runes:       buf[:n],
+		pooled:      pooledBuffer,
+		byteOffset:  decodeFrom,
+		ascii:       ascii,
+		runeStart:   startRuneIndex(s, startAt, decodeFrom, n, ascii),
+		matchBuffer: true,
+	}
+	// Byte index equals rune index only when the skipped prefix is also ASCII.
+	if ascii && (decodeFrom == 0 || helpers.IsASCII(s[:decodeFrom])) {
+		out.runeOffset = decodeFrom
+	} else if decodeFrom > 0 {
+		out.runeOffset = utf8.RuneCountInString(s[:decodeFrom])
+	}
+	return out
 }
 
-// decodeInput converts s[decodeFrom:] to runes. startAt is a byte index in s.
-// If startAt < 0 or is not a rune boundary, runeStart is -1. needOffsets walks
-// the skipped prefix to fill runeOffset; MatchString does not need that field.
-func decodeInput(s string, startAt, decodeFrom, maxCachedLength int, needOffsets bool) decodedInput {
+// decodeInput converts s[decodeFrom:] to runes for internal scans, which do not
+// need original-string offsets. Keep decoding in this call: an extra helper
+// call measurably slows short Boolean searches.
+// If startAt < 0 or is not a rune boundary, runeStart is -1.
+func decodeInput(s string, startAt, decodeFrom, maxCachedLength int) decodedInput {
 	if decodeFrom < 0 {
 		decodeFrom = 0
 	}
 	if decodeFrom > len(s) {
 		decodeFrom = len(s)
 	}
-
 	substr := s[decodeFrom:]
 	buf, pooledBuffer := pooledRuneBuffers.get(len(substr), maxCachedLength)
 	n, ascii := helpers.DecodeString(substr, buf)
-	runes := buf[:n]
-
-	out := decodedInput{
-		runes:      runes,
+	return decodedInput{
+		runes:      buf[:n],
 		pooled:     pooledBuffer,
 		byteOffset: decodeFrom,
 		ascii:      ascii,
 		runeStart:  startRuneIndex(s, startAt, decodeFrom, n, ascii),
 	}
-
-	if !needOffsets {
-		return out
-	}
-
-	// Byte index equals rune index only when the skipped prefix is also ASCII.
-	if ascii && (decodeFrom == 0 || helpers.IsASCII(s[:decodeFrom])) {
-		out.runeOffset = decodeFrom
-		return out
-	}
-	if decodeFrom > 0 {
-		out.runeOffset = utf8.RuneCountInString(s[:decodeFrom])
-	}
-	return out
 }
 
 func startRuneIndex(s string, startAt, decodeFrom, runeCount int, ascii bool) int {
@@ -162,6 +166,10 @@ func prevRuneByte(s string, byteIndex int) int {
 func (d decodedInput) release() {
 	if d.pooled != nil {
 		*d.pooled = d.runes
-		pooledRuneBuffers.put(d.pooled)
+		if d.matchBuffer {
+			pooledMatchRuneBuffers.putExact(d.pooled)
+		} else {
+			pooledRuneBuffers.put(d.pooled)
+		}
 	}
 }

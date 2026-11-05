@@ -247,6 +247,18 @@ var (
 		// so that they aren't flaky between versions.
 		"test/language/identifiers/start-unicode-14.",
 		"test/language/identifiers/part-unicode-14.",
+
+		// Go's unicode package only supports Unicode 15.0 up to Go 1.26, so the tests for later
+		// versions (and the simple case folding mappings added in Unicode 15.1) depend on the Go
+		// version used. Sobek skips them based on unicode.Version, here we skip them always to
+		// keep the recorded failures independent of it.
+		"test/language/identifiers/start-unicode-15.1.",
+		"test/language/identifiers/part-unicode-15.1.",
+		"test/language/identifiers/start-unicode-16.",
+		"test/language/identifiers/part-unicode-16.",
+		"test/language/identifiers/start-unicode-17.",
+		"test/language/identifiers/part-unicode-17.",
+		"test/built-ins/RegExp/unicode_full_case_folding.js",
 	}
 
 	update = flag.Bool("update", false, "update breaking_test_errors-*.json files") //nolint:gochecknoglobals

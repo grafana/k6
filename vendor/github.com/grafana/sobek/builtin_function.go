@@ -176,7 +176,7 @@ func (r *Runtime) functionproto_bind(call FunctionCall) Value {
 				// no-op, li == 0
 			default:
 				if !math.IsNaN(float64(lenProp)) {
-					li = int64(math.Abs(float64(lenProp)))
+					li = int64(lenProp)
 				} // else li = 0
 			}
 		}
@@ -387,7 +387,12 @@ func (r *Runtime) createGeneratorProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
 	o._putProp("constructor", r.getGeneratorFunctionPrototype(), false, false, true)
-	o._putProp("next", r.newNativeFunc(r.builtin_genproto_next, "next", 1), true, false, true)
+	o._putProp("next", r.newIteratorNextFunc(r.builtin_genproto_next, 1, func(iterator *Object) func(Value) (Value, bool) {
+		if i, ok := iterator.self.(*generatorObject); ok {
+			return i.nextResult
+		}
+		return nil
+	}), true, false, true)
 	o._putProp("return", r.newNativeFunc(r.builtin_genproto_return, "return", 1), true, false, true)
 	o._putProp("throw", r.newNativeFunc(r.builtin_genproto_throw, "throw", 1), true, false, true)
 

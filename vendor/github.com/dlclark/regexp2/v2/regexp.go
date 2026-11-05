@@ -43,10 +43,12 @@ type Regexp struct {
 	options RegexOptions // options
 	debug   bool
 
-	caps     map[int]int    // capnum->index
-	capnames map[string]int //capture group name -> index
-	capslist []string       //sorted list of capture group names
-	capsize  int            // size of the capture array
+	caps                  map[int]int      // public group number -> dense capture slot
+	capnames              map[string]int   // capture group name -> first public group number
+	duplicateCapnames     map[string][]int // ECMAScript name -> dense capture slots
+	duplicateGroupNumbers map[string][]int // ECMAScript name -> public group numbers; shared when dense
+	capslist              []string         // sorted list of capture group names
+	capsize               int              // size of the capture array
 
 	code *syntax.Code // compiled program
 
@@ -62,7 +64,8 @@ type Regexp struct {
 	execute            func(r *Runner) error
 	executeQuick       func(r *Runner) error
 	stringPrefixFilter StringPrefixFilter
-	quickCode          *syntax.Code // bool-only program with unobservable captures removed
+	prefixSearch       *equalASCIIPrefixSearch // immutable search masks shared by string and rune finders
+	quickCode          *syntax.Code            // bool-only program with unobservable captures removed
 	// leftContextRunes is used when code is nil (registered engines).
 	// The interpreter reads the same value from code.LeftContextRunes.
 	leftContextRunes int
@@ -118,6 +121,13 @@ func compile(expr string, c compileConfig) (*Regexp, error) {
 		optimizations: c.optimizations,
 	}
 	re.stringPrefixFilter = newStringPrefixFilter(code)
+	if opts := code.FindOptimizations; opts != nil && opts.FindMode == syntax.LeadingStrings_LeftToRight {
+		re.prefixSearch = compileEqualASCIIPrefixSearch(opts.LeadingPrefixes)
+		if re.prefixSearch != nil && re.prefixSearch.sharedFirst && re.stringPrefixFilter != nil {
+			re.stringPrefixFilter = withEqualASCIIPrefixSearch(re.stringPrefixFilter, re.prefixSearch, opts.MinRequiredLength)
+		}
+	}
+	re.initCaptureNames()
 	re.initCaches()
 	return re, nil
 }
@@ -217,7 +227,13 @@ func (re *Regexp) getReplacerData(replacement string) (*syntax.ReplacerData, err
 		}
 	}
 
-	data, err := syntax.NewReplacerData(replacement, re.caps, re.capsize, re.capnames, syntax.RegexOptions(re.options))
+	var data *syntax.ReplacerData
+	var err error
+	if len(re.duplicateCapnames) > 0 {
+		data, err = syntax.NewReplacerDataWithGroupNumbers(replacement, re.caps, re.capsize, re.capnames, syntax.RegexOptions(re.options), re.duplicateGroupNumbers)
+	} else {
+		data, err = syntax.NewReplacerData(replacement, re.caps, re.capsize, re.capnames, syntax.RegexOptions(re.options))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +265,7 @@ func (re *Regexp) FindStringMatch(s string) (*Match, error) {
 
 // FindRunesMatch searches the input rune slice for a Regexp match
 func (re *Regexp) FindRunesMatch(r []rune) (*Match, error) {
-	return re.run(false, -1, -1, r, newMatchText(r))
+	return re.run(scanFullMatch, -1, r)
 }
 
 // FindStringMatchStartingAt searches the input string for a Regexp match starting at the startAt index
@@ -265,19 +281,28 @@ func (re *Regexp) FindStringMatchStartingAt(s string, startAt int) (*Match, erro
 }
 
 func (re *Regexp) findDecodedStringMatch(s string, candidate, startAt int) (*Match, error) {
-	// Returned matches retain their rune data, so this path must not consume a
-	// pooled buffer that can never be returned.
-	d := re.decodeStringInput(s, candidate, false)
+	d := re.decodeStringInput(s, candidate, true)
 	runner := re.getRunner()
 	defer re.putRunner(runner)
-	text := newStringMatchTextAt(s, d.runes, d.runeOffset, d.byteOffset)
+	text := runner.stringMatchText(s, d.runes, d.runeOffset, d.byteOffset)
 	origin := re.stringSearchOrigin(s, startAt, d.runeStart)
-	return runner.scan(d.runes, text, origin, d.runeStart, -1, false, re.MatchTimeout)
+	m, err := runner.scan(d.runes, text, origin, d.runeStart, -1, scanFullMatch, re.MatchTimeout)
+	if err != nil || m == nil {
+		d.release()
+		return nil, err
+	}
+	// The match takes both the input and its metadata. A miss keeps the
+	// metadata in the runner and returns the decoded buffer for reuse.
+	runner.textInfo = nil
+	if d.pooled != nil {
+		pooledMatchRuneBuffers.detach(d.pooled, cap(d.runes))
+	}
+	return m, nil
 }
 
 // FindRunesMatchStartingAt searches the input rune slice for a Regexp match starting at the startAt index
 func (re *Regexp) FindRunesMatchStartingAt(r []rune, startAt int) (*Match, error) {
-	return re.run(false, startAt, -1, r, newMatchText(r))
+	return re.run(scanFullMatch, startAt, r)
 }
 
 // FindAllStringIndex returns a slice of byte index pairs identifying all
@@ -297,7 +322,7 @@ func (re *Regexp) FindAllStringIndex(s string, n int) ([][]int, error) {
 
 	// Index results only need byte offsets. Keep the mapper relative to the
 	// decoded suffix so neither decoding nor mapping has to count prefix runes.
-	d := decodeInput(s, startAt, re.decodeFrom(s, startAt), re.optimizations.MaxCachedRuneBufferLength, false)
+	d := decodeInput(s, startAt, re.decodeFrom(s, startAt), re.optimizations.MaxCachedRuneBufferLength)
 	runner := re.getRunner()
 	defer func() {
 		re.putRunner(runner)
@@ -346,14 +371,14 @@ func (re *Regexp) findAllRunesIndex(runner *Runner, input []rune, origin, startA
 	var out [][]int
 	var flat []int
 	if n > 0 {
-		out = make([][]int, 0, n)
-		flat = make([]int, 0, n*2)
+		// Preserve the non-nil empty result without allocating backing storage.
+		out = [][]int{}
 	}
 
 	prevEnd := -1
 	previousMatchLength := -1
 	for n != 0 {
-		m, err := runner.scan(input, nil, origin, startAt, previousMatchLength, true, re.MatchTimeout)
+		m, err := runner.scan(input, nil, origin, startAt, previousMatchLength, scanBounds, re.MatchTimeout)
 		if err != nil {
 			return nil, err
 		}
@@ -363,6 +388,10 @@ func (re *Regexp) findAllRunesIndex(runner *Runner, input []rune, origin, startA
 
 		localIndex := m.runeSliceIndex()
 		if m.RuneLength != 0 || localIndex != prevEnd {
+			if len(out) == 0 && n > 0 {
+				out = make([][]int, 0, n)
+				flat = make([]int, 0, n*2)
+			}
 			start, end := makeIndex(localIndex, m.RuneLength)
 			flat = append(flat, start, end)
 			out = append(out, flat[len(flat)-2:len(flat):len(flat)])
@@ -408,12 +437,28 @@ func (m *stringByteMapper) byteIndex(runeIndex int) int {
 
 // FindNextMatch returns the next match in the same input string as the match parameter.
 // Will return nil if there is no next match or if given a nil match.
+// It can reuse what earlier calls read of the input, so a rune slice input
+// must not change between them.
 func (re *Regexp) FindNextMatch(m *Match) (*Match, error) {
 	if m == nil {
 		return nil, nil
 	}
 
-	return re.run(false, m.textpos, m.RuneLength, m.text.runes, m.text)
+	runner := re.getRunner()
+	defer re.putRunner(runner)
+	landmarkChain := re.code != nil && re.code.FindOptimizations != nil && re.code.FindOptimizations.FindMode == syntax.RequiredLandmarkChain_LeftToRight
+	// Continue the required landmark searches that found m, so that iterating
+	// reads the input once. Only one call can take them; other calls, and
+	// calls on older matches or copies, start new ones.
+	if landmarkChain && m.text.landmarkMatch.CompareAndSwap(m, nil) {
+		runner.landmarks, runner.Runtext = m.landmarks, m.text.runes
+	}
+	next, err := runner.scan(m.text.runes, m.text, m.textpos, m.textpos, m.RuneLength, scanFullMatch, re.MatchTimeout)
+	if landmarkChain && next != nil && runner.landmarks != nil {
+		next.landmarks, runner.landmarks = runner.landmarks, nil
+		m.text.landmarkMatch.Store(next)
+	}
+	return next, err
 }
 
 // MatchString return true if the string matches the regex
@@ -442,7 +487,7 @@ func (re *Regexp) matchStringAt(s string, startAt int) (bool, error) {
 			runeStart = len(input)
 		}
 	} else {
-		d := decodeInput(s, startAt, re.decodeFrom(s, startAt), re.optimizations.MaxCachedRuneBufferLength, false)
+		d := decodeInput(s, startAt, re.decodeFrom(s, startAt), re.optimizations.MaxCachedRuneBufferLength)
 		input = d.runes
 		pooledInput = d.pooled
 		runeStart = d.runeStart
@@ -462,7 +507,7 @@ func (re *Regexp) matchStringAt(s string, startAt int) (bool, error) {
 	}
 
 	origin := re.stringSearchOrigin(s, -1, runeStart)
-	m, err := runner.scan(input, nil, origin, runeStart, -1, true, re.MatchTimeout)
+	m, err := runner.scan(input, nil, origin, runeStart, -1, scanBounds, re.MatchTimeout)
 	if err != nil {
 		return false, err
 	}
@@ -472,14 +517,15 @@ func (re *Regexp) matchStringAt(s string, startAt int) (bool, error) {
 // MatchRunes return true if the runes matches the regex
 // error will be set if a timeout occurs
 func (re *Regexp) MatchRunes(r []rune) (bool, error) {
-	m, err := re.run(true, -1, -1, r, nil)
+	m, err := re.run(scanBounds, -1, r)
 	if err != nil {
 		return false, err
 	}
 	return m != nil, nil
 }
 
-// GetGroupNames Returns the set of strings used to name capturing groups in the expression.
+// GetGroupNames returns the capture-group names in group-number order.
+// Duplicate ECMAScript names appear once for each group with that name.
 func (re *Regexp) GetGroupNames() []string {
 	var result []string
 
@@ -545,10 +591,27 @@ func (re *Regexp) GroupNameFromNumber(i int) string {
 	return ""
 }
 
+// groupNameFromSlot returns the name of the group stored in capture slot i.
+// The slot differs from the group number when explicit numbers leave gaps.
+func (re *Regexp) groupNameFromSlot(i int) string {
+	if re.caps == nil {
+		return re.GroupNameFromNumber(i)
+	}
+
+	if i >= 0 && i < len(re.capslist) {
+		return re.capslist[i]
+	}
+
+	return ""
+}
+
 // GroupNumberFromName returns a group number that corresponds to a group name.
 // Returns -1 if the name is not a recognized group name. Numbered groups
 // automatically get a group name that is the decimal string equivalent of its
 // number, except in ECMAScript mode where unnamed groups have no name.
+// For a name shared by multiple ECMAScript groups, it returns the number of
+// the first declaration, which may differ from the group selected by GroupByName.
+// This first-declaration lookup is regexp2's API policy.
 func (re *Regexp) GroupNumberFromName(name string) int {
 	// look up name if we have a hashtable of names
 	if re.capnames != nil {
@@ -559,22 +622,10 @@ func (re *Regexp) GroupNumberFromName(name string) int {
 		return -1
 	}
 
-	// convert to an int if it looks like a number
-	result := 0
-	for i := 0; i < len(name); i++ {
-		ch := name[i]
-
-		if ch > '9' || ch < '0' {
-			return -1
-		}
-
-		result *= 10
-		result += int(ch - '0')
-	}
-
-	// return int if it's in range
-	if result >= 0 && result < re.capsize {
-		return result
+	// Parse the decimal name without allowing empty input or integer overflow.
+	result, err := strconv.ParseUint(name, 10, 64)
+	if err == nil && result < uint64(re.capsize) {
+		return int(result)
 	}
 
 	return -1
@@ -595,6 +646,53 @@ func (re *Regexp) UnmarshalText(text []byte) error {
 	}
 	*re = *newRE
 	return nil
+}
+
+// initCaptureNames builds immutable duplicate-name mappings during construction,
+// before the compiled or registered regexp is shared.
+func (re *Regexp) initCaptureNames() {
+	if re.options&ECMAScript != 0 {
+		for slot, name := range re.capslist {
+			if name == "" {
+				continue
+			}
+			firstNumber, ok := re.capnames[name]
+			if !ok {
+				continue
+			}
+			first := firstNumber
+			if re.caps != nil {
+				first = re.caps[firstNumber]
+			}
+			if slot != first {
+				if re.duplicateCapnames == nil {
+					re.duplicateCapnames = make(map[string][]int)
+				}
+				if re.duplicateCapnames[name] == nil {
+					re.duplicateCapnames[name] = []int{first}
+				}
+				re.duplicateCapnames[name] = append(re.duplicateCapnames[name], slot)
+			}
+		}
+		// Replacements use public numbers; name lookup uses dense slots.
+		// Both are immutable after initialization and can share storage when
+		// the public numbering is already dense.
+		re.duplicateGroupNumbers = re.duplicateCapnames
+		if len(re.duplicateCapnames) > 0 && re.caps != nil {
+			numbers := make([]int, re.capsize)
+			for number, slot := range re.caps {
+				numbers[slot] = number
+			}
+			re.duplicateGroupNumbers = make(map[string][]int, len(re.duplicateCapnames))
+			for name, slots := range re.duplicateCapnames {
+				groups := make([]int, len(slots))
+				for i, slot := range slots {
+					groups[i] = numbers[slot]
+				}
+				re.duplicateGroupNumbers[name] = groups
+			}
+		}
+	}
 }
 
 func (re *Regexp) initCaches() {

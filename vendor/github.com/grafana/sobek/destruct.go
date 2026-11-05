@@ -74,6 +74,11 @@ func (d *destructKeyedSource) getOwnPropStr(u unistring.String) Value {
 	return d.w().getOwnPropStr(u)
 }
 
+func (d *destructKeyedSource) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	d.recordKey(stringValueFromRaw(name))
+	return d.w().hasAndGetStr(name, receiver)
+}
+
 func (d *destructKeyedSource) getOwnPropIdx(v valueInt) Value {
 	d.recordKey(v.toString())
 	return d.w().getOwnPropIdx(v)

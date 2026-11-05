@@ -48,6 +48,12 @@ func (o *objectGoSlice) _getIdx(idx int) Value {
 	return o.val.runtime.ToValue((*o.data)[idx])
 }
 
+// 'length' is recomputed by getOwnPropStr (updateLen), so it must be consulted rather than
+// reading the shared (possibly stale) lengthProp directly from the values map.
+func (o *objectGoSlice) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	return o.hasAndGetOwnStr(name, o.getOwnPropStr(name), receiver)
+}
+
 func (o *objectGoSlice) getStr(name unistring.String, receiver Value) Value {
 	var ownProp Value
 	if idx := strToGoIdx(name); idx >= 0 && idx < len(*o.data) {
