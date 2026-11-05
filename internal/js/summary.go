@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/internal/lib/summary"
+	machinereadable "go.k6.io/k6/v2/internal/lib/summary/machinereadable"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
@@ -178,6 +179,27 @@ func summarizeMetricsToObject(data *lib.LegacySummary, options lib.Options, setu
 	m["setup_data"] = setupDataI
 
 	return m
+}
+
+// machineReadableSummaryToObject preserves JSON field names through the JS runtime.
+func machineReadableSummaryToObject(v machinereadable.Summary) (map[string]any, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return nil, err
+	}
+
+	// TODO: Remove the snake_case aliases in v3.
+	if metadata, ok := decoded["metadata"].(map[string]any); ok {
+		metadata["generated_at"] = metadata["generatedAt"]
+		metadata["k6_version"] = metadata["k6Version"]
+	}
+
+	return decoded, nil
 }
 
 func exportGroup(group *lib.Group) map[string]any {
