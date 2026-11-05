@@ -74,3 +74,74 @@ func TestLifecycleEventUnmarshalText(t *testing.T) {
 				`must be one of: load, domcontentloaded, networkidle`)
 	})
 }
+
+func TestLifecycleEventMarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("load", func(t *testing.T) {
+		t.Parallel()
+
+		evt := LifecycleEventLoad
+		m, err := evt.MarshalJSON()
+		require.NoError(t, err)
+		assert.Equal(t, []byte(`"load"`), m)
+	})
+
+	t.Run("domcontentloaded", func(t *testing.T) {
+		t.Parallel()
+
+		evt := LifecycleEventDOMContentLoad
+		m, err := evt.MarshalJSON()
+		require.NoError(t, err)
+		assert.Equal(t, []byte(`"domcontentloaded"`), m)
+	})
+
+	t.Run("networkidle", func(t *testing.T) {
+		t.Parallel()
+
+		evt := LifecycleEventNetworkIdle
+		m, err := evt.MarshalJSON()
+		require.NoError(t, err)
+		assert.Equal(t, []byte(`"networkidle"`), m)
+	})
+}
+
+func TestLifecycleEventUnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("load", func(t *testing.T) {
+		t.Parallel()
+
+		var evt LifecycleEvent
+		err := evt.UnmarshalJSON([]byte(`"load"`))
+		require.NoError(t, err)
+		assert.Equal(t, LifecycleEventLoad, evt)
+	})
+
+	t.Run("domcontentloaded", func(t *testing.T) {
+		t.Parallel()
+
+		var evt LifecycleEvent
+		err := evt.UnmarshalJSON([]byte(`"domcontentloaded"`))
+		require.NoError(t, err)
+		assert.Equal(t, LifecycleEventDOMContentLoad, evt)
+	})
+
+	t.Run("networkidle", func(t *testing.T) {
+		t.Parallel()
+
+		var evt LifecycleEvent
+		err := evt.UnmarshalJSON([]byte(`"networkidle"`))
+		require.NoError(t, err)
+		assert.Equal(t, LifecycleEventNetworkIdle, evt)
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		t.Parallel()
+
+		var evt LifecycleEvent
+		err := evt.UnmarshalJSON([]byte(`load`))
+
+		require.Error(t, err)
+	})
+}
