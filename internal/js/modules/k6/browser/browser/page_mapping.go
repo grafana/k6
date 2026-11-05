@@ -793,6 +793,7 @@ type pageOnEvent struct {
 	// returns nil and the caller (e.g. frame_session) falls back to
 	// auto-dismiss. Nil means wait indefinitely (until ctx cancellation).
 	waitTimeout func() time.Duration
+	release     func(event common.PageEvent) <-chan struct{}
 }
 
 // mapPageOn enables using various page.on event handlers with the page.on method.
@@ -805,7 +806,10 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageEventName, sobek.Cal
 
 		pageEvents := map[common.PageEventName]pageOnEvent{
 			common.PageEventConsole:         {mapp: mapConsoleMessage},
-			common.PageEventDialog:          {mapp: mapDialog, wait: true, waitTimeout: p.Timeout, propagateErr: true},
+			common.PageEventDialog: {
+				mapp: mapDialog, wait: true, waitTimeout: p.Timeout, propagateErr: true,
+				release: func(event common.PageEvent) <-chan struct{} { return event.Dialog.Done() },
+			},
 			common.PageEventMetric:          {mapp: mapMetricEvent, wait: true, propagateErr: true},
 			common.PageEventRequest:         {mapp: mapRequestEvent},
 			common.PageEventResponse:        {mapp: mapResponseEvent},
@@ -853,7 +857,9 @@ func runPageOnHandler(
 	// including any asynchronous work if the handler is async and
 	// returns a Promise. Without this, async handlers that defer
 	// dialog.accept/dismiss past the first await would race against
-	// the auto-dismiss fallback in frame_session.
+	// the auto-dismiss fallback in frame_session. If the event provides
+	// a release channel (e.g. the dialog was accepted or dismissed), stop
+	// blocking once it closes so the rest of the handler can use the page.
 	result := make(chan error, 1)
 	tq.Queue(func() error {
 		restore := captured.Enter()
@@ -886,9 +892,15 @@ func runPageOnHandler(
 			timeoutCh = timer.C
 		}
 	}
+	var releaseCh <-chan struct{}
+	if pageEvent.release != nil {
+		releaseCh = pageEvent.release(event)
+	}
 	select {
 	case err := <-result:
 		return err
+	case <-releaseCh:
+		return nil
 	case <-timeoutCh:
 		vu.State().Logger.Warnf(
 			"page.on('%s') handler did not settle within %s, falling back to auto-dismiss",

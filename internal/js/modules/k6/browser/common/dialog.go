@@ -20,6 +20,9 @@ type Dialog struct {
 	mu           sync.Mutex
 	claimed      bool
 	handled      bool
+	settled      bool
+	doneOnce     sync.Once
+	done         chan struct{}
 	dialogType   string
 	message      string
 	defaultValue string
@@ -66,6 +69,16 @@ func (d *Dialog) Claimed() bool {
 	return d.claimed
 }
 
+// Done returns a channel that is closed once an accept or dismiss attempt has finished.
+func (d *Dialog) Done() <-chan struct{} {
+	return d.doneCh()
+}
+
+func (d *Dialog) doneCh() chan struct{} {
+	d.doneOnce.Do(func() { d.done = make(chan struct{}) })
+	return d.done
+}
+
 func (d *Dialog) Accept(promptText ...string) error {
 	return d.handle(true, promptText)
 }
@@ -87,6 +100,10 @@ func (d *Dialog) handle(accept bool, promptText []string) error {
 	err := action.Do(cdp.WithExecutor(d.ctx, d.session))
 	if err == nil {
 		d.handled = true
+	}
+	if !d.settled {
+		d.settled = true
+		close(d.doneCh())
 	}
 	return err
 }

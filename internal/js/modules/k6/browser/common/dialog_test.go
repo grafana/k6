@@ -237,3 +237,45 @@ func TestDialogDismissPropagatesError(t *testing.T) {
 	assert.Contains(t, err.Error(), "cdp error")
 	assert.False(t, d.handled)
 }
+
+func TestDialogDoneClosesAfterAccept(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	d := newTestDialog(ctx, ms)
+
+	select {
+	case <-d.Done():
+		t.Fatal("Done closed before the dialog was handled")
+	default:
+	}
+
+	require.NoError(t, d.Accept())
+	<-d.Done()
+	require.ErrorIs(t, d.Dismiss(), ErrDialogAlreadyHandled)
+}
+
+func TestDialogDoneClosesAfterFailedDismiss(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	ms := newMockSession(ctx)
+	ms.err = errors.New("cdp error")
+	d := newTestDialog(ctx, ms)
+
+	require.Error(t, d.Dismiss())
+	<-d.Done()
+	assert.False(t, d.Handled())
+
+	ms.err = nil
+	require.NoError(t, d.Dismiss())
+	assert.True(t, d.Handled())
+}
+
+func TestDialogDoneOnZeroValue(t *testing.T) {
+	t.Parallel()
+
+	d := &Dialog{}
+	assert.NotNil(t, d.Done())
+}

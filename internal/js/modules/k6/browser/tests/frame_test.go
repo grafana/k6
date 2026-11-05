@@ -217,6 +217,81 @@ func TestPageOnDialogZeroTimeoutWaitsForHandler(t *testing.T) {
 	assert.Equal(t, "confirm accepted", got.Result().String())
 }
 
+func TestPageOnDialogPageActionsAfterSettle(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		action string
+	}{
+		{
+			name:   "reload",
+			action: `await page.reload({ timeout: 2000 });`,
+		},
+		{
+			name: "waitForNavigation",
+			action: `await Promise.all([
+				page.waitForNavigation({ timeout: 2000 }),
+				page.evaluate(() => window.location.reload()),
+			]);`,
+		},
+		{
+			name:   "close",
+			action: `await page.close();`,
+		},
+		{
+			name: "nested_dialog",
+			action: `nested = true;
+				await page.evaluate(() => alert('nested'));`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
+
+			gv, err := tb.vu.RunAsync(t, `
+				const page = await browser.newPage();
+				page.setDefaultTimeout(10000);
+				let nested = false;
+				let finish;
+				const finished = new Promise((resolve) => { finish = resolve; });
+				page.on('dialog', async (dialog) => {
+					if (dialog.message() === 'nested') {
+						await dialog.accept();
+						return;
+					}
+					await dialog.accept();
+					%s
+					finish('done');
+				});
+				try {
+					await page.goto(%q, { waitUntil: 'networkidle' });
+					await page.evaluate(() => { setTimeout(() => alert('first'), 0); });
+					return await Promise.race([
+						finished,
+						new Promise((_, reject) => setTimeout(() => reject(new Error('handler stuck')), 3000)),
+					]);
+				} finally {
+					if (!page.isClosed()) {
+						await page.close();
+					}
+				}
+			`, tt.action, tb.staticURL("dialog.html"))
+			require.NoError(t, err)
+
+			got := k6test.ToPromise(t, gv)
+			require.Equal(t, sobek.PromiseStateFulfilled, got.State(), "%v", got.Result())
+			assert.Equal(t, "done", got.Result().String())
+		})
+	}
+}
+
 func TestPageOnDialogAsyncHandlerErrorFailsIteration(t *testing.T) {
 	t.Parallel()
 
