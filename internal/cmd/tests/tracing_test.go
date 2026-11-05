@@ -141,6 +141,55 @@ func TestTracesOutputExportsRunHierarchy(t *testing.T) {
 	}
 }
 
+// TestTracesOutputHTTPRequestSpans checks the wiring of the HTTP request spans in a test run:
+// they are children of their iteration, and the server receives their trace context. The span
+// contents are tested in lib/netext/httpext.
+func TestTracesOutputHTTPRequestSpans(t *testing.T) {
+	t.Parallel()
+
+	var mu sync.Mutex
+	var traceparents []string
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		traceparents = append(traceparents, r.Header.Get("traceparent"))
+	}))
+	t.Cleanup(srv.Close)
+
+	script := fmt.Sprintf(`
+		import http from 'k6/http';
+		export const options = { vus: 1, iterations: 1 };
+		export default async function () {
+			http.get(%q);
+			http.batch([[ 'GET', %q ], [ 'GET', %q ]]);
+			await http.asyncRequest('GET', %q);
+		}
+	`, srv.URL, srv.URL, srv.URL, srv.URL)
+
+	collector, endpoint := newOTLPCollector(t)
+	ts := getSingleFileTestState(t, script, []string{nativeTracingFlag, "--traces-output=otel=" + endpoint}, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	runs := collector.byName("k6.run")
+	iterations := collector.byName("iteration")
+	requests := collector.byName("GET")
+	require.Len(t, runs, 1)
+	require.Len(t, iterations, 1)
+	require.Len(t, requests, 4)
+
+	var wantTraceparents []string
+	for _, s := range requests {
+		assert.Equal(t, runs[0].GetTraceId(), s.GetTraceId())
+		assert.Equal(t, iterations[0].GetSpanId(), s.GetParentSpanId(), "requests are children of the iteration")
+		wantTraceparents = append(wantTraceparents,
+			fmt.Sprintf("00-%x-%x-01", s.GetTraceId(), s.GetSpanId()))
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.ElementsMatch(t, wantTraceparents, traceparents)
+}
+
 func TestTracesOutputRecordsFailures(t *testing.T) {
 	t.Parallel()
 
