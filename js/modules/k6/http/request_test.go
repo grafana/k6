@@ -2358,6 +2358,92 @@ func TestDigestAuthWithBody(t *testing.T) {
 	assertRequestMetricsEmitted(t, sampleContainers[1:2], "POST", urlRaw, 200, "")
 }
 
+func TestHTTPDebugRedaction(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		option     string
+		redacted   bool
+		bodyDumped bool
+	}{
+		{option: "headers"},
+		{option: "full", bodyDumped: true},
+		{option: "headers", redacted: true},
+		{option: "full", redacted: true, bodyDumped: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s/redact=%t", tt.option, tt.redacted), func(t *testing.T) {
+			t.Parallel()
+			ts := newTestCase(t)
+			tb := ts.tb
+			rt := ts.runtime.VU.Runtime()
+			state := ts.runtime.VU.State()
+
+			state.Options.Throw = null.BoolFrom(true)
+			state.Options.HTTPDebug = null.StringFrom(tt.option)
+			state.Options.HTTPDebugRedact = null.BoolFrom(tt.redacted)
+			cookieJar, err := cookiejar.New(nil)
+			require.NoError(t, err)
+			state.CookieJar = cookieJar
+
+			tb.Mux.HandleFunc("/debug-redaction", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Add("Set-Cookie", "sid=server-session; Path=/; HttpOnly")
+				_, _ = w.Write([]byte("response body"))
+			}))
+			tb.Mux.HandleFunc("/digest-redaction/{qop}/{user}/{password}", httpbin.New().DigestAuth)
+
+			_, err = rt.RunString(tb.Replacer.Replace(`
+				http.cookieJar().set("HTTPBIN_URL", "jar-cookie", "jar-secret");
+				http.post("HTTPBIN_URL/debug-redaction", "request body", {
+					headers: { "Authorization": "Bearer bearer-secret", "X-Api-Key": "api-key-secret" },
+				});
+				http.get("http://user:basic-secret@HTTPBIN_IP:HTTPBIN_PORT/debug-redaction");
+				var res = http.get("http://user:digest-secret@HTTPBIN_IP:HTTPBIN_PORT/digest-redaction/auth/user/digest-secret",
+					{ auth: "digest" });
+				if (res.status !== 200) { throw new Error("wrong digest status: " + res.status); }
+			`))
+			require.NoError(t, err)
+
+			out := strings.Join(ts.hook.Lines(), "\n")
+
+			secrets := []string{
+				"bearer-secret", "api-key-secret", "jar-secret", "server-session",
+				"dXNlcjpiYXNpYy1zZWNyZXQ=", // base64 of user:basic-secret
+			}
+			masked := []string{
+				"Authorization: Bearer ***REDACTED***",
+				"Authorization: Basic ***REDACTED***",
+				"Authorization: Digest ***REDACTED***",
+				"X-Api-Key: ***REDACTED***",
+				"jar-cookie=***REDACTED***",
+				"Set-Cookie: sid=***REDACTED***; Path=/; HttpOnly",
+			}
+			for _, secret := range secrets {
+				if tt.redacted {
+					assert.NotContains(t, out, secret)
+				} else {
+					assert.Contains(t, out, secret)
+				}
+			}
+			for _, m := range masked {
+				if tt.redacted {
+					assert.Contains(t, out, m)
+				} else {
+					assert.NotContains(t, out, m)
+				}
+			}
+			if tt.bodyDumped {
+				assert.Contains(t, out, "request body")
+				assert.Contains(t, out, "response body")
+			} else {
+				assert.NotContains(t, out, "request body")
+				assert.NotContains(t, out, "response body")
+			}
+		})
+	}
+}
+
 // A server that answers a digest-authenticated request with a 401 carrying no
 // digest challenge (e.g. "Negotiate, NTLM", as IIS commonly sends) must not
 // crash k6 like the previous digest library did (index out of range panic), and

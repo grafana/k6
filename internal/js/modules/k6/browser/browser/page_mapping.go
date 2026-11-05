@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -766,7 +767,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
-			var mehs []mapping
+			mehs := make([]mapping, 0, len(ehs))
 			for _, eh := range ehs {
 				ehm := mapElementHandle(vu, eh)
 				mehs = append(mehs, ehm)
@@ -964,9 +965,14 @@ func parseStringOrRegex(v sobek.Value, doubleQuote bool) string {
 	switch v.ExportType() {
 	case reflect.TypeFor[string](): // text values require quotes
 		if doubleQuote {
-			a = `"` + strings.ReplaceAll(v.String(), `"`, `\"`) + `"`
+			// The injected script reads double-quoted values with JSON.parse.
+			var b strings.Builder
+			enc := json.NewEncoder(&b)
+			enc.SetEscapeHTML(false)
+			_ = enc.Encode(v.String()) //nolint:errchkjson // encoding a string cannot fail
+			a = strings.TrimSuffix(b.String(), "\n")
 		} else {
-			a = `'` + strings.ReplaceAll(v.String(), `'`, `\'`) + `'`
+			a = `'` + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(v.String()) + `'`
 		}
 	case reflect.TypeFor[map[string]any](): // JS RegExp
 		a = v.String() // No quotes

@@ -192,6 +192,13 @@ func (o *objectGoReflect) init() {
 	}
 }
 
+func (o *objectGoReflect) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	if v := o._get(name.String()); v != nil {
+		return v, true
+	}
+	return o.baseObject.hasAndGetStr(name, receiver)
+}
+
 func (o *objectGoReflect) getStr(name unistring.String, receiver Value) Value {
 	if v := o._get(name.String()); v != nil {
 		return v

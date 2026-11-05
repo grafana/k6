@@ -351,9 +351,9 @@ func (e *compiledIdentifierExpr) emitGetter(putOnStack bool) {
 		}
 	} else {
 		if b != nil {
-			b.emitGetVar(false)
+			b.emitGetVar(false, e.c.scope.strict)
 		} else {
-			e.c.emit(loadDynamic(e.name))
+			e.c.emit(loadDynamic{name: e.name, strict: e.c.scope.strict})
 		}
 		if !putOnStack {
 			e.c.emit(pop)
@@ -368,9 +368,9 @@ func (e *compiledIdentifierExpr) emitGetterOrRef() {
 		b.emitGet()
 	} else {
 		if b != nil {
-			b.emitGetVar(false)
+			b.emitGetVar(false, e.c.scope.strict)
 		} else {
-			e.c.emit(loadDynamicRef(e.name))
+			e.c.emit(loadDynamicRef{name: e.name, strict: e.c.scope.strict})
 		}
 	}
 }
@@ -383,9 +383,9 @@ func (e *compiledIdentifierExpr) emitGetterAndCallee() {
 		b.emitGet()
 	} else {
 		if b != nil {
-			b.emitGetVar(true)
+			b.emitGetVar(true, e.c.scope.strict)
 		} else {
-			e.c.emit(loadDynamicCallee(e.name))
+			e.c.emit(loadDynamicCallee{name: e.name, strict: e.c.scope.strict})
 		}
 	}
 }
@@ -495,25 +495,21 @@ func (e *compiledIdentifierExpr) emitDelete(putOnStack bool) {
 		e.c.throwSyntaxError(e.offset, "Delete of an unqualified identifier in strict mode")
 		panic("Unreachable")
 	}
-	if b, noDynamics := e.c.scope.lookupName(e.name); noDynamics {
-		if b == nil {
-			e.addSrcMap()
-			e.c.emit(deleteGlobal(e.name))
-			if !putOnStack {
-				e.c.emit(pop)
-			}
-			return
+	b, noDynamics := e.c.scope.lookupName(e.name)
+	if !noDynamics {
+		e.addSrcMap()
+		if b != nil {
+			// If a static binding is found but dynamic scopes exist in between, mark the access point so that
+			// finaliseVarAlloc() updates deleteVar.level and deleteVar.exec stops scanning after that number of levels.
+			b.markAccessPoint()
 		}
-	} else {
-		if b == nil {
-			e.addSrcMap()
-			e.c.emit(deleteVar(e.name))
-			if !putOnStack {
-				e.c.emit(pop)
-			}
-			return
+		e.c.emit(&deleteVar{name: e.name})
+		if !putOnStack {
+			e.c.emit(pop)
 		}
+		return
 	}
+	// A statically bound name with no dynamic scopes in between is not deletable.
 	if putOnStack {
 		e.addSrcMap()
 		e.c.emitLiteralValue(valueFalse)
@@ -2426,10 +2422,10 @@ func (c *compiler) compileSequenceExpression(v *ast.SequenceExpression) compiled
 
 func (c *compiler) emitThrow(v Value) {
 	if o, ok := v.(*Object); ok {
-		t := nilSafe(o.self.getStr("name", nil)).toString().String()
+		t := unistring.String(nilSafe(o.self.getStr("name", nil)).toString().String())
 		switch t {
 		case "TypeError", "RangeError":
-			c.emit(loadDynamic(t))
+			c.emit(loadDynamic{name: t})
 			msg := o.self.getStr("message", nil)
 			if msg != nil {
 				c.emitLiteralValue(msg)
@@ -2696,7 +2692,9 @@ func (e *compiledLogicalAnd) emitGetter(putOnStack bool) {
 	if e.left.constant() {
 		if v, ex := e.c.evalConst(e.left); ex == nil {
 			if !v.ToBoolean() {
-				e.c.emitLiteralValue(v)
+				if putOnStack {
+					e.c.emitLiteralValue(v)
+				}
 			} else {
 				e.c.emitExpr(e.right, putOnStack)
 			}
@@ -3203,9 +3201,13 @@ func (c *compiler) compileIdentifierExpression(v *ast.Identifier) compiledExpr {
 }
 
 func (c *compiler) compileNumberLiteral(v *ast.NumberLiteral) compiledExpr {
-	if c.scope.strict && len(v.Literal) > 1 && v.Literal[0] == '0' && v.Literal[1] <= '7' && v.Literal[1] >= '0' {
-		c.throwSyntaxError(int(v.Idx)-1, "Octal literals are not allowed in strict mode")
-		panic("Unreachable")
+	if c.scope.strict {
+		switch v.Kind {
+		case ast.NumberLiteralLegacyOctal:
+			c.throwSyntaxError(int(v.Idx)-1, "Octal literals are not allowed in strict mode")
+		case ast.NumberLiteralNonOctalDecimal:
+			c.throwSyntaxError(int(v.Idx)-1, "Decimals with leading zeros are not allowed in strict mode")
+		}
 	}
 	var val Value
 	switch num := v.Value.(type) {
@@ -3227,6 +3229,9 @@ func (c *compiler) compileNumberLiteral(v *ast.NumberLiteral) compiledExpr {
 }
 
 func (c *compiler) compileStringLiteral(v *ast.StringLiteral) compiledExpr {
+	if v.Sloppy && c.scope.strict {
+		c.throwSyntaxError(int(v.Idx)-1, "Octal escape sequences are not allowed in strict mode")
+	}
 	r := &compiledLiteral{
 		val: stringValueFromRaw(v.Value),
 	}

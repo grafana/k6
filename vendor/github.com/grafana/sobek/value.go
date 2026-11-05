@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"reflect"
 	"strconv"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/grafana/sobek/ftoa"
@@ -117,7 +118,8 @@ type valueUndefined struct {
 // Well-known Symbols can be accessed using Sym* package variables (SymIterator, etc...)
 // Symbols can be shared by multiple Runtimes.
 type Symbol struct {
-	desc String
+	desc        String
+	weakMapRefs atomic.Pointer[weakMapRefs]
 }
 
 type valueUnresolved struct {
@@ -807,6 +809,13 @@ func (o *Object) Get(name string) Value {
 	return o.self.getStr(unistring.NewFromString(name), nil)
 }
 
+// GetIdx returns an object's property by a numeric key. This is mostly useful if the object is an Array to avoid
+// converting the index into a string.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
+func (o *Object) GetIdx(idx int64) Value {
+	return o.self.getIdx(valueInt(idx), nil)
+}
+
 // GetSymbol returns the value of a symbol property. Use one of the Sym* values for well-known
 // symbols (such as SymIterator, SymToStringTag, etc...).
 // This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
@@ -1131,6 +1140,18 @@ func (s *Symbol) hash(*maphash.Hash) uint64 {
 	// this may no longer provide sufficient dispersion. The alternative, however, is a globally
 	// synchronised random generator/hasher/sequencer and I don't want to go down that route just yet.
 	return uint64(uintptr(unsafe.Pointer(s)))
+}
+
+func (s *Symbol) getWeakMapRefs(create bool) *weakMapRefs {
+	refs := s.weakMapRefs.Load()
+	if refs == nil && create {
+		// Symbols may be shared between Runtimes running concurrently
+		refs = newWeakMapRefs()
+		if !s.weakMapRefs.CompareAndSwap(nil, refs) {
+			refs = s.weakMapRefs.Load()
+		}
+	}
+	return refs
 }
 
 func exportValue(v Value, ctx *objectExportCtx) interface{} {

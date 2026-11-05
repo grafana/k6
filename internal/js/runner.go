@@ -19,6 +19,7 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/v2/errext"
@@ -27,6 +28,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/eventloop"
 	"go.k6.io/k6/v2/internal/lib/consts"
 	"go.k6.io/k6/v2/internal/lib/summary"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/internal/loader"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
@@ -257,10 +259,13 @@ func (r *Runner) newVU(
 		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 		FeatureFlags:   r.preInitState.FeatureFlags,
-		TracerProvider: r.preInitState.TracerProvider,
 		Usage:          r.preInitState.Usage,
 		TestStatus:     r.preInitState.TestStatus,
 	}
+	if r.preInitState.TracerProvider != nil {
+		vu.state.TracerProvider = r.preInitState.TracerProvider
+	}
+	vu.tracer = k6trace.Tracer(r.preInitState.TracerProvider, r.preInitState.FeatureFlags)
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
 
@@ -512,9 +517,15 @@ func prepareHandleWrapperArgs(
 	noColor, enableColors, newMachineReadableSummary bool,
 	callbackResult, handleSummaryData, summaryData sobek.Value,
 ) []sobek.Value {
+	// A nil slice is exported as undefined to the JS runtime, which would override the defaults.
+	summaryTrendStats := vu.Runner.Bundle.Options.SummaryTrendStats
+	if summaryTrendStats == nil {
+		summaryTrendStats = []string{}
+	}
+
 	options := map[string]any{
 		// TODO: improve when we can easily export all option values, including defaults?
-		"summaryTrendStats":         vu.Runner.Bundle.Options.SummaryTrendStats,
+		"summaryTrendStats":         summaryTrendStats,
 		"summaryTimeUnit":           vu.Runner.Bundle.Options.SummaryTimeUnit.String,
 		"noColor":                   noColor, // TODO: move to the (runtime) options
 		"enableColors":              enableColors,
@@ -688,25 +699,36 @@ func (r *Runner) runPart(
 		return nil, deadlineError
 	}
 
+	if errors.Is(err, errPromiseNotSettled) {
+		return nil, fmt.Errorf("%s() %w", name, err)
+	}
+
 	return v, err
 }
 
 //nolint:gochecknoglobals
 var sobekPromiseType = reflect.TypeFor[*sobek.Promise]()
 
-// unPromisify gets the result of v if it is a promise, otherwise returns v
-func unPromisify(v sobek.Value) sobek.Value {
-	if !common.IsNullish(v) {
-		if v.ExportType() == sobekPromiseType {
-			p, ok := v.Export().(*sobek.Promise)
-			if !ok {
-				panic("Something that was promise did not export to a promise; this shouldn't happen")
-			}
-			return p.Result()
-		}
-	}
+// errPromiseNotSettled is returned by unPromisify when the function's promise is still pending after
+// the event loop has run out of work, so nothing is left that could ever settle it.
+var errPromiseNotSettled = errors.New(
+	"did not finish: it is still awaiting an operation that never completed")
 
-	return v
+// unPromisify gets the result of v if it is a promise, otherwise returns v. It returns
+// errPromiseNotSettled if v is a promise that is still pending, as its result will never be
+// available. Callers only call it once the event loop has stopped.
+func unPromisify(v sobek.Value) (sobek.Value, error) {
+	if common.IsNullish(v) || v.ExportType() != sobekPromiseType {
+		return v, nil
+	}
+	p, ok := v.Export().(*sobek.Promise)
+	if !ok {
+		panic("Something that was promise did not export to a promise; this shouldn't happen")
+	}
+	if p.State() == sobek.PromiseStatePending {
+		return nil, errPromiseNotSettled
+	}
+	return p.Result(), nil
 }
 
 // getTimeoutFor returns the timeout duration for given special script function.
@@ -744,6 +766,9 @@ type VU struct {
 	setupData sobek.Value
 
 	state *lib.State
+	// tracer creates the VU and iteration spans. It is nil when tracing, or the
+	// native-tracing feature flag, is disabled.
+	tracer oteltrace.Tracer
 	// count of iterations executed by this VU in each scenario
 	scenarioIter map[string]uint64
 }
@@ -759,6 +784,8 @@ type ActiveVU struct {
 	*VU
 	*lib.VUActivationParams
 	busy chan struct{}
+	// vuCtx is the RunContext of this activation (from VUActivationParams above), but with a VU span.
+	vuCtx context.Context
 
 	scenarioName              string
 	getNextIterationCounters  func() (uint64, uint64)
@@ -807,7 +834,10 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 	})
 
 	ctx := params.RunContext
-	u.moduleVUImpl.ctx = ctx
+	vuCtx, vuSpan := k6trace.StartVU(ctx, u.tracer, k6trace.VUInfo{
+		ID: u.ID, IDGlobal: u.IDGlobal, Scenario: params.Scenario,
+	})
+	u.moduleVUImpl.ctx = vuCtx
 
 	u.state.GetScenarioVUIter = func() uint64 {
 		return u.scenarioIter[params.Scenario]
@@ -821,6 +851,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		scIterLocal:              ^uint64(0),
 		scIterGlobal:             ^uint64(0),
 		getNextIterationCounters: params.GetNextIterationCounters,
+		vuCtx:                    vuCtx,
 	}
 
 	u.state.GetScenarioLocalVUIter = func() uint64 {
@@ -837,6 +868,9 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		// Wait for the VU to stop running, if it was, and prevent it from
 		// running again for this activation
 		avu.busy <- struct{}{}
+
+		// The VU span ends once the last iteration of this activation has ended.
+		vuSpan.End()
 
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback(u)
@@ -858,18 +892,8 @@ func (u *ActiveVU) RunOnce() error {
 		<-u.busy // unlock deactivation again
 	}()
 
-	// Unmarshall the setupData only the first time for each VU so that VUs are isolated but we
-	// still don't use too much CPU in the middle test
-	if u.setupData == nil {
-		if u.Runner.setupData != nil {
-			var data any
-			if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
-				return fmt.Errorf("error unmarshaling setup data for the iteration from JSON: %w", err)
-			}
-			u.setupData = u.Runtime.ToValue(data)
-		} else {
-			u.setupData = sobek.Undefined()
-		}
+	if err := u.loadSetupData(); err != nil {
+		return err
 	}
 
 	fn := u.getCallableExport(u.Exec)
@@ -883,8 +907,25 @@ func (u *ActiveVU) RunOnce() error {
 		panic(fmt.Errorf("error setting __ITER in Sobek runtime: %w", err))
 	}
 
-	ctx, cancel := context.WithCancel(u.RunContext)
+	ctx, cancel := context.WithCancel(u.vuCtx)
 	defer cancel()
+
+	ctx, iterSpan := k6trace.StartIteration(ctx, u.tracer, u.iterationInfo())
+	// After the iteration, the modules keep its context, which is done, but it carries the
+	// VU span instead of the iteration span, which has ended.
+	afterIterCtx := ctx
+	if u.tracer != nil {
+		afterIterCtx = oteltrace.ContextWithSpan(ctx, oteltrace.SpanFromContext(u.vuCtx))
+	}
+	iterationSpanEnded := false
+	defer func() {
+		// The iteration span is normally ended after IterEnd below, this only ends it
+		// when the iteration panics.
+		if !iterationSpanEnded {
+			iterSpan.End()
+		}
+		u.moduleVUImpl.ctx = afterIterCtx
+	}()
 	u.moduleVUImpl.ctx = ctx
 
 	eventIterData := event.IterData{
@@ -908,6 +949,9 @@ func (u *ActiveVU) RunOnce() error {
 	}
 
 	u.emitAndWaitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})
+	k6trace.EndIteration(iterSpan, err, isInterrupted(isFullIteration, err))
+	iterationSpanEnded = true
+	u.moduleVUImpl.ctx = afterIterCtx
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder
@@ -922,6 +966,53 @@ func (u *ActiveVU) RunOnce() error {
 	}
 
 	return err
+}
+
+// loadSetupData unmarshals the setupData only the first time for each VU so that VUs are
+// isolated but we still don't use too much CPU in the middle test.
+func (u *ActiveVU) loadSetupData() error {
+	if u.setupData != nil {
+		return nil
+	}
+	if u.Runner.setupData == nil {
+		u.setupData = sobek.Undefined()
+		return nil
+	}
+	var data any
+	if err := json.Unmarshal(u.Runner.setupData, &data); err != nil {
+		return fmt.Errorf("error unmarshaling setup data for the iteration from JSON: %w", err)
+	}
+	u.setupData = u.Runtime.ToValue(data)
+	return nil
+}
+
+// isInterrupted reports whether an iteration was interrupted rather than failed: its context
+// was done, e.g. at the end of its scenario, and it didn't fail otherwise, e.g. with an
+// exception thrown right before the interruption. An iteration aborting the test, e.g. with
+// test.abort(), failed.
+func isInterrupted(isFullIteration bool, err error) bool {
+	if _, aborted := errors.AsType[*errext.InterruptError](err); aborted {
+		return false
+	}
+	if isFullIteration {
+		return false
+	}
+	_, runtimeInterrupted := errors.AsType[*sobek.InterruptedError](err)
+	return err == nil || runtimeInterrupted || errors.Is(err, context.Canceled)
+}
+
+// iterationInfo returns the identifiers of the current iteration, attached to its span.
+func (u *ActiveVU) iterationInfo() k6trace.IterationInfo {
+	return k6trace.IterationInfo{
+		Number:                      u.iteration,
+		VUID:                        u.ID,
+		VUIDGlobal:                  u.IDGlobal,
+		VUIterationInScenario:       u.scenarioIter[u.scenarioName],
+		Scenario:                    u.scenarioName,
+		ScenarioIterationInInstance: u.scIterLocal,
+		ScenarioIterationInTest:     u.scIterGlobal,
+		HasScenarioIterationNumbers: u.getNextIterationCounters != nil,
+	}
 }
 
 func (u *ActiveVU) emitAndWaitEvent(evt *event.Event) {
@@ -995,7 +1086,15 @@ func (u *VU) runFn(
 		u.state.Samples <- iterationSamples(startTime, endTime, ctm, builtinMetrics)
 	}
 
-	v = unPromisify(v)
+	v, promiseErr := unPromisify(v)
+	// Only report a pending promise for a full iteration. When the context is done (the scenario
+	// ended, gracefulStop ran out, or the test was interrupted), the event loop stops with work still
+	// queued, so a pending promise is expected and isn't a script bug: without this check every
+	// iteration cut off at the end of a test would get this error. An existing error (an exception,
+	// an interrupt) also explains more than this one.
+	if promiseErr != nil && err == nil && isFullIteration {
+		err = promiseErr
+	}
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }

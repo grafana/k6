@@ -40,6 +40,10 @@ func (e *errorObject) addStackProp() Value {
 	return nil
 }
 
+func (e *errorObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	return e.hasAndGetOwnStr(name, e.getOwnPropStr(name), receiver)
+}
+
 func (e *errorObject) getStr(p unistring.String, receiver Value) Value {
 	return e.getStrWithOwnProp(e.getOwnPropStr(p), p, receiver)
 }

@@ -131,6 +131,11 @@ type proxyHandler interface {
 	getIdx(target *Object, prop valueInt, receiver Value) (Value, bool)
 	getSym(target *Object, prop *Symbol, receiver Value) (Value, bool)
 
+	// hasAndGetStr combines the has and get traps into a single lookup. The third return value
+	// reports whether the handler performed the combined lookup; if false, the caller must
+	// perform the HasProperty and Get steps separately (see proxyObject.hasAndGetStr).
+	hasAndGetStr(target *Object, prop unistring.String, receiver Value) (value Value, exists bool, handled bool)
+
 	setStr(target *Object, prop unistring.String, value Value, receiver Value) (bool, bool)
 	setIdx(target *Object, prop valueInt, value Value, receiver Value) (bool, bool)
 	setSym(target *Object, prop *Symbol, value Value, receiver Value) (bool, bool)
@@ -242,6 +247,12 @@ func (h *jsProxyHandler) getIdx(target *Object, prop valueInt, receiver Value) (
 
 func (h *jsProxyHandler) getSym(target *Object, prop *Symbol, receiver Value) (Value, bool) {
 	return h.proxyCall(proxy_trap_get, target, prop, receiver)
+}
+
+func (h *jsProxyHandler) hasAndGetStr(*Object, unistring.String, Value) (Value, bool, bool) {
+	// There is no combined has+get trap for JS handlers: the HasProperty and Get steps must be
+	// performed as separate trap calls, so report the combined lookup as not handled.
+	return nil, false, false
 }
 
 func (h *jsProxyHandler) setStr(target *Object, prop unistring.String, value Value, receiver Value) (bool, bool) {
@@ -382,7 +393,7 @@ func (p *proxyObject) proxyDefineOwnPropertyPreCheck(trapResult, throw bool) boo
 	return true
 }
 
-func (p *proxyObject) proxyDefineOwnPropertyPostCheck(prop Value, target *Object, descr PropertyDescriptor) {
+func (p *proxyObject) proxyDefineOwnPropertyPostCheck(name unistring.String, getName func() unistring.String, prop Value, target *Object, descr PropertyDescriptor) {
 	targetDesc := propToValueProp(prop)
 	extensibleTarget := target.self.isExtensible()
 	settingConfigFalse := descr.Configurable == FLAG_FALSE
@@ -394,9 +405,7 @@ func (p *proxyObject) proxyDefineOwnPropertyPostCheck(prop Value, target *Object
 			panic(p.val.runtime.NewTypeError())
 		}
 	} else {
-		if !p.__isCompatibleDescriptor(extensibleTarget, &descr, targetDesc) {
-			panic(p.val.runtime.NewTypeError())
-		}
+		p.val.runtime.isCompatiblePropertyDescriptor(name, getName, extensibleTarget, &descr, targetDesc, true)
 		if settingConfigFalse && targetDesc.configurable {
 			panic(p.val.runtime.NewTypeError())
 		}
@@ -414,7 +423,7 @@ func (p *proxyObject) defineOwnPropertyStr(name unistring.String, descr Property
 		if !p.proxyDefineOwnPropertyPreCheck(booleanTrapResult, throw) {
 			return false
 		}
-		p.proxyDefineOwnPropertyPostCheck(target.self.getOwnPropStr(name), target, descr)
+		p.proxyDefineOwnPropertyPostCheck(name, nil, target.self.getOwnPropStr(name), target, descr)
 		return true
 	}
 	return target.self.defineOwnPropertyStr(name, descr, throw)
@@ -426,7 +435,7 @@ func (p *proxyObject) defineOwnPropertyIdx(idx valueInt, descr PropertyDescripto
 		if !p.proxyDefineOwnPropertyPreCheck(booleanTrapResult, throw) {
 			return false
 		}
-		p.proxyDefineOwnPropertyPostCheck(target.self.getOwnPropIdx(idx), target, descr)
+		p.proxyDefineOwnPropertyPostCheck("", func() unistring.String { return idx.string() }, target.self.getOwnPropIdx(idx), target, descr)
 		return true
 	}
 
@@ -439,7 +448,7 @@ func (p *proxyObject) defineOwnPropertySym(s *Symbol, descr PropertyDescriptor, 
 		if !p.proxyDefineOwnPropertyPreCheck(booleanTrapResult, throw) {
 			return false
 		}
-		p.proxyDefineOwnPropertyPostCheck(target.self.getOwnPropSym(s), target, descr)
+		p.proxyDefineOwnPropertyPostCheck("", func() unistring.String { return s.descriptiveString().string() }, target.self.getOwnPropSym(s), target, descr)
 		return true
 	}
 
@@ -456,6 +465,29 @@ func (p *proxyObject) proxyHasChecks(targetProp Value, target *Object, name fmt.
 			panic(p.val.runtime.NewTypeError("'has' on proxy: trap returned falsish for property '%s' but the proxy target is not extensible", name.String()))
 		}
 	}
+}
+
+// Proxy property lookups delegate to traps. If the handler can perform a combined has+get lookup
+// (see proxyHandler.hasAndGetStr) it is used, subject to the same invariant checks as the separate
+// traps; otherwise HasProperty and Get are performed as separate steps in the prescribed order.
+func (p *proxyObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	target := p.target
+	if receiver == nil {
+		receiver = p.val
+	}
+	if v, exists, ok := p.checkHandler().hasAndGetStr(target, name, receiver); ok {
+		targetProp := target.self.getOwnPropStr(name)
+		if !exists {
+			p.proxyHasChecks(targetProp, target, name)
+			return nil, false
+		}
+		p.proxyGetChecks(targetProp, v, name)
+		return v, true
+	}
+	if p.hasPropertyStr(name) {
+		return nilSafe(p.getStr(name, receiver)), true
+	}
+	return nil, false
 }
 
 func (p *proxyObject) hasPropertyStr(name unistring.String) bool {
@@ -506,7 +538,7 @@ func (p *proxyObject) hasOwnPropertySym(s *Symbol) bool {
 	return p.getOwnPropSym(s) != nil
 }
 
-func (p *proxyObject) proxyGetOwnPropertyDescriptor(targetProp Value, target *Object, trapResult Value, name fmt.Stringer) Value {
+func (p *proxyObject) proxyGetOwnPropertyDescriptor(name unistring.String, getName func() unistring.String, targetProp Value, target *Object, trapResult Value) Value {
 	r := p.val.runtime
 	targetDesc := propToValueProp(targetProp)
 	var trapResultObj *Object
@@ -514,6 +546,9 @@ func (p *proxyObject) proxyGetOwnPropertyDescriptor(targetProp Value, target *Ob
 		if obj, ok := trapResult.(*Object); ok {
 			trapResultObj = obj
 		} else {
+			if getName != nil {
+				name = getName()
+			}
 			panic(r.NewTypeError("'getOwnPropertyDescriptor' on proxy: trap returned neither object nor undefined for property '%s'", name.String()))
 		}
 	}
@@ -532,7 +567,7 @@ func (p *proxyObject) proxyGetOwnPropertyDescriptor(targetProp Value, target *Ob
 	extensibleTarget := target.self.isExtensible()
 	resultDesc := r.toPropertyDescriptor(trapResultObj)
 	resultDesc.complete()
-	if !p.__isCompatibleDescriptor(extensibleTarget, &resultDesc, targetDesc) {
+	if !p.val.runtime.isCompatiblePropertyDescriptor(name, getName, extensibleTarget, &resultDesc, targetDesc, false) {
 		panic(r.NewTypeError("'getOwnPropertyDescriptor' on proxy: trap returned descriptor for property '%s' that is incompatible with the existing property in the proxy target", name.String()))
 	}
 
@@ -560,7 +595,7 @@ func (p *proxyObject) proxyGetOwnPropertyDescriptor(targetProp Value, target *Ob
 func (p *proxyObject) getOwnPropStr(name unistring.String) Value {
 	target := p.target
 	if v, ok := p.checkHandler().getOwnPropertyDescriptorStr(target, name); ok {
-		return p.proxyGetOwnPropertyDescriptor(target.self.getOwnPropStr(name), target, v, name)
+		return p.proxyGetOwnPropertyDescriptor(name, nil, target.self.getOwnPropStr(name), target, v)
 	}
 
 	return target.self.getOwnPropStr(name)
@@ -569,7 +604,7 @@ func (p *proxyObject) getOwnPropStr(name unistring.String) Value {
 func (p *proxyObject) getOwnPropIdx(idx valueInt) Value {
 	target := p.target
 	if v, ok := p.checkHandler().getOwnPropertyDescriptorIdx(target, idx); ok {
-		return p.proxyGetOwnPropertyDescriptor(target.self.getOwnPropIdx(idx), target, v, idx)
+		return p.proxyGetOwnPropertyDescriptor("", func() unistring.String { return idx.string() }, target.self.getOwnPropIdx(idx), target, v)
 	}
 
 	return target.self.getOwnPropIdx(idx)
@@ -578,7 +613,7 @@ func (p *proxyObject) getOwnPropIdx(idx valueInt) Value {
 func (p *proxyObject) getOwnPropSym(s *Symbol) Value {
 	target := p.target
 	if v, ok := p.checkHandler().getOwnPropertyDescriptorSym(target, s); ok {
-		return p.proxyGetOwnPropertyDescriptor(target.self.getOwnPropSym(s), target, v, s)
+		return p.proxyGetOwnPropertyDescriptor("", func() unistring.String { return s.descriptiveString().string() }, target.self.getOwnPropSym(s), target, v)
 	}
 
 	return target.self.getOwnPropSym(s)
@@ -907,55 +942,6 @@ func (p *proxyObject) construct(args []Value, newTarget *Object) *Object {
 		return p.val.runtime.toObject(v)
 	}
 	return p.ctor(args, newTarget)
-}
-
-func (p *proxyObject) __isCompatibleDescriptor(extensible bool, desc *PropertyDescriptor, current *valueProperty) bool {
-	if current == nil {
-		return extensible
-	}
-
-	if !current.configurable {
-		if desc.Configurable == FLAG_TRUE {
-			return false
-		}
-
-		if desc.Enumerable != FLAG_NOT_SET && desc.Enumerable.Bool() != current.enumerable {
-			return false
-		}
-
-		if desc.IsGeneric() {
-			return true
-		}
-
-		if desc.IsData() != !current.accessor {
-			return desc.Configurable != FLAG_FALSE
-		}
-
-		if desc.IsData() && !current.accessor {
-			if !current.configurable {
-				if desc.Writable == FLAG_TRUE && !current.writable {
-					return false
-				}
-				if !current.writable {
-					if desc.Value != nil && !desc.Value.SameAs(current.value) {
-						return false
-					}
-				}
-			}
-			return true
-		}
-		if desc.IsAccessor() && current.accessor {
-			if !current.configurable {
-				if desc.Setter != nil && desc.Setter.SameAs(current.setterFunc) {
-					return false
-				}
-				if desc.Getter != nil && desc.Getter.SameAs(current.getterFunc) {
-					return false
-				}
-			}
-		}
-	}
-	return true
 }
 
 func (p *proxyObject) __sameValue(val1, val2 Value) bool {

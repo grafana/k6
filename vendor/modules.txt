@@ -108,7 +108,7 @@ github.com/chromedp/cdproto/webmcp
 # github.com/chromedp/sysutil v1.1.0
 ## explicit; go 1.23
 github.com/chromedp/sysutil
-# github.com/dlclark/regexp2/v2 v2.7.2
+# github.com/dlclark/regexp2/v2 v2.11.0
 ## explicit; go 1.25
 github.com/dlclark/regexp2/v2
 github.com/dlclark/regexp2/v2/helpers
@@ -183,8 +183,8 @@ github.com/grafana/k6-cloud-openapi-client-go/k6
 # github.com/grafana/k6provider v0.5.1
 ## explicit; go 1.26.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20260908083152-4698bc773ae7
-## explicit; go 1.25.0
+# github.com/grafana/sobek v0.0.0-20261031082357-c1e3e36bfbc3
+## explicit; go 1.26.0
 github.com/grafana/sobek
 github.com/grafana/sobek/ast
 github.com/grafana/sobek/file
@@ -237,7 +237,7 @@ github.com/jhump/protoreflect/v2/internal/reparse
 github.com/jhump/protoreflect/v2/internal/sort
 github.com/jhump/protoreflect/v2/protoresolve
 github.com/jhump/protoreflect/v2/sourceinfo
-# github.com/klauspost/compress v1.20.0
+# github.com/klauspost/compress v1.20.3
 ## explicit; go 1.25
 github.com/klauspost/compress
 github.com/klauspost/compress/flate

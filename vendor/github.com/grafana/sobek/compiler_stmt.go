@@ -154,7 +154,12 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement, needResult bool) {
 						c.throwSyntaxError(offset, "Catch variable may not be eval or arguments in strict mode")
 					}
 				}
-				c.scope.bindNameLexical(name, true, offset)
+				b, _ := c.scope.bindNameLexical(name, true, offset)
+				if _, ok := v.Catch.Parameter.(*ast.Identifier); ok {
+					// A simple catch parameter may be redeclared with var in the catch block,
+					// including by a direct eval() (B.3.4).
+					b.isVar = true
+				}
 			})
 			enter := &enterBlock{}
 			c.emit(enter)
@@ -407,12 +412,13 @@ func (c *compiler) compileForInto(into ast.ForInto, needResult bool) (enter *ent
 	return
 }
 
-func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.Expression, body ast.Statement, iter, needResult bool, label unistring.String) {
+func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.Expression, body ast.Statement, iter, async, needResult bool, label unistring.String) {
 	c.block = &block{
 		typ:        blockLoopEnum,
 		outer:      c.block,
 		label:      label,
 		needResult: needResult,
+		async:      async,
 	}
 	enterPos := -1
 	if forDecl, ok := into.(*ast.ForDeclaration); ok {
@@ -452,7 +458,9 @@ func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.E
 		}
 		c.popScope()
 	}
-	if iter {
+	if async {
+		c.emit(iterateAsyncP)
+	} else if iter {
 		c.emit(iterateP)
 	} else {
 		c.emit(enumerate)
@@ -462,7 +470,20 @@ func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.E
 	}
 	start := len(c.p.code)
 	c.block.cont = start
+	if async {
+		c.emit(asyncIterNext)
+	}
+	next := len(c.p.code)
 	c.emit(nil)
+	tryPos := len(c.p.code)
+	if async {
+		// exceptions thrown by the binding or the body close the iterator
+		c.block = &block{
+			typ:   blockTry,
+			outer: c.block,
+		}
+		c.emit(nil)
+	}
 	enterIterBlock := c.compileForInto(into, needResult)
 	if needResult {
 		c.emit(clearResult)
@@ -472,19 +493,39 @@ func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.E
 		c.leaveScopeBlock(enterIterBlock)
 		c.popScope()
 	}
-	c.emit(jump(start - len(c.p.code)))
-	if iter {
-		c.p.code[start] = iterNext(len(c.p.code) - start)
-	} else {
-		c.p.code[start] = enumNext(len(c.p.code) - start)
+	if async {
+		c.emit(leaveTry{})
+		c.block = c.block.outer
 	}
-	c.emit(enumPop, jump(2))
+	c.emit(jump(start - len(c.p.code)))
+	if async {
+		c.p.code[tryPos] = try{catchOffset: int32(len(c.p.code) - tryPos)}
+		// catch: close the iterator, ignoring any errors, then rethrow the original exception
+		c.emit(try{catchOffset: 5}, asyncIterClose(2), pop, leaveTry{}, jump(2), pop, enumPop, throw)
+		c.p.code[next] = asyncIterStep(len(c.p.code) - next)
+	} else if iter {
+		c.p.code[next] = iterNext(len(c.p.code) - next)
+	} else {
+		c.p.code[next] = enumNext(len(c.p.code) - next)
+	}
+	c.emit(enumPop)
+	end := len(c.p.code)
+	c.emit(nil)
 	c.leaveBlock()
-	c.emit(enumPopClose)
+	c.emitIterClose(async)
+	c.p.code[end] = jump(len(c.p.code) - end)
+}
+
+func (c *compiler) emitIterClose(async bool) {
+	if async {
+		c.emit(asyncIterClose(2), checkObjectP, enumPop)
+	} else {
+		c.emit(enumPopClose)
+	}
 }
 
 func (c *compiler) compileLabeledForInStatement(v *ast.ForInStatement, needResult bool, label unistring.String) {
-	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, false, needResult, label)
+	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, false, false, needResult, label)
 }
 
 func (c *compiler) compileForOfStatement(v *ast.ForOfStatement, needResult bool) {
@@ -492,7 +533,7 @@ func (c *compiler) compileForOfStatement(v *ast.ForOfStatement, needResult bool)
 }
 
 func (c *compiler) compileLabeledForOfStatement(v *ast.ForOfStatement, needResult bool, label unistring.String) {
-	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, true, needResult, label)
+	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, true, v.Await, needResult, label)
 }
 
 func (c *compiler) compileWhileStatement(v *ast.WhileStatement, needResult bool) {
@@ -643,7 +684,7 @@ L:
 		case blockWith:
 			c.emit(leaveWith)
 		case blockLoopEnum:
-			c.emit(enumPopClose)
+			c.emitIterClose(b.async)
 		}
 	}
 	return block
@@ -744,7 +785,7 @@ func (c *compiler) compileReturnStatement(v *ast.ReturnStatement) {
 		case blockTry:
 			c.emit(saveResult, leaveTry{}, loadResult)
 		case blockLoopEnum:
-			c.emit(enumPopClose)
+			c.emitIterClose(b.async)
 		}
 	}
 	if s := c.scope.nearestFunction(); s != nil && s.funcType == funcDerivedCtor {
@@ -988,6 +1029,9 @@ func (c *compiler) emitPatternAssign(target, init compiledExpr) {
 	if id, ok := target.(*compiledIdentifierExpr); ok {
 		b, noDyn := c.scope.lookupName(id.name)
 		if noDyn {
+			if c.scope.strict {
+				c.checkIdentifierLName(id.name, id.offset)
+			}
 			c.emitNamedOrConst(init, id.name)
 			b.emitSetP()
 		} else {
