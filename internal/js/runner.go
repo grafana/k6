@@ -263,6 +263,7 @@ func (r *Runner) newVU(
 		vu.state.TracerProvider = r.preInitState.TracerProvider
 	}
 	vu.tracer = k6trace.Tracer(r.preInitState.TracerProvider, r.preInitState.FeatureFlags)
+	vu.state.Tracer = vu.tracer
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
 
