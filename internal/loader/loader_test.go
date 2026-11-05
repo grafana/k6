@@ -168,6 +168,21 @@ func TestLoad(t *testing.T) {
 				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk at "%s". `,
 					path, path))
 		})
+
+		t.Run("Directory", func(t *testing.T) {
+			t.Parallel()
+			filesystems := map[string]fsext.Fs{"file": fsext.NewMemMapFs()}
+			assert.NoError(t, filesystems["file"].MkdirAll("/path/to", 0o755))
+
+			root, err := url.Parse("file:///path/")
+			require.NoError(t, err)
+			pathURL, err := loader.Resolve(root, "./to")
+			require.NoError(t, err)
+
+			_, err = loader.Load(logger, filesystems, pathURL, "./to")
+			require.ErrorContains(t, err, fmt.Sprintf(`The moduleSpecifier "./to" is a directory on local disk at "%s"`,
+				filepath.FromSlash("/path/to")))
+		})
 	})
 
 	t.Run("Remote", func(t *testing.T) {

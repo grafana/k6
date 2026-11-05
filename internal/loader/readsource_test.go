@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -141,6 +142,20 @@ func TestReadSourceMissingRelativeFileIncludesResolvedPath(t *testing.T) {
 		`The moduleSpecifier "./missing.js" couldn't be found on local disk at "%s".`,
 		filepath.FromSlash("/c/missing.js"),
 	))
+}
+
+func TestReadSourceDirectoryError(t *testing.T) {
+	t.Parallel()
+	logger := logrus.New()
+	logger.SetOutput(testutils.NewTestOutput(t))
+
+	pwd := t.TempDir()
+	dir := filepath.Join(pwd, "types")
+	require.NoError(t, os.Mkdir(dir, 0o755))
+
+	filesystems := CreateFilesystems(fsext.NewOsFs())
+	_, err := ReadSource(logger, "types", pwd, filesystems, nil)
+	require.ErrorContains(t, err, fmt.Sprintf(`The moduleSpecifier "types" is a directory on local disk at "%s"`, dir))
 }
 
 func TestLocalPathForError(t *testing.T) {

@@ -39,6 +39,8 @@ const (
 		fileNotFoundHint
 	fileSchemeCouldntBeLoadedAtMsg = `The moduleSpecifier "%s" couldn't be found on local disk at "%s"` +
 		fileNotFoundHint
+	fileSchemeIsDirectoryMsg = `The moduleSpecifier "%s" is a directory on local disk at "%s", but only files ` +
+		`can be loaded. k6 doesn't look for an index file inside a directory, so specify the path of the file itself.`
 )
 
 // fileNotFoundError reports that moduleSpecifier was missing at the path k6 looked up.
@@ -170,6 +172,15 @@ func Load(
 	pathOnFs, err := url.PathUnescape(filepath.FromSlash(pathOnFs))
 	if err != nil {
 		return nil, err
+	}
+
+	// Reading a directory fails with an OS-specific error ("Incorrect function." on Windows),
+	// or not at all on an in-memory filesystem: https://github.com/spf13/afero/issues/201
+	if scheme == "file" {
+		if isDir, dirErr := fsext.IsDir(filesystems[scheme], pathOnFs); dirErr == nil && isDir {
+			//nolint:staticcheck
+			return nil, fmt.Errorf(fileSchemeIsDirectoryMsg, originalModuleSpecifier, localPathForError(pathOnFs))
+		}
 	}
 
 	data, err := fsext.ReadFile(filesystems[scheme], pathOnFs)
