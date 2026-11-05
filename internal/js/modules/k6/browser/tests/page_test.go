@@ -3530,10 +3530,6 @@ func TestPageMustUseNativeJavaScriptObjects(t *testing.T) {
 }
 
 func TestWaitForNavigationWithURL(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
-	}
-
 	t.Parallel()
 
 	tb := newTestBrowser(t, withFileServer())
@@ -3615,10 +3611,6 @@ func TestWaitForNavigationWithURL(t *testing.T) {
 
 func TestPageWaitForURLSuccess(t *testing.T) {
 	t.Parallel()
-
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
-	}
 
 	tests := []struct {
 		name     string
@@ -3708,9 +3700,6 @@ func TestPageWaitForURLSuccess(t *testing.T) {
 
 func TestPageWaitForURLFailure(t *testing.T) {
 	t.Parallel()
-	if runtime.GOOS == "windows" {
-		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4937")
-	}
 
 	tests := []struct {
 		name     string
