@@ -136,3 +136,73 @@ func testTimeoutSettingsTimeoutWithParent(t *testing.T) {
 	tsWithParent.setDefaultTimeout(time.Duration(100) * time.Millisecond)
 	assert.Equal(t, int64(100), tsWithParent.timeout().Milliseconds())
 }
+
+func TestTimeoutSettingsPrecedence(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name           string
+		configure      func(parent, child *TimeoutSettings)
+		wantTimeout    time.Duration
+		wantNavigation time.Duration
+	}{
+		{
+			name: "local default overrides parent navigation timeout",
+			configure: func(_, child *TimeoutSettings) {
+				child.setDefaultTimeout(3 * time.Second)
+			},
+			wantTimeout: 3 * time.Second, wantNavigation: 3 * time.Second,
+		},
+		{
+			name: "local navigation overrides local default only for navigation",
+			configure: func(_, child *TimeoutSettings) {
+				child.setDefaultTimeout(3 * time.Second)
+				child.setDefaultNavigationTimeout(4 * time.Second)
+			},
+			wantTimeout: 3 * time.Second, wantNavigation: 4 * time.Second,
+		},
+		{
+			name: "local navigation preserves inherited default",
+			configure: func(_, child *TimeoutSettings) {
+				child.setDefaultNavigationTimeout(4 * time.Second)
+			},
+			wantTimeout: time.Second, wantNavigation: 4 * time.Second,
+		},
+		{
+			name: "zero local default overrides parent timeouts",
+			configure: func(_, child *TimeoutSettings) {
+				child.setDefaultTimeout(0)
+			},
+			wantTimeout: 0, wantNavigation: 0,
+		},
+		{
+			name: "zero local navigation overrides nonzero local default",
+			configure: func(_, child *TimeoutSettings) {
+				child.setDefaultTimeout(3 * time.Second)
+				child.setDefaultNavigationTimeout(0)
+			},
+			wantTimeout: 3 * time.Second, wantNavigation: 0,
+		},
+		{
+			name: "zero parent timeouts are inherited",
+			configure: func(parent, _ *TimeoutSettings) {
+				parent.setDefaultTimeout(0)
+				parent.setDefaultNavigationTimeout(0)
+			},
+			wantTimeout: 0, wantNavigation: 0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			parent := NewTimeoutSettings(nil)
+			parent.setDefaultTimeout(time.Second)
+			parent.setDefaultNavigationTimeout(2 * time.Second)
+			child := NewTimeoutSettings(parent)
+			tc.configure(parent, child)
+
+			assert.Equal(t, tc.wantTimeout, child.timeout(), "operation timeout")
+			assert.Equal(t, tc.wantNavigation, child.navigationTimeout(), "navigation timeout")
+		})
+	}
+}
