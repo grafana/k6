@@ -183,7 +183,7 @@ github.com/grafana/k6-cloud-openapi-client-go/k6
 # github.com/grafana/k6provider v0.5.1
 ## explicit; go 1.26.0
 github.com/grafana/k6provider
-# github.com/grafana/sobek v0.0.0-20261031082357-c1e3e36bfbc3
+# github.com/grafana/sobek v0.0.0-20261105103427-a5b602015248
 ## explicit; go 1.26.0
 github.com/grafana/sobek
 github.com/grafana/sobek/ast

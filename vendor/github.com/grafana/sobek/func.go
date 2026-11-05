@@ -296,7 +296,7 @@ func (f *classFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 }
 
 func (f *classFuncObject) vmCall(vm *vm, n int) {
-	f.Call(FunctionCall{})
+	f.Call(FunctionCall{This: _undefined})
 }
 
 func (f *classFuncObject) exportType() reflect.Type {
@@ -797,7 +797,11 @@ func (g *generator) enterNextFinallyFrame() (canContinue bool) {
 			vm.stash = tf.stash
 			vm.privEnv = tf.privEnv
 			vm.pc = int(tf.finallyPos)
-			tf.catchPos = tryPanicMarker
+			// Use -1 rather than tryPanicMarker so that handleThrow() treats this as a regular
+			// frame with no handler: it will pop the frame and continue unwinding through any
+			// enclosing finally blocks. If this state ever needs to be distinguished from an
+			// ordinary no-handler frame, this should become a dedicated marker instead.
+			tf.catchPos = -1
 			tf.finallyPos = -1
 			tf.finallyRet = -2 // -1 would cause it to continue after leaveFinally
 			return true
@@ -830,6 +834,13 @@ func (g *generator) step() (res Value, resultType resultType, ex *Exception) {
 					vm.popTryFrame()
 				}
 				return
+			}
+
+			if !vm.halted() {
+				// An exception thrown by a nested call (e.g. a constructor) was caught by
+				// handleThrow(), which set pc to a catch/finally handler. runTryInner() returned
+				// without executing it, so continue running.
+				continue
 			}
 
 			if vm.prg != nil && vm.pc == -2 { // normal exit from finally
@@ -872,37 +883,47 @@ func (g *generator) step() (res Value, resultType resultType, ex *Exception) {
 	return
 }
 
-func (g *generator) enterNext() {
+type genEnterNextCtx struct {
+	callStackLen, tryStackLen int
+}
+
+func (g *generator) enterNext() (ctx genEnterNextCtx) {
 	g.vm.pushCtx()
+	ctx.callStackLen, ctx.tryStackLen = len(g.vm.callStack), len(g.vm.tryStack)
 	g.vm.pushTryFrame(tryPanicMarker, -1)
 	g.vm.callStack = append(g.vm.callStack, context{pc: -2}) // extra frame so that vm.run() halts after ret
 	g.storeLengths()
 	g.vm.resume(&g.ctx)
+	return
+}
+
+func (g *generator) leaveNext(ctx genEnterNextCtx) {
+	g.vm.callStack = g.vm.callStack[:ctx.callStackLen]
+	g.vm.tryStack = g.vm.tryStack[:ctx.tryStackLen]
+	g.vm.popCtx()
 }
 
 func (g *generator) next(v Value) (Value, resultType, *Exception) {
-	g.enterNext()
+	ctx := g.enterNext()
+	defer g.leaveNext(ctx)
+
 	if v != nil {
 		g.vm.push(v)
 	}
 	res, done, ex := g.step()
-	g.vm.popTryFrame()
-	g.vm.popCtx()
 	return res, done, ex
 }
 
 func (g *generator) nextThrow(v interface{}) (Value, resultType, *Exception) {
-	g.enterNext()
+	ctx := g.enterNext()
+	defer g.leaveNext(ctx)
+
 	ex := g.vm.handleThrow(v)
 	if ex != nil {
-		g.vm.popTryFrame()
-		g.vm.popCtx()
 		return nil, resultNormal, ex
 	}
 
 	res, resType, ex := g.step()
-	g.vm.popTryFrame()
-	g.vm.popCtx()
 	return res, resType, ex
 }
 
@@ -1148,7 +1169,7 @@ func (g *generatorObject) _return(v Value) Value {
 
 	g.gen.returning = v
 	g.state = genStateExecuting
-	g.gen.enterNext()
+	ctx := g.gen.enterNext()
 	canContinue := g.gen.enterNextFinallyFrame()
 	if !canContinue {
 		vm := g.gen.vm
@@ -1168,10 +1189,8 @@ func (g *generatorObject) _return(v Value) Value {
 
 		return g.val.runtime.createIterResultObject(v, true)
 	}
+	defer g.gen.leaveNext(ctx)
 	res, done, ex := g.gen.step()
-	vm := g.gen.vm
-	vm.popTryFrame()
-	vm.popCtx()
 
 	return g.step(res, done, ex)
 }

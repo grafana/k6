@@ -166,7 +166,9 @@ func (b *unicodeStringBuilder) Grow(n int) {
 		panic(rangeError("Invalid string length"))
 	}
 	if len(b.buf) == 0 {
-		n++
+		// Reserve room for the BOM. With n == math.MaxInt the increment
+		// wraps around to a negative length.
+		n = toStringLen(n + 1)
 	}
 	if cap(b.buf)-len(b.buf) < n {
 		newCap := safeMul(2, cap(b.buf)) + n
@@ -709,6 +711,9 @@ func utf16IndexBytes(s, sep []uint16) int {
 }
 
 func (s unicodeString) index(substr String, start int) int {
+	if start > s.Length() {
+		return -1
+	}
 	var ss []uint16
 	a, u := devirtualizeString(substr)
 	if u != nil {
@@ -716,7 +721,7 @@ func (s unicodeString) index(substr String, start int) int {
 	} else {
 		ss = a.utf16()
 	}
-	idx := utf16Index(s[min(1+start, len(s)):], ss)
+	idx := utf16Index(s[1+start:], ss)
 	if idx != -1 {
 		return idx + start
 	}

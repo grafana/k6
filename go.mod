@@ -19,7 +19,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa7c
 	github.com/grafana/k6provider v0.5.1
-	github.com/grafana/sobek v0.0.0-20261031082357-c1e3e36bfbc3
+	github.com/grafana/sobek v0.0.0-20261105103427-a5b602015248
 	github.com/grafana/sobek-webapi-encoding v0.1.0
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0

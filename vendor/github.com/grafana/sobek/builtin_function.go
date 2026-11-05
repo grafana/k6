@@ -120,7 +120,7 @@ func (r *Runtime) boundCallable(target func(FunctionCall) Value, boundArgs []Val
 	var this Value
 	var args []Value
 	if len(boundArgs) > 0 {
-		this = boundArgs[0]
+		this = nilSafe(boundArgs[0])
 		args = make([]Value, len(boundArgs)-1)
 		copy(args, boundArgs[1:])
 	} else {
@@ -212,7 +212,7 @@ func (r *Runtime) getThrower() *Object {
 	if ret == nil {
 		ret = r.newNativeFunc(r.builtin_thrower, "", 0)
 		r.global.thrower = ret
-		r.object_freeze(FunctionCall{Arguments: []Value{ret}})
+		r.object_freeze(FunctionCall{This: _undefined, Arguments: []Value{ret}})
 	}
 	return ret
 }

@@ -739,7 +739,10 @@ func (self *_parser) parseForOrForInStatement() ast.Statement {
 			}
 			if forIn || forOf {
 				if list[0].Initializer != nil {
-					self.error(list[0].Initializer.Idx0(), "for-in loop variable declaration may not have an initializer")
+					// for (var x = ... in ...) is allowed in non-strict code (B.3.5), strict mode is checked by the compiler
+					if _, ok := list[0].Target.(*ast.Identifier); !ok || !forIn || tok != token.VAR {
+						self.error(list[0].Initializer.Idx0(), "for-in loop variable declaration may not have an initializer")
+					}
 				}
 				if tok == token.VAR {
 					into = &ast.ForIntoVar{

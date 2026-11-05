@@ -72,6 +72,7 @@ type uint16Array []byte
 type int16Array []byte
 type uint32Array []byte
 type int32Array []byte
+type float16Array []byte
 type float32Array []byte
 type float64Array []byte
 type bigInt64Array []byte
@@ -233,6 +234,25 @@ func toInt32Exact(v Value) (int32, bool) {
 	return 0, false
 }
 
+// toFloat16Exact returns the value of v (which must be a Number) if it is exactly representable as
+// a float16. NaN is not representable (and never strictly equals anything), so
+// false is returned.
+func toFloat16Exact(v Value) (float64, bool) {
+	var f float64
+	switch v := v.(type) {
+	case valueInt:
+		f = float64(v)
+	case valueFloat:
+		f = float64(v)
+	default:
+		return 0, false
+	}
+	if Float16ToFloat64(Float64ToFloat16(f)) != f {
+		return 0, false
+	}
+	return f, true
+}
+
 // toFloat32Exact converts v (which must be a Number) to float32 if the value is exactly
 // representable as a float32. A float64 value that is not representable as a float32 cannot be
 // strictly equal to a float32Array element, as elements read back as their exact float32 values.
@@ -269,9 +289,27 @@ func fillSlice[S ~[]E, E any](s S, v E) {
 	}
 }
 
+func typedArrayPtr[T any](s []byte, idx int) *T {
+	return (*T)(unsafe.Add(unsafe.Pointer(unsafe.SliceData(s)), idx*int(unsafe.Sizeof(*new(T)))))
+}
+
+// typedArraySlice returns a slice of length elements starting at start. If start is at or
+// past the end of the underlying buffer, an empty slice is returned instead of creating a
+// zero-length slice whose data pointer is past the end of the allocation. Such a pointer is
+// not a valid interior pointer and would cause the GC to abort if it is stored on the heap.
+func typedArraySlice[T any](s []byte, start, length int) []T {
+	if start*int(unsafe.Sizeof(*new(T))) >= len(s) {
+		return []T{}
+	}
+	return unsafe.Slice(typedArrayPtr[T](s, start), length)
+}
+
 func (a *uint8Array) ptr(idx int) *uint8 {
-	p := unsafe.SliceData(*a)
-	return (*uint8)(unsafe.Add(unsafe.Pointer(p), idx))
+	return typedArrayPtr[uint8](*a, idx)
+}
+
+func (a *uint8Array) slice(start, length int) []uint8 {
+	return typedArraySlice[uint8](*a, start, length)
 }
 
 func (a *uint8Array) get(idx int) Value {
@@ -296,7 +334,7 @@ func (a *uint8Array) indexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return bytes.IndexByte(unsafe.Slice(a.ptr(start), length), i)
+	return bytes.IndexByte(a.slice(start, length), i)
 }
 
 func (a *uint8Array) lastIndexOf(v Value, start, length int) int {
@@ -307,7 +345,7 @@ func (a *uint8Array) lastIndexOf(v Value, start, length int) int {
 	// LastIndexByte is not currently SIMD-optimised (as of Go 1.26), but it is equivalent to the
 	// generic lastIndex() below and may get an optimised implementation in the
 	// future, in which case it will be picked up automatically.
-	return bytes.LastIndexByte(unsafe.Slice(a.ptr(start), length), i)
+	return bytes.LastIndexByte(a.slice(start, length), i)
 }
 
 func (a *uint8Array) includes(v Value, start, length int) bool {
@@ -315,11 +353,11 @@ func (a *uint8Array) includes(v Value, start, length int) bool {
 }
 
 func (a *uint8Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toUint8(v))
+	fillSlice(a.slice(start, length), toUint8(v))
 }
 
 func (a *uint8Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 func (a *uint8Array) exportType() reflect.Type {
@@ -327,8 +365,11 @@ func (a *uint8Array) exportType() reflect.Type {
 }
 
 func (a *uint8ClampedArray) ptr(idx int) *uint8 {
-	p := unsafe.SliceData(*a)
-	return (*uint8)(unsafe.Add(unsafe.Pointer(p), idx))
+	return typedArrayPtr[uint8](*a, idx)
+}
+
+func (a *uint8ClampedArray) slice(start, length int) []uint8 {
+	return typedArraySlice[uint8](*a, start, length)
 }
 
 func (a *uint8ClampedArray) get(idx int) Value {
@@ -353,7 +394,7 @@ func (a *uint8ClampedArray) indexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return bytes.IndexByte(unsafe.Slice(a.ptr(start), length), i)
+	return bytes.IndexByte(a.slice(start, length), i)
 }
 
 func (a *uint8ClampedArray) lastIndexOf(v Value, start, length int) int {
@@ -364,7 +405,7 @@ func (a *uint8ClampedArray) lastIndexOf(v Value, start, length int) int {
 	// LastIndexByte is not currently SIMD-optimised, but it is equivalent to the
 	// generic lastIndex() below and may get an optimised implementation in the
 	// future, in which case it will be picked up automatically.
-	return bytes.LastIndexByte(unsafe.Slice(a.ptr(start), length), i)
+	return bytes.LastIndexByte(a.slice(start, length), i)
 }
 
 func (a *uint8ClampedArray) includes(v Value, start, length int) bool {
@@ -372,11 +413,11 @@ func (a *uint8ClampedArray) includes(v Value, start, length int) bool {
 }
 
 func (a *uint8ClampedArray) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toUint8Clamp(v))
+	fillSlice(a.slice(start, length), toUint8Clamp(v))
 }
 
 func (a *uint8ClampedArray) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 func (a *uint8ClampedArray) exportType() reflect.Type {
@@ -384,8 +425,15 @@ func (a *uint8ClampedArray) exportType() reflect.Type {
 }
 
 func (a *int8Array) ptr(idx int) *int8 {
-	p := unsafe.SliceData(*a)
-	return (*int8)(unsafe.Add(unsafe.Pointer(p), idx))
+	return typedArrayPtr[int8](*a, idx)
+}
+
+func (a *int8Array) slice(start, length int) []int8 {
+	return typedArraySlice[int8](*a, start, length)
+}
+
+func (a *int8Array) byteSlice(start, length int) []byte {
+	return typedArraySlice[byte](*a, start, length)
 }
 
 func (a *int8Array) get(idx int) Value {
@@ -413,7 +461,7 @@ func (a *int8Array) indexOf(v Value, start, length int) int {
 	// int8 elements are compared by their bit patterns, which are the same as the
 	// corresponding uint8 values, so the SIMD-optimised bytes.IndexByte can be
 	// used directly on the underlying byte data.
-	return bytes.IndexByte(unsafe.Slice((*byte)(unsafe.Pointer(a.ptr(start))), length), uint8(i))
+	return bytes.IndexByte(a.byteSlice(start, length), uint8(i))
 }
 
 func (a *int8Array) lastIndexOf(v Value, start, length int) int {
@@ -426,7 +474,7 @@ func (a *int8Array) lastIndexOf(v Value, start, length int) int {
 	// the underlying byte data. LastIndexByte is not currently SIMD-optimised (as of Go 1.26), but
 	// it is equivalent to the generic lastIndex() below and may get an optimised
 	// implementation in the future, in which case it will be picked up automatically.
-	return bytes.LastIndexByte(unsafe.Slice((*byte)(unsafe.Pointer(a.ptr(start))), length), uint8(i))
+	return bytes.LastIndexByte(a.byteSlice(start, length), uint8(i))
 }
 
 func (a *int8Array) includes(v Value, start, length int) bool {
@@ -434,11 +482,11 @@ func (a *int8Array) includes(v Value, start, length int) bool {
 }
 
 func (a *int8Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toInt8(v))
+	fillSlice(a.slice(start, length), toInt8(v))
 }
 
 func (a *int8Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeInt8Array = reflect.TypeOf(([]int8)(nil))
@@ -448,8 +496,11 @@ func (a *int8Array) exportType() reflect.Type {
 }
 
 func (a *uint16Array) ptr(idx int) *uint16 {
-	p := unsafe.SliceData(*a)
-	return (*uint16)(unsafe.Add(unsafe.Pointer(p), idx*2))
+	return typedArrayPtr[uint16](*a, idx)
+}
+
+func (a *uint16Array) slice(start, length int) []uint16 {
+	return typedArraySlice[uint16](*a, start, length)
 }
 
 func (a *uint16Array) get(idx int) Value {
@@ -474,7 +525,7 @@ func (a *uint16Array) indexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+	return slices.Index(a.slice(start, length), i)
 }
 
 func (a *uint16Array) lastIndexOf(v Value, start, length int) int {
@@ -482,7 +533,7 @@ func (a *uint16Array) lastIndexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+	return lastIndex(a.slice(start, length), i)
 }
 
 func (a *uint16Array) includes(v Value, start, length int) bool {
@@ -490,13 +541,13 @@ func (a *uint16Array) includes(v Value, start, length int) bool {
 }
 
 func (a *uint16Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toUint16(v))
+	fillSlice(a.slice(start, length), toUint16(v))
 }
 
 var typeUint16Array = reflect.TypeOf(([]uint16)(nil))
 
 func (a *uint16Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 func (a *uint16Array) exportType() reflect.Type {
@@ -504,8 +555,11 @@ func (a *uint16Array) exportType() reflect.Type {
 }
 
 func (a *int16Array) ptr(idx int) *int16 {
-	p := unsafe.SliceData(*a)
-	return (*int16)(unsafe.Add(unsafe.Pointer(p), idx*2))
+	return typedArrayPtr[int16](*a, idx)
+}
+
+func (a *int16Array) slice(start, length int) []int16 {
+	return typedArraySlice[int16](*a, start, length)
 }
 
 func (a *int16Array) get(idx int) Value {
@@ -530,7 +584,7 @@ func (a *int16Array) indexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+	return slices.Index(a.slice(start, length), i)
 }
 
 func (a *int16Array) lastIndexOf(v Value, start, length int) int {
@@ -538,7 +592,7 @@ func (a *int16Array) lastIndexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+	return lastIndex(a.slice(start, length), i)
 }
 
 func (a *int16Array) includes(v Value, start, length int) bool {
@@ -546,11 +600,11 @@ func (a *int16Array) includes(v Value, start, length int) bool {
 }
 
 func (a *int16Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toInt16(v))
+	fillSlice(a.slice(start, length), toInt16(v))
 }
 
 func (a *int16Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeInt16Array = reflect.TypeOf(([]int16)(nil))
@@ -560,8 +614,11 @@ func (a *int16Array) exportType() reflect.Type {
 }
 
 func (a *uint32Array) ptr(idx int) *uint32 {
-	p := unsafe.SliceData(*a)
-	return (*uint32)(unsafe.Add(unsafe.Pointer(p), idx*4))
+	return typedArrayPtr[uint32](*a, idx)
+}
+
+func (a *uint32Array) slice(start, length int) []uint32 {
+	return typedArraySlice[uint32](*a, start, length)
 }
 
 func (a *uint32Array) get(idx int) Value {
@@ -586,7 +643,7 @@ func (a *uint32Array) indexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+	return slices.Index(a.slice(start, length), i)
 }
 
 func (a *uint32Array) lastIndexOf(v Value, start, length int) int {
@@ -594,7 +651,7 @@ func (a *uint32Array) lastIndexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+	return lastIndex(a.slice(start, length), i)
 }
 
 func (a *uint32Array) includes(v Value, start, length int) bool {
@@ -602,11 +659,11 @@ func (a *uint32Array) includes(v Value, start, length int) bool {
 }
 
 func (a *uint32Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toUint32(v))
+	fillSlice(a.slice(start, length), toUint32(v))
 }
 
 func (a *uint32Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeUint32Array = reflect.TypeOf(([]uint32)(nil))
@@ -616,8 +673,11 @@ func (a *uint32Array) exportType() reflect.Type {
 }
 
 func (a *int32Array) ptr(idx int) *int32 {
-	p := unsafe.SliceData(*a)
-	return (*int32)(unsafe.Add(unsafe.Pointer(p), idx*4))
+	return typedArrayPtr[int32](*a, idx)
+}
+
+func (a *int32Array) slice(start, length int) []int32 {
+	return typedArraySlice[int32](*a, start, length)
 }
 
 func (a *int32Array) get(idx int) Value {
@@ -642,7 +702,7 @@ func (a *int32Array) indexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return slices.Index(unsafe.Slice(a.ptr(start), length), i)
+	return slices.Index(a.slice(start, length), i)
 }
 
 func (a *int32Array) lastIndexOf(v Value, start, length int) int {
@@ -650,7 +710,7 @@ func (a *int32Array) lastIndexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return lastIndex(unsafe.Slice(a.ptr(start), length), i)
+	return lastIndex(a.slice(start, length), i)
 }
 
 func (a *int32Array) includes(v Value, start, length int) bool {
@@ -658,11 +718,11 @@ func (a *int32Array) includes(v Value, start, length int) bool {
 }
 
 func (a *int32Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toInt32(v))
+	fillSlice(a.slice(start, length), toInt32(v))
 }
 
 func (a *int32Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeInt32Array = reflect.TypeOf(([]int32)(nil))
@@ -671,9 +731,100 @@ func (a *int32Array) exportType() reflect.Type {
 	return typeInt32Array
 }
 
+func (a *float16Array) ptr(idx int) *uint16 {
+	return typedArrayPtr[uint16](*a, idx)
+}
+
+func (a *float16Array) slice(start, length int) []uint16 {
+	return typedArraySlice[uint16](*a, start, length)
+}
+
+func (a *float16Array) value(idx int) float64 {
+	return Float16ToFloat64(*(a.ptr(idx)))
+}
+
+func (a *float16Array) get(idx int) Value {
+	return floatToValue(a.value(idx))
+}
+
+func (a *float16Array) set(idx int, value Value) {
+	*(a.ptr(idx)) = toFloat16Bits(value)
+}
+
+func (a *float16Array) less(i, j int) bool {
+	return typedFloatLess(a.value(i), a.value(j))
+}
+
+func (a *float16Array) swap(i, j int) {
+	pi, pj := a.ptr(i), a.ptr(j)
+	*pi, *pj = *pj, *pi
+}
+
+// indexOf compares elements by value rather than by bits, so that 0 and -0 are equal.
+func (a *float16Array) indexOf(v Value, start, length int) int {
+	f, ok := toFloat16Exact(v)
+	if !ok {
+		return -1
+	}
+	for i := start; i < start+length; i++ {
+		if a.value(i) == f {
+			return i - start
+		}
+	}
+	return -1
+}
+
+func (a *float16Array) lastIndexOf(v Value, start, length int) int {
+	f, ok := toFloat16Exact(v)
+	if !ok {
+		return -1
+	}
+	for i := start + length - 1; i >= start; i-- {
+		if a.value(i) == f {
+			return i - start
+		}
+	}
+	return -1
+}
+
+func (a *float16Array) includes(v Value, start, length int) bool {
+	switch v.(type) {
+	case valueInt, valueFloat:
+	default:
+		return false
+	}
+	if math.IsNaN(v.ToFloat()) {
+		for i := start; i < start+length; i++ {
+			if math.IsNaN(a.value(i)) {
+				return true
+			}
+		}
+		return false
+	}
+	return a.indexOf(v, start, length) >= 0
+}
+
+func (a *float16Array) fill(v Value, start, length int) {
+	fillSlice(a.slice(start, length), toFloat16Bits(v))
+}
+
+// export returns the raw IEEE 754 binary16 bits of the elements, as Go has no float16 type.
+func (a *float16Array) export(offset int, length int) interface{} {
+	return a.slice(offset, length)
+}
+
+var typeFloat16Array = reflect.TypeOf(([]uint16)(nil))
+
+func (a *float16Array) exportType() reflect.Type {
+	return typeFloat16Array
+}
+
 func (a *float32Array) ptr(idx int) *float32 {
-	p := unsafe.SliceData(*a)
-	return (*float32)(unsafe.Add(unsafe.Pointer(p), idx*4))
+	return typedArrayPtr[float32](*a, idx)
+}
+
+func (a *float32Array) slice(start, length int) []float32 {
+	return typedArraySlice[float32](*a, start, length)
 }
 
 func (a *float32Array) get(idx int) Value {
@@ -712,7 +863,7 @@ func (a *float32Array) indexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return slices.Index(unsafe.Slice(a.ptr(start), length), f)
+	return slices.Index(a.slice(start, length), f)
 }
 
 func (a *float32Array) lastIndexOf(v Value, start, length int) int {
@@ -720,7 +871,7 @@ func (a *float32Array) lastIndexOf(v Value, start, length int) int {
 	if !ok {
 		return -1
 	}
-	return lastIndex(unsafe.Slice(a.ptr(start), length), f)
+	return lastIndex(a.slice(start, length), f)
 }
 
 func (a *float32Array) includes(v Value, start, length int) bool {
@@ -730,7 +881,7 @@ func (a *float32Array) includes(v Value, start, length int) bool {
 		return false
 	}
 	f := v.ToFloat()
-	s := unsafe.Slice(a.ptr(start), length)
+	s := a.slice(start, length)
 	if math.IsNaN(f) {
 		for _, e := range s {
 			if math.IsNaN(float64(e)) {
@@ -749,11 +900,11 @@ func (a *float32Array) includes(v Value, start, length int) bool {
 }
 
 func (a *float32Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toFloat32(v))
+	fillSlice(a.slice(start, length), toFloat32(v))
 }
 
 func (a *float32Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeFloat32Array = reflect.TypeOf(([]float32)(nil))
@@ -763,8 +914,11 @@ func (a *float32Array) exportType() reflect.Type {
 }
 
 func (a *float64Array) ptr(idx int) *float64 {
-	p := unsafe.SliceData(*a)
-	return (*float64)(unsafe.Add(unsafe.Pointer(p), idx*8))
+	return typedArrayPtr[float64](*a, idx)
+}
+
+func (a *float64Array) slice(start, length int) []float64 {
+	return typedArraySlice[float64](*a, start, length)
 }
 
 func (a *float64Array) get(idx int) Value {
@@ -790,7 +944,7 @@ func (a *float64Array) indexOf(v Value, start, length int) int {
 	default:
 		return -1
 	}
-	return slices.Index(unsafe.Slice(a.ptr(start), length), v.ToFloat())
+	return slices.Index(a.slice(start, length), v.ToFloat())
 }
 
 func (a *float64Array) lastIndexOf(v Value, start, length int) int {
@@ -799,7 +953,7 @@ func (a *float64Array) lastIndexOf(v Value, start, length int) int {
 	default:
 		return -1
 	}
-	return lastIndex(unsafe.Slice(a.ptr(start), length), v.ToFloat())
+	return lastIndex(a.slice(start, length), v.ToFloat())
 }
 
 func (a *float64Array) includes(v Value, start, length int) bool {
@@ -808,7 +962,7 @@ func (a *float64Array) includes(v Value, start, length int) bool {
 	default:
 		return false
 	}
-	s := unsafe.Slice(a.ptr(start), length)
+	s := a.slice(start, length)
 	f := v.ToFloat()
 	if math.IsNaN(f) {
 		for _, e := range s {
@@ -822,11 +976,11 @@ func (a *float64Array) includes(v Value, start, length int) bool {
 }
 
 func (a *float64Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), v.ToFloat())
+	fillSlice(a.slice(start, length), v.ToFloat())
 }
 
 func (a *float64Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeFloat64Array = reflect.TypeOf(([]float64)(nil))
@@ -836,8 +990,11 @@ func (a *float64Array) exportType() reflect.Type {
 }
 
 func (a *bigInt64Array) ptr(idx int) *int64 {
-	p := unsafe.SliceData(*a)
-	return (*int64)(unsafe.Add(unsafe.Pointer(p), idx*8))
+	return typedArrayPtr[int64](*a, idx)
+}
+
+func (a *bigInt64Array) slice(start, length int) []int64 {
+	return typedArraySlice[int64](*a, start, length)
 }
 
 func (a *bigInt64Array) get(idx int) Value {
@@ -873,7 +1030,7 @@ func (a *bigInt64Array) indexOf(v Value, start, length int) int {
 		return -1
 	}
 	if b := (*big.Int)(bi); b.IsInt64() {
-		return slices.Index(unsafe.Slice(a.ptr(start), length), b.Int64())
+		return slices.Index(a.slice(start, length), b.Int64())
 	}
 	return -1
 }
@@ -884,7 +1041,7 @@ func (a *bigInt64Array) lastIndexOf(v Value, start, length int) int {
 		return -1
 	}
 	if b := (*big.Int)(bi); b.IsInt64() {
-		return lastIndex(unsafe.Slice(a.ptr(start), length), b.Int64())
+		return lastIndex(a.slice(start, length), b.Int64())
 	}
 	return -1
 }
@@ -894,11 +1051,11 @@ func (a *bigInt64Array) includes(v Value, start, length int) bool {
 }
 
 func (a *bigInt64Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toBigInt64(v).Int64())
+	fillSlice(a.slice(start, length), toBigInt64(v).Int64())
 }
 
 func (a *bigInt64Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeBigInt64Array = reflect.TypeOf(([]int64)(nil))
@@ -908,8 +1065,11 @@ func (a *bigInt64Array) exportType() reflect.Type {
 }
 
 func (a *bigUint64Array) ptr(idx int) *uint64 {
-	p := unsafe.SliceData(*a)
-	return (*uint64)(unsafe.Add(unsafe.Pointer(p), idx*8))
+	return typedArrayPtr[uint64](*a, idx)
+}
+
+func (a *bigUint64Array) slice(start, length int) []uint64 {
+	return typedArraySlice[uint64](*a, start, length)
 }
 
 func (a *bigUint64Array) get(idx int) Value {
@@ -940,7 +1100,7 @@ func (a *bigUint64Array) indexOf(v Value, start, length int) int {
 		return -1
 	}
 	if b := (*big.Int)(bi); b.IsUint64() {
-		return slices.Index(unsafe.Slice(a.ptr(start), length), b.Uint64())
+		return slices.Index(a.slice(start, length), b.Uint64())
 	}
 	return -1
 }
@@ -951,7 +1111,7 @@ func (a *bigUint64Array) lastIndexOf(v Value, start, length int) int {
 		return -1
 	}
 	if b := (*big.Int)(bi); b.IsUint64() {
-		return lastIndex(unsafe.Slice(a.ptr(start), length), b.Uint64())
+		return lastIndex(a.slice(start, length), b.Uint64())
 	}
 	return -1
 }
@@ -961,11 +1121,11 @@ func (a *bigUint64Array) includes(v Value, start, length int) bool {
 }
 
 func (a *bigUint64Array) fill(v Value, start, length int) {
-	fillSlice(unsafe.Slice(a.ptr(start), length), toBigUint64(v).Uint64())
+	fillSlice(a.slice(start, length), toBigUint64(v).Uint64())
 }
 
 func (a *bigUint64Array) export(offset int, length int) interface{} {
-	return unsafe.Slice(a.ptr(offset), length)
+	return a.slice(offset, length)
 }
 
 var typeBigUint64Array = reflect.TypeOf(([]uint64)(nil))
@@ -1305,6 +1465,10 @@ func (r *Runtime) newInt32ArrayObject(buf *arrayBufferObject, offset, length int
 	return r._newTypedArrayObject(buf, offset, length, 4, r.global.Int32Array, (*int32Array)(&buf.data), proto)
 }
 
+func (r *Runtime) newFloat16ArrayObject(buf *arrayBufferObject, offset, length int, proto *Object) *typedArrayObject {
+	return r._newTypedArrayObject(buf, offset, length, 2, r.global.Float16Array, (*float16Array)(&buf.data), proto)
+}
+
 func (r *Runtime) newFloat32ArrayObject(buf *arrayBufferObject, offset, length int, proto *Object) *typedArrayObject {
 	return r._newTypedArrayObject(buf, offset, length, 4, r.global.Float32Array, (*float32Array)(&buf.data), proto)
 }
@@ -1346,6 +1510,14 @@ func (o *arrayBufferObject) ensureNotDetached(throw bool) bool {
 		return false
 	}
 	return true
+}
+
+func (o *arrayBufferObject) getFloat16(idx int, byteOrder byteOrder) float64 {
+	return Float16ToFloat64(o.getUint16(idx, byteOrder))
+}
+
+func (o *arrayBufferObject) setFloat16(idx int, val uint16, byteOrder byteOrder) {
+	o.setUint16(idx, val, byteOrder)
 }
 
 func (o *arrayBufferObject) getFloat32(idx int, byteOrder byteOrder) float32 {

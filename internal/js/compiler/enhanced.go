@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"strings"
+
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/grafana/sobek/file"
 	"github.com/grafana/sobek/parser"
@@ -24,27 +26,31 @@ func StripTypes(src, filename string) (code string, srcMap []byte, err error) {
 
 	result := api.Transform(src, opts)
 
-	if hasError, err := esbuildCheckError(&result); hasError {
+	if hasError, err := esbuildCheckError(&result, src); hasError {
 		return "", nil, err
 	}
 
 	return string(result.Code), result.Map, nil
 }
 
-func esbuildCheckError(result *api.TransformResult) (bool, error) {
+func esbuildCheckError(result *api.TransformResult, src string) (bool, error) {
 	if len(result.Errors) == 0 {
 		return false, nil
 	}
 
 	msg := result.Errors[0]
-	err := &parser.Error{Message: msg.Text}
+	err := &parser.Error{Message: msg.Text, File: file.NewFile("", src, 1)}
 
 	if msg.Location != nil {
-		err.Position = file.Position{
-			Filename: msg.Location.File,
-			Line:     msg.Location.Line,
-			Column:   msg.Location.Column,
+		err.File = file.NewFile(msg.Location.File, src, 1)
+		for line := 1; line < msg.Location.Line; line++ {
+			next := strings.IndexByte(src[err.Offset:], '\n')
+			if next < 0 {
+				break
+			}
+			err.Offset += next + 1
 		}
+		err.Offset += max(msg.Location.Column-1, 0)
 	}
 
 	return true, err

@@ -181,7 +181,7 @@ func (r *Runtime) newPromiseResolveThenableJob(p *Promise, thenable Value, then 
 		})
 		if ex != nil {
 			if fn, ok := reject.self.assertCallable(); ok {
-				fn(FunctionCall{Arguments: []Value{ex.val}})
+				fn(FunctionCall{This: _undefined, Arguments: []Value{ex.val}})
 			}
 		}
 	}
@@ -259,11 +259,11 @@ func (r *Runtime) builtin_newPromise(args []Value, newTarget *Object) *Object {
 
 	resolve, reject := po.createResolvingFunctions()
 	ex := r.vm.try(func() {
-		executor(FunctionCall{Arguments: []Value{resolve, reject}})
+		executor(FunctionCall{This: _undefined, Arguments: []Value{resolve, reject}})
 	})
 	if ex != nil {
 		if fn, ok := reject.self.assertCallable(); ok {
-			fn(FunctionCall{Arguments: []Value{ex.val}})
+			fn(FunctionCall{This: _undefined, Arguments: []Value{ex.val}})
 		}
 	}
 	return po.val
@@ -364,7 +364,7 @@ func (r *Runtime) promiseProto_finally(call FunctionCall) Value {
 	} else {
 		thenFinally = r.newNativeFunc(func(call FunctionCall) Value {
 			value := call.Argument(0)
-			result := onFinallyFn(FunctionCall{})
+			result := onFinallyFn(FunctionCall{This: _undefined})
 			promise := r.promiseResolve(c, result)
 			valueThunk := r.newNativeFunc(func(call FunctionCall) Value {
 				return value
@@ -374,7 +374,7 @@ func (r *Runtime) promiseProto_finally(call FunctionCall) Value {
 
 		catchFinally = r.newNativeFunc(func(call FunctionCall) Value {
 			reason := call.Argument(0)
-			result := onFinallyFn(FunctionCall{})
+			result := onFinallyFn(FunctionCall{This: _undefined})
 			promise := r.promiseResolve(c, result)
 			thrower := r.newNativeFunc(func(call FunctionCall) Value {
 				panic(reason)
@@ -386,11 +386,11 @@ func (r *Runtime) promiseProto_finally(call FunctionCall) Value {
 }
 
 func (pcap *promiseCapability) resolve(result Value) {
-	pcap.promise.runtime.toCallable(pcap.resolveObj)(FunctionCall{Arguments: []Value{result}})
+	pcap.promise.runtime.toCallable(pcap.resolveObj)(FunctionCall{This: _undefined, Arguments: []Value{result}})
 }
 
 func (pcap *promiseCapability) reject(reason Value) {
-	pcap.promise.runtime.toCallable(pcap.rejectObj)(FunctionCall{Arguments: []Value{reason}})
+	pcap.promise.runtime.toCallable(pcap.rejectObj)(FunctionCall{This: _undefined, Arguments: []Value{reason}})
 }
 
 func (pcap *promiseCapability) try(f func()) bool {
