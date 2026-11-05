@@ -28,6 +28,19 @@ func (ProtocolHTTPLabels) IsProtocolLabels() {
 	// Do nothing
 }
 
+// ProtocolGRPCLabels describes labels associated with a single gRPC request.
+type ProtocolGRPCLabels struct {
+	URL        string
+	Service    string
+	Method     string
+	StatusCode int64
+}
+
+// IsProtocolLabels is a dummy implementation to satisfy the ProtocolLabels interface.
+func (ProtocolGRPCLabels) IsProtocolLabels() {
+	// Do nothing
+}
+
 // RequestMetadatas is a slice of RequestMetadata.
 type RequestMetadatas []RequestMetadata
 
