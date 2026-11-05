@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
 func TestValueFromRemoteObject(t *testing.T) {
@@ -272,4 +273,49 @@ func TestParseRemoteObject(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseConsoleRemoteObjectString(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name  string
+		value jsontext.Value
+		want  string
+	}{
+		{name: "ascii", value: jsontext.Value(`"some string"`), want: "some string"},
+		{name: "non_ascii_escaped", value: jsontext.Value(`"\u041a\u043e\u0440\u0437\u0438\u043d\u0430"`), want: "Корзина"},
+		{name: "non_ascii_raw", value: jsontext.Value(`"Корзина"`), want: "Корзина"},
+		{name: "escapes", value: jsontext.Value(`"quote \" newline \n backslash \\"`), want: "quote \" newline \n backslash \\"},
+		{name: "empty", value: jsontext.Value(`""`), want: ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseConsoleRemoteObject(log.NewNullLogger(), &runtime.RemoteObject{
+				Type:  runtime.TypeString,
+				Value: tc.value,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestParseConsoleRemoteObjectPreviewString(t *testing.T) {
+	t.Parallel()
+
+	// Preview property values are plain text, not JSON: they must stay as is.
+	got, err := parseConsoleRemoteObject(log.NewNullLogger(), &runtime.RemoteObject{
+		Type: runtime.TypeObject,
+		Preview: &runtime.ObjectPreview{
+			Properties: []*runtime.PropertyPreview{
+				{Name: "str", Type: runtime.TypeString, Value: `Корзина \u041a`},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"str":"Корзина \\u041a"}`, got)
 }
