@@ -188,6 +188,26 @@ func newOutput(params output.Params) (*Output, error) {
 			conf.MaxTimeSeriesInBatch.Int64)
 	}
 
+	// Non-positive intervals panic inside time.NewTicker during Start().
+	// Catch them here for early, actionable errors (env / JSON / script cloud config).
+	// Backend ConfigOverride applied later is validated again in cloudv2.New.
+	if conf.MetricPushInterval.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("metrics push interval must be a positive duration but is %s",
+			conf.MetricPushInterval)
+	}
+	if conf.AggregationPeriod.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("aggregation period must be a positive duration but is %s",
+			conf.AggregationPeriod)
+	}
+	if conf.AggregationWaitPeriod.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("aggregation wait period must be a positive duration but is %s",
+			conf.AggregationWaitPeriod)
+	}
+	if conf.TracesEnabled.Bool && conf.TracesPushInterval.TimeDuration() <= 0 {
+		return nil, fmt.Errorf("traces push interval must be a positive duration but is %s",
+			conf.TracesPushInterval)
+	}
+
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, build.Version, conf.Timeout.TimeDuration())
 

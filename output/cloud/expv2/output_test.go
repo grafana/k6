@@ -26,7 +26,9 @@ func TestNew(t *testing.T) {
 
 	logger, hook := testutils.NewLoggerWithHook(t)
 	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
-	o, err := New(logger, cloudapi.Config{APIVersion: null.IntFrom(99)}, c)
+	conf := cloudapi.NewConfig()
+	conf.APIVersion = null.IntFrom(99)
+	o, err := New(logger, conf, c)
 	require.NoError(t, err)
 	require.NotNil(t, o)
 
@@ -45,11 +47,66 @@ func TestNewWithConfigOverwritten(t *testing.T) {
 
 	logger := testutils.NewLogger(t)
 	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
-	conf := cloudapi.Config{Host: null.StringFrom("the-new-host")}
+	conf := cloudapi.NewConfig()
+	conf.Host = null.StringFrom("the-new-host")
 	o, err := New(logger, conf, c)
 	require.NoError(t, err)
 	require.NotNil(t, o)
 	assert.Equal(t, "the-new-host/v1", o.cloudClient.BaseURL())
+}
+
+func TestNewRejectsNonPositiveIntervals(t *testing.T) {
+	t.Parallel()
+
+	logger := testutils.NewLogger(t)
+	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
+
+	tests := []struct {
+		name   string
+		mutate func(*cloudapi.Config)
+		errMsg string
+	}{
+		{
+			name: "zero metric push interval",
+			mutate: func(conf *cloudapi.Config) {
+				conf.MetricPushInterval = types.NewNullDuration(0, true)
+			},
+			errMsg: "metrics push interval must be a positive duration",
+		},
+		{
+			name: "negative metric push interval",
+			mutate: func(conf *cloudapi.Config) {
+				conf.MetricPushInterval = types.NewNullDuration(-1*time.Second, true)
+			},
+			errMsg: "metrics push interval must be a positive duration",
+		},
+		{
+			name: "zero aggregation period",
+			mutate: func(conf *cloudapi.Config) {
+				conf.AggregationPeriod = types.NewNullDuration(0, true)
+			},
+			errMsg: "aggregation period must be a positive duration",
+		},
+		{
+			name: "zero traces push interval with traces enabled",
+			mutate: func(conf *cloudapi.Config) {
+				conf.TracesEnabled = null.BoolFrom(true)
+				conf.TracesPushInterval = types.NewNullDuration(0, true)
+			},
+			errMsg: "traces push interval must be a positive duration",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			conf := cloudapi.NewConfig()
+			tc.mutate(&conf)
+			_, err := New(logger, conf, c)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.errMsg)
+		})
+	}
 }
 
 func TestOutputSetTestRunID(t *testing.T) {
