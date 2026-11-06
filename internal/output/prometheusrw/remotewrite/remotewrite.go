@@ -201,8 +201,10 @@ func (o *Output) setTrendStatsResolver(trendStats []string) error {
 
 func (o *Output) flush() {
 	var (
-		start = time.Now()
-		nts   int
+		start       = time.Now()
+		nts         int
+		aggregation time.Duration
+		flushing    time.Duration
 	)
 
 	defer func() {
@@ -211,8 +213,8 @@ func (o *Output) flush() {
 		if d > time.Duration(o.config.PushInterval.Duration) {
 			// There is no intermediary storage so warn if writing to remote write endpoint becomes too slow
 			o.logger.WithField("nts", nts).
-				Warnf("%s but it took %s while flush period is %s. Some samples may be dropped.",
-					okmsg, d.String(), o.config.PushInterval.String())
+				Warnf("%s but it took %s (aggregating %s, flushing %s) while flush period is %s. Some samples may be dropped.",
+					okmsg, d.String(), aggregation.String(), flushing.String(), o.config.PushInterval.String())
 		} else {
 			o.logger.WithField("nts", nts).WithField("took", d).Debug(okmsg)
 		}
@@ -231,11 +233,16 @@ func (o *Output) flush() {
 	// c) not have duplicate timestamps within 1 timeseries, see https://github.com/prometheus/prometheus/issues/9210
 	// Prometheus write handler processes only some fields as of now, so here we'll add only them.
 
+	convertStart := time.Now()
 	promTimeSeries := o.convertToPbSeries(samplesContainers)
+	aggregation = time.Since(convertStart)
 	nts = len(promTimeSeries)
 	o.logger.WithField("nts", nts).Debug("Converted samples to Prometheus TimeSeries")
 
-	if err := o.client.Store(context.Background(), promTimeSeries); err != nil {
+	storeStart := time.Now()
+	err := o.client.Store(context.Background(), promTimeSeries)
+	flushing = time.Since(storeStart)
+	if err != nil {
 		o.logger.WithError(err).Error("Failed to send the time series data to the endpoint")
 		return
 	}
