@@ -85,16 +85,21 @@ func isUTF16SecondSurrogate(c uint16) bool {
 	return c >= 0xDC00 && c <= 0xDFFF
 }
 
-func (si *stringIterObject) next() Value {
+func (si *stringIterObject) nextResult(Value) (Value, bool) {
 	if si.reader == nil {
-		return si.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 	r, _, err := si.reader.ReadRune()
 	if err == io.EOF {
 		si.reader = nil
-		return si.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
-	return si.val.runtime.createIterResultObject(stringFromRune(r), false)
+	return stringFromRune(r), true
+}
+
+func (si *stringIterObject) next() Value {
+	value, valid := si.nextResult(nil)
+	return si.val.runtime.createIterResultObject(value, !valid)
 }
 
 func stringFromRune(r rune) String {
@@ -156,6 +161,10 @@ func (s *stringObject) setLength() {
 	}
 	s.lengthProp.value = intToValue(int64(s.length))
 	s._put("length", &s.lengthProp)
+}
+
+func (s *stringObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	return s.hasAndGetOwnStr(name, s.getOwnPropStr(name), receiver)
 }
 
 func (s *stringObject) getStr(name unistring.String, receiver Value) Value {
@@ -234,7 +243,7 @@ func (s *stringObject) setForeignIdx(idx valueInt, val, receiver Value, throw bo
 
 func (s *stringObject) defineOwnPropertyStr(name unistring.String, descr PropertyDescriptor, throw bool) bool {
 	if i := strToGoIdx(name); i >= 0 && i < s.length {
-		_, ok := s._defineOwnProperty(name, &valueProperty{enumerable: true}, descr, throw)
+		_, ok := s._defineOwnProperty(name, nil, &valueProperty{enumerable: true}, descr, throw)
 		return ok
 	}
 
@@ -329,6 +338,8 @@ func devirtualizeString(s String) (asciiString, unicodeString) {
 			return "", s.u
 		}
 		return asciiString(s.s), nil
+	case *concatString:
+		return devirtualizeString(s.flatten())
 	default:
 		panic(unknownStringTypeErr(s))
 	}

@@ -175,7 +175,7 @@ func (s *regexFcd) calculateFC(nt NodeType, node *RegexNode, CurIndex int) {
 			s.skipChild()
 		}
 
-	case NtEmpty:
+	case NtEmpty, NtResetCapture:
 		s.pushFC(regexFc{nullable: true})
 
 	case NtConcatenate | AfterChild:
@@ -244,6 +244,9 @@ func (s *regexFcd) calculateFC(nt NodeType, node *RegexNode, CurIndex int) {
 
 	case NtSetloop, NtSetlazy, NtSetloopatomic:
 		s.pushFC(regexFc{cc: node.Set.Copy(), nullable: node.M == 0, caseInsensitive: ci})
+
+	case NtGrapheme:
+		s.pushFC(regexFc{cc: *AnyClass(), nullable: false})
 
 	case NtRef:
 		s.pushFC(regexFc{cc: *AnyClass(), nullable: true, caseInsensitive: false})
@@ -356,7 +359,7 @@ func getPrefix(tree *RegexTree) *Prefix {
 			}
 
 		case NtBol, NtEol, NtBoundary, NtECMABoundary, NtBeginning, NtStart,
-			NtEndZ, NtEnd, NtEmpty, NtPosLook, NtNegLook:
+			NtEndZ, NtEnd, NtEmpty, NtResetCapture, NtPosLook, NtNegLook:
 
 		default:
 			return nil
@@ -803,7 +806,7 @@ func getAnchors(tree *RegexTree) AnchorLoc {
 			NtStart, NtEndZ, NtEnd:
 			return result | anchorFromType(curNode.T)
 
-		case NtEmpty, NtPosLook, NtNegLook:
+		case NtEmpty, NtResetCapture, NtPosLook, NtNegLook:
 
 		default:
 			return result

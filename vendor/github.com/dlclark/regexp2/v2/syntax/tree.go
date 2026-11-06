@@ -128,6 +128,12 @@ const (
 	NtSetloopatomic NodeType = 45
 	// Updates the bumpalong position to the current position.
 	NtUpdateBumpalong NodeType = 46
+	// Matches one Unicode extended grapheme cluster (\X).
+	NtGrapheme NodeType = 47
+	// Implements ECMAScript 2025 §22.2.2.3.1 RepeatMatcher, step 4:
+	// clears capture M before an iteration, with backtracking restore.
+	// Unlike a reference or balancing group, this does not observe its value.
+	NtResetCapture NodeType = 48
 )
 
 func newRegexNode(t NodeType, opt RegexOptions) *RegexNode {
@@ -187,19 +193,14 @@ func nodeWithCaseConversion(n *RegexNode) *RegexNode {
 
 	if n.Ch > 0 {
 		ch := n.Ch
-		if isLow, isUp := unicode.IsLower(ch), unicode.IsUpper(ch); isLow || isUp {
-			/*var upper, lower rune
-			// it's a capitalizable char
-			if isUp {
-				upper = ch
-				lower = unicode.ToLower(ch)
-			} else {
-				lower = ch
-				upper = unicode.ToUpper(ch)
-			}*/
+		folds := unicode.IsLower(ch) || unicode.IsUpper(ch)
+		if n.Options&ECMAScript != 0 {
+			folds = unicode.SimpleFold(ch) != ch
+		}
+		if folds {
 			set := &CharSet{}
 			set.addChar(ch)
-			set.addCaseEquivalences()
+			set.addCaseEquivalences(n.Options)
 			t := NtSet
 
 			switch n.T {
@@ -220,7 +221,7 @@ func nodeWithCaseConversion(n *RegexNode) *RegexNode {
 		// just to be safe we don't modify the original set pointer
 		// just in case it's used in a case-sensitive area
 		s := n.Set.Copy()
-		s.addCaseEquivalences()
+		s.addCaseEquivalences(n.Options)
 		n.Set = &s
 		n.Options &= ^IgnoreCase
 	}
@@ -471,8 +472,9 @@ func (node *RegexNode) processNode(subsequent *RegexNode) {
 }
 
 func (n *RegexNode) reduce() *RegexNode {
-	// Remove IgnoreCase option from everything except a Backreference
-	if n.T != NtRef {
+	// Remove IgnoreCase option from everything except a Backreference and an
+	// ECMAScript \b or \B whose word characters depend on it
+	if n.T != NtRef && !((n.T == NtECMABoundary || n.T == NtNonECMABoundary) && hasECMAWordCharExtras(n.Options)) {
 		n.Options &= ^IgnoreCase
 	}
 	switch n.T {
@@ -693,8 +695,115 @@ func (n *RegexNode) reduceAtomic() *RegexNode {
 	// For everything else, try to reduce ending backtracking of the last contained expression.
 	default:
 		child.eliminateEndingBacktracking()
+		if child.T == NtAlternate && child.hasDisjointStartingSets() && child.hasOnlyIntrinsicallyAtomicBranches() {
+			return child
+		}
 		return atomic
 	}
+}
+
+// hasDisjointStartingSets reports whether every branch is non-nullable and
+// begins with a character set that cannot overlap any other branch. In that
+// case, once one branch has matched, no sibling branch could match the same
+// starting position.
+func (n *RegexNode) hasDisjointStartingSets() bool {
+	_, ok := n.disjointStartingSets()
+	return ok
+}
+
+// disjointStartingSets returns the non-nullable first-character set for each
+// branch when all of those sets are pairwise disjoint.
+func (n *RegexNode) disjointStartingSets() ([]*CharSet, bool) {
+	sets := make([]*CharSet, 0, len(n.Children))
+	for _, branch := range n.Children {
+		var set *CharSet
+		if tryFindFirstCharClass(branch, &set) != 1 || set == nil {
+			return nil, false
+		}
+		for _, previous := range sets {
+			if set.MayOverlap(previous) {
+				return nil, false
+			}
+		}
+		sets = append(sets, set)
+	}
+	return sets, true
+}
+
+// disjointAtomicBranchSets returns the first-character sets when an
+// alternation can select a branch without leaving a backtracking choice.
+func (n *RegexNode) disjointAtomicBranchSets() ([]*CharSet, bool) {
+	if n.T != NtAlternate || !n.hasOnlyIntrinsicallyAtomicBranches() {
+		return nil, false
+	}
+	return n.disjointStartingSets()
+}
+
+// dispatchCandidates returns disjoint branch sets and the leading nodes that
+// can be folded into a consuming Dispatch instruction.
+func (n *RegexNode) dispatchCandidates() ([]*CharSet, []*RegexNode, []bool, bool) {
+	if len(n.Children) >= 1<<16 {
+		return nil, nil, nil, false
+	}
+	sets, ok := n.disjointAtomicBranchSets()
+	if !ok {
+		return nil, nil, nil, false
+	}
+
+	leaders := make([]*RegexNode, len(n.Children))
+	complete := make([]bool, len(n.Children))
+	for i := range leaders {
+		branch := n.Children[i]
+		leader := branch
+		if leader.T == NtConcatenate && len(leader.Children) > 0 {
+			leader = leader.Children[0]
+		}
+		switch leader.T {
+		case NtOne, NtNotone, NtSet, NtMulti:
+			leaders[i] = leader
+		default:
+			return nil, nil, nil, false
+		}
+		complete[i] = leader == branch && (leader.T != NtMulti || len(leader.Str) == 1)
+	}
+	return sets, leaders, complete, true
+}
+
+func (n *RegexNode) hasOnlyIntrinsicallyAtomicBranches() bool {
+	for _, branch := range n.Children {
+		if !branch.isIntrinsicallyAtomic() {
+			return false
+		}
+	}
+	return true
+}
+
+// isIntrinsicallyAtomic reports whether a successful match of this node has no
+// alternative input-consuming path to explore if something later fails.
+func (n *RegexNode) isIntrinsicallyAtomic() bool {
+	switch n.T {
+	case NtOne, NtNotone, NtSet, NtMulti, NtRef, NtGrapheme,
+		NtBol, NtEol, NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary,
+		NtBeginning, NtStart, NtEndZ, NtEnd, NtNothing, NtEmpty, NtUpdateBumpalong, NtResetCapture,
+		NtOneloopatomic, NtNotoneloopatomic, NtSetloopatomic,
+		NtPosLook, NtNegLook, NtAtomic:
+		return true
+
+	case NtOneloop, NtNotoneloop, NtSetloop, NtOnelazy, NtNotonelazy, NtSetlazy:
+		return n.M == n.N
+
+	case NtCapture, NtGroup:
+		return len(n.Children) == 1 && n.Children[0].isIntrinsicallyAtomic()
+
+	case NtConcatenate:
+		for _, child := range n.Children {
+			if !child.isIntrinsicallyAtomic() {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 func (n *RegexNode) makeLoopAtomic() {
@@ -800,6 +909,12 @@ func (n *RegexNode) eliminateEndingBacktracking() {
 			fallthrough
 		case NtLoop:
 			if node.N == 1 {
+				// ECMAScript RepeatMatcher rejects an optional empty iteration.
+				// Its body must retain backtracking so a consuming alternative
+				// can still succeed, even when nothing follows the loop.
+				if node.Options&ECMAScript != 0 && node.M == 0 && node.Children[0].ComputeMinLength() == 0 {
+					break
+				}
 				// If the loop has a max iteration count of 1 (e.g. it's an optional node),
 				// there's no possibility for conflict between multiple iterations, so
 				// we can process it.
@@ -851,6 +966,15 @@ func (n *RegexNode) FindLastExpressionInLoopForAutoAtomic() *RegexNode {
 	return nil
 }
 
+// containsLineBreak reports whether the set holds a character that $ can match
+// before in Multiline mode (see IsLineBreak).
+func (c *CharSet) containsLineBreak(options RegexOptions) bool {
+	if options&ECMAScript == 0 {
+		return c.CharIn('\n')
+	}
+	return c.CharIn('\n') || c.CharIn('\r') || c.CharIn('\u2028') || c.CharIn('\u2029')
+}
+
 // Determines whether a node can be switched to an atomic loop.
 //
 // The node following is subsequent, used to determine whether it overlaps.
@@ -878,7 +1002,19 @@ func (n *RegexNode) canBeMadeAtomic(subsequent *RegexNode, iterateNullableSubseq
 
 		// If the current node's options don't match the subsequent node, then we cannot make it atomic.
 		// This applies to RightToLeft for lookbehinds, as well as patterns that enable/disable global flags in the middle of the pattern.
-		if n.Options != subsequent.Options {
+		// reduce keeps IgnoreCase only on an ECMAScript \b or \B that also has Unicode, to choose its word characters; the
+		// boundary checks below hold for either set of word characters, so leave it out of the comparison.
+		subsequentOptions := subsequent.Options
+		if subsequent.T == NtECMABoundary || subsequent.T == NtNonECMABoundary {
+			subsequentOptions &^= IgnoreCase
+		}
+		if n.Options != subsequentOptions {
+			return false
+		}
+
+		// The Multi and end anchor checks below assume left-to-right matching.
+		if n.Options&RightToLeft != 0 &&
+			(subsequent.T == NtMulti || subsequent.T == NtEnd || subsequent.T == NtEndZ || subsequent.T == NtEol) {
 			return false
 		}
 
@@ -912,18 +1048,18 @@ func (n *RegexNode) canBeMadeAtomic(subsequent *RegexNode, iterateNullableSubseq
 				(subsequent.T == NtMulti && n.Ch != subsequent.Str[0]) ||
 				(subsequent.T == NtEnd) ||
 				(subsequent.T == NtEndZ && n.Ch != '\n') ||
-				(subsequent.T == NtEol && n.Ch != '\n') {
+				(subsequent.T == NtEol && !IsLineBreak(n.Options, n.Ch)) {
 				return true
 			}
 
 			// The loop can be made atomic based on this subsequent node, but we'll need to evaluate the next one as well.
+			// A \b after a loop of word characters fails at every position backtracking would give back. There is no such
+			// rule for \B: it holds at each of those positions, between two of the loop's characters.
 			if (subsequent.IsOneloopFamily() && subsequent.M == 0 && n.Ch != subsequent.Ch) ||
 				(subsequent.IsNotoneloopFamily() && subsequent.M == 0 && n.Ch == subsequent.Ch) ||
 				(subsequent.IsSetloopFamily() && subsequent.M == 0 && !subsequent.Set.CharIn(n.Ch)) ||
 				(subsequent.T == NtBoundary && n.M > 0 && IsWordChar(n.Ch)) ||
-				(subsequent.T == NtNonboundary && n.M > 0 && !IsWordChar(n.Ch)) ||
-				(subsequent.T == NtECMABoundary && n.M > 0 && IsECMAWordChar(n.Ch)) ||
-				(subsequent.T == NtNonECMABoundary && n.M > 0 && !IsECMAWordChar(n.Ch)) {
+				(subsequent.T == NtECMABoundary && n.M > 0 && IsECMAWordCharWithOptions(subsequent.Options, n.Ch)) {
 				goto end
 			}
 
@@ -951,16 +1087,14 @@ func (n *RegexNode) canBeMadeAtomic(subsequent *RegexNode, iterateNullableSubseq
 				(subsequent.T == NtMulti && !n.Set.CharIn(subsequent.Str[0])) ||
 				(subsequent.T == NtEnd) ||
 				(subsequent.T == NtEndZ && !n.Set.CharIn('\n')) ||
-				(subsequent.T == NtEol && !n.Set.CharIn('\n')) {
+				(subsequent.T == NtEol && !n.Set.containsLineBreak(n.Options)) {
 				return true
 			}
 
 			if (subsequent.IsOneloopFamily() && subsequent.M == 0 && !n.Set.CharIn(subsequent.Ch)) ||
-				(subsequent.IsSetloopFamily() && subsequent.M == 0 && subsequent.Set.MayOverlap(n.Set)) ||
+				(subsequent.IsSetloopFamily() && subsequent.M == 0 && !subsequent.Set.MayOverlap(n.Set)) ||
 				(subsequent.T == NtBoundary && n.M > 0 && (n.Set.Equals(WordClass()) || n.Set.Equals(DigitClass()))) ||
-				(subsequent.T == NtNonboundary && n.M > 0 && (n.Set.Equals(NotWordClass()) || n.Set.Equals(NotDigitClass()))) ||
-				(subsequent.T == NtECMABoundary && n.M > 0 && (n.Set.Equals(ECMAWordClass()) || n.Set.Equals(ECMADigitClass()))) ||
-				(subsequent.T == NtNonECMABoundary && n.M > 0 && (n.Set.Equals(NotECMAWordClass()) || n.Set.Equals(NotDigitClass()))) {
+				(subsequent.T == NtECMABoundary && n.M > 0 && (n.Set.Equals(ECMAWordClass()) || n.Set.Equals(ECMADigitClass()))) {
 				// The loop can be made atomic based on this subsequent node, but we'll need to evaluate the next one as well.
 				goto end
 			}
@@ -1521,7 +1655,9 @@ func (n *RegexNode) reduceConcatenationWithAdjacentLoops() {
 					next++
 					continue
 				}
-			} else if (currentNode.T == NtOneloop || currentNode.T == NtOnelazy) && nextNode.T == NtMulti && currentNode.Ch == nextNode.Str[0] {
+			} else if (currentNode.T == NtOneloop || currentNode.T == NtOnelazy) && nextNode.T == NtMulti &&
+				nextNode.Options&RightToLeft == 0 && // RTL multi nodes don't have their text reversed
+				currentNode.Ch == nextNode.Str[0] {
 				// Coalescing a loop with a subsequent string
 				// Determine how many of the multi's characters can be combined.
 				// We already checked for the first, so we know it's at least one.
@@ -1795,6 +1931,9 @@ func (n *RegexNode) reduceGroup() *RegexNode {
 // or empty, it's transformed accordingly.
 func (n *RegexNode) reduceSet() *RegexNode {
 	// Extract empty-set, one and not-one case as special
+	if n.Set != nil {
+		n.Set.simplify()
+	}
 
 	if n.Set == nil {
 		n.T = NtNothing
@@ -1871,7 +2010,7 @@ func (n *RegexNode) makeQuantifier(lazy bool, min, max int) *RegexNode {
 // If the result is 0, there is no minimum we can enforce.
 func (n *RegexNode) ComputeMinLength() int {
 	switch n.T {
-	case NtOne, NtNotone, NtSet:
+	case NtOne, NtNotone, NtSet, NtGrapheme:
 		// single char
 		return 1
 	case NtMulti:
@@ -1927,7 +2066,7 @@ func (n *RegexNode) ComputeMinLength() int {
 	case NtAtomic, NtCapture, NtGroup:
 		// For groups, we just delegate to the sole child.
 		return n.Children[0].ComputeMinLength()
-	case NtEmpty, NtNothing,
+	case NtEmpty, NtNothing, NtResetCapture,
 		NtBeginning, NtBol, NtBoundary, NtECMABoundary, NtEnd, NtEndZ, NtEol,
 		NtNonboundary, NtNonECMABoundary, NtStart, NtNegLook, NtPosLook, NtRef:
 		// Nothing to match. In the future, we could potentially use Nothing to say that the min length
@@ -1943,6 +2082,8 @@ func (n *RegexNode) computeMaxLength() int {
 	switch n.T {
 	case NtOne, NtNotone, NtSet:
 		return 1
+	case NtGrapheme:
+		return -1
 	case NtMulti:
 		return len(n.Str)
 	case NtNotonelazy, NtNotoneloop, NtNotoneloopatomic,
@@ -2019,7 +2160,7 @@ func (n *RegexNode) computeMaxLength() int {
 	case NtAtomic, NtCapture:
 		// For groups, we just delegate to the sole child.
 		return n.Children[0].computeMaxLength()
-	case NtEmpty, NtNothing, NtUpdateBumpalong,
+	case NtEmpty, NtNothing, NtUpdateBumpalong, NtResetCapture,
 		NtBeginning, NtBol, NtBoundary, NtECMABoundary, NtEnd, NtEndZ, NtEol,
 		NtNonboundary, NtNonECMABoundary, NtStart, NtNegLook, NtPosLook:
 		//zero-width
@@ -2055,6 +2196,8 @@ var typeStr = []string{
 	"ECMABoundary", "NonECMABoundary",
 	"OneloopAtomic", "NotoneloopAtomic", "SetloopAtomic",
 	"UpdateBumpalong",
+	"Grapheme",
+	"ResetCapture",
 }
 
 func (n *RegexNode) Description() string {
@@ -2089,7 +2232,7 @@ func (n *RegexNode) Description() string {
 		buf.WriteString("(Ch = " + CharDescription(n.Ch) + ")")
 	case NtCapture:
 		buf.WriteString("(index = " + strconv.Itoa(n.M) + ", unindex = " + strconv.Itoa(n.N) + ")")
-	case NtRef, NtBackRefCond:
+	case NtRef, NtBackRefCond, NtResetCapture:
 		buf.WriteString("(index = " + strconv.Itoa(n.M) + ")")
 	case NtMulti:
 		fmt.Fprintf(buf, "(String = %#v)", string(n.Str))

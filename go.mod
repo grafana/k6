@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6provider v0.5.1
-	github.com/grafana/sobek v0.0.0-20260727154728-7781506a890f
+	github.com/grafana/sobek v0.0.0-20261105103427-a5b602015248
 	github.com/grafana/xk6-dashboard v0.8.1
 	github.com/grafana/xk6-redis v0.3.6
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -65,7 +65,7 @@ require (
 )
 
 require (
-	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
+	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
 	github.com/grafana/xk6-dashboard-assets v0.1.2 // indirect
 	github.com/jhump/protoreflect/v2 v2.0.0-beta.1 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

@@ -50,21 +50,21 @@ const (
 
 // An Error represents a parsing error. It includes the position where the error occurred and a message/description.
 type Error struct {
-	Position file.Position
-	Message  string
+	Message string
+	File    *file.File
+	Offset  int
 }
 
-// FIXME Should this be "SyntaxError"?
-
 func (self Error) Error() string {
-	filename := self.Position.Filename
+	filename := self.File.Name()
 	if filename == "" {
 		filename = "(anonymous)"
 	}
+	pos := self.File.Position(self.Offset)
 	return fmt.Sprintf("%s: Line %d:%d %s",
 		filename,
-		self.Position.Line,
-		self.Position.Column,
+		pos.Line,
+		pos.Column,
 		self.Message,
 	)
 }
@@ -84,10 +84,14 @@ func (self *_parser) error(place interface{}, msg string, msgValues ...interface
 		panic(fmt.Errorf("error(%T, ...)", place))
 	}
 
-	position := self.position(idx)
 	msg = fmt.Sprintf(msg, msgValues...)
-	self.errors.Add(position, msg)
-	return self.errors[len(self.errors)-1]
+	e := &Error{
+		Message: msg,
+		File:    self.file,
+		Offset:  int(idx) - self.base,
+	}
+	self.errors.Add(e)
+	return e
 }
 
 func (self *_parser) errorUnexpected(idx file.Idx, chr rune) error {
@@ -125,8 +129,8 @@ func (self *_parser) errorUnexpectedToken(tkn token.Token) error {
 type ErrorList []*Error
 
 // Add adds an Error with given position and message to an ErrorList.
-func (self *ErrorList) Add(position file.Position, msg string) {
-	*self = append(*self, &Error{position, msg})
+func (self *ErrorList) Add(e *Error) {
+	*self = append(*self, e)
 }
 
 // Reset resets an ErrorList to no errors.
@@ -135,18 +139,15 @@ func (self *ErrorList) Reset() { *self = (*self)[0:0] }
 func (self ErrorList) Len() int      { return len(self) }
 func (self ErrorList) Swap(i, j int) { self[i], self[j] = self[j], self[i] }
 func (self ErrorList) Less(i, j int) bool {
-	x := &self[i].Position
-	y := &self[j].Position
-	if x.Filename < y.Filename {
+	x := self[i]
+	y := self[j]
+	xName := x.File.Name()
+	yName := y.File.Name()
+	if xName < yName {
 		return true
 	}
-	if x.Filename == y.Filename {
-		if x.Line < y.Line {
-			return true
-		}
-		if x.Line == y.Line {
-			return x.Column < y.Column
-		}
+	if xName == yName {
+		return x.Offset < y.Offset
 	}
 	return false
 }

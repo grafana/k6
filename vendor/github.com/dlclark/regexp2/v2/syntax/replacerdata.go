@@ -25,11 +25,47 @@ var ErrReplacementError = errors.New("replacement pattern error")
 // NewReplacerData will populate a reusable replacer data struct based on the given replacement string
 // and the capture group data from a regexp
 func NewReplacerData(rep string, caps map[int]int, capsize int, capnames map[string]int, op RegexOptions) (*ReplacerData, error) {
+	return newReplacerData(rep, caps, capsize, capnames, op, nil)
+}
+
+// NewReplacerDataWithGroupNames is like NewReplacerData, with group names in
+// capture-slot order so duplicate ECMAScript names resolve all their slots.
+// Numeric replacement references still select individual groups.
+func NewReplacerDataWithGroupNames(rep string, caps map[int]int, capsize int, capnames map[string]int, op RegexOptions, groupNames []string) (*ReplacerData, error) {
+	var namedCaptures map[string][]int
+	if op&ECMAScript != 0 {
+		namedCaptures = make(map[string][]int)
+		numbers := make([]int, len(groupNames))
+		for i := range numbers {
+			numbers[i] = i
+		}
+		for number, slot := range caps {
+			numbers[slot] = number
+		}
+		for slot, name := range groupNames {
+			if name != "" {
+				namedCaptures[name] = append(namedCaptures[name], numbers[slot])
+			}
+		}
+	}
+	return NewReplacerDataWithGroupNumbers(rep, caps, capsize, capnames, op, namedCaptures)
+}
+
+// NewReplacerDataWithGroupNumbers is like NewReplacerData, with ECMAScript
+// duplicate names mapped to their public group numbers in declaration order.
+// The map and its slices are read only during this call and may be reused.
+// Numeric replacement references still select individual groups.
+func NewReplacerDataWithGroupNumbers(rep string, caps map[int]int, capsize int, capnames map[string]int, op RegexOptions, groupNumbers map[string][]int) (*ReplacerData, error) {
+	return newReplacerData(rep, caps, capsize, capnames, op, groupNumbers)
+}
+
+func newReplacerData(rep string, caps map[int]int, capsize int, capnames map[string]int, op RegexOptions, namedCaptures map[string][]int) (*ReplacerData, error) {
 	p := parser{
-		options:  op,
-		caps:     caps,
-		capsize:  capsize,
-		capnames: capnames,
+		options:       op,
+		caps:          caps,
+		capsize:       capsize,
+		capnames:      capnames,
+		namedCaptures: namedCaptures,
 	}
 	p.setPattern(rep)
 	concat, err := p.scanReplacement()

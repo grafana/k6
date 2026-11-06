@@ -1,6 +1,9 @@
 package sobek
 
 import (
+	stdbase64 "encoding/base64"
+	stdhex "encoding/hex"
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -72,11 +75,6 @@ func (ctx *typedArraySortCtx) Swap(i, j int) {
 }
 
 func allocByteSlice(size int) (b []byte) {
-	defer func() {
-		if x := recover(); x != nil {
-			panic(rangeError(fmt.Sprintf("Buffer size is too large: %d", size)))
-		}
-	}()
 	if size < 0 {
 		panic(rangeError(fmt.Sprintf("Invalid buffer size: %d", size)))
 	}
@@ -109,6 +107,8 @@ func (r *Runtime) arrayBufferProto_getByteLength(call FunctionCall) Value {
 func (r *Runtime) arrayBufferProto_slice(call FunctionCall) Value {
 	o := r.toObject(call.This)
 	if b, ok := o.self.(*arrayBufferObject); ok {
+		// Source detached check before argument conversions (spec §25.1.6.7 step 3).
+		b.ensureNotDetached(true)
 		l := int64(len(b.data))
 		start := relToIdx(call.Argument(0).ToInteger(), l)
 		var stop int64
@@ -121,15 +121,17 @@ func (r *Runtime) arrayBufferProto_slice(call FunctionCall) Value {
 		newLen := max(stop-start, 0)
 		ret := r.speciesConstructor(o, r.getArrayBuffer())([]Value{intToValue(newLen)}, nil)
 		if ab, ok := ret.self.(*arrayBufferObject); ok {
+			// Re-check source after side effects (spec step 13), then validate
+			// the species result regardless of newLen (spec steps 14-17).
+			b.ensureNotDetached(true)
+			if ret == o {
+				panic(r.NewTypeError("Species constructor returned the same ArrayBuffer"))
+			}
+			if int64(len(ab.data)) < newLen {
+				panic(r.NewTypeError("Species constructor returned an ArrayBuffer that is too small: %d", len(ab.data)))
+			}
+			ab.ensureNotDetached(true)
 			if newLen > 0 {
-				b.ensureNotDetached(true)
-				if ret == o {
-					panic(r.NewTypeError("Species constructor returned the same ArrayBuffer"))
-				}
-				if int64(len(ab.data)) < newLen {
-					panic(r.NewTypeError("Species constructor returned an ArrayBuffer that is too small: %d", len(ab.data)))
-				}
-				ab.ensureNotDetached(true)
 				copy(ab.data, b.data[start:stop])
 			}
 			return ret
@@ -137,6 +139,51 @@ func (r *Runtime) arrayBufferProto_slice(call FunctionCall) Value {
 		panic(r.NewTypeError("Species constructor did not return an ArrayBuffer: %s", ret.String()))
 	}
 	panic(r.NewTypeError("Object is not ArrayBuffer: %s", o))
+}
+
+func (r *Runtime) arrayBufferProto_getDetached(call FunctionCall) Value {
+	o := r.toObject(call.This)
+	if b, ok := o.self.(*arrayBufferObject); ok {
+		return r.toBoolean(b.detached)
+	}
+	panic(r.NewTypeError("Object is not ArrayBuffer: %s", o))
+}
+
+// arrayBufferCopyAndDetach implements ArrayBufferCopyAndDetach (https://tc39.es/ecma262/#sec-arraybuffercopyanddetach).
+// Resizable buffers are not supported, so the result is always a fixed-length buffer.
+func (r *Runtime) arrayBufferCopyAndDetach(this, newLength Value) Value {
+	o := r.toObject(this)
+	b, ok := o.self.(*arrayBufferObject)
+	if !ok {
+		panic(r.NewTypeError("Object is not ArrayBuffer: %s", o))
+	}
+	var newByteLength int
+	if newLength == _undefined {
+		newByteLength = len(b.data)
+	} else {
+		newByteLength = r.toIndex(newLength)
+	}
+	b.ensureNotDetached(true)
+	var data []byte
+	if newByteLength <= len(b.data) {
+		// Hand the existing bytes over to the new buffer instead of copying them.
+		data = b.data[:newByteLength]
+	} else {
+		data = allocByteSlice(newByteLength)
+		copy(data, b.data)
+	}
+	b.detach()
+	newBuffer := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
+	newBuffer.data = data
+	return newBuffer.val
+}
+
+func (r *Runtime) arrayBufferProto_transfer(call FunctionCall) Value {
+	return r.arrayBufferCopyAndDetach(call.This, call.Argument(0))
+}
+
+func (r *Runtime) arrayBufferProto_transferToFixedLength(call FunctionCall) Value {
+	return r.arrayBufferCopyAndDetach(call.This, call.Argument(0))
 }
 
 func (r *Runtime) arrayBuffer_isView(call FunctionCall) Value {
@@ -233,6 +280,13 @@ func (r *Runtime) dataViewProto_getByteOffset(call FunctionCall) Value {
 	panic(r.NewTypeError("Method get DataView.prototype.byteOffset called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
+func (r *Runtime) dataViewProto_getFloat16(call FunctionCall) Value {
+	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
+		return floatToValue(dv.viewedArrayBuf.getFloat16(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 2)))
+	}
+	panic(r.NewTypeError("Method DataView.prototype.getFloat16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
+}
+
 func (r *Runtime) dataViewProto_getFloat32(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return floatToValue(float64(dv.viewedArrayBuf.getFloat32(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 4))))
@@ -303,6 +357,17 @@ func (r *Runtime) dataViewProto_getBigUint64(call FunctionCall) Value {
 		return (*valueBigInt)(dv.viewedArrayBuf.getBigUint64(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0).ToNumber()), call.Argument(1), 8)))
 	}
 	panic(r.NewTypeError("Method DataView.prototype.getBigUint64 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
+}
+
+func (r *Runtime) dataViewProto_setFloat16(call FunctionCall) Value {
+	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
+		idxVal := r.toIndex(call.Argument(0))
+		val := toFloat16Bits(call.Argument(1))
+		idx, bo := dv.getIdxAndByteOrder(idxVal, call.Argument(2), 2)
+		dv.viewedArrayBuf.setFloat16(idx, val, bo)
+		return _undefined
+	}
+	panic(r.NewTypeError("Method DataView.prototype.setFloat16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setFloat32(call FunctionCall) Value {
@@ -514,6 +579,18 @@ func (r *Runtime) typedArrayProto_fill(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		ta.viewedArrayBuf.ensureNotDetached(true)
 		l := int64(ta.length)
+		// Per the spec, the fill value is converted before the start and end index
+		// coercion. The converted value is always a primitive (Number or BigInt),
+		// so converting it further to the element type inside the fill()
+		// implementation cannot have side effects (and thus cannot detach the
+		// buffer in the middle of the fill).
+		var value Value
+		switch ta.typedArray.(type) {
+		case *bigInt64Array, *bigUint64Array:
+			value = toBigInt(call.Argument(0))
+		default:
+			value = call.Argument(0).ToNumber()
+		}
 		k := toIntStrict(relToIdx(call.Argument(1).ToInteger(), l))
 		var relEnd int64
 		if endArg := call.Argument(2); endArg != _undefined {
@@ -522,10 +599,9 @@ func (r *Runtime) typedArrayProto_fill(call FunctionCall) Value {
 			relEnd = l
 		}
 		final := toIntStrict(relToIdx(relEnd, l))
-		value := ta.typedArray.toRaw(call.Argument(0))
 		ta.viewedArrayBuf.ensureNotDetached(true)
-		for ; k < final; k++ {
-			ta.typedArray.setRaw(ta.offset+k, value)
+		if length := final - k; length > 0 {
+			ta.typedArray.fill(value, ta.offset+k, length)
 		}
 		return call.This
 	}
@@ -715,9 +791,6 @@ func (r *Runtime) typedArrayProto_includes(call FunctionCall) Value {
 		}
 
 		searchElement := call.Argument(0)
-		if searchElement == _negativeZero {
-			searchElement = _positiveZero
-		}
 		startIdx := toIntStrict(n)
 		if !ta.viewedArrayBuf.ensureNotDetached(false) {
 			if searchElement == _undefined && startIdx < ta.length {
@@ -725,15 +798,7 @@ func (r *Runtime) typedArrayProto_includes(call FunctionCall) Value {
 			}
 			return valueFalse
 		}
-		if ta.typedArray.typeMatch(searchElement) {
-			se := ta.typedArray.toRaw(searchElement)
-			for k := startIdx; k < ta.length; k++ {
-				if ta.typedArray.getRaw(ta.offset+k) == se {
-					return valueTrue
-				}
-			}
-		}
-		return valueFalse
+		return r.toBoolean(ta.typedArray.includes(searchElement, ta.offset+startIdx, ta.length-startIdx))
 	}
 	panic(r.NewTypeError("Method TypedArray.prototype.includes called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
@@ -775,17 +840,9 @@ func (r *Runtime) typedArrayProto_indexOf(call FunctionCall) Value {
 		}
 
 		if ta.viewedArrayBuf.ensureNotDetached(false) {
-			searchElement := call.Argument(0)
-			if searchElement == _negativeZero {
-				searchElement = _positiveZero
-			}
-			if !IsNaN(searchElement) && ta.typedArray.typeMatch(searchElement) {
-				se := ta.typedArray.toRaw(searchElement)
-				for k := toIntStrict(n); k < ta.length; k++ {
-					if ta.typedArray.getRaw(ta.offset+k) == se {
-						return intToValue(int64(k))
-					}
-				}
+			start := toIntStrict(n)
+			if idx := ta.typedArray.indexOf(call.Argument(0), ta.offset+start, ta.length-start); idx >= 0 {
+				return intToValue(int64(start + idx))
 			}
 		}
 		return intToValue(-1)
@@ -866,17 +923,9 @@ func (r *Runtime) typedArrayProto_lastIndexOf(call FunctionCall) Value {
 		}
 
 		if ta.viewedArrayBuf.ensureNotDetached(false) {
-			searchElement := call.Argument(0)
-			if searchElement == _negativeZero {
-				searchElement = _positiveZero
-			}
-			if !IsNaN(searchElement) && ta.typedArray.typeMatch(searchElement) {
-				se := ta.typedArray.toRaw(searchElement)
-				for k := toIntStrict(fromIndex); k >= 0; k-- {
-					if ta.typedArray.getRaw(ta.offset+k) == se {
-						return intToValue(int64(k))
-					}
-				}
+			// Search the [0, fromIndex] range backwards.
+			if idx := ta.typedArray.lastIndexOf(call.Argument(0), ta.offset, toIntStrict(fromIndex)+1); idx >= 0 {
+				return intToValue(int64(idx))
 			}
 		}
 
@@ -1013,6 +1062,9 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 					src.viewedArrayBuf.data[src.offset*src.elemSize:(src.offset+srcLen)*src.elemSize])
 			} else {
 				checkTypedArrayMixBigInt(src.defaultCtor, ta.defaultCtor)
+				if srcLen == 0 {
+					return _undefined
+				}
 				curSrc := uintptr(unsafe.Pointer(&src.viewedArrayBuf.data[src.offset*src.elemSize]))
 				endSrc := curSrc + uintptr(srcLen*src.elemSize)
 				curDst := uintptr(unsafe.Pointer(&ta.viewedArrayBuf.data[(ta.offset+targetOffset)*ta.elemSize]))
@@ -1317,10 +1369,10 @@ func (r *Runtime) typedArray_from(call FunctionCall) Value {
 	if mapFn := call.Argument(1); mapFn != _undefined {
 		mapFc = r.toCallable(mapFn)
 	}
-	source := r.toObject(call.Argument(0))
-	usingIter := toMethod(source.self.getSym(SymIterator, nil))
+	items := call.Argument(0)
+	usingIter := toMethod(r.getV(items, SymIterator))
 	if usingIter != nil {
-		values := r.iterableToList(source, usingIter)
+		values := r.iterableToList(items, usingIter)
 		ta := r.typedArrayCreate(c, intToValue(int64(len(values))))
 		if mapFc == nil {
 			for idx, val := range values {
@@ -1339,6 +1391,7 @@ func (r *Runtime) typedArray_from(call FunctionCall) Value {
 		}
 		return ta.val
 	}
+	source := items.ToObject(r)
 	length := toIntStrict(toLength(source.self.getStr("length", nil)))
 	ta := r.typedArrayCreate(c, intToValue(int64(length)))
 	if mapFc == nil {
@@ -1490,7 +1543,7 @@ func (r *Runtime) _newTypedArrayFromTypedArray(src *typedArrayObject, newTarget 
 	src.viewedArrayBuf.ensureNotDetached(true)
 	l := src.length
 
-	dst.viewedArrayBuf.data = allocByteSlice(toIntStrict(int64(l) * int64(dst.elemSize)))
+	dst.viewedArrayBuf.data = allocByteSlice(safeMul(l, dst.elemSize))
 	src.viewedArrayBuf.ensureNotDetached(true)
 	if src.defaultCtor == dst.defaultCtor {
 		copy(dst.viewedArrayBuf.data, src.viewedArrayBuf.data[src.offset*src.elemSize:])
@@ -1504,6 +1557,17 @@ func (r *Runtime) _newTypedArrayFromTypedArray(src *typedArrayObject, newTarget 
 		dst.typedArray.set(i, src.typedArray.get(src.offset+i))
 	}
 	return dst.val
+}
+
+// Creates typedArrayObject from directly by data to avoiding extra allocation.
+// Caller must not retain or modify it, because the underlying ArrayBuffer takes ownership of it.
+// len(data) must be a multiple of the element size.
+func (r *Runtime) newTypedArrayWithData(data []byte, newTarget *Object, taCtor typedArrayObjectCtor, proto *Object) *typedArrayObject {
+	ab := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
+	ab.data = data
+	ta := taCtor(ab, 0, 0, r.getPrototypeFromCtor(newTarget, nil, proto))
+	ta.length = len(data) / ta.elemSize
+	return ta
 }
 
 func (r *Runtime) _newTypedArray(args []Value, newTarget *Object, taCtor typedArrayObjectCtor, proto *Object) *Object {
@@ -1559,6 +1623,10 @@ func (r *Runtime) newInt32Array(args []Value, newTarget, proto *Object) *Object 
 	return r._newTypedArray(args, newTarget, r.newInt32ArrayObject, proto)
 }
 
+func (r *Runtime) newFloat16Array(args []Value, newTarget, proto *Object) *Object {
+	return r._newTypedArray(args, newTarget, r.newFloat16ArrayObject, proto)
+}
+
 func (r *Runtime) newFloat32Array(args []Value, newTarget, proto *Object) *Object {
 	return r._newTypedArray(args, newTarget, r.newFloat32ArrayObject, proto)
 }
@@ -1575,6 +1643,203 @@ func (r *Runtime) newBigUint64Array(args []Value, newTarget, proto *Object) *Obj
 	return r._newTypedArray(args, newTarget, r.newBigUint64ArrayObject, proto)
 }
 
+func (r *Runtime) uint8Array_fromHex(call FunctionCall) Value {
+	s, ok := call.Argument(0).(String)
+	if !ok {
+		panic(r.NewTypeError("Uint8Array.fromHex requires a string"))
+	}
+	b, err := fromHex(s)
+	if err != nil {
+		panic(r.newSyntaxError(err.Error())) // SyntaxError for odd-length-input or illegal-characters
+	}
+	return r.newTypedArrayWithData(b, r.getUint8Array(), r.newUint8ArrayObject, nil).val
+}
+
+func (r *Runtime) uint8Array_fromBase64(call FunctionCall) Value {
+	// 1. If string is not a String, throw a TypeError exception.
+	s, ok := call.Argument(0).(String)
+	if !ok {
+		panic(r.NewTypeError("Uint8Array.fromBase64 requires a string"))
+	}
+	// 2. Let opts be ? GetOptionsObject(options).
+	// 3.-8. Get and validate "alphabet" and "lastChunkHandling".
+	decodeMap, lastChunkHandling := r.parseFromBase64Options(call.Argument(1))
+
+	// 9. Let result be FromBase64(string, alphabet, lastChunkHandling).
+	_, b, err := fromBase64(s, decodeMap, lastChunkHandling)
+	if err != nil {
+		panic(r.newSyntaxError(err.Error()))
+	}
+	return r.newTypedArrayWithData(b, r.getUint8Array(), r.newUint8ArrayObject, nil).val
+}
+
+// parseFromBase64Options reads the "alphabet" and "lastChunkHandling" options shared by
+// Uint8Array.fromBase64 and Uint8Array.prototype.setFromBase64.
+func (r *Runtime) parseFromBase64Options(options Value) (decodeMap *[256]byte, lastChunkHandling base64LastChunkHandling) {
+	// The defaults above are what an empty options object yields, so an undefined
+	// one needs no allocation to be read.
+	if options == nil || options == _undefined {
+		return &base64DecodeMap, base64LastChunkHandlingLoose
+	}
+	opts, ok := options.(*Object)
+	if !ok {
+		panic(r.NewTypeError("Options is not an object"))
+	}
+	if v := opts.self.getStr("alphabet", nil); v != nil && v != _undefined {
+		str, ok := v.(String)
+		if ok {
+			switch str.String() {
+			case "base64":
+				decodeMap = &base64DecodeMap
+			case "base64url":
+				decodeMap = &base64DecodeMapUrl
+			}
+		}
+		if decodeMap == nil {
+			panic(r.NewTypeError("alphabet must be \"base64\" or \"base64url\""))
+		}
+	} else {
+		decodeMap = &base64DecodeMap
+	}
+	if v := opts.self.getStr("lastChunkHandling", nil); v != nil && v != _undefined {
+		str, ok := v.(String)
+		if ok {
+			switch str.String() {
+			case "loose":
+				lastChunkHandling = base64LastChunkHandlingLoose
+			case "strict":
+				lastChunkHandling = base64LastChunkHandlingStrict
+			case "stop-before-partial":
+				lastChunkHandling = base64LastChunkHandlingStop
+			}
+		}
+		if lastChunkHandling == base64LastChunkHandlingInvalid {
+			panic(r.NewTypeError(`lastChunkHandling must be "loose", "strict" or "stop-before-partial"`))
+		}
+	} else {
+		lastChunkHandling = base64LastChunkHandlingLoose
+	}
+	return
+}
+
+func (r *Runtime) uint8ArrayProto_toBase64(call FunctionCall) Value {
+	ta := r.validateUint8Array(call.This)
+	enc := r.parseToBase64Encoding(call.Argument(0))
+	// GetUint8ArrayBytes runs after the option getters, which may have detached the buffer.
+	toEnc := r.getUint8ArrayBytes(ta)
+	buf := make([]byte, enc.EncodedLen(len(toEnc)))
+	enc.Encode(buf, toEnc)
+	return asciiString(unsafe.String(unsafe.SliceData(buf), len(buf)))
+}
+
+// parseToBase64Encoding reads the "alphabet" and "omitPadding" options of
+// Uint8Array.prototype.toBase64(section 3. to 10.) and returns the encoding they select:
+// the base64 encoding of section 4 of RFC 4648, or the base64url encoding of section 5.
+func (r *Runtime) parseToBase64Encoding(options Value) *stdbase64.Encoding {
+	// The defaults are "base64" and omitPadding false.
+	if options == nil || options == _undefined {
+		return stdbase64.StdEncoding
+	}
+	// 3. Let opts be ? GetOptionsObject(options).
+	opts, ok := options.(*Object)
+	if !ok {
+		panic(r.NewTypeError("Options is not an object"))
+	}
+	// 4. Let alphabet be ? Get(opts, "alphabet").
+	alphabetVal := nilSafe(opts.self.getStr("alphabet", nil))
+	// 5. If alphabet is undefined, set alphabet to "base64".
+	alphabet := "base64"
+	if alphabetVal != _undefined {
+		str, ok := alphabetVal.(String)
+		if ok {
+			alphabet = str.String()
+		}
+		// 6. If alphabet is neither "base64" nor "base64url", throw a TypeError exception.
+		if !ok || (alphabet != "base64" && alphabet != "base64url") {
+			panic(r.NewTypeError(`alphabet must be "base64" or "base64url"`))
+		}
+	}
+	// 7.-8. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
+	omitPadding := false
+	if v := opts.self.getStr("omitPadding", nil); v != nil {
+		omitPadding = v.ToBoolean()
+	}
+	if alphabet == "base64" {
+		if omitPadding {
+			return stdbase64.RawStdEncoding
+		}
+		return stdbase64.StdEncoding
+	}
+	if omitPadding {
+		return stdbase64.RawURLEncoding
+	}
+	return stdbase64.URLEncoding
+}
+
+func (r *Runtime) uint8ArrayProto_toHex(call FunctionCall) Value {
+	ta := r.validateUint8Array(call.This)
+	toEnc := r.getUint8ArrayBytes(ta)
+	buf := make([]byte, stdhex.EncodedLen(len(toEnc)))
+	stdhex.Encode(buf, toEnc)
+	return asciiString(unsafe.String(unsafe.SliceData(buf), len(buf)))
+}
+
+func (r *Runtime) uint8ArrayProto_setFromHex(call FunctionCall) Value {
+	// 2. Perform ? ValidateUint8Array(into).
+	ta := r.validateUint8Array(call.This)
+	// 3. If string is not a String, throw a TypeError exception.
+	s, ok := call.Argument(0).(String)
+	if !ok {
+		panic(r.NewTypeError("Uint8Array.prototype.setFromHex requires a string"))
+	}
+
+	// 6. Let result be FromHex(string, byteLength).
+	into := r.getUint8ArrayBytes(ta)
+	// Whatever was decoded before the error has already been written into the
+	// destination, as required by the spec (SetUint8ArrayBytes runs before the throw).
+	// Writes data directly, instead of using [SetUint8ArrayBytes], to avoiding extra allocation.
+	written, err := fromHexInto(s, len(into), into)
+	if err != nil {
+		panic(r.newSyntaxError(err.Error()))
+	}
+	res := r.NewObject()
+	res.self.setOwnStr("read", intToValue(int64(2*written)), false)
+	res.self.setOwnStr("written", intToValue(int64(written)), false)
+	return res
+}
+
+func (r *Runtime) uint8ArrayProto_setFromBase64(call FunctionCall) Value {
+	// 2. Perform ? ValidateUint8Array(ta).
+	ta := r.validateUint8Array(call.This)
+	// 3. If string is not a String, throw a TypeError exception.
+	s, ok := call.Argument(0).(String)
+	if !ok {
+		panic(r.NewTypeError("Uint8Array.prototype.setFromBase64 requires a string"))
+	}
+	// 4. Let opts be ? GetOptionsObject(options).
+	// 5.-10. Get and validate "alphabet" and "lastChunkHandling".
+	decodeMap, lastChunkHandling := r.parseFromBase64Options(call.Argument(1))
+
+	// 11.-12. Let taRecord be ? ValidateTypedArrayBounds(taRecord, seq-cst),
+	// and let byteLength be TypedArrayLength(taRecord).
+	// The option getters above may have detached the buffer; getUint8ArrayBytes throws then.
+	into := r.getUint8ArrayBytes(ta)
+	// 13.-18. Let result be FromBase64(string, alphabet, lastChunkHandling, byteLength).
+	// Whatever was decoded before an error has already been written into the
+	// destination, as required by the spec (SetUint8ArrayBytes runs before the throw).
+	// Writes data directly, instead of using [SetUint8ArrayBytes], to avoiding extra allocation.
+	read, written, err := fromBase64Into(s, decodeMap, lastChunkHandling, into)
+
+	if err != nil {
+		panic(r.newSyntaxError(err.Error()))
+	}
+
+	res := r.NewObject()
+	res.self.setOwnStr("read", intToValue(int64(read)), false)
+	res.self.setOwnStr("written", intToValue(int64(written)), false)
+	return res
+}
+
 func (r *Runtime) createArrayBufferProto(val *Object) objectImpl {
 	b := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
 	byteLengthProp := &valueProperty{
@@ -1584,7 +1849,14 @@ func (r *Runtime) createArrayBufferProto(val *Object) objectImpl {
 	}
 	b._put("byteLength", byteLengthProp)
 	b._putProp("constructor", r.getArrayBuffer(), true, false, true)
+	b._put("detached", &valueProperty{
+		accessor:     true,
+		configurable: true,
+		getterFunc:   r.newNativeFunc(r.arrayBufferProto_getDetached, "get detached", 0),
+	})
 	b._putProp("slice", r.newNativeFunc(r.arrayBufferProto_slice, "slice", 2), true, false, true)
+	b._putProp("transfer", r.newNativeFunc(r.arrayBufferProto_transfer, "transfer", 0), true, false, true)
+	b._putProp("transferToFixedLength", r.newNativeFunc(r.arrayBufferProto_transferToFixedLength, "transferToFixedLength", 0), true, false, true)
 	b._putSym(SymToStringTag, valueProp(asciiString("ArrayBuffer"), false, false, true))
 	return b
 }
@@ -1621,7 +1893,7 @@ func (r *Runtime) getTypedArray() *Object {
 	return ret
 }
 
-func (r *Runtime) createTypedArrayCtor(val *Object, ctor func(args []Value, newTarget, proto *Object) *Object, name unistring.String, bytesPerElement int) {
+func (r *Runtime) createTypedArrayCtor(val *Object, ctor func(args []Value, newTarget, proto *Object) *Object, name unistring.String, bytesPerElement int) *baseObject {
 	p := r.newBaseObject(r.getTypedArrayPrototype(), classObject)
 	o := r.newNativeConstructOnly(val, func(args []Value, newTarget *Object) *Object {
 		return ctor(args, newTarget, p.val)
@@ -1633,6 +1905,7 @@ func (r *Runtime) createTypedArrayCtor(val *Object, ctor func(args []Value, newT
 	bpe := intToValue(int64(bytesPerElement))
 	o._putProp("BYTES_PER_ELEMENT", bpe, false, false, false)
 	p._putProp("BYTES_PER_ELEMENT", bpe, false, false, false)
+	return p
 }
 
 func addTypedArrays(t *objectTemplate) {
@@ -1645,6 +1918,7 @@ func addTypedArrays(t *objectTemplate) {
 	t.putStr("Int16Array", func(r *Runtime) Value { return valueProp(r.getInt16Array(), true, false, true) })
 	t.putStr("Uint32Array", func(r *Runtime) Value { return valueProp(r.getUint32Array(), true, false, true) })
 	t.putStr("Int32Array", func(r *Runtime) Value { return valueProp(r.getInt32Array(), true, false, true) })
+	t.putStr("Float16Array", func(r *Runtime) Value { return valueProp(r.getFloat16Array(), true, false, true) })
 	t.putStr("Float32Array", func(r *Runtime) Value { return valueProp(r.getFloat32Array(), true, false, true) })
 	t.putStr("Float64Array", func(r *Runtime) Value { return valueProp(r.getFloat64Array(), true, false, true) })
 	t.putStr("BigInt64Array", func(r *Runtime) Value { return valueProp(r.getBigInt64Array(), true, false, true) })
@@ -1767,7 +2041,20 @@ func (r *Runtime) getUint8Array() *Object {
 	if ret == nil {
 		ret = &Object{runtime: r}
 		r.global.Uint8Array = ret
-		r.createTypedArrayCtor(ret, r.newUint8Array, "Uint8Array", 1)
+		p := r.createTypedArrayCtor(ret, r.newUint8Array, "Uint8Array", 1)
+
+		// Applies Uint8Array only, not other TypedArrays.
+		// implements Uint8Array.fromHex/Uint8Array.fromBase64 static method
+		o := ret.self.(*nativeFuncObject)
+		o._putProp("fromBase64", r.newNativeFunc(r.uint8Array_fromBase64, "fromBase64", 1), true, false, true)
+		o._putProp("fromHex", r.newNativeFunc(r.uint8Array_fromHex, "fromHex", 1), true, false, true)
+
+		// implements Uint8Array.prototype.setFromHex/Uint8Array.prototype.setFromBase64 method
+		p._putProp("setFromBase64", r.newNativeFunc(r.uint8ArrayProto_setFromBase64, "setFromBase64", 1), true, false, true)
+		p._putProp("setFromHex", r.newNativeFunc(r.uint8ArrayProto_setFromHex, "setFromHex", 1), true, false, true)
+		// implements Uint8Array.prototype.toHex/Uint8Array.prototype.toBase64 method
+		p._putProp("toBase64", r.newNativeFunc(r.uint8ArrayProto_toBase64, "toBase64", 0), true, false, true)
+		p._putProp("toHex", r.newNativeFunc(r.uint8ArrayProto_toHex, "toHex", 0), true, false, true)
 	}
 	return ret
 }
@@ -1828,6 +2115,16 @@ func (r *Runtime) getInt32Array() *Object {
 		ret = &Object{runtime: r}
 		r.global.Int32Array = ret
 		r.createTypedArrayCtor(ret, r.newInt32Array, "Int32Array", 4)
+	}
+	return ret
+}
+
+func (r *Runtime) getFloat16Array() *Object {
+	ret := r.global.Float16Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Float16Array = ret
+		r.createTypedArrayCtor(ret, r.newFloat16Array, "Float16Array", 2)
 	}
 	return ret
 }
@@ -1902,6 +2199,7 @@ func createDataViewProtoTemplate() *objectTemplate {
 
 	t.putStr("constructor", func(r *Runtime) Value { return valueProp(r.getDataView(), true, false, true) })
 
+	t.putStr("getFloat16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat16, "getFloat16", 1) })
 	t.putStr("getFloat32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat32, "getFloat32", 1) })
 	t.putStr("getFloat64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat64, "getFloat64", 1) })
 	t.putStr("getInt8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getInt8, "getInt8", 1) })
@@ -1912,6 +2210,7 @@ func createDataViewProtoTemplate() *objectTemplate {
 	t.putStr("getUint32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getUint32, "getUint32", 1) })
 	t.putStr("getBigInt64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getBigInt64, "getBigInt64", 1) })
 	t.putStr("getBigUint64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getBigUint64, "getBigUint64", 1) })
+	t.putStr("setFloat16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat16, "setFloat16", 2) })
 	t.putStr("setFloat32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat32, "setFloat32", 2) })
 	t.putStr("setFloat64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat64, "setFloat64", 2) })
 	t.putStr("setInt8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setInt8, "setInt8", 2) })
@@ -1976,4 +2275,59 @@ func (r *Runtime) getArrayBuffer() *Object {
 		ret.self = r.createArrayBuffer(ret)
 	}
 	return ret
+}
+
+// TC39 Abstract Operations for Uint8Array Objects - [ValidateUint8Array(ta)].
+// If ta.[[TypedArrayName]] is not "Uint8Array", throw a TypeError exception.
+//
+// [ValidateUint8Array(ta)]: https://tc39.es/ecma262/multipage/indexed-collections.html#sec-validateuint8array
+func (r *Runtime) validateUint8Array(v Value) *typedArrayObject {
+	if obj, ok := v.(*Object); ok {
+		if ta, ok := obj.self.(*typedArrayObject); ok {
+			if _, ok := ta.typedArray.(*uint8Array); ok {
+				// Don't call ensureNotDetached.
+				// Because Uint8Array.prototype.toBase64 checks for detachedness after side-effects are finished
+				return ta
+			}
+		}
+	}
+	panic(r.NewTypeError("Receiver must be a Uint8Array"))
+}
+
+// TC39 Abstract Operations for Uint8Array Objects - [GetUint8ArrayBytes(ta)].
+//
+// [GetUint8ArrayBytes(ta)]: https://tc39.es/ecma262/multipage/indexed-collections.html#sec-getuint8arraybytes
+func (r *Runtime) getUint8ArrayBytes(ta *typedArrayObject) []byte {
+	ta.viewedArrayBuf.ensureNotDetached(true)
+	return ta.viewedArrayBuf.data[ta.offset : ta.offset+ta.length]
+}
+
+// https://tc39.es/ecma262/multipage/indexed-collections.html#sec-frombase64
+func fromBase64Into(s String, decodeMap *[256]byte, lastChunkHandling base64LastChunkHandling, dst []byte) (read, written int, err error) {
+	a, u := devirtualizeString(s)
+	if u == nil {
+		return base64DecodeAscii(a, s, decodeMap, lastChunkHandling, dst)
+	}
+
+	return base64DecodeUnicode(u, s, decodeMap, lastChunkHandling, dst)
+}
+
+// https://tc39.es/ecma262/multipage/indexed-collections.html#sec-fromhex
+func fromHex(s String) ([]byte, error) {
+	b, err := stdhex.DecodeString(s.String())
+	return b, err
+}
+
+// https://tc39.es/ecma262/multipage/indexed-collections.html#sec-fromhex
+func fromHexInto(s String, maxLength int, dst []byte) (written int, err error) {
+	// Length() counts UTF-16 code units.
+	length := s.Length()
+	if length%2 != 0 {
+		return 0, errors.New("string should have an even number of characters")
+	}
+	// while read < length and the number of elements in bytes < maxLength.
+	if length > maxLength*2 {
+		s = s.Substring(0, maxLength*2)
+	}
+	return stdhex.Decode(dst, []byte(s.String()))
 }

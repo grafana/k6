@@ -3,6 +3,7 @@ package regexp2
 import (
 	"bytes"
 	"fmt"
+	"sync/atomic"
 	"unicode/utf8"
 )
 
@@ -13,22 +14,25 @@ import (
 type Match struct {
 	Group //embeded group 0
 
-	regex       *Regexp
-	otherGroups []Group
-
-	// input to the match
-	textpos   int
-	textstart int
-
-	capcount   int
+	// Keep pointers and slices ahead of scalar state to shorten the portion
+	// of each match that the garbage collector must scan.
+	regex      *Regexp
 	sparseCaps map[int]int
+	// landmarks holds the required landmark searches that found this match.
+	landmarks   *requiredLandmarkState
+	otherGroups []Group
 
 	// output from the match
 	matches    [][]int
 	matchcount []int
 
-	// whether we've done any balancing with this match.  If we
-	// have done balancing, we'll need to do extra work in Tidy().
+	// input to the match
+	textpos   int
+	textstart int
+	capcount  int
+
+	// whether we've done any balancing with this match. If we have, full
+	// matches need capture-history compaction in tidy.
 	balancing bool
 }
 
@@ -44,8 +48,9 @@ type Group struct {
 type Capture struct {
 	// the original string
 	text *matchText
-	// RuneIndex is the position in the underlying rune slice where the first character of
-	// captured substring was found. Even if you pass in a string this will be in Runes.
+	// RuneIndex is the rune index in the original input where the capture starts.
+	// For string input this counts runes from the start of that string, not of
+	// any internally sliced decode buffer.
 	RuneIndex int
 	// RuneLength is the number of runes in the captured substring.
 	RuneLength int
@@ -55,24 +60,53 @@ type matchText struct {
 	runes            []rune
 	input            string
 	hasStringInput   bool
+	runeOffset       int // original-string rune index of runes[0]
+	byteOffset       int // original-string byte index of runes[0]
 	byteOffsets      []int
 	byteOffsetsReady bool
+	// The first returned capture retains this metadata anyway. Store it here
+	// to avoid a separate allocation; subsequent matches need their own record.
+	initialCaptureUsed bool
+	initialCapture     [1]Capture
+	// landmarkMatch is the last match that FindNextMatch found in this text.
+	// The first call to continue from it takes its landmarks.
+	landmarkMatch atomic.Pointer[Match]
 }
 
-// String returns the captured text as a String
+// String returns the captured text. For string input it is a slice of the
+// original haystack: it does not allocate and keeps the original string alive.
 func (c *Capture) String() string {
-	return string(c.text.runes[c.RuneIndex : c.RuneIndex+c.RuneLength])
+	if c.text == nil {
+		return ""
+	}
+	if c.text.hasStringInput {
+		start, length := c.ByteRange()
+		return c.text.input[start : start+length]
+	}
+	start := c.runeSliceIndex()
+	return string(c.text.runes[start : start+c.RuneLength])
 }
 
 // Runes returns the captured text as a rune slice
 func (c *Capture) Runes() []rune {
-	return c.text.runes[c.RuneIndex : c.RuneIndex+c.RuneLength]
+	if c.text == nil {
+		return nil
+	}
+	start := c.runeSliceIndex()
+	return c.text.runes[start : start+c.RuneLength]
+}
+
+func (c *Capture) runeSliceIndex() int {
+	if c.text == nil {
+		return c.RuneIndex
+	}
+	return c.RuneIndex - c.text.runeOffset
 }
 
 // ByteRange returns the UTF-8 byte index and byte length of the captured
-// substring. The first call lazily caches byte offsets on shared match text,
-// so it is not safe to call concurrently with ByteRange on another capture
-// from the same match until the cache has been initialized.
+// substring. Matches returned to callers have offsets computed when the match
+// is tidied, so concurrent ByteRange/String on captures of the same match is
+// then safe. Internal match objects may still initialize the cache on first use.
 func (c *Capture) ByteRange() (index, length int) {
 	if c.text == nil {
 		return c.RuneIndex, c.RuneLength
@@ -84,54 +118,58 @@ func newMatchText(r []rune) *matchText {
 	return &matchText{runes: r}
 }
 
-func newStringMatchText(input string, r []rune) *matchText {
-	return &matchText{runes: r, input: input, hasStringInput: true}
+func (t *matchText) resetString(input string, r []rune, runeOffset, byteOffset int) {
+	*t = matchText{
+		runes:          r,
+		input:          input,
+		hasStringInput: true,
+		runeOffset:     runeOffset,
+		byteOffset:     byteOffset,
+		// Every decoded rune consumes at least one byte, even invalid UTF-8.
+		// Equal lengths therefore mean byte and rune offsets are identical.
+		byteOffsetsReady: len(input)-byteOffset == len(r),
+	}
+}
+
+func (t *matchText) ensureByteOffsets() {
+	if t == nil || t.byteOffsetsReady {
+		return
+	}
+	t.byteOffsets = t.buildByteOffsets()
+	t.byteOffsetsReady = true
 }
 
 func (t *matchText) byteRange(runeIndex, runeLength int) (int, int) {
-	if !t.byteOffsetsReady {
-		t.byteOffsets = t.buildByteOffsets()
-		t.byteOffsetsReady = true
-	}
+	localRuneIndex := runeIndex - t.runeOffset
+	t.ensureByteOffsets()
 	if t.byteOffsets == nil {
-		return runeIndex, runeLength
+		return t.byteOffset + localRuneIndex, runeLength
 	}
-	byteIndex := t.byteOffsets[runeIndex]
-	return byteIndex, t.byteOffsets[runeIndex+runeLength] - byteIndex
+	byteIndex := t.byteOffsets[localRuneIndex]
+	return t.byteOffset + byteIndex, t.byteOffsets[localRuneIndex+runeLength] - byteIndex
 }
 
 func (t *matchText) buildByteOffsets() []int {
 	if t.hasStringInput {
-		return stringByteOffsets(t.input)
+		return stringByteOffsets(t.input[t.byteOffset:], len(t.runes))
 	}
 	return runeByteOffsets(t.runes)
 }
 
-func stringByteOffsets(s string) []int {
-	var byteOffsets []int
-	runeIndex := 0
-	for strIdx, ch := range s {
-		if byteOffsets != nil {
-			byteOffsets[runeIndex] = strIdx
-		}
-		runeLen := utf8.RuneLen(ch)
-		if ch == utf8.RuneError {
-			_, runeLen = utf8.DecodeRuneInString(s[strIdx:])
-		}
-		if byteOffsets == nil && (strIdx != runeIndex || runeLen != 1) {
-			byteOffsets = make([]int, len(s)+1)
-			for i := 0; i < runeIndex; i++ {
-				byteOffsets[i] = i
-			}
-			byteOffsets[runeIndex] = strIdx
-		}
-		runeIndex++
+func stringByteOffsets(s string, runeCount int) []int {
+	if len(s) == runeCount {
+		return nil
 	}
-	if byteOffsets != nil {
-		byteOffsets[runeIndex] = len(s)
-		return byteOffsets[:runeIndex+1]
+	// Decoding already established the rune count. A range walk gives the
+	// original byte positions, including one-byte invalid UTF-8 sequences.
+	offsets := make([]int, runeCount+1)
+	i := 0
+	for byteIndex := range s {
+		offsets[i] = byteIndex
+		i++
 	}
-	return nil
+	offsets[runeCount] = len(s)
+	return offsets
 }
 
 func runeByteOffsets(runes []rune) []int {
@@ -161,19 +199,35 @@ func runeByteOffsets(runes []rune) []int {
 }
 
 func newMatch(regex *Regexp, capcount int, text *matchText, startpos int) *Match {
-	m := Match{
-		regex:      regex,
-		matchcount: make([]int, capcount),
-		matches:    make([][]int, capcount),
-		textstart:  startpos,
-		balancing:  false,
+	var m *Match
+	if capcount == 1 {
+		// With no explicit capture groups, keep the whole-match bookkeeping in
+		// one allocation rather than allocating three separate slice backings.
+		storage := new(struct {
+			Match
+			countsAndInterval [3]int
+			intervals         [1][]int
+		})
+		m = &storage.Match
+		m.matchcount = storage.countsAndInterval[:1:1]
+		m.matches = storage.intervals[:]
+		m.matches[0] = storage.countsAndInterval[1:]
+	} else {
+		// Capture counts and the initial whole-match interval have the same lifetime.
+		countsAndInterval := make([]int, capcount+2)
+		m = &Match{
+			matchcount: countsAndInterval[:capcount:capcount],
+			matches:    make([][]int, capcount),
+		}
+		m.matches[0] = countsAndInterval[capcount:]
 	}
+	m.regex = regex
+	m.textstart = startpos
 	if (regex.options & ECMAScript) == 0 {
 		m.Name = "0"
 	}
 	m.text = text
-	m.matches[0] = make([]int, 2)
-	return &m
+	return m
 }
 
 func newMatchSparse(regex *Regexp, caps map[int]int, capcount int, text *matchText, startpos int) *Match {
@@ -198,7 +252,16 @@ func (m *Match) tidy(textpos int) {
 	m.textpos = textpos
 	m.capcount = m.matchcount[0]
 	//copy our root capture to the list
-	m.Captures = []Capture{m.Capture}
+	if m.text != nil && !m.text.initialCaptureUsed {
+		m.text.initialCaptureUsed = true
+		m.text.initialCapture[0] = m.Capture
+		m.Captures = m.text.initialCapture[:]
+	} else {
+		m.Captures = []Capture{m.Capture}
+	}
+	if m.text != nil && m.text.hasStringInput {
+		m.text.ensureByteOffsets()
+	}
 
 	if m.balancing {
 		// The idea here is that we want to compact all of our unbalanced captures.  To do that we
@@ -328,7 +391,20 @@ func (m *Match) GroupCount() int {
 }
 
 // GroupByName returns a group based on the name of the group, or nil if the group name does not exist
+// For duplicate ECMAScript names, it selects the participating group, or the
+// first declaration if none participated.
 func (m *Match) GroupByName(name string) *Group {
+	// Participating selection follows ECMAScript 2025 §22.2.7.2 RegExpBuiltinExec,
+	// step 34.5;
+	// https://tc39.es/ecma262/2025/multipage/text-processing.html#sec-regexpbuiltinexec
+	if slots := m.regex.duplicateCapnames[name]; len(slots) > 0 {
+		for _, slot := range slots {
+			if m.isMatched(slot) {
+				return m.groupByIndex(slot)
+			}
+		}
+		return m.groupByIndex(slots[0])
+	}
 	num := m.regex.GroupNumberFromName(name)
 	if num < 0 {
 		return nil
@@ -340,10 +416,16 @@ func (m *Match) GroupByName(name string) *Group {
 func (m *Match) GroupByNumber(num int) *Group {
 	// check our sparse map
 	if m.sparseCaps != nil {
-		if newNum, ok := m.sparseCaps[num]; ok {
-			num = newNum
+		newNum, ok := m.sparseCaps[num]
+		if !ok {
+			return nil
 		}
+		num = newNum
 	}
+	return m.groupByIndex(num)
+}
+
+func (m *Match) groupByIndex(num int) *Group {
 	if num >= len(m.matchcount) || num < 0 {
 		return nil
 	}
@@ -371,7 +453,7 @@ func (m *Match) populateOtherGroups() {
 	if m.otherGroups == nil {
 		m.otherGroups = make([]Group, len(m.matchcount)-1)
 		for i := 0; i < len(m.otherGroups); i++ {
-			m.otherGroups[i] = newGroup(m.regex.GroupNameFromNumber(i+1), m.text, m.matches[i+1], m.matchcount[i+1])
+			m.otherGroups[i] = newGroup(m.regex.groupNameFromSlot(i+1), m.text, m.matches[i+1], m.matchcount[i+1])
 		}
 	}
 }
@@ -415,6 +497,9 @@ func newCapture(text *matchText, runeIndex, runeLength int) Capture {
 }
 
 func setCaptureFields(c *Capture, runeIndex, runeLength int) {
+	if c.text != nil {
+		runeIndex += c.text.runeOffset
+	}
 	c.RuneIndex = runeIndex
 	c.RuneLength = runeLength
 }
