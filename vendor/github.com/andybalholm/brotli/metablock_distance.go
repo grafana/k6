@@ -44,7 +44,7 @@ func initBlockSplitterDistance(self *blockSplitterDistance, alphabet_size uint, 
 	brotli_ensure_capacity_uint32_t(&split.lengths, &split.lengths_alloc_size, max_num_blocks)
 	self.split_.num_blocks = max_num_blocks
 	*histograms_size = max_num_types
-	if histograms == nil || cap(*histograms) < int(*histograms_size) {
+	if cap(*histograms) < int(*histograms_size) {
 		*histograms = make([]histogramDistance, *histograms_size)
 	} else {
 		*histograms = (*histograms)[:*histograms_size]
@@ -58,10 +58,13 @@ func initBlockSplitterDistance(self *blockSplitterDistance, alphabet_size uint, 
 	self.last_histogram_ix_[0] = self.last_histogram_ix_[1]
 }
 
-/* Does either of three things:
-   (1) emits the current block with a new block type;
-   (2) emits the current block with the type of the second last block;
-   (3) merges the current block with the last block. */
+/*
+Does either of three things:
+
+	(1) emits the current block with a new block type;
+	(2) emits the current block with the type of the second last block;
+	(3) merges the current block with the last block.
+*/
 func blockSplitterFinishBlockDistance(self *blockSplitterDistance, is_final bool) {
 	var split *blockSplit = self.split_
 	var last_entropy []float64 = self.last_entropy_[:]
@@ -154,8 +157,10 @@ func blockSplitterFinishBlockDistance(self *blockSplitterDistance, is_final bool
 	}
 }
 
-/* Adds the next symbol to the current histogram. When the current histogram
-   reaches the target size, decides on merging the block. */
+/*
+Adds the next symbol to the current histogram. When the current histogram
+reaches the target size, decides on merging the block.
+*/
 func blockSplitterAddSymbolDistance(self *blockSplitterDistance, symbol uint) {
 	histogramAddDistance(&self.histograms_[self.curr_histogram_ix_], symbol)
 	self.block_size_++
