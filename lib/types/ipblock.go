@@ -18,6 +18,7 @@ type ipBlock struct {
 // from which it starts in an IPPool
 type ipPoolBlock struct {
 	firstIP, startIndex *big.Int
+	ipv6                bool
 }
 
 // IPPool represent a slice of IPBlocks
@@ -109,8 +110,11 @@ func (b ipPoolBlock) getIP(index *big.Int) net.IP {
 	// thinking about it - it looks like it's going to be kind of hard or badly defined
 	i := new(big.Int)
 	i.Add(b.firstIP, index)
-	// TODO use big.Int.FillBytes when golang 1.14 is no longer supported
-	return net.IP(i.Bytes())
+	size := net.IPv4len
+	if b.ipv6 {
+		size = net.IPv6len
+	}
+	return i.FillBytes(make(net.IP, size))
 }
 
 // NewIPPool returns an IPPool slice from the provided string representation that should be comma
@@ -129,6 +133,7 @@ func NewIPPool(ranges string) (*IPPool, error) {
 		pool.list[i] = ipPoolBlock{
 			firstIP:    r.firstIP,
 			startIndex: new(big.Int).Set(pool.count), // this is how many there are until now
+			ipv6:       r.ipv6,
 		}
 		pool.count.Add(pool.count, r.count)
 	}
