@@ -102,9 +102,30 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 	e.NextEmit = len(q.history)
 	q.history = append(q.history, src...)
 	if q.ChainLength > 0 {
-		q.chain = append(q.chain, make([]uint32, len(src))...)
+		oldLen := len(q.chain)
+		newLen := oldLen + len(src)
+		if cap(q.chain) < newLen {
+			newCap := 2 * cap(q.chain)
+			if newCap < newLen {
+				newCap = newLen
+			}
+			newChain := make([]uint32, newLen, newCap)
+			copy(newChain, q.chain)
+			q.chain = newChain
+		} else {
+			q.chain = q.chain[:newLen]
+			clear(q.chain[oldLen:])
+		}
 	}
 	src = q.history
+
+	hashMask := (uint64(1) << (8 * q.HashLen)) - 1
+	hashShift := uint(64 - q.TableBits)
+	table := q.table
+	chain := q.chain
+	chainLength := q.ChainLength
+	maxDistance := q.MaxDistance
+	minLength := q.MinLength
 
 	// matches stores the matches that have been found but not emitted,
 	// in reverse order. (matches[0] is the most recent one.)
@@ -117,7 +138,7 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 				if matches[1].End > matches[0].Start {
 					matches[1].End = matches[0].Start
 				}
-				if matches[1].End-matches[1].Start >= q.MinLength && q.score(matches[1]) > 0 {
+				if matches[1].End-matches[1].Start >= minLength && q.score(matches[1]) > 0 {
 					e.emit(matches[1])
 				}
 			}
@@ -128,53 +149,56 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 		// Look for a repeat match one byte after the current position.
 		if matches[0] == (absoluteMatch{}) && len(e.Dst) > 0 {
 			prevDistance := e.Dst[len(e.Dst)-1].Distance
-			if binary.LittleEndian.Uint32(src[i+1:]) == binary.LittleEndian.Uint32(src[i+1-prevDistance:]) && prevDistance != 0 {
+			repIndex := i + 1 - prevDistance
+			if 0 <= repIndex && repIndex < i+1 &&
+				binary.LittleEndian.Uint32(src[i+1:]) == binary.LittleEndian.Uint32(src[repIndex:]) {
 				// We have a 4-byte match.
-				m := extendMatch2(src, i+1, i+1-prevDistance, e.NextEmit+1)
-				if m.End-m.Start >= q.MinLength {
+				m := extendMatch2(src, i+1, repIndex, e.NextEmit+1)
+				if m.End-m.Start >= minLength {
 					matches[0] = m
 				}
 			}
 		}
 
 		// Calculate and store the hash.
-		h := ((binary.LittleEndian.Uint64(src[i:]) & (1<<(8*q.HashLen) - 1)) * hashMul64) >> (64 - q.TableBits)
-		candidate := int(q.table[h])
-		q.table[h] = uint32(i)
-		if q.ChainLength > 0 && candidate != 0 {
-			delta := i - candidate
-			q.chain[i] = uint32(delta)
+		cv := binary.LittleEndian.Uint64(src[i:])
+		h := ((cv & hashMask) * hashMul64) >> hashShift
+		candidate := int(table[h])
+		table[h] = uint32(i)
+		if chainLength > 0 && candidate != 0 {
+			chain[i] = uint32(i - candidate)
 		}
 
 		if i < matches[0].End && i != matches[0].End+2-q.HashLen {
 			continue
 		}
-		if candidate == 0 || i-candidate > q.MaxDistance {
+		if candidate == 0 || i-candidate > maxDistance {
 			continue
 		}
 
 		// Look for a match.
 		var currentMatch absoluteMatch
+		iVal := uint32(cv)
 
-		if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
+		if binary.LittleEndian.Uint32(src[candidate:]) == iVal {
 			m := extendMatch2(src, i, candidate, e.NextEmit)
-			if m.End-m.Start > q.MinLength && q.score(m) > 0 {
+			if m.End-m.Start > minLength && q.score(m) > 0 {
 				currentMatch = m
 			}
 		}
 
-		for j := 0; j < q.ChainLength; j++ {
-			delta := q.chain[candidate]
+		for j := 0; j < chainLength; j++ {
+			delta := chain[candidate]
 			if delta == 0 {
 				break
 			}
 			candidate -= int(delta)
-			if candidate <= 0 || i-candidate > q.MaxDistance {
+			if candidate <= 0 || i-candidate > maxDistance {
 				break
 			}
-			if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
+			if binary.LittleEndian.Uint32(src[candidate:]) == iVal {
 				m := extendMatch2(src, i, candidate, e.NextEmit)
-				if m.End-m.Start > q.MinLength && q.score(m) > q.score(currentMatch) {
+				if m.End-m.Start > minLength && q.score(m) > q.score(currentMatch) {
 					currentMatch = m
 				}
 			}
@@ -295,9 +319,9 @@ func extendMatch(src []byte, i, j int) int {
 	case "amd64", "arm64":
 		// As long as we are 8 or more bytes before the end of src, we can load and
 		// compare 8 bytes at a time. If those 8 bytes are equal, repeat.
-		for j+8 < len(src) {
-			iBytes := binary.LittleEndian.Uint64(src[i:])
-			jBytes := binary.LittleEndian.Uint64(src[j:])
+		for j+8 <= len(src) {
+			iBytes := binary.LittleEndian.Uint64(src[i : i+8])
+			jBytes := binary.LittleEndian.Uint64(src[j : j+8])
 			if iBytes != jBytes {
 				// If those 8 bytes were not equal, XOR the two 8 byte values, and return
 				// the index of the first byte that differs. The BSF instruction finds the
@@ -309,9 +333,9 @@ func extendMatch(src []byte, i, j int) int {
 		}
 	case "386":
 		// On a 32-bit CPU, we do it 4 bytes at a time.
-		for j+4 < len(src) {
-			iBytes := binary.LittleEndian.Uint32(src[i:])
-			jBytes := binary.LittleEndian.Uint32(src[j:])
+		for j+4 <= len(src) {
+			iBytes := binary.LittleEndian.Uint32(src[i : i+4])
+			jBytes := binary.LittleEndian.Uint32(src[j : j+4])
 			if iBytes != jBytes {
 				return j + bits.TrailingZeros32(iBytes^jBytes)>>3
 			}
