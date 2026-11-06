@@ -263,7 +263,6 @@ func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleCl
 		Button:                          "left",
 		ClickCount:                      1,
 		Delay:                           0,
-		Modifiers:                       []string{},
 	}
 }
 
@@ -304,6 +303,7 @@ func (o *ElementHandleClickOptions) ToMouseClickOptions() *MouseClickOptions {
 	o2.Button = o.Button
 	o2.ClickCount = o.ClickCount
 	o2.Delay = o.Delay
+	o2.modifiers = o.Modifiers
 	return o2
 }
 
@@ -312,7 +312,6 @@ func NewElementHandleDblclickOptions(defaultTimeout time.Duration) *ElementHandl
 		ElementHandleBasePointerOptions: *NewElementHandleBasePointerOptions(defaultTimeout),
 		Button:                          "left",
 		Delay:                           0,
-		Modifiers:                       []string{},
 	}
 }
 
@@ -347,6 +346,7 @@ func (o *ElementHandleDblclickOptions) ToMouseClickOptions() *MouseClickOptions 
 	o2.Button = o.Button
 	o2.ClickCount = 2
 	o2.Delay = o.Delay
+	o2.modifiers = o.Modifiers
 	return o2
 }
 

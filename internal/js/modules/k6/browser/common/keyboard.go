@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -258,6 +259,74 @@ func (k *Keyboard) platformSpecificResolution(key string) string {
 		}
 	}
 	return key
+}
+
+// Omitted modifiers preserve held keys; an empty slice releases them just for the action.
+func (k *Keyboard) withModifiers(modifiers []string, action func() error) (err error) {
+	if modifiers == nil {
+		return action()
+	}
+
+	previous := k.modifierKeys()
+	desired := make(map[keyboardlayout.KeyInput]struct{})
+	for _, key := range modifiers {
+		key = k.platformSpecificResolution(key)
+		if k.modifierBitFromKeyName(key) == 0 {
+			return fmt.Errorf("invalid keyboard modifier %q", key)
+		}
+		found := false
+		for code := range previous {
+			if k.layout.Keys[code].Key == key {
+				desired[code] = struct{}{}
+				found = true
+			}
+		}
+		if !found {
+			desired[keyboardlayout.KeyInput(key+"Left")] = struct{}{}
+		}
+	}
+
+	defer func() {
+		if restoreErr := k.setModifierKeys(previous); restoreErr != nil {
+			err = errors.Join(err, fmt.Errorf("restoring keyboard modifiers: %w", restoreErr))
+		}
+	}()
+	if err := k.setModifierKeys(desired); err != nil {
+		return fmt.Errorf("setting keyboard modifiers: %w", err)
+	}
+	return action()
+}
+
+// Preserve physical key codes so restoring modifiers keeps left and right keys distinct.
+func (k *Keyboard) modifierKeys() map[keyboardlayout.KeyInput]struct{} {
+	keys := make(map[keyboardlayout.KeyInput]struct{})
+	k.pressedKeysMu.Lock()
+	defer k.pressedKeysMu.Unlock()
+	for _, code := range []keyboardlayout.KeyInput{
+		"AltLeft", "AltRight", "ControlLeft", "ControlRight",
+		"MetaLeft", "MetaRight", "ShiftLeft", "ShiftRight",
+	} {
+		if _, pressed := k.pressedKeys[k.layout.Keys[code].KeyCode]; pressed {
+			keys[code] = struct{}{}
+		}
+	}
+	return keys
+}
+
+func (k *Keyboard) setModifierKeys(desired map[keyboardlayout.KeyInput]struct{}) error {
+	current := k.modifierKeys()
+	var errs []error
+	for code := range current {
+		if _, keep := desired[code]; !keep {
+			errs = append(errs, k.up(string(code)))
+		}
+	}
+	for code := range desired {
+		if _, pressed := current[code]; !pressed {
+			errs = append(errs, k.down(string(code)))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func (k *Keyboard) comboPress(keys string, opts KeyboardOptions) error {

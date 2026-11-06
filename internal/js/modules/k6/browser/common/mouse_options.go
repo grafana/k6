@@ -4,6 +4,9 @@ type MouseClickOptions struct {
 	Button     string `json:"button"`
 	ClickCount int64  `json:"clickCount"`
 	Delay      int64  `json:"delay"`
+
+	// Element and locator clicks can temporarily override the keyboard modifiers.
+	modifiers []string
 }
 
 type MouseDblClickOptions struct {
