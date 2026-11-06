@@ -17,12 +17,23 @@ permissions:
   contents: read
 
 jobs:
+  configure:
+    runs-on: ubuntu-latest
+    outputs:
+      go_current: ${{ steps.go_versions.outputs.current }}
+      go_prev: ${{ steps.go_versions.outputs.prev }}
+    steps:
+      - name: Resolve Go versions
+        id: go_versions
+        uses: grafana/k6-ci/.github/actions/go-versions@7dc7a71c57a30eddd3f1591ee0cc5abaeedafa14 # v0.5.4
+
   test-prev:
+    needs: configure
     if: ${{ github.ref == 'refs/heads/master' }}
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.25.x]
+        go-version: ["${{ needs.configure.outputs.go_prev }}"]
         platform:
           [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
@@ -75,10 +86,11 @@ jobs:
           use_gotip: "true"
 
   test-latest:
+    needs: configure
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.26.x]
+        go-version: ["${{ needs.configure.outputs.go_current }}"]
         platform:
           [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
