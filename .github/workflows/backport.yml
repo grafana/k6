@@ -1,0 +1,125 @@
+# Runs the actual backport after backport-trigger.yml completes.
+
+name: Backport (workflow)
+run-name: "Backport for ${{ github.event.workflow_run.head_branch }} #${{ github.event.workflow_run.run_number }}"
+
+on:
+  workflow_run: # zizmor: ignore[dangerous-triggers] trigger runs no PR code; worker validates metadata
+    workflows: ["Backport (trigger)"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  backport:
+    if: >-
+      github.repository == 'grafana/k6' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+      pull-requests: read
+    steps:
+      # A workflow whose only job was skipped can still conclude successfully.
+      - name: Check for PR info artifact
+        id: artifact
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo, run_id: context.payload.workflow_run.id,
+            });
+            core.setOutput('exists', artifacts.some(a => a.name === 'pr_info' && !a.expired));
+
+      - name: Download PR info artifact
+        if: steps.artifact.outputs.exists == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        id: download-pr-info
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          name: pr_info
+          # Never extract files from a PR workflow into the directory used by checkout.
+          path: ${{ runner.temp }}/backport-pr-info
+
+      # Allow forks and verify their artifact against the API.
+      - name: Get and validate PR info
+        if: steps.artifact.outputs.exists == 'true'
+        id: pr-info
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          SOURCE_BRANCH: master
+          PR_INFO_FILE: ${{ steps.download-pr-info.outputs.download-path }}/pr_info.json
+        with:
+          script: |
+            const info = JSON.parse(require('node:fs').readFileSync(process.env.PR_INFO_FILE, 'utf8'));
+            if (!Number.isSafeInteger(info?.pr_number) || info.pr_number <= 0 ||
+                !['closed', 'labeled'].includes(info.action)) {
+              throw new Error('Invalid backport request');
+            }
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo, pull_number: info.pr_number,
+            });
+            const run = context.payload.workflow_run;
+            // GitHub can omit pull_requests for fork runs. In all cases, require the PR's
+            // head repository, branch and commit to match GitHub's triggering-run metadata.
+            if ((run.pull_requests?.length &&
+                 !run.pull_requests.some(candidate => candidate.number === pr.number)) ||
+                !pr.head.repo || pr.head.repo.id !== run.head_repository?.id ||
+                pr.head.ref !== run.head_branch || pr.head.sha !== run.head_sha) {
+              throw new Error('Requested PR does not match the triggering workflow run');
+            }
+            if (!pr.merged || pr.base.ref !== process.env.SOURCE_BRANCH ||
+                pr.base.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              throw new Error(`Backports must originate from a PR merged into ${context.repo.owner}/${context.repo.repo}:${process.env.SOURCE_BRANCH}`);
+            }
+            const labels = pr.labels.map(label => label.name)
+              .filter(label => label.startsWith('backport ') && label.length > 9);
+            if (!labels.length || (info.action === 'labeled' && !labels.includes(info.label))) {
+              throw new Error('PR no longer has the requested backport labels');
+            }
+            core.setOutput('pr_number', info.pr_number);
+            core.setOutput('action', info.action);
+            core.setOutput('label', info.action === 'labeled' ? info.label : '');
+
+      - name: Print PR info
+        if: steps.artifact.outputs.exists == 'true'
+        env:
+          PR_ACTION: ${{ steps.pr-info.outputs.action }}
+          PR_LABEL: ${{ steps.pr-info.outputs.label }}
+          PR_NUMBER: ${{ steps.pr-info.outputs.pr_number }}
+        run: |
+          echo "PR action: $PR_ACTION"
+          echo "PR label: $PR_LABEL"
+          echo "PR number: $PR_NUMBER"
+
+      - name: Checkout k6
+        if: steps.artifact.outputs.exists == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 2
+          fetch-tags: false
+          persist-credentials: false
+
+      - name: Get GitHub App token
+        if: steps.artifact.outputs.exists == 'true'
+        id: app-token
+        uses: grafana/shared-workflows/actions/create-github-app-token@5bbb526b1728ca57fbe1750c4c27ab6ab06171c2 # create-github-app-token/v1.0.0
+        with:
+          github_app: k6-core-bot
+
+      - name: Run backport
+        if: steps.artifact.outputs.exists == 'true'
+        uses: grafana/grafana-github-actions-go/backport@015e217f58ce35182230e20ac721e8351258f0ad
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          # If triggered by being labelled, only backport that label.
+          # Otherwise, the action will backport all labels.
+          pr_label: ${{ steps.pr-info.outputs.action == 'labeled' && steps.pr-info.outputs.label || '' }}
+          pr_number: ${{ steps.pr-info.outputs.pr_number }}
+          repo_owner: ${{ github.repository_owner }}
+          repo_name: ${{ github.event.repository.name }}
