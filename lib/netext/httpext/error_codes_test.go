@@ -58,7 +58,7 @@ func TestBlackListedIPError(t *testing.T) {
 type timeoutError bool
 
 func (t timeoutError) Timeout() bool {
-	return (bool)(t)
+	return bool(t)
 }
 
 func (t timeoutError) Error() string {

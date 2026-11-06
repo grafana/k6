@@ -145,7 +145,7 @@ func (c *Config) StreamLogsToLogger(
 	msgBuffer := make(chan []byte, 10)
 	defer close(msgBuffer)
 
-	var mostRecent int64
+	var mostRecent atomic.Int64
 	go func() {
 		for message := range msgBuffer {
 			var m msg
@@ -156,7 +156,7 @@ func (c *Config) StreamLogsToLogger(
 				continue
 			}
 			ts := m.Log(logger)
-			atomic.StoreInt64(&mostRecent, ts)
+			mostRecent.Store(ts)
 		}
 	}()
 
@@ -172,7 +172,7 @@ func (c *Config) StreamLogsToLogger(
 			logger.WithError(err).Warn("error reading a log message from the cloud, trying to establish a fresh connection with the logs service...") //nolint:lll
 
 			var since time.Time
-			if ts := atomic.LoadInt64(&mostRecent); ts > 0 {
+			if ts := mostRecent.Load(); ts > 0 {
 				// add 1ns for avoid possible repetition
 				since = time.Unix(0, ts).Add(time.Nanosecond)
 			} else {

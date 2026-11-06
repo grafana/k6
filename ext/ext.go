@@ -134,7 +134,7 @@ func extractModuleInfo(mod any) (path, version string) {
 	t := reflect.TypeOf(mod)
 
 	switch t.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if t.Elem() != nil {
 			path = t.Elem().PkgPath()
 		}

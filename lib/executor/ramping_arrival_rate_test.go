@@ -68,9 +68,9 @@ func TestRampingArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 
 func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
-	var count int64
+	var count atomic.Int64
 	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		atomic.AddInt64(&count, 1)
+		count.Add(1)
 		return nil
 	})
 
@@ -83,15 +83,15 @@ func TestRampingArrivalRateRunCorrectRate(t *testing.T) {
 		var currentCount int64
 
 		time.Sleep(time.Second)
-		currentCount = atomic.SwapInt64(&count, 0)
+		currentCount = count.Swap(0)
 		assert.InDelta(t, 10, currentCount, 1)
 
 		time.Sleep(time.Second)
-		currentCount = atomic.SwapInt64(&count, 0)
+		currentCount = count.Swap(0)
 		assert.InDelta(t, 30, currentCount, 2)
 
 		time.Sleep(time.Second)
-		currentCount = atomic.SwapInt64(&count, 0)
+		currentCount = count.Swap(0)
 		assert.InDelta(t, 50, currentCount, 3)
 	})
 	engineOut := make(chan metrics.SampleContainer, 1000)
@@ -181,10 +181,10 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 		MaxVUs:          null.IntFrom(3),
 	}
 
-	var count int64
+	var count atomic.Int64
 	ch := make(chan struct{}) // closed when new unplannedVU is started and signal to get to next iterations
 	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		cur := atomic.AddInt64(&count, 1)
+		cur := count.Add(1)
 		if cur == 1 {
 			<-ch // wait to start again
 		}
@@ -198,12 +198,12 @@ func TestRampingArrivalRateRunCorrectRateWithSlowRate(t *testing.T) {
 	engineOut := make(chan metrics.SampleContainer, 1000)
 	test.state.SetInitVUFunc(func(ctx context.Context, _ *logrus.Entry) (lib.InitializedVU, error) {
 		t.Log("init")
-		cur := atomic.LoadInt64(&count)
+		cur := count.Load()
 		require.Equal(t, int64(1), cur)
 		time.Sleep(time.Millisecond * 200)
 		close(ch)
 		time.Sleep(time.Millisecond * 200)
-		cur = atomic.LoadInt64(&count)
+		cur = count.Load()
 		require.NotEqual(t, int64(1), cur)
 
 		idl, idg := test.state.GetUniqueVUIdentifiers()
@@ -267,13 +267,13 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 			engineOut := make(chan metrics.SampleContainer, 1000)
 			defer close(engineOut)
 			go func() {
-				for range engineOut { //nolint:revive // we want to discard samples
+				for range engineOut {
 				}
 			}()
 
-			var count int64
+			var count atomic.Int64
 			runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-				atomic.AddInt64(&count, 1)
+				count.Add(1)
 				return nil
 			})
 
@@ -311,7 +311,7 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 			took := time.Since(start)
 			assert.NoError(b, err)
 
-			iterations := float64(atomic.LoadInt64(&count))
+			iterations := float64(count.Load())
 			b.ReportMetric(0, "ns/op")
 			b.ReportMetric(iterations/took.Seconds(), "iterations/s")
 		})

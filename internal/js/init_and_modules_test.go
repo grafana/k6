@@ -36,13 +36,13 @@ func (cm *CheckModule) VuCtx(_ context.Context) {
 	cm.vuCtxCalled++
 }
 
-var uniqueModuleNumber int64 //nolint:gochecknoglobals // we need this so multiple test can register differently named modules
+var uniqueModuleNumber atomic.Int64 //nolint:gochecknoglobals // we need this so multiple test can register differently named modules
 
 func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	t.Parallel()
 
 	checkModule := &CheckModule{t: t}
-	moduleName := fmt.Sprintf("k6/x/check-%d", atomic.AddInt64(&uniqueModuleNumber, 1))
+	moduleName := fmt.Sprintf("k6/x/check-%d", uniqueModuleNumber.Add(1))
 	modules.Register(moduleName, checkModule)
 
 	script := fmt.Sprintf(`

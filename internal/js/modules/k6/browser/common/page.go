@@ -90,7 +90,8 @@ func (r ReducedMotion) String() string {
 	return reducedMotionToString[r]
 }
 
-var reducedMotionToString = map[ReducedMotion]string{ //nolint:gochecknoglobals
+//nolint:goconst,gochecknoglobals // map values mirror the public enum strings
+var reducedMotionToString = map[ReducedMotion]string{
 	ReducedMotionReduce:       "reduce",
 	ReducedMotionNoPreference: "no-preference",
 }

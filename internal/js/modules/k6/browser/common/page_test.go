@@ -163,6 +163,6 @@ func TestPageOn(t *testing.T) {
 
 		err := p.On("metric", handler)
 		assert.NoError(t, err)
-		assert.Len(t, p.eventHandlers[("metric")], 1)
+		assert.Len(t, p.eventHandlers["metric"], 1)
 	})
 }

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/andybalholm/brotli"
@@ -149,8 +150,8 @@ func readResponseBody(
 	contentEncodings := strings.Split(resp.Header.Get("Content-Encoding"), ",")
 	// Transparently decompress the body if it's has a content-encoding we
 	// support. If not, simply return it as it is.
-	for i := len(contentEncodings) - 1; i >= 0; i-- {
-		contentEncoding := strings.TrimSpace(contentEncodings[i])
+	for _, contentEncoding := range slices.Backward(contentEncodings) {
+		contentEncoding := strings.TrimSpace(contentEncoding)
 		if compression, err := CompressionTypeString(contentEncoding); err == nil {
 			decoder, err := pickDecoder(compression, rc)
 			if err != nil {

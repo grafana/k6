@@ -189,8 +189,7 @@ func (c *rootCommand) execute() {
 		return
 	}
 
-	var ecerr errext.HasExitCode
-	if errors.As(err, &ecerr) {
+	if ecerr, ok := errors.AsType[errext.HasExitCode](err); ok {
 		exitCode = int(ecerr.ExitCode())
 	}
 
@@ -230,8 +229,7 @@ func handleUnsatisfiedDependencies(err error, c *rootCommand) (exitcodes.ExitCod
 
 	err = customBinary.run(c.globalState)
 	// this only happens if we actually ran the binary and it exited afterwads, in which case we propagate the exit code
-	var ecerr errext.HasExitCode
-	if errors.As(err, &ecerr) {
+	if ecerr, ok := errors.AsType[errext.HasExitCode](err); ok {
 		return ecerr.ExitCode(), err
 	}
 

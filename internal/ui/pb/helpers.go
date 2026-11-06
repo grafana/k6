@@ -41,7 +41,7 @@ func GetFixedLengthFloatFormat(maxValue float64, precision uint) (formatStr stri
 	if precision > 0 {
 		resLen += precision + 1
 	}
-	return "%0" + strconv.FormatUint(uint64(resLen), 10) + "." + strconv.Itoa(int(precision)) + "f" //nolint:gosec
+	return "%0" + strconv.FormatUint(uint64(resLen), 10) + "." + strconv.Itoa(int(precision)) + "f"
 }
 
 // GetFixedLengthDuration takes a *positive* duration and its max value and
@@ -68,7 +68,7 @@ func GetFixedLengthDuration(d, maxDuration time.Duration) (result string) {
 	// Positions:    0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17
 	buf := [18]byte{'0', '0', '0', '0', '0', '0', 'd', '0', '0', 'h', '0', '0', 'm', '0', '0', '.', '0', 's'}
 
-	u := d.Round(rounding) / (rounding)
+	u := d.Round(rounding) / rounding
 	u, buf[16] = u/10, byte(u%10)+'0' //nolint:gosec
 	u, buf[14] = u/10, byte(u%10)+'0' //nolint:gosec
 	if maxDuration < 10*time.Second {

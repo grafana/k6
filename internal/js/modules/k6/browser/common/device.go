@@ -1,3 +1,4 @@
+//nolint:goconst // device definitions intentionally repeat user-agent strings
 package common
 
 // Device represents an end-user device (computer, tablet, phone etc.)

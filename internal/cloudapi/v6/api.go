@@ -36,8 +36,7 @@ func (c *Client) ValidateToken(stackURL string) (_ *k6cloud.AuthenticationRespon
 	}()
 
 	if rerr != nil {
-		var apiErr *k6cloud.GenericOpenAPIError
-		if !errors.As(rerr, &apiErr) {
+		if _, ok := errors.AsType[*k6cloud.GenericOpenAPIError](rerr); !ok {
 			return nil, fmt.Errorf("failed to validate token: %w", rerr)
 		}
 	}
