@@ -7,7 +7,7 @@ require (
 	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/PuerkitoBio/goquery v1.13.0
-	github.com/andybalholm/brotli v1.2.6
+	github.com/andybalholm/brotli v1.2.8
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/chromedp/cdproto v0.158.3
 	github.com/evanw/esbuild v0.28.2
