@@ -120,15 +120,15 @@ func (k *Keyboard) down(key string) error {
 
 	action := newCommand(input.DispatchKeyEvent, input.DispatchKeyEventParams{
 		Type:                  keyType,
-		Modifiers:             int64(k.modifiers),
+		Modifiers:             k.modifiers,
 		Key:                   keyDef.Key,
 		WindowsVirtualKeyCode: keyDef.KeyCode,
 		Code:                  keyDef.Code,
 		Location:              keyDef.Location,
-		IsKeypad:              ptr(keyDef.Location == 3),
+		IsKeypad:              new(keyDef.Location == 3),
 		Text:                  text,
 		UnmodifiedText:        text,
-		AutoRepeat:            ptr(autoRepeat),
+		AutoRepeat:            new(autoRepeat),
 	})
 	if err := action.Do(k.ctx, k.session); err != nil {
 		return fmt.Errorf("dispatching key event down: %w", err)
@@ -153,7 +153,7 @@ func (k *Keyboard) up(key string) error {
 
 	action := newCommand(input.DispatchKeyEvent, input.DispatchKeyEventParams{
 		Type:                  input.DispatchKeyEventTypeKeyUp,
-		Modifiers:             int64(k.modifiers),
+		Modifiers:             k.modifiers,
 		Key:                   keyDef.Key,
 		WindowsVirtualKeyCode: keyDef.KeyCode,
 		Code:                  keyDef.Code,

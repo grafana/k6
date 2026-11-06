@@ -66,7 +66,9 @@ func parseRemoteObjectPreview(op *runtime.ObjectPreview) (map[string]any, error)
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseRemoteObjectValue(runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview)
+		val, err := parseRemoteObjectValue(
+			runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview,
+		)
 		if err != nil {
 			result = append(result, &objectPropertyParseError{err, p.Name})
 			continue
@@ -189,7 +191,9 @@ func parseConsoleRemoteObjectPreview(logger *log.Logger, op *runtime.ObjectPrevi
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseConsoleRemoteObjectValue(logger, runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview)
+		val, err := parseConsoleRemoteObjectValue(
+			logger, runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview,
+		)
 		if err != nil {
 			return "", err
 		}
@@ -211,7 +215,9 @@ func parseConsoleRemoteArrayPreview(logger *log.Logger, op *runtime.ObjectPrevie
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseConsoleRemoteObjectValue(logger, runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview)
+		val, err := parseConsoleRemoteObjectValue(
+			logger, runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview,
+		)
 		if err != nil {
 			return "", err
 		}

@@ -181,11 +181,13 @@ func (s *screenshotter) screenshot(
 
 	shouldSetDefaultBackground := omitBackground && format == "png"
 	if shouldSetDefaultBackground {
-		action := newCommand(emulation.SetDefaultBackgroundColorOverride, emulation.SetDefaultBackgroundColorOverrideParams{Color: &cdp.RGBA{R: 0, G: 0, B: 0, A: 0}})
+		action := newCommand(emulation.SetDefaultBackgroundColorOverride,
+			emulation.SetDefaultBackgroundColorOverrideParams{Color: &cdp.RGBA{R: 0, G: 0, B: 0, A: 0}})
 		defer func() {
 			ctx, cancel := s.cleanupContext()
 			defer cancel()
-			if restoreErr := newCommand(emulation.SetDefaultBackgroundColorOverride, emulation.SetDefaultBackgroundColorOverrideParams{}).Do(ctx, sess); restoreErr != nil {
+			if restoreErr := newCommand(emulation.SetDefaultBackgroundColorOverride,
+				emulation.SetDefaultBackgroundColorOverrideParams{}).Do(ctx, sess); restoreErr != nil {
 				err = errors.Join(err, fmt.Errorf("resetting screenshot background color: %w", restoreErr))
 			}
 		}()
@@ -195,7 +197,7 @@ func (s *screenshotter) screenshot(
 	}
 
 	// Add common options
-	capture.params.Quality = ptr(quality)
+	capture.params.Quality = new(quality)
 	switch format {
 	case ImageFormatJPEG:
 		capture.params.Format = cdppage.CaptureScreenshotFormatJpeg

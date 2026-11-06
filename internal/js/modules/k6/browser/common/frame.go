@@ -890,7 +890,7 @@ func (f *Frame) Evaluate(pageFunc string, args ...any) (any, error) {
 
 // EvaluateGlobal will evaluate the given JS code in the global object.
 func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
-	action := newCommand(runtime.Evaluate, runtime.EvaluateParams{Expression: js, AwaitPromise: ptr(true)})
+	action := newCommand(runtime.Evaluate, runtime.EvaluateParams{Expression: js, AwaitPromise: new(true)})
 
 	var (
 		exceptionDetails *runtime.ExceptionDetails

@@ -183,9 +183,9 @@ func (e *ExecutionContext) eval(
 		action = newCommand(runtime.Evaluate, runtime.EvaluateParams{
 			Expression:    js,
 			ContextID:     e.id,
-			ReturnByValue: ptr(opts.returnByValue),
-			AwaitPromise:  ptr(true),
-			UserGesture:   ptr(true),
+			ReturnByValue: new(opts.returnByValue),
+			AwaitPromise:  new(true),
+			UserGesture:   new(true),
 		})
 	} else {
 		var arguments []*runtime.CallArgument
@@ -204,9 +204,9 @@ func (e *ExecutionContext) eval(
 			FunctionDeclaration: js,
 			Arguments:           arguments,
 			ExecutionContextID:  e.id,
-			ReturnByValue:       ptr(opts.returnByValue),
-			AwaitPromise:        ptr(true),
-			UserGesture:         ptr(true),
+			ReturnByValue:       new(opts.returnByValue),
+			AwaitPromise:        new(true),
+			UserGesture:         new(true),
 		})
 	}
 

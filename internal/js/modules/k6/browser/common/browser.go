@@ -247,7 +247,12 @@ func (b *Browser) initEvents() error {
 		}
 	}()
 
-	action := newCommand(target.SetAutoAttach, target.SetAutoAttachParams{AutoAttach: true, WaitForDebuggerOnStart: true, Flatten: ptr(true)})
+	action := newCommand(target.SetAutoAttach,
+		target.SetAutoAttachParams{
+			AutoAttach:             true,
+			WaitForDebuggerOnStart: true,
+			Flatten:                new(true),
+		})
 	if err := action.Do(b.vuCtx, b.conn); err != nil {
 		return fmt.Errorf("internal error while auto-attaching to browser pages: %w", err)
 	}
@@ -257,7 +262,6 @@ func (b *Browser) initEvents() error {
 	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
 	action2 := newCommand(target.GetTargetInfo, target.GetTargetInfoParams{})
 	_, err := action2.Result(b.vuCtx, b.conn)
-
 	if err != nil {
 		return fmt.Errorf("internal error while getting browser target info: %w", err)
 	}
@@ -531,7 +535,8 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	defer removeEventHandler()
 
 	// create a new page.
-	action := newCommand(target.CreateTarget, target.CreateTargetParams{URL: BlankPage, NewWindow: ptr(true), BrowserContextID: id})
+	action := newCommand(target.CreateTarget,
+		target.CreateTargetParams{URL: BlankPage, NewWindow: new(true), BrowserContextID: id})
 	result, err := action.Result(ctx, b.conn)
 	tid := result.TargetID
 	if err != nil {
@@ -723,7 +728,7 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 		return nil, spanRecordError(span, err)
 	}
 
-	action := newCommand(target.CreateBrowserContext, target.CreateBrowserContextParams{DisposeOnDetach: ptr(true)})
+	action := newCommand(target.CreateBrowserContext, target.CreateBrowserContextParams{DisposeOnDetach: new(true)})
 	if opts.Proxy != nil {
 		action.params.ProxyServer = strings.TrimSpace(opts.Proxy.Server)
 		if bypass := strings.TrimSpace(opts.Proxy.Bypass); bypass != "" {
@@ -806,7 +811,11 @@ func (b *Browser) fetchVersion() (browserVersion, error) {
 	)
 	result, err := newCommand(cdpbrowser.GetVersion, cdp.Empty{}).
 		Result(b.vuCtx, b.conn)
-	bv.protocolVersion, bv.product, bv.revision, bv.userAgent, bv.jsVersion = result.ProtocolVersion, result.Product, result.Revision, result.UserAgent, result.JsVersion
+	bv.protocolVersion = result.ProtocolVersion
+	bv.product = result.Product
+	bv.revision = result.Revision
+	bv.userAgent = result.UserAgent
+	bv.jsVersion = result.JsVersion
 
 	if err != nil {
 		return browserVersion{}, fmt.Errorf("getting browser version information: %w", err)

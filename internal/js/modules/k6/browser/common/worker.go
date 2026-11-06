@@ -36,7 +36,9 @@ func NewWorker(ctx context.Context, s session, id target.ID, url string) (*Worke
 
 func (w *Worker) initEvents() error {
 	actions := []Action{
-		newCommand(log.Enable, cdp.Empty{}), newCommand(network.Enable, network.EnableParams{}), newCommand(runtime.RunIfWaitingForDebugger, cdp.Empty{}),
+		newCommand(log.Enable, cdp.Empty{}), newCommand(network.Enable,
+			network.EnableParams{}), newCommand(runtime.RunIfWaitingForDebugger,
+			cdp.Empty{}),
 	}
 	for _, action := range actions {
 		if err := action.Do(w.ctx, w.session); err != nil {

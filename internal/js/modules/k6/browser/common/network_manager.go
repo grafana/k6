@@ -435,7 +435,9 @@ func (m *NetworkManager) initDomains() error {
 	})}
 
 	if m.userReqInterceptionEnabled {
-		actions = append(actions, newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable, fetch.EnableParams{Patterns: []*fetch.RequestPattern{{URLPattern: "*"}}}))
+		actions = append(actions, newCommand(network.SetCacheDisabled,
+			network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable,
+			fetch.EnableParams{Patterns: []*fetch.RequestPattern{{URLPattern: "*"}}}))
 	}
 	for _, action := range actions {
 		if err := action.Do(m.ctx, m.session); err != nil {
@@ -730,7 +732,11 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		}
 
 		if failErr != nil {
-			action := newCommand(fetch.FailRequest, fetch.FailRequestParams{RequestID: event.RequestID, ErrorReason: network.ErrorReasonBlockedByClient})
+			action := newCommand(fetch.FailRequest,
+				fetch.FailRequestParams{
+					RequestID:   event.RequestID,
+					ErrorReason: network.ErrorReasonBlockedByClient,
+				})
 			if err := action.Do(m.ctx, m.session); err != nil {
 				// Avoid logging as error when context is canceled.
 				// Most probably this happens when trying to fail a site's background request
@@ -833,11 +839,12 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 		// See: https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#type-AuthChallengeResponse
 		username, password = m.credentials.Username, m.credentials.Password
 	}
-	err := newCommand(fetch.ContinueWithAuth, fetch.ContinueWithAuthParams{RequestID: rid, AuthChallengeResponse: &fetch.AuthChallengeResponse{
-		Response: res,
-		Username: username,
-		Password: password,
-	}}).
+	err := newCommand(fetch.ContinueWithAuth,
+		fetch.ContinueWithAuthParams{RequestID: rid, AuthChallengeResponse: &fetch.AuthChallengeResponse{
+			Response: res,
+			Username: username,
+			Password: password,
+		}}).
 		Do(m.ctx, m.session)
 	if err != nil {
 		m.logger.Debugf("NetworkManager:onAuthRequired", "continueWithAuth url:%q err:%v", event.Request.URL, err)
@@ -933,15 +940,19 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 	m.logger.Debugf("NetworkManager:updateProtocolRequestInterception",
 		"updating request interception to %t (session: %s)", enabled, m.session.ID())
 
-	actions := []Action{newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable, fetch.EnableParams{HandleAuthRequests: ptr(true), Patterns: []*fetch.RequestPattern{
-		{
-			URLPattern:   "*",
-			RequestStage: fetch.RequestStageRequest,
-		},
-	}}),
+	actions := []Action{
+		newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable,
+			fetch.EnableParams{HandleAuthRequests: new(true), Patterns: []*fetch.RequestPattern{
+				{
+					URLPattern:   "*",
+					RequestStage: fetch.RequestStageRequest,
+				},
+			}}),
 	}
 	if !enabled {
-		actions = []Action{newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: false}), newCommand(fetch.Disable, cdp.Empty{})}
+		actions = []Action{newCommand(network.SetCacheDisabled,
+			network.SetCacheDisabledParams{CacheDisabled: false}), newCommand(fetch.Disable,
+			cdp.Empty{})}
 	}
 	for _, action := range actions {
 		if err := action.Do(m.ctx, m.session); err != nil {
@@ -1040,7 +1051,8 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts FulfillOptions) e
 		responseCode = opts.Status
 	}
 
-	action := newCommand(fetch.FulfillRequest, fetch.FulfillRequestParams{RequestID: request.interceptionID, ResponseCode: responseCode})
+	action := newCommand(fetch.FulfillRequest,
+		fetch.FulfillRequestParams{RequestID: request.interceptionID, ResponseCode: responseCode})
 
 	if opts.ContentType != "" {
 		opts.Headers = append(opts.Headers, HTTPHeader{
@@ -1116,7 +1128,6 @@ func (m *NetworkManager) emulateNetworkConditions() error {
 		}},
 	})
 	_, err := byRule.Result(m.ctx, m.session)
-
 	if err != nil {
 		return fmt.Errorf("emulating network conditions by rule: %w", err)
 	}

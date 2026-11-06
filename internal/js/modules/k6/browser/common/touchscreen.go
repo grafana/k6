@@ -35,7 +35,7 @@ func (t *Touchscreen) tap(x float64, y float64) error {
 	touchStart := newCommand(input.DispatchTouchEvent, input.DispatchTouchEventParams{
 		Type:        input.DispatchTouchEventTypeTouchStart,
 		TouchPoints: []*input.TouchPoint{{X: x, Y: y}},
-		Modifiers:   int64(t.keyboard.modifiers),
+		Modifiers:   t.keyboard.modifiers,
 	})
 
 	if err := touchStart.Do(t.ctx, t.session); err != nil {
@@ -45,7 +45,7 @@ func (t *Touchscreen) tap(x float64, y float64) error {
 	touchEnd := newCommand(input.DispatchTouchEvent, input.DispatchTouchEventParams{
 		Type:        input.DispatchTouchEventTypeTouchEnd,
 		TouchPoints: []*input.TouchPoint{},
-		Modifiers:   int64(t.keyboard.modifiers),
+		Modifiers:   t.keyboard.modifiers,
 	})
 
 	if err := touchEnd.Do(t.ctx, t.session); err != nil {

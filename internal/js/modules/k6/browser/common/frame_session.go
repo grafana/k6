@@ -237,7 +237,8 @@ func NewFrameSession(
 }
 
 func (fs *FrameSession) emulateLocale() error {
-	action := newCommand(emulation.SetLocaleOverride, emulation.SetLocaleOverrideParams{Locale: fs.page.browserCtx.opts.Locale})
+	action := newCommand(emulation.SetLocaleOverride,
+		emulation.SetLocaleOverrideParams{Locale: fs.page.browserCtx.opts.Locale})
 	if err := action.Do(fs.ctx, fs.session); err != nil {
 		if strings.Contains(err.Error(), "Another locale override is already in effect") {
 			return nil
@@ -248,7 +249,8 @@ func (fs *FrameSession) emulateLocale() error {
 }
 
 func (fs *FrameSession) emulateTimezone() error {
-	action := newCommand(emulation.SetTimezoneOverride, emulation.SetTimezoneOverrideParams{TimezoneID: fs.page.browserCtx.opts.TimezoneID})
+	action := newCommand(emulation.SetTimezoneOverride,
+		emulation.SetTimezoneOverrideParams{TimezoneID: fs.page.browserCtx.opts.TimezoneID})
 	if err := action.Do(fs.ctx, fs.session); err != nil {
 		if strings.Contains(err.Error(), "Timezone override is already in effect") {
 			return nil
@@ -263,10 +265,16 @@ func (fs *FrameSession) getNetworkManager() *NetworkManager {
 }
 
 func (fs *FrameSession) initDomains() error {
-	actions := []Action{newCommand(
-		// TODO: can we get rid of the following by doing DOM related stuff in JS instead?
-		dom.Enable, dom.EnableParams{}), newCommand(cdplog.Enable, cdp.Empty{}),
-		newCommand(cdpruntime.Enable, cdp.Empty{}), newCommand(target.SetAutoAttach, target.SetAutoAttachParams{AutoAttach: true, WaitForDebuggerOnStart: true, Flatten: ptr(true)}),
+	actions := []Action{
+		newCommand(
+			// TODO: can we get rid of the following by doing DOM related stuff in JS instead?
+			dom.Enable, dom.EnableParams{}), newCommand(cdplog.Enable, cdp.Empty{}),
+		newCommand(cdpruntime.Enable, cdp.Empty{}), newCommand(target.SetAutoAttach,
+			target.SetAutoAttachParams{
+				AutoAttach:             true,
+				WaitForDebuggerOnStart: true,
+				Flatten:                new(true),
+			}),
 	}
 	for _, action := range actions {
 		if err := action.Do(fs.ctx, fs.session); err != nil {
@@ -559,7 +567,7 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 			&cdppage.CreateIsolatedWorldParams{
 				FrameID:             cdp.FrameID(frame.ID()),
 				WorldName:           name,
-				GrantUniveralAccess: ptr(true),
+				GrantUniveralAccess: new(true),
 			},
 			nil)
 	}
@@ -567,9 +575,9 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	fs.logger.Debugf("NewFrameSession:initIsolatedWorld:AddScriptToEvaluateOnNewDocument",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
-	action2 := newCommand(cdppage.AddScriptToEvaluateOnNewDocument, cdppage.AddScriptToEvaluateOnNewDocumentParams{Source: `//# sourceURL=` + evaluationScriptURL, WorldName: name})
+	action2 := newCommand(cdppage.AddScriptToEvaluateOnNewDocument,
+		cdppage.AddScriptToEvaluateOnNewDocumentParams{Source: `//# sourceURL=` + evaluationScriptURL, WorldName: name})
 	_, err := action2.Result(fs.ctx, fs.session)
-
 	if err != nil {
 		return fmt.Errorf("adding script to evaluate on new document: %w", err)
 	}
@@ -580,14 +588,13 @@ func (fs *FrameSession) initOptions() error {
 	fs.logger.Debugf("NewFrameSession:initOptions",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
-	var (
-		opts       = fs.manager.page.browserCtx.opts
-		optActions = []Action{}
-		state      = fs.vu.State()
-	)
+	opts := fs.manager.page.browserCtx.opts
+	var optActions []Action
+	state := fs.vu.State()
 
 	if fs.isMainFrame() {
-		optActions = append(optActions, newCommand(emulation.SetFocusEmulationEnabled, emulation.SetFocusEmulationEnabledParams{Enabled: true}))
+		optActions = append(optActions, newCommand(emulation.SetFocusEmulationEnabled,
+			emulation.SetFocusEmulationEnabledParams{Enabled: true}))
 		if err := fs.updateViewport(fs.ctx, fs.page.emulatedSize); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
@@ -599,16 +606,20 @@ func (fs *FrameSession) initOptions() error {
 		optActions = append(optActions, newCommand(cdppage.SetBypassCSP, cdppage.SetBypassCSPParams{Enabled: true}))
 	}
 	if opts.IgnoreHTTPSErrors {
-		optActions = append(optActions, newCommand(security.SetIgnoreCertificateErrors, security.SetIgnoreCertificateErrorsParams{Ignore: true}))
+		optActions = append(optActions, newCommand(security.SetIgnoreCertificateErrors,
+			security.SetIgnoreCertificateErrorsParams{Ignore: true}))
 	}
 	if opts.HasTouch {
-		optActions = append(optActions, newCommand(emulation.SetTouchEmulationEnabled, emulation.SetTouchEmulationEnabledParams{Enabled: true}))
+		optActions = append(optActions, newCommand(emulation.SetTouchEmulationEnabled,
+			emulation.SetTouchEmulationEnabledParams{Enabled: true}))
 	}
 	if !opts.JavaScriptEnabled {
-		optActions = append(optActions, newCommand(emulation.SetScriptExecutionDisabled, emulation.SetScriptExecutionDisabledParams{Value: true}))
+		optActions = append(optActions, newCommand(emulation.SetScriptExecutionDisabled,
+			emulation.SetScriptExecutionDisabledParams{Value: true}))
 	}
 	if opts.UserAgent != "" || opts.Locale != "" {
-		optActions = append(optActions, newCommand(emulation.SetUserAgentOverride, emulation.SetUserAgentOverrideParams{UserAgent: opts.UserAgent, AcceptLanguage: opts.Locale}))
+		optActions = append(optActions, newCommand(emulation.SetUserAgentOverride,
+			emulation.SetUserAgentOverrideParams{UserAgent: opts.UserAgent, AcceptLanguage: opts.Locale}))
 	}
 	if opts.Locale != "" {
 		if err := fs.emulateLocale(); err != nil {
@@ -713,7 +724,8 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 		"sid:%v fid:%s tid:%v url:%q referrer:%q",
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
-	action := newCommand(cdppage.Navigate, cdppage.NavigateParams{URL: url, Referrer: referrer, FrameID: cdp.FrameID(frame.ID())})
+	action := newCommand(cdppage.Navigate,
+		cdppage.NavigateParams{URL: url, Referrer: referrer, FrameID: cdp.FrameID(frame.ID())})
 	result, err := action.Result(fs.ctx, fs.session)
 	documentID, errorText := result.LoaderID, result.ErrorText
 	if err != nil {
@@ -1260,7 +1272,8 @@ func (fs *FrameSession) updateEmulateMedia() error {
 		features = append(features, &emulation.MediaFeature{Name: "prefers-reduced-motion", Value: ""})
 	}
 
-	action := newCommand(emulation.SetEmulatedMedia, emulation.SetEmulatedMediaParams{Media: string(fs.page.mediaType), Features: features})
+	action := newCommand(emulation.SetEmulatedMedia,
+		emulation.SetEmulatedMediaParams{Media: string(fs.page.mediaType), Features: features})
 	if err := action.Do(fs.ctx, fs.session); err != nil {
 		return fmt.Errorf("internal error while updating emulated media: %w", err)
 	}
@@ -1293,9 +1306,9 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 	geolocation := fs.page.browserCtx.opts.Geolocation
 	if !initial || geolocation != nil {
 		action := newCommand(emulation.SetGeolocationOverride, emulation.SetGeolocationOverrideParams{
-			Latitude:  ptr(geolocation.Latitude),
-			Longitude: ptr(geolocation.Longitude),
-			Accuracy:  ptr(geolocation.Accuracy),
+			Latitude:  new(geolocation.Latitude),
+			Longitude: new(geolocation.Longitude),
+			Accuracy:  new(geolocation.Accuracy),
 		})
 		if err := action.Do(fs.ctx, fs.session); err != nil {
 			return fmt.Errorf("%w", err)
@@ -1400,10 +1413,11 @@ func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *Emulat
 			fs.page.browserCtx.browser.browserOpts.Headless,
 			runtime.GOOS,
 		)
-		action2 := newCommand(browser.SetWindowBounds, browser.SetWindowBoundsParams{WindowID: fs.windowID, Bounds: &browser.Bounds{
-			Width:  viewport.Width,
-			Height: viewport.Height,
-		}})
+		action2 := newCommand(browser.SetWindowBounds,
+			browser.SetWindowBoundsParams{WindowID: fs.windowID, Bounds: &browser.Bounds{
+				Width:  viewport.Width,
+				Height: viewport.Height,
+			}})
 		if err := action2.Do(ctx, fs.session); err != nil {
 			return fmt.Errorf("setting window bounds: %w", err)
 		}

@@ -487,7 +487,8 @@ func (h *ElementHandle) ownerFrame(apiCtx context.Context) (*Frame, error) {
 }
 
 func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect *dom.Rect) error {
-	action := newCommand(dom.ScrollIntoViewIfNeeded, dom.ScrollIntoViewIfNeededParams{ObjectID: h.remoteObject.ObjectID, Rect: rect})
+	action := newCommand(dom.ScrollIntoViewIfNeeded,
+		dom.ScrollIntoViewIfNeededParams{ObjectID: h.remoteObject.ObjectID, Rect: rect})
 	err := action.Do(apiCtx, h.session)
 	if err != nil {
 		if strings.Contains(err.Error(), "Node does not have a layout object") {

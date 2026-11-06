@@ -183,7 +183,8 @@ func (h *BaseJSHandle) GetProperties() (map[string]JSHandleAPI, error) {
 
 // getProperties is like GetProperties, but does not panic.
 func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
-	act := newCommand(runtime.GetProperties, runtime.GetPropertiesParams{ObjectID: h.remoteObject.ObjectID, OwnProperties: ptr(true)})
+	act := newCommand(runtime.GetProperties,
+		runtime.GetPropertiesParams{ObjectID: h.remoteObject.ObjectID, OwnProperties: new(true)})
 	commandResult, err := act.Result(h.ctx, h.session)
 	result := commandResult.Result
 
@@ -210,8 +211,8 @@ func (h *BaseJSHandle) JSONValue() (string, error) {
 		var err error
 		action := newCommand(runtime.CallFunctionOn, runtime.CallFunctionOnParams{
 			FunctionDeclaration: "function() { return this; }",
-			ReturnByValue:       ptr(true),
-			AwaitPromise:        ptr(true),
+			ReturnByValue:       new(true),
+			AwaitPromise:        new(true),
 			ObjectID:            h.remoteObject.ObjectID,
 		})
 		result, err := action.Result(h.ctx, h.session)

@@ -369,8 +369,8 @@ func NewPage(
 
 	p.initEvents()
 
-	action := newCommand(target.SetAutoAttach, target.SetAutoAttachParams{AutoAttach: true, WaitForDebuggerOnStart: true, Flatten: ptr(true)})
-	if err := action.Do(p.ctx, p.session); err != nil {
+	params := target.SetAutoAttachParams{AutoAttach: true, WaitForDebuggerOnStart: true, Flatten: new(true)}
+	if err := newCommand(target.SetAutoAttach, params).Do(p.ctx, p.session); err != nil {
 		return nil, fmt.Errorf("internal error while auto attaching to browser pages: %w", err)
 	}
 
@@ -651,9 +651,9 @@ func (p *Page) didClose() {
 func (p *Page) evaluateOnNewDocument(source string) error {
 	p.logger.Debugf("Page:evaluateOnNewDocument", "sid:%v", p.sessionID())
 
-	action := newCommand(page.AddScriptToEvaluateOnNewDocument, page.AddScriptToEvaluateOnNewDocumentParams{Source: source})
+	action := newCommand(page.AddScriptToEvaluateOnNewDocument,
+		page.AddScriptToEvaluateOnNewDocumentParams{Source: source})
 	_, err := action.Result(p.ctx, p.session)
-
 	if err != nil {
 		return fmt.Errorf("evaluating script on document: %w", err)
 	}
@@ -826,7 +826,8 @@ func (p *Page) hasRoutes() bool {
 func (p *Page) resetViewport(ctx context.Context) error {
 	p.logger.Debugf("Page:resetViewport", "sid:%v", p.sessionID())
 
-	action := newCommand(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: 0, Height: 0, DeviceScaleFactor: 0, Mobile: false})
+	action := newCommand(emulation.SetDeviceMetricsOverride,
+		emulation.SetDeviceMetricsOverrideParams{Width: 0, Height: 0, DeviceScaleFactor: 0, Mobile: false})
 	return action.Do(ctx, p.session)
 }
 
@@ -1020,7 +1021,8 @@ func (p *Page) Close() error {
 			p.logger.Warnf("Page:Close", "failed to trigger visibilitychange for web vitals: %v", err)
 		}
 
-		keyDown := newCommand(input.DispatchKeyEvent, input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeKeyDown, Key: "Escape"})
+		keyDown := newCommand(input.DispatchKeyEvent,
+			input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeKeyDown, Key: "Escape"})
 		if err := keyDown.Do(teardownTimeoutCtx, p.session); err != nil {
 			p.logger.Warnf("Page:Close", "failed to dispatch keydown for web vitals: %v", err)
 		}
@@ -1033,7 +1035,8 @@ func (p *Page) Close() error {
 			closeErrs = append(closeErrs, fmt.Errorf("internal error while removing binding from page: %w", err))
 		}
 
-		err := newCommand(target.CloseTarget, target.CloseTargetParams{TargetID: p.targetID}).Do(teardownTimeoutCtx, p.session)
+		err := newCommand(target.CloseTarget,
+			target.CloseTargetParams{TargetID: p.targetID}).Do(teardownTimeoutCtx, p.session)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			// When a close target command is sent to the browser via CDP,
 			// the browser will start to cleanup and the first thing it

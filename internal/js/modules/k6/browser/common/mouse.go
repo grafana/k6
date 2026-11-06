@@ -88,7 +88,7 @@ func (m *Mouse) down(opts *MouseDownUpOptions) error {
 		X:          m.x,
 		Y:          m.y,
 		Button:     input.MouseButton(opts.Button),
-		Modifiers:  int64(m.keyboard.modifiers),
+		Modifiers:  m.keyboard.modifiers,
 		ClickCount: opts.ClickCount,
 	})
 	if err := action.Do(m.ctx, m.session); err != nil {
@@ -112,7 +112,7 @@ func (m *Mouse) up(opts *MouseDownUpOptions) error {
 		X:          m.x,
 		Y:          m.y,
 		Button:     input.MouseButton(opts.Button),
-		Modifiers:  int64(m.keyboard.modifiers),
+		Modifiers:  m.keyboard.modifiers,
 		ClickCount: opts.ClickCount,
 	})
 	if err := action.Do(m.ctx, m.session); err != nil {
@@ -143,7 +143,7 @@ func (m *Mouse) move(x float64, y float64, opts *MouseMoveOptions) error {
 			X:         x,
 			Y:         y,
 			Button:    m.button,
-			Modifiers: int64(m.keyboard.modifiers),
+			Modifiers: m.keyboard.modifiers,
 		})
 		if err := action.Do(m.ctx, m.session); err != nil {
 			return fmt.Errorf("mouse move: %w", err)

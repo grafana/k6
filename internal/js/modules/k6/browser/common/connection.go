@@ -267,7 +267,7 @@ func (c *Connection) createSession(info *target.Info) (*Session, error) {
 
 	var sessionID target.SessionID
 	var err error
-	action := newCommand(target.AttachToTarget, target.AttachToTargetParams{TargetID: info.TargetID, Flatten: ptr(true)})
+	action := newCommand(target.AttachToTarget, target.AttachToTargetParams{TargetID: info.TargetID, Flatten: new(true)})
 	result, err := action.Result(c.ctx, c)
 	sessionID = result.SessionID
 	if err != nil {
