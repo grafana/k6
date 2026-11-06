@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/keyboardlayout"
@@ -114,22 +113,24 @@ func (k *Keyboard) down(key string) error {
 	k.pressedKeys[keyDef.KeyCode] = struct{}{}
 	k.pressedKeysMu.Unlock()
 
-	keyType := input.KeyDown
+	keyType := input.DispatchKeyEventTypeKeyDown
 	if text == "" {
-		keyType = input.KeyRawDown
+		keyType = input.DispatchKeyEventTypeRawKeyDown
 	}
 
-	action := input.DispatchKeyEvent(keyType).
-		WithModifiers(input.Modifier(k.modifiers)).
-		WithKey(keyDef.Key).
-		WithWindowsVirtualKeyCode(keyDef.KeyCode).
-		WithCode(keyDef.Code).
-		WithLocation(keyDef.Location).
-		WithIsKeypad(keyDef.Location == 3).
-		WithText(text).
-		WithUnmodifiedText(text).
-		WithAutoRepeat(autoRepeat)
-	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
+	action := newCommand(input.DispatchKeyEvent, input.DispatchKeyEventParams{
+		Type:                  keyType,
+		Modifiers:             k.modifiers,
+		Key:                   keyDef.Key,
+		WindowsVirtualKeyCode: keyDef.KeyCode,
+		Code:                  keyDef.Code,
+		Location:              keyDef.Location,
+		IsKeypad:              new(keyDef.Location == 3),
+		Text:                  text,
+		UnmodifiedText:        text,
+		AutoRepeat:            new(autoRepeat),
+	})
+	if err := action.Do(k.ctx, k.session); err != nil {
 		return fmt.Errorf("dispatching key event down: %w", err)
 	}
 
@@ -150,13 +151,15 @@ func (k *Keyboard) up(key string) error {
 	delete(k.pressedKeys, keyDef.KeyCode)
 	k.pressedKeysMu.Unlock()
 
-	action := input.DispatchKeyEvent(input.KeyUp).
-		WithModifiers(input.Modifier(k.modifiers)).
-		WithKey(keyDef.Key).
-		WithWindowsVirtualKeyCode(keyDef.KeyCode).
-		WithCode(keyDef.Code).
-		WithLocation(keyDef.Location)
-	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
+	action := newCommand(input.DispatchKeyEvent, input.DispatchKeyEventParams{
+		Type:                  input.DispatchKeyEventTypeKeyUp,
+		Modifiers:             k.modifiers,
+		Key:                   keyDef.Key,
+		WindowsVirtualKeyCode: keyDef.KeyCode,
+		Code:                  keyDef.Code,
+		Location:              keyDef.Location,
+	})
+	if err := action.Do(k.ctx, k.session); err != nil {
 		return fmt.Errorf("dispatching key event up: %w", err)
 	}
 
@@ -164,8 +167,8 @@ func (k *Keyboard) up(key string) error {
 }
 
 func (k *Keyboard) insertText(text string) error {
-	action := input.InsertText(text)
-	if err := action.Do(cdp.WithExecutor(k.ctx, k.session)); err != nil {
+	action := newCommand(input.InsertText, input.InsertTextParams{Text: text})
+	if err := action.Do(k.ctx, k.session); err != nil {
 		return fmt.Errorf("inserting text: %w", err)
 	}
 	return nil

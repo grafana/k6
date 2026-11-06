@@ -66,7 +66,9 @@ func parseRemoteObjectPreview(op *runtime.ObjectPreview) (map[string]any, error)
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseRemoteObjectValue(p.Type, p.Subtype, p.Value, p.ValuePreview)
+		val, err := parseRemoteObjectValue(
+			runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview,
+		)
 		if err != nil {
 			result = append(result, &objectPropertyParseError{err, p.Name})
 			continue
@@ -78,36 +80,36 @@ func parseRemoteObjectPreview(op *runtime.ObjectPreview) (map[string]any, error)
 }
 
 func parseRemoteObjectValue(
-	t runtime.Type, st runtime.Subtype, val string, op *runtime.ObjectPreview,
+	t runtime.RemoteObjectType, st runtime.RemoteObjectSubtype, val string, op *runtime.ObjectPreview,
 ) (any, error) {
 	switch t { //nolint:exhaustive
-	case runtime.TypeAccessor:
+	case "accessor":
 		return "accessor", nil
-	case runtime.TypeBigint:
+	case runtime.RemoteObjectTypeBigint:
 		n, err := strconv.ParseInt(strings.ReplaceAll(val, "n", ""), 10, 64)
 		if err != nil {
 			return nil, BigIntParseError{err}
 		}
 		return n, nil
-	case runtime.TypeFunction:
+	case runtime.RemoteObjectTypeFunction:
 		return "function()", nil
-	case runtime.TypeString:
+	case runtime.RemoteObjectTypeString:
 		if !strings.HasPrefix(val, `"`) {
 			return val, nil
 		}
-	case runtime.TypeSymbol:
+	case runtime.RemoteObjectTypeSymbol:
 		return val, nil
-	case runtime.TypeObject:
+	case runtime.RemoteObjectTypeObject:
 		if op != nil {
 			return parseRemoteObjectPreview(op)
 		}
 		if val == "Object" {
 			return val, nil
 		}
-		if st == runtime.SubtypeNull {
+		if st == runtime.RemoteObjectSubtypeNull {
 			return nil, nil //nolint:nilnil
 		}
-	case runtime.TypeUndefined:
+	case runtime.RemoteObjectTypeUndefined:
 		return "undefined", nil
 	}
 
@@ -189,7 +191,9 @@ func parseConsoleRemoteObjectPreview(logger *log.Logger, op *runtime.ObjectPrevi
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		val, err := parseConsoleRemoteObjectValue(
+			logger, runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview,
+		)
 		if err != nil {
 			return "", err
 		}
@@ -211,7 +215,9 @@ func parseConsoleRemoteArrayPreview(logger *log.Logger, op *runtime.ObjectPrevie
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		val, err := parseConsoleRemoteObjectValue(
+			logger, runtime.RemoteObjectType(p.Type), runtime.RemoteObjectSubtype(p.Subtype), p.Value, p.ValuePreview,
+		)
 		if err != nil {
 			return "", err
 		}
@@ -228,22 +234,22 @@ func parseConsoleRemoteArrayPreview(logger *log.Logger, op *runtime.ObjectPrevie
 
 func parseConsoleRemoteObjectValue(
 	logger *log.Logger,
-	t runtime.Type,
-	st runtime.Subtype,
+	t runtime.RemoteObjectType,
+	st runtime.RemoteObjectSubtype,
 	val string,
 	op *runtime.ObjectPreview,
 ) (string, error) {
 	switch t {
-	case runtime.TypeAccessor:
+	case "accessor":
 		return "accessor", nil
-	case runtime.TypeFunction:
+	case runtime.RemoteObjectTypeFunction:
 		return "function()", nil
-	case runtime.TypeString:
+	case runtime.RemoteObjectTypeString:
 		if after, ok := strings.CutPrefix(val, `"`); ok {
 			val = after
 			val = strings.TrimSuffix(val, `"`)
 		}
-	case runtime.TypeObject:
+	case runtime.RemoteObjectTypeObject:
 		if op != nil {
 			if st == "array" {
 				return parseConsoleRemoteArrayPreview(logger, op)
@@ -256,14 +262,14 @@ func parseConsoleRemoteObjectValue(
 		if st == "null" {
 			return "null", nil
 		}
-	case runtime.TypeUndefined:
+	case runtime.RemoteObjectTypeUndefined:
 		return "undefined", nil
 	// The following cases are here to clarify that all cases have been
 	// considered, but that the result will return val without processing it.
-	case runtime.TypeNumber:
-	case runtime.TypeBoolean:
-	case runtime.TypeSymbol:
-	case runtime.TypeBigint:
+	case runtime.RemoteObjectTypeNumber:
+	case runtime.RemoteObjectTypeBoolean:
+	case runtime.RemoteObjectTypeSymbol:
+	case runtime.RemoteObjectTypeBigint:
 	}
 
 	return val, nil

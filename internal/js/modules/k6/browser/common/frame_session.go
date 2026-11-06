@@ -166,7 +166,7 @@ func NewFrameSession(
 		hasUIWindow:          hasUIWindow,
 	}
 
-	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	if err := newCommand(cdpruntime.RunIfWaitingForDebugger, cdp.Empty{}).Do(fs.ctx, fs.session); err != nil {
 		return nil, fmt.Errorf("run if waiting for debugger to attach: %w", err)
 	}
 
@@ -186,8 +186,10 @@ func NewFrameSession(
 	// iframes that are attached are setup with hasUIWindow as false which seems to work
 	// as expected for iframes with and without UI elements.
 	if fs.hasUIWindow {
-		action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
-		if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		action := newCommand(browser.GetWindowForTarget, browser.GetWindowForTargetParams{TargetID: fs.targetID})
+		result, err := action.Result(fs.ctx, fs.session)
+		fs.windowID = result.WindowID
+		if err != nil {
 			l.Debugf(
 				"NewFrameSession:GetWindowForTarget",
 				"sid:%v tid:%v err:%v",
@@ -235,8 +237,9 @@ func NewFrameSession(
 }
 
 func (fs *FrameSession) emulateLocale() error {
-	action := emulation.SetLocaleOverride().WithLocale(fs.page.browserCtx.opts.Locale)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action := newCommand(emulation.SetLocaleOverride,
+		emulation.SetLocaleOverrideParams{Locale: fs.page.browserCtx.opts.Locale})
+	if err := action.Do(fs.ctx, fs.session); err != nil {
 		if strings.Contains(err.Error(), "Another locale override is already in effect") {
 			return nil
 		}
@@ -246,8 +249,9 @@ func (fs *FrameSession) emulateLocale() error {
 }
 
 func (fs *FrameSession) emulateTimezone() error {
-	action := emulation.SetTimezoneOverride(fs.page.browserCtx.opts.TimezoneID)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action := newCommand(emulation.SetTimezoneOverride,
+		emulation.SetTimezoneOverrideParams{TimezoneID: fs.page.browserCtx.opts.TimezoneID})
+	if err := action.Do(fs.ctx, fs.session); err != nil {
 		if strings.Contains(err.Error(), "Timezone override is already in effect") {
 			return nil
 		}
@@ -262,14 +266,18 @@ func (fs *FrameSession) getNetworkManager() *NetworkManager {
 
 func (fs *FrameSession) initDomains() error {
 	actions := []Action{
-		// TODO: can we get rid of the following by doing DOM related stuff in JS instead?
-		dom.Enable(),
-		cdplog.Enable(),
-		cdpruntime.Enable(),
-		target.SetAutoAttach(true, true).WithFlatten(true),
+		newCommand(
+			// TODO: can we get rid of the following by doing DOM related stuff in JS instead?
+			dom.Enable, dom.EnableParams{}), newCommand(cdplog.Enable, cdp.Empty{}),
+		newCommand(cdpruntime.Enable, cdp.Empty{}), newCommand(target.SetAutoAttach,
+			target.SetAutoAttachParams{
+				AutoAttach:             true,
+				WaitForDebuggerOnStart: true,
+				Flatten:                new(true),
+			}),
 	}
 	for _, action := range actions {
-		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		if err := action.Do(fs.ctx, fs.session); err != nil {
 			return fmt.Errorf("internal error while enabling %T: %w", action, err)
 		}
 	}
@@ -351,7 +359,7 @@ func (fs *FrameSession) initEvents() {
 				case *cdpruntime.EventExecutionContextCreated:
 					fs.onExecutionContextCreated(ev)
 				case *cdpruntime.EventExecutionContextDestroyed:
-					fs.onExecutionContextDestroyed(ev.ExecutionContextID)
+					fs.onExecutionContextDestroyed(ev.ExecutionContextUniqueID)
 				case *cdpruntime.EventExecutionContextsCleared:
 					fs.onExecutionContextsCleared()
 				case *target.EventAttachedToTarget:
@@ -480,12 +488,12 @@ func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavas
 	// dismiss beforeunload dialog boxes at the moment as
 	// it seems to pause the exec of any other action on
 	// the page. I believe this is an issue in Chromium.
-	action := cdppage.HandleJavaScriptDialog(false)
+	action := newCommand(cdppage.HandleJavaScriptDialog, cdppage.HandleJavaScriptDialogParams{Accept: false})
 	if event.Type == cdppage.DialogTypeBeforeunload {
-		action = cdppage.HandleJavaScriptDialog(true)
+		action = newCommand(cdppage.HandleJavaScriptDialog, cdppage.HandleJavaScriptDialogParams{Accept: true})
 	}
 
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	if err := action.Do(fs.ctx, fs.session); err != nil {
 		fs.logger.Errorf("FrameSession:onEventJavascriptDialogOpening", "failed to dismiss dialog box: %v", err)
 	}
 }
@@ -494,8 +502,8 @@ func (fs *FrameSession) initFrameTree() error {
 	fs.logger.Debugf("NewFrameSession:initFrameTree",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
-	action := cdppage.Enable()
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action := newCommand(cdppage.Enable, cdppage.EnableParams{})
+	if err := action.Do(fs.ctx, fs.session); err != nil {
 		return fmt.Errorf("enabling page domain: %w", err)
 	}
 
@@ -504,8 +512,10 @@ func (fs *FrameSession) initFrameTree() error {
 
 	// Recursively enumerate all existing frames in page to create initial in-memory structures
 	// used for access and manipulation from JS.
-	action2 := cdppage.GetFrameTree()
-	if frameTree, err = action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action2 := newCommand(cdppage.GetFrameTree, cdp.Empty{})
+	result, err := action2.Result(fs.ctx, fs.session)
+	frameTree = result.FrameTree
+	if err != nil {
 		return fmt.Errorf("getting page frame tree: %w", err)
 	} else if frameTree == nil {
 		// This can happen with very short scripts when we might not have enough
@@ -526,8 +536,8 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	fs.logger.Debugf("NewFrameSession:initIsolatedWorld",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
-	action := cdppage.SetLifecycleEventsEnabled(true)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action := newCommand(cdppage.SetLifecycleEventsEnabled, cdppage.SetLifecycleEventsEnabledParams{Enabled: true})
+	if err := action.Do(fs.ctx, fs.session); err != nil {
 		return fmt.Errorf("enabling page lifecycle events: %w", err)
 	}
 
@@ -557,7 +567,7 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 			&cdppage.CreateIsolatedWorldParams{
 				FrameID:             cdp.FrameID(frame.ID()),
 				WorldName:           name,
-				GrantUniveralAccess: true,
+				GrantUniveralAccess: new(true),
 			},
 			nil)
 	}
@@ -565,9 +575,10 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	fs.logger.Debugf("NewFrameSession:initIsolatedWorld:AddScriptToEvaluateOnNewDocument",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
-	action2 := cdppage.AddScriptToEvaluateOnNewDocument(`//# sourceURL=` + evaluationScriptURL).
-		WithWorldName(name)
-	if _, err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action2 := newCommand(cdppage.AddScriptToEvaluateOnNewDocument,
+		cdppage.AddScriptToEvaluateOnNewDocumentParams{Source: `//# sourceURL=` + evaluationScriptURL, WorldName: name})
+	_, err := action2.Result(fs.ctx, fs.session)
+	if err != nil {
 		return fmt.Errorf("adding script to evaluate on new document: %w", err)
 	}
 	return nil
@@ -577,14 +588,13 @@ func (fs *FrameSession) initOptions() error {
 	fs.logger.Debugf("NewFrameSession:initOptions",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
-	var (
-		opts       = fs.manager.page.browserCtx.opts
-		optActions = []Action{}
-		state      = fs.vu.State()
-	)
+	opts := fs.manager.page.browserCtx.opts
+	var optActions []Action
+	state := fs.vu.State()
 
 	if fs.isMainFrame() {
-		optActions = append(optActions, emulation.SetFocusEmulationEnabled(true))
+		optActions = append(optActions, newCommand(emulation.SetFocusEmulationEnabled,
+			emulation.SetFocusEmulationEnabledParams{Enabled: true}))
 		if err := fs.updateViewport(fs.ctx, fs.page.emulatedSize); err != nil {
 			fs.logger.Debugf("NewFrameSession:initOptions:updateViewport",
 				"sid:%v tid:%v, err:%v",
@@ -593,19 +603,23 @@ func (fs *FrameSession) initOptions() error {
 		}
 	}
 	if opts.BypassCSP {
-		optActions = append(optActions, cdppage.SetBypassCSP(true))
+		optActions = append(optActions, newCommand(cdppage.SetBypassCSP, cdppage.SetBypassCSPParams{Enabled: true}))
 	}
 	if opts.IgnoreHTTPSErrors {
-		optActions = append(optActions, security.SetIgnoreCertificateErrors(true))
+		optActions = append(optActions, newCommand(security.SetIgnoreCertificateErrors,
+			security.SetIgnoreCertificateErrorsParams{Ignore: true}))
 	}
 	if opts.HasTouch {
-		optActions = append(optActions, emulation.SetTouchEmulationEnabled(true))
+		optActions = append(optActions, newCommand(emulation.SetTouchEmulationEnabled,
+			emulation.SetTouchEmulationEnabledParams{Enabled: true}))
 	}
 	if !opts.JavaScriptEnabled {
-		optActions = append(optActions, emulation.SetScriptExecutionDisabled(true))
+		optActions = append(optActions, newCommand(emulation.SetScriptExecutionDisabled,
+			emulation.SetScriptExecutionDisabledParams{Value: true}))
 	}
 	if opts.UserAgent != "" || opts.Locale != "" {
-		optActions = append(optActions, emulation.SetUserAgentOverride(opts.UserAgent).WithAcceptLanguage(opts.Locale))
+		optActions = append(optActions, newCommand(emulation.SetUserAgentOverride,
+			emulation.SetUserAgentOverrideParams{UserAgent: opts.UserAgent, AcceptLanguage: opts.Locale}))
 	}
 	if opts.Locale != "" {
 		if err := fs.emulateLocale(); err != nil {
@@ -644,7 +658,7 @@ func (fs *FrameSession) initOptions() error {
 	}
 
 	for _, action := range optActions {
-		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		if err := action.Do(fs.ctx, fs.session); err != nil {
 			return fmt.Errorf("internal error while initializing frame %T: %w", action, err)
 		}
 	}
@@ -710,8 +724,10 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 		"sid:%v fid:%s tid:%v url:%q referrer:%q",
 		fs.session.ID(), frame.ID(), fs.targetID, url, referrer)
 
-	action := cdppage.Navigate(url).WithReferrer(referrer).WithFrameID(cdp.FrameID(frame.ID()))
-	_, documentID, errorText, _, err := action.Do(cdp.WithExecutor(fs.ctx, fs.session))
+	action := newCommand(cdppage.Navigate,
+		cdppage.NavigateParams{URL: url, Referrer: referrer, FrameID: cdp.FrameID(frame.ID())})
+	result, err := action.Result(fs.ctx, fs.session)
+	documentID, errorText := result.LoaderID, result.ErrorText
 	if err != nil {
 		if errorText == "" {
 			err = fmt.Errorf("%w", err)
@@ -724,7 +740,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	l := fs.logger.
-		WithTime(event.Timestamp.Time()).
+		WithTime(protocolTime(float64(event.Timestamp)/1000)).
 		WithField("source", "browser").
 		WithField("browser_source", "console-api")
 
@@ -797,6 +813,7 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		fs.isolatedWorlds[event.Context.Name] = true
 	}
 	context := NewExecutionContext(fs.ctx, fs.session, frame, event.Context.ID, fs.logger)
+	context.uniqueID = event.Context.UniqueID
 	if world != "" {
 		fs.logger.Debugf("FrameSession:setContext",
 			"sid:%v fid:%v ectxid:%d",
@@ -808,15 +825,22 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 	fs.contextIDToContextMu.Unlock()
 }
 
-func (fs *FrameSession) onExecutionContextDestroyed(execCtxID cdpruntime.ExecutionContextID) {
+func (fs *FrameSession) onExecutionContextDestroyed(uniqueID string) {
 	fs.logger.Debugf("FrameSession:onExecutionContextDestroyed",
-		"sid:%v tid:%v ectxid:%d",
-		fs.session.ID(), fs.targetID, execCtxID)
+		"sid:%v tid:%v uniqueid:%s",
+		fs.session.ID(), fs.targetID, uniqueID)
 
 	fs.contextIDToContextMu.Lock()
 	defer fs.contextIDToContextMu.Unlock()
-	context, ok := fs.contextIDToContext[execCtxID]
-	if !ok {
+	var execCtxID cdpruntime.ExecutionContextID
+	var context *ExecutionContext
+	for id, candidate := range fs.contextIDToContext {
+		if candidate.uniqueID == uniqueID {
+			execCtxID, context = id, candidate
+			break
+		}
+	}
+	if context == nil {
 		return
 	}
 	if context.Frame() != nil {
@@ -1010,7 +1034,7 @@ func (fs *FrameSession) onFrameStoppedLoading(frameID cdp.FrameID) {
 
 func (fs *FrameSession) onLogEntryAdded(event *cdplog.EventEntryAdded) {
 	l := fs.logger.
-		WithTime(event.Entry.Timestamp.Time()).
+		WithTime(protocolTime(float64(event.Entry.Timestamp)/1000)).
 		WithField("source", "browser").
 		WithField("url", event.Entry.URL).
 		WithField("browser_source", event.Entry.Source.String()).
@@ -1028,7 +1052,7 @@ func (fs *FrameSession) onLogEntryAdded(event *cdplog.EventEntryAdded) {
 func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 	fs.logger.Debugf("FrameSession:onPageLifecycle",
 		"sid:%v tid:%v fid:%v event:%s eventTime:%q",
-		fs.session.ID(), fs.targetID, event.FrameID, event.Name, event.Timestamp.Time())
+		fs.session.ID(), fs.targetID, event.FrameID, event.Name, protocolTime(float64(event.Timestamp)))
 
 	_, ok := fs.manager.getFrameByID(event.FrameID)
 	if !ok {
@@ -1248,10 +1272,9 @@ func (fs *FrameSession) updateEmulateMedia() error {
 		features = append(features, &emulation.MediaFeature{Name: "prefers-reduced-motion", Value: ""})
 	}
 
-	action := emulation.SetEmulatedMedia().
-		WithMedia(string(fs.page.mediaType)).
-		WithFeatures(features)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action := newCommand(emulation.SetEmulatedMedia,
+		emulation.SetEmulatedMediaParams{Media: string(fs.page.mediaType), Features: features})
+	if err := action.Do(fs.ctx, fs.session); err != nil {
 		return fmt.Errorf("internal error while updating emulated media: %w", err)
 	}
 	return nil
@@ -1282,11 +1305,12 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 
 	geolocation := fs.page.browserCtx.opts.Geolocation
 	if !initial || geolocation != nil {
-		action := emulation.SetGeolocationOverride().
-			WithLatitude(geolocation.Latitude).
-			WithLongitude(geolocation.Longitude).
-			WithAccuracy(geolocation.Accuracy)
-		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		action := newCommand(emulation.SetGeolocationOverride, emulation.SetGeolocationOverrideParams{
+			Latitude:  new(geolocation.Latitude),
+			Longitude: new(geolocation.Longitude),
+			Accuracy:  new(geolocation.Accuracy),
+		})
+		if err := action.Do(fs.ctx, fs.session); err != nil {
 			return fmt.Errorf("%w", err)
 		}
 	}
@@ -1325,8 +1349,8 @@ func (fs *FrameSession) throttleNetwork(networkProfile NetworkProfile) error {
 }
 
 func (fs *FrameSession) throttleCPU(cpuProfile CPUProfile) error {
-	action := emulation.SetCPUThrottlingRate(cpuProfile.Rate)
-	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	action := newCommand(emulation.SetCPUThrottlingRate, emulation.SetCPUThrottlingRateParams{Rate: cpuProfile.Rate})
+	if err := action.Do(fs.ctx, fs.session); err != nil {
 		return fmt.Errorf("throttling CPU: %w", err)
 	}
 
@@ -1363,17 +1387,22 @@ func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *Emulat
 
 	orientation := emulation.ScreenOrientation{
 		Angle: 0.0,
-		Type:  emulation.OrientationTypePortraitPrimary,
+		Type:  emulation.ScreenOrientationTypePortraitPrimary,
 	}
 	if viewport.Width > viewport.Height {
 		orientation.Angle = 90.0
-		orientation.Type = emulation.OrientationTypeLandscapePrimary
+		orientation.Type = emulation.ScreenOrientationTypeLandscapePrimary
 	}
-	action := emulation.SetDeviceMetricsOverride(viewport.Width, viewport.Height, opts.DeviceScaleFactor, opts.IsMobile).
-		WithScreenOrientation(&orientation).
-		WithScreenWidth(screen.Width).
-		WithScreenHeight(screen.Height)
-	if err := action.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
+	action := newCommand(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{
+		Width:             viewport.Width,
+		Height:            viewport.Height,
+		DeviceScaleFactor: opts.DeviceScaleFactor,
+		Mobile:            opts.IsMobile,
+		ScreenOrientation: &orientation,
+		ScreenWidth:       screen.Width,
+		ScreenHeight:      screen.Height,
+	})
+	if err := action.Do(ctx, fs.session); err != nil {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
@@ -1384,11 +1413,12 @@ func (fs *FrameSession) updateViewport(ctx context.Context, emulatedSize *Emulat
 			fs.page.browserCtx.browser.browserOpts.Headless,
 			runtime.GOOS,
 		)
-		action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
-			Width:  viewport.Width,
-			Height: viewport.Height,
-		})
-		if err := action2.Do(cdp.WithExecutor(ctx, fs.session)); err != nil {
+		action2 := newCommand(browser.SetWindowBounds,
+			browser.SetWindowBoundsParams{WindowID: fs.windowID, Bounds: &browser.Bounds{
+				Width:  viewport.Width,
+				Height: viewport.Height,
+			}})
+		if err := action2.Do(ctx, fs.session); err != nil {
 			return fmt.Errorf("setting window bounds: %w", err)
 		}
 	}

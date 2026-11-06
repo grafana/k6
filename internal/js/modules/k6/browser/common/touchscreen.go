@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 )
 
@@ -33,23 +32,23 @@ func (t *Touchscreen) Tap(x float64, y float64) error {
 }
 
 func (t *Touchscreen) tap(x float64, y float64) error {
-	touchStart := input.DispatchTouchEvent(
-		input.TouchStart,
-		[]*input.TouchPoint{{X: x, Y: y}},
-	).WithModifiers(
-		input.Modifier(t.keyboard.modifiers),
-	)
-	if err := touchStart.Do(cdp.WithExecutor(t.ctx, t.session)); err != nil {
+	touchStart := newCommand(input.DispatchTouchEvent, input.DispatchTouchEventParams{
+		Type:        input.DispatchTouchEventTypeTouchStart,
+		TouchPoints: []*input.TouchPoint{{X: x, Y: y}},
+		Modifiers:   t.keyboard.modifiers,
+	})
+
+	if err := touchStart.Do(t.ctx, t.session); err != nil {
 		return fmt.Errorf("touch start: %w", err)
 	}
 
-	touchEnd := input.DispatchTouchEvent(
-		input.TouchEnd,
-		[]*input.TouchPoint{},
-	).WithModifiers(
-		input.Modifier(t.keyboard.modifiers),
-	)
-	if err := touchEnd.Do(cdp.WithExecutor(t.ctx, t.session)); err != nil {
+	touchEnd := newCommand(input.DispatchTouchEvent, input.DispatchTouchEventParams{
+		Type:        input.DispatchTouchEventTypeTouchEnd,
+		TouchPoints: []*input.TouchPoint{},
+		Modifiers:   t.keyboard.modifiers,
+	})
+
+	if err := touchEnd.Do(t.ctx, t.session); err != nil {
 		return fmt.Errorf("touch end: %w", err)
 	}
 

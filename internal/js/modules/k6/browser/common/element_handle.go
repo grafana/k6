@@ -71,8 +71,10 @@ func (h *ElementHandle) String() string {
 func (h *ElementHandle) boundingBox() (*Rect, error) {
 	var box *dom.BoxModel
 	var err error
-	action := dom.GetBoxModel().WithObjectID(h.remoteObject.ObjectID)
-	if box, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	action := newCommand(dom.GetBoxModel, dom.GetBoxModelParams{ObjectID: h.remoteObject.ObjectID})
+	result, err := action.Result(h.ctx, h.session)
+	box = result.Model
+	if err != nil {
 		return nil, fmt.Errorf("getting bounding box model of DOM node: %w", err)
 	}
 
@@ -485,8 +487,9 @@ func (h *ElementHandle) ownerFrame(apiCtx context.Context) (*Frame, error) {
 }
 
 func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect *dom.Rect) error {
-	action := dom.ScrollIntoViewIfNeeded().WithObjectID(h.remoteObject.ObjectID).WithRect(rect)
-	err := action.Do(cdp.WithExecutor(apiCtx, h.session))
+	action := newCommand(dom.ScrollIntoViewIfNeeded,
+		dom.ScrollIntoViewIfNeededParams{ObjectID: h.remoteObject.ObjectID, Rect: rect})
+	err := action.Do(apiCtx, h.session)
 	if err != nil {
 		if strings.Contains(err.Error(), "Node does not have a layout object") {
 			return ErrElementNotVisible
@@ -862,8 +865,10 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 		node *cdp.Node
 		err  error
 	)
-	action := dom.DescribeNode().WithObjectID(h.remoteObject.ObjectID)
-	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	action := newCommand(dom.DescribeNode, dom.DescribeNodeParams{ObjectID: h.remoteObject.ObjectID})
+	result, err := action.Result(h.ctx, h.session)
+	node = result.Node
+	if err != nil {
 		return nil, fmt.Errorf("getting remote node %q: %w", h.remoteObject.ObjectID, err)
 	}
 	if node == nil || node.FrameID == "" {
@@ -1159,8 +1164,10 @@ func (h *ElementHandle) OwnerFrame() (_ *Frame, rerr error) {
 	}
 
 	var node *cdp.Node
-	action := dom.DescribeNode().WithObjectID(documentHandle.remoteObject.ObjectID)
-	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	action := newCommand(dom.DescribeNode, dom.DescribeNodeParams{ObjectID: documentHandle.remoteObject.ObjectID})
+	result, err := action.Result(h.ctx, h.session)
+	node = result.Node
+	if err != nil {
 		return nil, fmt.Errorf("getting node in frame: %w", err)
 	}
 	if node == nil || node.FrameID == "" {

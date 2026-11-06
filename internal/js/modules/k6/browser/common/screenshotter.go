@@ -177,31 +177,32 @@ func (s *screenshotter) screenshot(
 	sess session, doc, viewport *Rect, format ImageFormat, omitBackground bool, quality int64, path string,
 ) (buf []byte, err error) {
 	var clip *cdppage.Viewport
-	capture := cdppage.CaptureScreenshot()
+	capture := newCommand(cdppage.CaptureScreenshot, cdppage.CaptureScreenshotParams{})
 
 	shouldSetDefaultBackground := omitBackground && format == "png"
 	if shouldSetDefaultBackground {
-		action := emulation.SetDefaultBackgroundColorOverride().
-			WithColor(&cdp.RGBA{R: 0, G: 0, B: 0, A: 0})
+		action := newCommand(emulation.SetDefaultBackgroundColorOverride,
+			emulation.SetDefaultBackgroundColorOverrideParams{Color: &cdp.RGBA{R: 0, G: 0, B: 0, A: 0}})
 		defer func() {
 			ctx, cancel := s.cleanupContext()
 			defer cancel()
-			if restoreErr := emulation.SetDefaultBackgroundColorOverride().Do(cdp.WithExecutor(ctx, sess)); restoreErr != nil {
+			if restoreErr := newCommand(emulation.SetDefaultBackgroundColorOverride,
+				emulation.SetDefaultBackgroundColorOverrideParams{}).Do(ctx, sess); restoreErr != nil {
 				err = errors.Join(err, fmt.Errorf("resetting screenshot background color: %w", restoreErr))
 			}
 		}()
-		if err := action.Do(cdp.WithExecutor(s.ctx, sess)); err != nil {
+		if err := action.Do(s.ctx, sess); err != nil {
 			return nil, fmt.Errorf("setting screenshot background transparency: %w", err)
 		}
 	}
 
 	// Add common options
-	capture.WithQuality(quality)
+	capture.params.Quality = new(quality)
 	switch format {
 	case ImageFormatJPEG:
-		capture.WithFormat(cdppage.CaptureScreenshotFormatJpeg)
+		capture.params.Format = cdppage.CaptureScreenshotFormatJpeg
 	default:
-		capture.WithFormat(cdppage.CaptureScreenshotFormatPng)
+		capture.params.Format = cdppage.CaptureScreenshotFormatPng
 	}
 
 	visualViewportScale, visualViewportPageX, visualViewportPageY, err := getViewPortDimensions(s.ctx, sess, s.logger)
@@ -234,11 +235,11 @@ func (s *screenshotter) screenshot(
 		Scale:  scale,
 	}
 	if clip.Width > 0 && clip.Height > 0 {
-		capture = capture.WithClip(clip)
+		capture.params.Clip = clip
 	}
-
 	// Capture screenshot
-	buf, err = capture.Do(cdp.WithExecutor(s.ctx, sess))
+	result, err := capture.Result(s.ctx, sess)
+	buf = result.Data
 	if err != nil {
 		return nil, fmt.Errorf("capturing screenshot: %w", err)
 	}
@@ -258,8 +259,8 @@ func getViewPortDimensions(ctx context.Context, sess session, logger *log.Logger
 	visualViewportPageX, visualViewportPageY := 0.0, 0.0
 
 	// Add clip region
-	//nolint:dogsled
-	_, _, _, _, cssVisualViewport, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(ctx, sess))
+	metrics, err := newCommand(cdppage.GetLayoutMetrics, cdp.Empty{}).Result(ctx, sess)
+	cssVisualViewport := metrics.CSSVisualViewport
 	if err != nil {
 		return 0, 0, 0, fmt.Errorf("getting layout metrics for screenshot: %w", err)
 	}
