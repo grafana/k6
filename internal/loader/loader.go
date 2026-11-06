@@ -39,6 +39,9 @@ const (
 		fileNotFoundHint
 	fileSchemeCouldntBeLoadedAtMsg = `The moduleSpecifier "%s" couldn't be found on local disk at "%s"` +
 		fileNotFoundHint
+	directoryNotImportableMsg = `The moduleSpecifier "%s" resolves to the directory "%s", ` +
+		`but k6 can only import files. Import a file inside it instead, ` +
+		`using its full file name including the extension.`
 )
 
 // fileNotFoundError reports that moduleSpecifier was missing at the path k6 looked up.
@@ -47,6 +50,14 @@ const (
 func fileNotFoundError(moduleSpecifier, lookedUpPath string) error {
 	//nolint:staticcheck
 	return fmt.Errorf(fileSchemeCouldntBeLoadedAtMsg, moduleSpecifier, localPathForError(lookedUpPath))
+}
+
+// directoryError reports that moduleSpecifier resolved to a directory, which can't be imported.
+// Without it, reading a directory fails with a bare OS error such as "is a directory", or
+// "Incorrect function" on Windows, that doesn't tell what went wrong.
+func directoryError(moduleSpecifier, lookedUpPath string) error {
+	//nolint:staticcheck
+	return fmt.Errorf(directoryNotImportableMsg, moduleSpecifier, localPathForError(lookedUpPath))
 }
 
 func localPathForError(p string) string {
@@ -170,6 +181,14 @@ func Load(
 	pathOnFs, err := url.PathUnescape(filepath.FromSlash(pathOnFs))
 	if err != nil {
 		return nil, err
+	}
+
+	// Reading a directory doesn't fail the same way on every filesystem, so check for it up front.
+	// A failed check is ignored on purpose: the read below reports a missing file properly.
+	if scheme != "https" {
+		if isDir, dirErr := fsext.IsDir(filesystems[scheme], pathOnFs); dirErr == nil && isDir {
+			return nil, directoryError(originalModuleSpecifier, pathOnFs)
+		}
 	}
 
 	data, err := fsext.ReadFile(filesystems[scheme], pathOnFs)
