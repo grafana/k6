@@ -38,12 +38,7 @@ proto-dependencies:
 	rm $(PROTOC_ARCHIVE)
 
 generate-tools-installs: proto-dependencies
-	# Pinned here, not in go.mod, per review feedback in #6487: `go install tool@version` builds
-	# from the tool's own module graph, so this pin decides which golang.org/x/tools version
-	# reads k6's export data. v0.0.2 carries x/tools v0.52.0, which understands the Go 1.27
-	# export data format, so generate works under Go 1.27 again (#6399); bump the pin whenever
-	# a new Go release breaks generate.
-	go install github.com/mstoykov/enumer@v0.0.2
+	go install github.com/mstoykov/enumer@v0.0.2 # TODO figure out if we shouldn't move to a different fork
 	go install mvdan.cc/gofumpt@v0.8.0 # TODO maybe just use go fmt for this case
 
 generate: generate-tools-installs
