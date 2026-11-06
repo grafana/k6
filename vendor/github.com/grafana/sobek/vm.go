@@ -673,6 +673,12 @@ func (vm *vm) init() {
 }
 
 func (vm *vm) halted() bool {
+	if vm.prg == nil {
+		// A nil program means there is no JS program to execute. This is used
+		// during native calls, after a generator has returned, and after the
+		// top-level program has finished.
+		return true
+	}
 	pc := vm.pc
 	return pc < 0 || pc >= len(vm.prg.code)
 }

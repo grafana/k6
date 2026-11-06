@@ -91,7 +91,6 @@ var (
 		"promise-with-resolvers",
 		"array-grouping",
 		"Math.sumPrecise",
-		"Float16Array",
 		"arraybuffer-transfer",
 		"Array.fromAsync",
 		"String.prototype.isWellFormed",

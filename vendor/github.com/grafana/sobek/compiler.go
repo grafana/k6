@@ -654,7 +654,7 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 			for scope, aps := range b.accessPoints {
 				var level uint32
 				for sc := scope; sc != nil && sc != s; sc = sc.outer {
-					if sc.needStash || sc.isDynamic() {
+					if sc.hasStash() {
 						level++
 					}
 				}
@@ -760,7 +760,7 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 			for scope, aps := range b.accessPoints {
 				var level int
 				for sc := scope; sc != nil && sc != s; sc = sc.outer {
-					if sc.needStash || sc.isDynamic() {
+					if sc.hasStash() {
 						level++
 					}
 				}
@@ -931,6 +931,13 @@ func (s *scope) makeNamesMap() map[unistring.String]uint32 {
 
 func (s *scope) isDynamic() bool {
 	return s.dynLookup || s.dynamic
+}
+
+// hasStash returns whether this scope creates its own stash at runtime (as opposed to
+// the stash of an outer scope being the current one). This must match the corresponding
+// enter instruction (see updateEnterBlock, enterFunc, enterFunc1 and enterFuncBody).
+func (s *scope) hasStash() bool {
+	return s.needStash || s.dynamic || s.dynLookup && len(s.bindings) > 0
 }
 
 func (s *scope) isFunction() bool {

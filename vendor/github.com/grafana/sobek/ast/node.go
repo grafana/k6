@@ -99,6 +99,10 @@ type (
 		Operator token.Token
 		Left     Expression
 		Right    Expression
+
+		// Left is an identifier in parentheses, e.g. (a) = function() {}. It's not an IdentifierRef,
+		// so an anonymous function or class on the right does not get its name.
+		ParenthesizedLeft bool
 	}
 
 	BadExpression struct {

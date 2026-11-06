@@ -73,6 +73,10 @@ func (r *Runtime) math_floor(call FunctionCall) Value {
 	return floatToValue(math.Floor(call.Argument(0).ToFloat()))
 }
 
+func (r *Runtime) math_f16round(call FunctionCall) Value {
+	return floatToValue(Float16ToFloat64(Float64ToFloat16(call.Argument(0).ToFloat())))
+}
+
 func (r *Runtime) math_fround(call FunctionCall) Value {
 	return floatToValue(float64(float32(call.Argument(0).ToFloat())))
 }
@@ -492,6 +496,7 @@ func createMathTemplate() *objectTemplate {
 	t.putStr("exp", func(r *Runtime) Value { return r.methodProp(r.math_exp, "exp", 1) })
 	t.putStr("expm1", func(r *Runtime) Value { return r.methodProp(r.math_expm1, "expm1", 1) })
 	t.putStr("floor", func(r *Runtime) Value { return r.methodProp(r.math_floor, "floor", 1) })
+	t.putStr("f16round", func(r *Runtime) Value { return r.methodProp(r.math_f16round, "f16round", 1) })
 	t.putStr("fround", func(r *Runtime) Value { return r.methodProp(r.math_fround, "fround", 1) })
 	t.putStr("hypot", func(r *Runtime) Value { return r.methodProp(r.math_hypot, "hypot", 2) })
 	t.putStr("imul", func(r *Runtime) Value { return r.methodProp(r.math_imul, "imul", 2) })

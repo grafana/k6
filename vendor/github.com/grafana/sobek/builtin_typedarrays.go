@@ -280,6 +280,13 @@ func (r *Runtime) dataViewProto_getByteOffset(call FunctionCall) Value {
 	panic(r.NewTypeError("Method get DataView.prototype.byteOffset called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
+func (r *Runtime) dataViewProto_getFloat16(call FunctionCall) Value {
+	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
+		return floatToValue(dv.viewedArrayBuf.getFloat16(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 2)))
+	}
+	panic(r.NewTypeError("Method DataView.prototype.getFloat16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
+}
+
 func (r *Runtime) dataViewProto_getFloat32(call FunctionCall) Value {
 	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
 		return floatToValue(float64(dv.viewedArrayBuf.getFloat32(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0)), call.Argument(1), 4))))
@@ -350,6 +357,17 @@ func (r *Runtime) dataViewProto_getBigUint64(call FunctionCall) Value {
 		return (*valueBigInt)(dv.viewedArrayBuf.getBigUint64(dv.getIdxAndByteOrder(r.toIndex(call.Argument(0).ToNumber()), call.Argument(1), 8)))
 	}
 	panic(r.NewTypeError("Method DataView.prototype.getBigUint64 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
+}
+
+func (r *Runtime) dataViewProto_setFloat16(call FunctionCall) Value {
+	if dv, ok := r.toObject(call.This).self.(*dataViewObject); ok {
+		idxVal := r.toIndex(call.Argument(0))
+		val := toFloat16Bits(call.Argument(1))
+		idx, bo := dv.getIdxAndByteOrder(idxVal, call.Argument(2), 2)
+		dv.viewedArrayBuf.setFloat16(idx, val, bo)
+		return _undefined
+	}
+	panic(r.NewTypeError("Method DataView.prototype.setFloat16 called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
 }
 
 func (r *Runtime) dataViewProto_setFloat32(call FunctionCall) Value {
@@ -1044,6 +1062,9 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 					src.viewedArrayBuf.data[src.offset*src.elemSize:(src.offset+srcLen)*src.elemSize])
 			} else {
 				checkTypedArrayMixBigInt(src.defaultCtor, ta.defaultCtor)
+				if srcLen == 0 {
+					return _undefined
+				}
 				curSrc := uintptr(unsafe.Pointer(&src.viewedArrayBuf.data[src.offset*src.elemSize]))
 				endSrc := curSrc + uintptr(srcLen*src.elemSize)
 				curDst := uintptr(unsafe.Pointer(&ta.viewedArrayBuf.data[(ta.offset+targetOffset)*ta.elemSize]))
@@ -1602,6 +1623,10 @@ func (r *Runtime) newInt32Array(args []Value, newTarget, proto *Object) *Object 
 	return r._newTypedArray(args, newTarget, r.newInt32ArrayObject, proto)
 }
 
+func (r *Runtime) newFloat16Array(args []Value, newTarget, proto *Object) *Object {
+	return r._newTypedArray(args, newTarget, r.newFloat16ArrayObject, proto)
+}
+
 func (r *Runtime) newFloat32Array(args []Value, newTarget, proto *Object) *Object {
 	return r._newTypedArray(args, newTarget, r.newFloat32ArrayObject, proto)
 }
@@ -1893,6 +1918,7 @@ func addTypedArrays(t *objectTemplate) {
 	t.putStr("Int16Array", func(r *Runtime) Value { return valueProp(r.getInt16Array(), true, false, true) })
 	t.putStr("Uint32Array", func(r *Runtime) Value { return valueProp(r.getUint32Array(), true, false, true) })
 	t.putStr("Int32Array", func(r *Runtime) Value { return valueProp(r.getInt32Array(), true, false, true) })
+	t.putStr("Float16Array", func(r *Runtime) Value { return valueProp(r.getFloat16Array(), true, false, true) })
 	t.putStr("Float32Array", func(r *Runtime) Value { return valueProp(r.getFloat32Array(), true, false, true) })
 	t.putStr("Float64Array", func(r *Runtime) Value { return valueProp(r.getFloat64Array(), true, false, true) })
 	t.putStr("BigInt64Array", func(r *Runtime) Value { return valueProp(r.getBigInt64Array(), true, false, true) })
@@ -2093,6 +2119,16 @@ func (r *Runtime) getInt32Array() *Object {
 	return ret
 }
 
+func (r *Runtime) getFloat16Array() *Object {
+	ret := r.global.Float16Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Float16Array = ret
+		r.createTypedArrayCtor(ret, r.newFloat16Array, "Float16Array", 2)
+	}
+	return ret
+}
+
 func (r *Runtime) getFloat32Array() *Object {
 	ret := r.global.Float32Array
 	if ret == nil {
@@ -2163,6 +2199,7 @@ func createDataViewProtoTemplate() *objectTemplate {
 
 	t.putStr("constructor", func(r *Runtime) Value { return valueProp(r.getDataView(), true, false, true) })
 
+	t.putStr("getFloat16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat16, "getFloat16", 1) })
 	t.putStr("getFloat32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat32, "getFloat32", 1) })
 	t.putStr("getFloat64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat64, "getFloat64", 1) })
 	t.putStr("getInt8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getInt8, "getInt8", 1) })
@@ -2173,6 +2210,7 @@ func createDataViewProtoTemplate() *objectTemplate {
 	t.putStr("getUint32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getUint32, "getUint32", 1) })
 	t.putStr("getBigInt64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getBigInt64, "getBigInt64", 1) })
 	t.putStr("getBigUint64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getBigUint64, "getBigUint64", 1) })
+	t.putStr("setFloat16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat16, "setFloat16", 2) })
 	t.putStr("setFloat32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat32, "setFloat32", 2) })
 	t.putStr("setFloat64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat64, "setFloat64", 2) })
 	t.putStr("setInt8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setInt8, "setInt8", 2) })

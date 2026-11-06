@@ -784,6 +784,8 @@ func (o *Object) baseObject(*Runtime) *Object {
 // For a DynamicObject or a DynamicArray, returns the underlying handler.
 //
 // For typed arrays it returns a slice of the corresponding type backed by the original data (i.e. it does not copy).
+// As Go has no float16 type, a Float16Array is exported as []uint16 holding the raw IEEE 754 binary16 bits
+// of its elements. Use Float16ToFloat64 and Float64ToFloat16 to convert them.
 //
 // For an untyped array, returns its items exported into a newly created []interface{}.
 //

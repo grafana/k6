@@ -90,8 +90,8 @@ github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa
 github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa7c/go.mod h1:RhZGBq6e90zSi0EME83c6S1qkOzD8pP0MNETqieWX0k=
 github.com/grafana/k6provider v0.5.1 h1:cm9jT0k4PTGJQvK3uPlOMz6GYWKAztUyrbhNDMemXuw=
 github.com/grafana/k6provider v0.5.1/go.mod h1:B/nAJTk+2qXxGrt/MG9c0cYAfxAQn6oTNl0/eZvZKZ0=
-github.com/grafana/sobek v0.0.0-20261031082357-c1e3e36bfbc3 h1:U+kxiRbKpyQ1pVagMdpFFJuYKK2ZF5F/tA9doHjM/nc=
-github.com/grafana/sobek v0.0.0-20261031082357-c1e3e36bfbc3/go.mod h1:bn7hgQnfWMq4VR3G3hKKK1EkxXMB/LdFAtBd1JG60f8=
+github.com/grafana/sobek v0.0.0-20261105103427-a5b602015248 h1:CbmhwJmn23e2wT6+P29WG5aMsdylVayH3AYjQoQ/l3Y=
+github.com/grafana/sobek v0.0.0-20261105103427-a5b602015248/go.mod h1:bn7hgQnfWMq4VR3G3hKKK1EkxXMB/LdFAtBd1JG60f8=
 github.com/grafana/sobek-webapi-encoding v0.1.0 h1:2qf2pUiI6j33vl2etSE0Id4mfSQ4Jfa0VVfUuSccAkI=
 github.com/grafana/sobek-webapi-encoding v0.1.0/go.mod h1:IegnWm83cyZ8qTnfL6Rivmx7dpMVE+w3CblopwfL/go=
 github.com/grafana/xk6-dashboard-assets v0.1.2 h1:n2wqytPICn2ZYsKa9HE6GlvFXk+WjByMfT4eM+ms3gE=
