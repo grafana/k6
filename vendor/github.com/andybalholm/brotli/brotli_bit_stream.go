@@ -1,7 +1,7 @@
 package brotli
 
 import (
-	"math"
+	"slices"
 	"sync"
 )
 
@@ -438,12 +438,6 @@ func buildAndStoreHuffmanTree(histogram []uint32, histogram_length uint, alphabe
 	}
 }
 
-func sortHuffmanTree1(v0 huffmanTree, v1 huffmanTree) bool {
-	return v0.total_count_ < v1.total_count_
-}
-
-var huffmanTreePool sync.Pool
-
 func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_bits uint, depth []byte, bits []uint16, storage_ix *uint, storage []byte) {
 	var count uint = 0
 	var symbols = [4]uint{0}
@@ -470,98 +464,7 @@ func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_
 		return
 	}
 
-	for i := 0; i < int(length); i++ {
-		depth[i] = 0
-	}
-	{
-		var max_tree_size uint = 2*length + 1
-		tree, _ := huffmanTreePool.Get().(*[]huffmanTree)
-		if tree == nil || cap(*tree) < int(max_tree_size) {
-			tmp := make([]huffmanTree, max_tree_size)
-			tree = &tmp
-		} else {
-			*tree = (*tree)[:max_tree_size]
-		}
-		var count_limit uint32
-		for count_limit = 1; ; count_limit *= 2 {
-			var node int = 0
-			var l uint
-			for l = length; l != 0; {
-				l--
-				if histogram[l] != 0 {
-					if histogram[l] >= count_limit {
-						initHuffmanTree(&(*tree)[node:][0], histogram[l], -1, int16(l))
-					} else {
-						initHuffmanTree(&(*tree)[node:][0], count_limit, -1, int16(l))
-					}
-
-					node++
-				}
-			}
-			{
-				var n int = node
-				/* Points to the next leaf node. */ /* Points to the next non-leaf node. */
-				var sentinel huffmanTree
-				var i int = 0
-				var j int = n + 1
-				var k int
-
-				sortHuffmanTreeItems(*tree, uint(n), huffmanTreeComparator(sortHuffmanTree1))
-
-				/* The nodes are:
-				   [0, n): the sorted leaf nodes that we start with.
-				   [n]: we add a sentinel here.
-				   [n + 1, 2n): new parent nodes are added here, starting from
-				                (n+1). These are naturally in ascending order.
-				   [2n]: we add a sentinel at the end as well.
-				   There will be (2n+1) elements at the end. */
-				initHuffmanTree(&sentinel, math.MaxUint32, -1, -1)
-
-				(*tree)[node] = sentinel
-				node++
-				(*tree)[node] = sentinel
-				node++
-
-				for k = n - 1; k > 0; k-- {
-					var left int
-					var right int
-					if (*tree)[i].total_count_ <= (*tree)[j].total_count_ {
-						left = i
-						i++
-					} else {
-						left = j
-						j++
-					}
-
-					if (*tree)[i].total_count_ <= (*tree)[j].total_count_ {
-						right = i
-						i++
-					} else {
-						right = j
-						j++
-					}
-
-					/* The sentinel node becomes the parent node. */
-					(*tree)[node-1].total_count_ = (*tree)[left].total_count_ + (*tree)[right].total_count_
-
-					(*tree)[node-1].index_left_ = int16(left)
-					(*tree)[node-1].index_right_or_value_ = int16(right)
-
-					/* Add back the last sentinel node. */
-					(*tree)[node] = sentinel
-					node++
-				}
-
-				if setDepth(2*n-1, *tree, depth, 14) {
-					/* We need to pack the Huffman tree in 14 bits. If this was not
-					   successful, add fake entities to the lowest values and retry. */
-					break
-				}
-			}
-		}
-
-		huffmanTreePool.Put(tree)
-	}
+	chooseBitDepths(histogram[:length], depth[:length], 14)
 
 	convertBitDepthsToSymbols(depth, length, bits)
 	if count <= 4 {
@@ -647,6 +550,90 @@ func buildAndStoreHuffmanTreeFast(histogram []uint32, histogram_total uint, max_
 	}
 }
 
+type symbolAndCount struct {
+	symbol uint32
+	count  uint32
+}
+
+func chooseBitDepths(histogram []uint32, depth []byte, maxBits int) {
+	totalCodeSpace := 1 << maxBits
+	symbols := make([]symbolAndCount, 0, 704 /* static capacity so that it will be stack allocated */)
+	var totalCount uint32 = 0
+	for i, n := range histogram {
+		if n != 0 {
+			symbols = append(symbols, symbolAndCount{
+				symbol: uint32(i),
+				count:  n,
+			})
+			totalCount += n
+		}
+	}
+	slices.SortFunc(symbols, func(a, b symbolAndCount) int {
+		return int(b.count) - int(a.count)
+	})
+
+	// boundaries contains indexes into symbols such that (for example)
+	// boundaries[8] is the index of the first 8-bit symbol.
+	boundaries := make([]int, maxBits+1, 20 /* static capacity for stack allocation */)
+
+	codeSpaceUsed := 0
+
+	// Assign initial boundaries conservatively, making sure no symbol uses more
+	// than its share of code space.
+	totalRatio := float64(totalCount) / float64(totalCodeSpace)
+	currentDepth := 1
+	for i, symbol := range symbols {
+		for currentDepth < maxBits && float64(symbol.count)/float64(int(1)<<(maxBits-currentDepth)) < totalRatio {
+			currentDepth++
+			boundaries[currentDepth] = i
+		}
+		codeSpaceUsed += 1 << (maxBits - currentDepth)
+	}
+	for i := currentDepth + 1; i <= maxBits; i++ {
+		boundaries[i] = len(symbols)
+	}
+
+	// Move the boundaries till the code space is filled.
+	for codeSpaceUsed < totalCodeSpace {
+		available := totalCodeSpace - codeSpaceUsed
+		// Find the most efficient boundary to move, based on the ratio of how
+		// many times the symbol was used to how much code space will be consumed.
+		bestRatio := 0.0
+		bestBoundary := 0
+		for i := 2; i <= maxBits; i++ {
+			cost := 1 << (maxBits - i) // code space that would be used by moving this boundary
+			if cost > available {
+				continue
+			}
+			if boundaries[i] == len(symbols) {
+				continue
+			}
+			if i < maxBits && boundaries[i] == boundaries[i+1] {
+				continue
+			}
+			ratio := float64(symbols[boundaries[i]].count) / float64(cost)
+			if ratio > bestRatio {
+				bestRatio = ratio
+				bestBoundary = i
+			}
+		}
+		boundaries[bestBoundary]++
+		codeSpaceUsed += 1 << (maxBits - bestBoundary)
+	}
+
+	for i := range depth {
+		depth[i] = 0
+	}
+	for i := 1; i < maxBits; i++ {
+		for j := boundaries[i]; j < boundaries[i+1]; j++ {
+			depth[symbols[j].symbol] = byte(i)
+		}
+	}
+	for j := boundaries[maxBits]; j < len(symbols); j++ {
+		depth[symbols[j].symbol] = byte(maxBits)
+	}
+}
+
 func buildAndStoreHuffmanTreeFastBW(histogram []uint32, histogram_total uint, max_bits uint, depth []byte, bits []uint16, bw *bitWriter) {
 	var count uint = 0
 	var symbols = [4]uint{0}
@@ -673,98 +660,7 @@ func buildAndStoreHuffmanTreeFastBW(histogram []uint32, histogram_total uint, ma
 		return
 	}
 
-	for i := 0; i < int(length); i++ {
-		depth[i] = 0
-	}
-	{
-		var max_tree_size uint = 2*length + 1
-		tree, _ := huffmanTreePool.Get().(*[]huffmanTree)
-		if tree == nil || cap(*tree) < int(max_tree_size) {
-			tmp := make([]huffmanTree, max_tree_size)
-			tree = &tmp
-		} else {
-			*tree = (*tree)[:max_tree_size]
-		}
-		var count_limit uint32
-		for count_limit = 1; ; count_limit *= 2 {
-			var node int = 0
-			var l uint
-			for l = length; l != 0; {
-				l--
-				if histogram[l] != 0 {
-					if histogram[l] >= count_limit {
-						initHuffmanTree(&(*tree)[node:][0], histogram[l], -1, int16(l))
-					} else {
-						initHuffmanTree(&(*tree)[node:][0], count_limit, -1, int16(l))
-					}
-
-					node++
-				}
-			}
-			{
-				var n int = node
-				/* Points to the next leaf node. */ /* Points to the next non-leaf node. */
-				var sentinel huffmanTree
-				var i int = 0
-				var j int = n + 1
-				var k int
-
-				sortHuffmanTreeItems(*tree, uint(n), huffmanTreeComparator(sortHuffmanTree1))
-
-				/* The nodes are:
-				   [0, n): the sorted leaf nodes that we start with.
-				   [n]: we add a sentinel here.
-				   [n + 1, 2n): new parent nodes are added here, starting from
-				                (n+1). These are naturally in ascending order.
-				   [2n]: we add a sentinel at the end as well.
-				   There will be (2n+1) elements at the end. */
-				initHuffmanTree(&sentinel, math.MaxUint32, -1, -1)
-
-				(*tree)[node] = sentinel
-				node++
-				(*tree)[node] = sentinel
-				node++
-
-				for k = n - 1; k > 0; k-- {
-					var left int
-					var right int
-					if (*tree)[i].total_count_ <= (*tree)[j].total_count_ {
-						left = i
-						i++
-					} else {
-						left = j
-						j++
-					}
-
-					if (*tree)[i].total_count_ <= (*tree)[j].total_count_ {
-						right = i
-						i++
-					} else {
-						right = j
-						j++
-					}
-
-					/* The sentinel node becomes the parent node. */
-					(*tree)[node-1].total_count_ = (*tree)[left].total_count_ + (*tree)[right].total_count_
-
-					(*tree)[node-1].index_left_ = int16(left)
-					(*tree)[node-1].index_right_or_value_ = int16(right)
-
-					/* Add back the last sentinel node. */
-					(*tree)[node] = sentinel
-					node++
-				}
-
-				if setDepth(2*n-1, *tree, depth, 14) {
-					/* We need to pack the Huffman tree in 14 bits. If this was not
-					   successful, add fake entities to the lowest values and retry. */
-					break
-				}
-			}
-		}
-
-		huffmanTreePool.Put(tree)
-	}
+	chooseBitDepths(histogram[:length], depth[:length], 14)
 
 	convertBitDepthsToSymbols(depth, length, bits)
 	if count <= 4 {
