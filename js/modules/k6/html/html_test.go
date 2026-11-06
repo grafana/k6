@@ -404,6 +404,20 @@ func TestParseHTML(t *testing.T) {
 			}
 		})
 	})
+	t.Run("Empty results are arrays", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTML)
+
+		for _, script := range []string{
+			`doc.find("#missing").map(function(idx, val) { return val.text() })`,
+			`doc.find("#missing").get()`,
+			`doc.find("h1").get(0).classList()`,
+		} {
+			v, err := rt.RunString("Array.isArray(" + script + ")")
+			require.NoError(t, err, script)
+			assert.True(t, v.ToBoolean(), script)
+		}
+	})
 	t.Run("Map", func(t *testing.T) {
 		t.Parallel()
 		rt := getTestRuntimeWithDoc(t, testHTML)

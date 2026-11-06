@@ -12,6 +12,24 @@ type mappedProperty struct {
 	v *Value
 }
 
+// Mapped argument properties are stored in the values map as *mappedProperty which is neither a
+// plain value nor a *valueProperty, so baseObject.hasAndGetStr would wrongly return the property
+// object itself.
+func (a *argumentsObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	if mapped, ok := a.values[name].(*mappedProperty); ok {
+		if mapped.writable && mapped.enumerable && mapped.configurable {
+			return *mapped.v, true
+		}
+		return &valueProperty{
+			value:        *mapped.v,
+			writable:     mapped.writable,
+			configurable: mapped.configurable,
+			enumerable:   mapped.enumerable,
+		}, true
+	}
+	return a.baseObject.hasAndGetStr(name, receiver)
+}
+
 func (a *argumentsObject) getStr(name unistring.String, receiver Value) Value {
 	return a.getStrWithOwnProp(a.getOwnPropStr(name), name, receiver)
 }
@@ -96,7 +114,7 @@ func (a *argumentsObject) defineOwnPropertyStr(name unistring.String, descr Prop
 			value:        *mapped.v,
 		}
 
-		val, ok := a.baseObject._defineOwnProperty(name, existing, descr, throw)
+		val, ok := a.baseObject._defineOwnProperty(name, nil, existing, descr, throw)
 		if !ok {
 			return false
 		}

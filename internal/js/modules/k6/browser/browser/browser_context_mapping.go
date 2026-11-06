@@ -76,7 +76,15 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		},
 		"cookies": func(urls ...string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
-				return bc.Cookies(urls...) //nolint:wrapcheck
+				cookies, err := bc.Cookies(urls...)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				// A nil slice would be exported to JS as null, but users expect an empty array.
+				if cookies == nil {
+					cookies = []*common.Cookie{}
+				}
+				return cookies, nil
 			})
 		},
 		"grantPermissions": func(permissions []string, opts sobek.Value) (*sobek.Promise, error) {
@@ -153,7 +161,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		},
 		"pages": func() *sobek.Object {
 			var (
-				mpages []mapping
+				mpages = []mapping{}
 				pages  = bc.Pages()
 			)
 			for _, page := range pages {

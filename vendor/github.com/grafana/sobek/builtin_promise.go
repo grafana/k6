@@ -181,7 +181,7 @@ func (r *Runtime) newPromiseResolveThenableJob(p *Promise, thenable Value, then 
 		})
 		if ex != nil {
 			if fn, ok := reject.self.assertCallable(); ok {
-				fn(FunctionCall{Arguments: []Value{ex.val}})
+				fn(FunctionCall{This: _undefined, Arguments: []Value{ex.val}})
 			}
 		}
 	}
@@ -259,11 +259,11 @@ func (r *Runtime) builtin_newPromise(args []Value, newTarget *Object) *Object {
 
 	resolve, reject := po.createResolvingFunctions()
 	ex := r.vm.try(func() {
-		executor(FunctionCall{Arguments: []Value{resolve, reject}})
+		executor(FunctionCall{This: _undefined, Arguments: []Value{resolve, reject}})
 	})
 	if ex != nil {
 		if fn, ok := reject.self.assertCallable(); ok {
-			fn(FunctionCall{Arguments: []Value{ex.val}})
+			fn(FunctionCall{This: _undefined, Arguments: []Value{ex.val}})
 		}
 	}
 	return po.val
@@ -342,9 +342,11 @@ func (r *Runtime) promiseProto_catch(call FunctionCall) Value {
 
 func (r *Runtime) promiseResolve(c *Object, x Value) *Object {
 	if obj, ok := x.(*Object); ok {
-		xConstructor := nilSafe(obj.self.getStr("constructor", nil))
-		if xConstructor.SameAs(c) {
-			return obj
+		if _, ok := obj.self.(*Promise); ok {
+			xConstructor := nilSafe(obj.self.getStr("constructor", nil))
+			if xConstructor.SameAs(c) {
+				return obj
+			}
 		}
 	}
 	pcap := r.newPromiseCapability(c)
@@ -362,7 +364,7 @@ func (r *Runtime) promiseProto_finally(call FunctionCall) Value {
 	} else {
 		thenFinally = r.newNativeFunc(func(call FunctionCall) Value {
 			value := call.Argument(0)
-			result := onFinallyFn(FunctionCall{})
+			result := onFinallyFn(FunctionCall{This: _undefined})
 			promise := r.promiseResolve(c, result)
 			valueThunk := r.newNativeFunc(func(call FunctionCall) Value {
 				return value
@@ -372,7 +374,7 @@ func (r *Runtime) promiseProto_finally(call FunctionCall) Value {
 
 		catchFinally = r.newNativeFunc(func(call FunctionCall) Value {
 			reason := call.Argument(0)
-			result := onFinallyFn(FunctionCall{})
+			result := onFinallyFn(FunctionCall{This: _undefined})
 			promise := r.promiseResolve(c, result)
 			thrower := r.newNativeFunc(func(call FunctionCall) Value {
 				panic(reason)
@@ -384,11 +386,11 @@ func (r *Runtime) promiseProto_finally(call FunctionCall) Value {
 }
 
 func (pcap *promiseCapability) resolve(result Value) {
-	pcap.promise.runtime.toCallable(pcap.resolveObj)(FunctionCall{Arguments: []Value{result}})
+	pcap.promise.runtime.toCallable(pcap.resolveObj)(FunctionCall{This: _undefined, Arguments: []Value{result}})
 }
 
 func (pcap *promiseCapability) reject(reason Value) {
-	pcap.promise.runtime.toCallable(pcap.rejectObj)(FunctionCall{Arguments: []Value{reason}})
+	pcap.promise.runtime.toCallable(pcap.rejectObj)(FunctionCall{This: _undefined, Arguments: []Value{reason}})
 }
 
 func (pcap *promiseCapability) try(f func()) bool {
@@ -503,9 +505,7 @@ func (r *Runtime) promise_any(call FunctionCall) Value {
 				errors[index] = call.Argument(0)
 				remainingElementsCount--
 				if remainingElementsCount == 0 {
-					_error := r.builtin_new(r.getAggregateError(), nil)
-					_error.self._putProp("errors", r.newArrayValues(errors), true, false, true)
-					pcap.reject(_error)
+					pcap.reject(r.newAggregateErrorErrors(errors))
 				}
 				return _undefined
 			}, "", 1)
@@ -515,9 +515,7 @@ func (r *Runtime) promise_any(call FunctionCall) Value {
 		})
 		remainingElementsCount--
 		if remainingElementsCount == 0 {
-			_error := r.builtin_new(r.getAggregateError(), nil)
-			_error.self._putProp("errors", r.newArrayValues(errors), true, false, true)
-			pcap.reject(_error)
+			pcap.reject(r.newAggregateErrorErrors(errors))
 		}
 	})
 	return pcap.promise
@@ -548,6 +546,32 @@ func (r *Runtime) promise_resolve(call FunctionCall) Value {
 	return r.promiseResolve(r.toObject(call.This), call.Argument(0))
 }
 
+func (r *Runtime) promise_try(call FunctionCall) Value {
+	c := r.toObject(call.This)
+	var args []Value
+	if len(call.Arguments) > 1 {
+		args = call.Arguments[1:]
+	}
+	var result Value
+	if ex := r.vm.try(func() {
+		result = r.toCallable(call.Argument(0))(FunctionCall{This: _undefined, Arguments: args})
+	}); ex != nil {
+		pcap := r.newPromiseCapability(c)
+		pcap.reject(ex.val)
+		return pcap.promise
+	}
+	return r.promiseResolve(c, result)
+}
+
+func (r *Runtime) promise_withResolvers(call FunctionCall) Value {
+	pcap := r.newPromiseCapability(r.toObject(call.This))
+	obj := r.NewObject()
+	obj.self._putProp("promise", pcap.promise, true, true, true)
+	obj.self._putProp("resolve", pcap.resolveObj, true, true, true)
+	obj.self._putProp("reject", pcap.rejectObj, true, true, true)
+	return obj
+}
+
 func (r *Runtime) createPromiseProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
 	o._putProp("constructor", r.getPromise(), true, false, true)
@@ -570,6 +594,8 @@ func (r *Runtime) createPromise(val *Object) objectImpl {
 	o._putProp("race", r.newNativeFunc(r.promise_race, "race", 1), true, false, true)
 	o._putProp("reject", r.newNativeFunc(r.promise_reject, "reject", 1), true, false, true)
 	o._putProp("resolve", r.newNativeFunc(r.promise_resolve, "resolve", 1), true, false, true)
+	o._putProp("try", r.newNativeFunc(r.promise_try, "try", 1), true, false, true)
+	o._putProp("withResolvers", r.newNativeFunc(r.promise_withResolvers, "withResolvers", 0), true, false, true)
 
 	r.putSpeciesReturnThis(o)
 

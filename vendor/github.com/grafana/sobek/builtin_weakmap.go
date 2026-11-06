@@ -6,55 +6,103 @@ import (
 	"weak"
 )
 
-type weakMap struct {
-	m map[uint64]Value
+type weakMapRefsValue struct {
+	value Value
+
+	// Keep these so that they can be stopped after an entry is removed from the weakMap to prevent memory leaks
+	keyCleanup, wmCleanup runtime.Cleanup
+}
+
+type weakMapRefs struct {
+	m map[weak.Pointer[weakMap]]*weakMapRefsValue
 	sync.Mutex
 }
 
-func (wm *weakMap) set(key *Object, value Value) {
-	id := key.getId()
-	wm.Lock()
-	_, exists := wm.m[id]
-	wm.m[id] = value
-	wm.Unlock()
-	if !exists {
-		wmPtr := weak.Make(wm) // do not hold strong reference to wm so that it could be collected by GC
-		runtime.AddCleanup(key, func(id uint64) {
-			wm := wmPtr.Value()
-			if wm == nil {
+func newWeakMapRefs() *weakMapRefs {
+	return &weakMapRefs{
+		m: make(map[weak.Pointer[weakMap]]*weakMapRefsValue),
+	}
+}
+
+type weakMap struct {
+	// Make sure it's not zero-sized and is not tiny-allocated so that runtime.Cleanup runs on it
+	_ [16]byte
+}
+
+func (wm *weakMap) set(refs *weakMapRefs, value Value) {
+	type wmCleanupArg struct {
+		refPtr weak.Pointer[weakMapRefs]
+		wmPtr  weak.Pointer[weakMap]
+	}
+
+	p := weak.Make(wm)
+	refs.Lock()
+	if v, exists := refs.m[p]; !exists {
+		// This is to ensure keys do not keep values alive after weakMap becomes unreachable
+		wmCleanup := runtime.AddCleanup(wm, func(arg wmCleanupArg) {
+			refs := arg.refPtr.Value()
+			if refs == nil {
 				return
 			}
-			wm.Lock()
-			delete(wm.m, id)
-			wm.Unlock()
-		}, id)
+			refs.Lock()
+			if v, exists := refs.m[arg.wmPtr]; exists {
+				v.keyCleanup.Stop()
+				delete(refs.m, arg.wmPtr)
+			}
+			refs.Unlock()
+		}, wmCleanupArg{weak.Make(refs), p})
+
+		// This is to prevent wmCleanup from taking memory after key becomes unreachable (which makes wmCleanup a no-op)
+		keyCleanup := runtime.AddCleanup(refs, func(c runtime.Cleanup) {
+			c.Stop()
+		}, wmCleanup)
+
+		refs.m[p] = &weakMapRefsValue{
+			value:      value,
+			keyCleanup: keyCleanup,
+			wmCleanup:  wmCleanup,
+		}
+	} else {
+		v.value = value
 	}
+	refs.Unlock()
 }
 
-func (wm *weakMap) get(key *Object) (res Value) {
-	id := key.getId()
-	wm.Lock()
-	res = wm.m[id]
-	wm.Unlock()
+func (wm *weakMap) get(refs *weakMapRefs) (res Value) {
+	if refs != nil {
+		p := weak.Make(wm)
+		refs.Lock()
+		if v, exists := refs.m[p]; exists {
+			res = v.value
+		}
+		refs.Unlock()
+	}
 	return
 }
 
-func (wm *weakMap) remove(key *Object) (removed bool) {
-	id := key.getId()
-	wm.Lock()
-	if _, removed = wm.m[id]; removed {
-		delete(wm.m, id)
+func (wm *weakMap) remove(refs *weakMapRefs) (removed bool) {
+	if refs != nil {
+		p := weak.Make(wm)
+		refs.Lock()
+		if v, exists := refs.m[p]; exists {
+			delete(refs.m, p)
+			v.wmCleanup.Stop()
+			v.keyCleanup.Stop()
+			removed = true
+		}
+		refs.Unlock()
 	}
-	wm.Unlock()
 	return
 }
 
-func (wm *weakMap) has(key *Object) bool {
-	id := key.getId()
-	wm.Lock()
-	_, exists := wm.m[id]
-	wm.Unlock()
-	return exists
+func (wm *weakMap) has(refs *weakMapRefs) (exists bool) {
+	if refs != nil {
+		p := weak.Make(wm)
+		refs.Lock()
+		_, exists = refs.m[p]
+		refs.Unlock()
+	}
+	return
 }
 
 type weakMapObject struct {
@@ -64,9 +112,6 @@ type weakMapObject struct {
 
 func (wmo *weakMapObject) init() {
 	wmo.baseObject.init()
-	wmo.m = weakMap{
-		m: make(map[uint64]Value),
-	}
 }
 
 func (r *Runtime) weakMapProto_delete(call FunctionCall) Value {
@@ -75,8 +120,7 @@ func (r *Runtime) weakMapProto_delete(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakMap.prototype.delete called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
-	key, ok := call.Argument(0).(*Object)
-	if ok && wmo.m.remove(key) {
+	if wmo.m.remove(r.getWeakMapRefs(call.Argument(0), false)) {
 		return valueTrue
 	}
 	return valueFalse
@@ -88,14 +132,43 @@ func (r *Runtime) weakMapProto_get(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakMap.prototype.get called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
-	var res Value
-	if key, ok := call.Argument(0).(*Object); ok {
-		res = wmo.m.get(key)
-	}
+	res := wmo.m.get(r.getWeakMapRefs(call.Argument(0), false))
 	if res == nil {
 		return _undefined
 	}
 	return res
+}
+
+func (r *Runtime) weakMapProto_getOrInsert(call FunctionCall) Value {
+	thisObj := r.toObject(call.This)
+	wmo, ok := thisObj.self.(*weakMapObject)
+	if !ok {
+		panic(r.NewTypeError("Method WeakMap.prototype.getOrInsert called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
+	}
+	refs := r.weakMapKeyRefs(call.Argument(0))
+	if v := wmo.m.get(refs); v != nil {
+		return v
+	}
+	value := call.Argument(1)
+	wmo.m.set(refs, value)
+	return value
+}
+
+func (r *Runtime) weakMapProto_getOrInsertComputed(call FunctionCall) Value {
+	thisObj := r.toObject(call.This)
+	wmo, ok := thisObj.self.(*weakMapObject)
+	if !ok {
+		panic(r.NewTypeError("Method WeakMap.prototype.getOrInsertComputed called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
+	}
+	key := call.Argument(0)
+	refs := r.weakMapKeyRefs(key)
+	callbackFn := r.toCallable(call.Argument(1))
+	if v := wmo.m.get(refs); v != nil {
+		return v
+	}
+	value := callbackFn(FunctionCall{This: _undefined, Arguments: []Value{key}})
+	wmo.m.set(refs, value)
+	return value
 }
 
 func (r *Runtime) weakMapProto_has(call FunctionCall) Value {
@@ -104,8 +177,7 @@ func (r *Runtime) weakMapProto_has(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakMap.prototype.has called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
-	key, ok := call.Argument(0).(*Object)
-	if ok && wmo.m.has(key) {
+	if wmo.m.has(r.getWeakMapRefs(call.Argument(0), false)) {
 		return valueTrue
 	}
 	return valueFalse
@@ -117,9 +189,29 @@ func (r *Runtime) weakMapProto_set(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakMap.prototype.set called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
-	key := r.toObject(call.Argument(0))
-	wmo.m.set(key, call.Argument(1))
+	wmo.m.set(r.weakMapKeyRefs(call.Argument(0)), call.Argument(1))
 	return call.This
+}
+
+// getWeakMapRefs returns the weakMapRefs of v, or nil if v cannot be held weakly
+// (https://tc39.es/ecma262/#sec-canbeheldweakly) or, unless create is true, if v has never been used as a weak key.
+func (r *Runtime) getWeakMapRefs(v Value, create bool) *weakMapRefs {
+	switch v := v.(type) {
+	case *Object:
+		return v.getWeakMapRefs(create)
+	case *Symbol:
+		if !r.isRegisteredSymbol(v) {
+			return v.getWeakMapRefs(create)
+		}
+	}
+	return nil
+}
+
+func (r *Runtime) weakMapKeyRefs(key Value) *weakMapRefs {
+	if refs := r.getWeakMapRefs(key, true); refs != nil {
+		return refs
+	}
+	panic(r.NewTypeError("Invalid value used as weak map key: %s", nilSafe(key).String()))
 }
 
 func (r *Runtime) needNew(name string) *Object {
@@ -155,7 +247,7 @@ func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 					itemObj := r.toObject(item)
 					k := itemObj.self.getIdx(i0, nil)
 					v := nilSafe(itemObj.self.getIdx(i1, nil))
-					wmo.m.set(r.toObject(k), v)
+					wmo.m.set(r.weakMapKeyRefs(k), v)
 				})
 			} else {
 				iter.iterate(func(item Value) {
@@ -179,6 +271,8 @@ func (r *Runtime) createWeakMapProto(val *Object) objectImpl {
 	o._putProp("delete", r.newNativeFunc(r.weakMapProto_delete, "delete", 1), true, false, true)
 	o._putProp("has", r.newNativeFunc(r.weakMapProto_has, "has", 1), true, false, true)
 	o._putProp("get", r.newNativeFunc(r.weakMapProto_get, "get", 1), true, false, true)
+	o._putProp("getOrInsert", r.newNativeFunc(r.weakMapProto_getOrInsert, "getOrInsert", 2), true, false, true)
+	o._putProp("getOrInsertComputed", r.newNativeFunc(r.weakMapProto_getOrInsertComputed, "getOrInsertComputed", 2), true, false, true)
 
 	o._putSym(SymToStringTag, valueProp(asciiString(classWeakMap), false, false, true))
 
