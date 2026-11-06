@@ -30,7 +30,7 @@ func TestGetStatus(t *testing.T) {
 	cs := getControlSurface(t, testState)
 
 	rw := httptest.NewRecorder()
-	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/status", nil))
 	res := rw.Result()
 	t.Cleanup(func() {
 		assert.NoError(t, res.Body.Close())
@@ -159,7 +159,7 @@ func TestPatchStatus(t *testing.T) {
 			time.Sleep(200 * time.Millisecond)
 
 			rw := httptest.NewRecorder()
-			NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodPatch, "/v1/status", bytes.NewReader(testCase.Payload)))
+			NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(t.Context(), http.MethodPatch, "/v1/status", bytes.NewReader(testCase.Payload)))
 			res := rw.Result()
 			t.Cleanup(func() {
 				assert.NoError(t, res.Body.Close())

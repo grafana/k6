@@ -473,9 +473,7 @@ func extractUnknownModules(err error) (dependencies, error) {
 		return deps, nil
 	}
 
-	var u modules.UnknownModulesError
-
-	if errors.As(err, &u) {
+	if u, ok := errors.AsType[modules.UnknownModulesError](err); ok {
 		for _, name := range u.List() {
 			deps[name] = nil
 		}

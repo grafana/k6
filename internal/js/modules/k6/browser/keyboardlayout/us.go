@@ -1,3 +1,4 @@
+//nolint:goconst // keyboard layout data is easier to audit with literal key names
 package keyboardlayout
 
 //nolint:funlen

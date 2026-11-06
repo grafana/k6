@@ -107,8 +107,7 @@ func (b *customBinary) run(gs *state.GlobalState) error {
 	for {
 		select {
 		case err := <-done:
-			var exitError *exec.ExitError
-			if errors.As(err, &exitError) {
+			if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 				return errext.WithExitCodeIfNone(errAlreadyReported, exitcodes.ExitCode(exitError.ExitCode())) //nolint:gosec
 			}
 			return err

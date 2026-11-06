@@ -50,7 +50,8 @@ func (j CookieJar) Set(url, name, value string, opts sobek.Value) (bool, error) 
 		return false, err
 	}
 
-	c := http.Cookie{Name: name, Value: value}
+	// The caller controls flags for this client-side cookie; this is not a Set-Cookie response.
+	c := http.Cookie{Name: name, Value: value} // #nosec G124 nosemgrep: cookie-missing-secure, cookie-missing-httponly
 	paramsV := opts
 	if !common.IsNullish(paramsV) {
 		params := paramsV.ToObject(rt)
@@ -110,7 +111,8 @@ func (j CookieJar) Delete(url, name string) error {
 		return err
 	}
 
-	c := http.Cookie{Name: name, MaxAge: -1}
+	// This cookie only removes an entry from the client-side jar.
+	c := http.Cookie{Name: name, MaxAge: -1} // #nosec G124 nosemgrep: cookie-missing-secure, cookie-missing-httponly
 	j.Jar.SetCookies(u, []*http.Cookie{&c})
 
 	return nil

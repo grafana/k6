@@ -102,8 +102,7 @@ LOOP:
 		default:
 			mt, message, err := in.ReadMessage()
 			if err != nil {
-				var cerr *websocket.CloseError
-				if errors.As(err, &cerr) {
+				if _, ok := errors.AsType[*websocket.CloseError](err); ok {
 					// If WS conn is closed, just return
 					return
 				}
@@ -112,8 +111,7 @@ LOOP:
 
 			err = out.WriteMessage(mt, message)
 			if err != nil {
-				var cerr *websocket.CloseError
-				if errors.As(err, &cerr) {
+				if _, ok := errors.AsType[*websocket.CloseError](err); ok {
 					// If WS conn is closed, just return
 					return
 				}
