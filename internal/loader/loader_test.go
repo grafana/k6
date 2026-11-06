@@ -168,6 +168,27 @@ func TestLoad(t *testing.T) {
 				fmt.Sprintf(`The moduleSpecifier "%s" couldn't be found on local disk at "%s". `,
 					path, path))
 		})
+
+		t.Run("Directory", func(t *testing.T) {
+			t.Parallel()
+			filesystems := make(map[string]fsext.Fs)
+			filesystems["file"] = fsext.NewMemMapFs()
+			assert.NoError(t, filesystems["file"].MkdirAll("/path/to/types", 0o755))
+			assert.NoError(t, fsext.WriteFile(filesystems["file"], "/path/to/types/index.ts", []byte("hi"), 0o644))
+
+			pwdURL, err := url.Parse("file:///path/to/")
+			require.NoError(t, err)
+
+			const moduleSpecifier = "./types"
+			moduleURL, err := loader.Resolve(pwdURL, moduleSpecifier)
+			require.NoError(t, err)
+
+			_, err = loader.Load(logger, filesystems, moduleURL, moduleSpecifier)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(),
+				fmt.Sprintf(`The moduleSpecifier "%s" resolves to the directory "%s", but k6 can only import files. `,
+					moduleSpecifier, filepath.FromSlash("/path/to/types")))
+		})
 	})
 
 	t.Run("Remote", func(t *testing.T) {
