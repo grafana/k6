@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"testing"
+	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/parser"
@@ -43,6 +44,26 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		_, _, err := c.Parse(src, "script.ts", false, false)
 		assert.IsType(t, &parser.Error{}, err)
 		assert.Contains(t, err.Error(), `script.ts: Line 1:26 Unexpected ")"`)
+	})
+	t.Run("experimental_enhanced stripped code that doesn't parse", func(t *testing.T) {
+		t.Parallel()
+		c := New(testutils.NewLogger(t))
+		// esbuild keeps explicit resource management as it is, but the parser can't handle it. After the
+		// types are stripped once, the parsing error has to be returned instead of stripping them again.
+		src := `using resource = { [Symbol.dispose]() {} };`
+		done := make(chan error, 1)
+		go func() {
+			_, _, err := c.Parse(src, "script.ts", false, true)
+			done <- err
+		}()
+		select {
+		case err := <-done:
+			if err != nil {
+				assert.Contains(t, err.Error(), "script.ts")
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("parsing a TypeScript file whose stripped code doesn't parse didn't return")
+		}
 	})
 	t.Run("experimental_enhanced", func(t *testing.T) {
 		t.Parallel()
