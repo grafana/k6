@@ -36,7 +36,9 @@ jobs:
         go-version: ["${{ needs.configure.outputs.go_prev }}"]
         platform:
           [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
-    runs-on: ${{ matrix.platform }}
+    # Forks can't use Grafana's large runners, so map them to the equivalent
+    # standard GitHub-hosted runners there. grafana/k6 keeps matrix.platform.
+    runs-on: ${{ (github.repository != 'grafana/k6' && matrix.platform == 'ubuntu-arm64-large' && 'ubuntu-24.04-arm') || (github.repository != 'grafana/k6' && matrix.platform == 'github-hosted-windows-x64-large' && 'windows-latest') || matrix.platform }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -67,7 +69,9 @@ jobs:
             gotip_platform: ubuntu-24.04-arm
           - platform: github-hosted-windows-x64-large
             gotip_platform: windows-latest
-    runs-on: ${{ matrix.platform }}
+    # Forks can't use Grafana's large runners, so map them to the equivalent
+    # standard GitHub-hosted runners there. grafana/k6 keeps matrix.platform.
+    runs-on: ${{ (github.repository != 'grafana/k6' && matrix.platform == 'ubuntu-arm64-large' && 'ubuntu-24.04-arm') || (github.repository != 'grafana/k6' && matrix.platform == 'github-hosted-windows-x64-large' && 'windows-latest') || matrix.platform }}
     continue-on-error: true
     steps:
       - name: Checkout code
@@ -93,7 +97,9 @@ jobs:
         go-version: ["${{ needs.configure.outputs.go_current }}"]
         platform:
           [ubuntu-24.04, ubuntu-arm64-large, github-hosted-windows-x64-large]
-    runs-on: ${{ matrix.platform }}
+    # Forks can't use Grafana's large runners, so map them to the equivalent
+    # standard GitHub-hosted runners there. grafana/k6 keeps matrix.platform.
+    runs-on: ${{ (github.repository != 'grafana/k6' && matrix.platform == 'ubuntu-arm64-large' && 'ubuntu-24.04-arm') || (github.repository != 'grafana/k6' && matrix.platform == 'github-hosted-windows-x64-large' && 'windows-latest') || matrix.platform }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
