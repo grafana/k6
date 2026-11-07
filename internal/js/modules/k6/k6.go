@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -211,6 +212,12 @@ func (mi *K6) Check(arg0, checks sobek.Value, extras ...sobek.Value) (bool, erro
 
 	succ := true
 	var exc error
+	var failed []string
+	defer func() {
+		if len(failed) > 0 && state.Options.HTTPDebug.String == "error" {
+			logFailedCheck(state, arg0, failed, commonTagsAndMeta.Tags.Map())
+		}
+	}()
 	obj := checks.ToObject(rt)
 	for _, name := range obj.Keys() {
 		if strings.Contains(name, lib.GroupSeparator) {
@@ -243,6 +250,7 @@ func (mi *K6) Check(arg0, checks sobek.Value, extras ...sobek.Value) (bool, erro
 		if !booleanVal {
 			// A single failure makes the return value false.
 			succ = false
+			failed = append(failed, name)
 		}
 
 		sample := metrics.Sample{
@@ -265,4 +273,21 @@ func (mi *K6) Check(arg0, checks sobek.Value, extras ...sobek.Value) (bool, erro
 	}
 
 	return succ, nil
+}
+
+func logFailedCheck(state *lib.State, arg0 sobek.Value, failed []string, tags map[string]string) {
+	if arg0 == nil {
+		return
+	}
+	requestFields, dump, ok := httpext.DebugDump(arg0.Export(), state.Options.HTTPDebugRedact.Bool)
+	if !ok {
+		return
+	}
+	meta := map[string]any{
+		"vu":            state.VUID,
+		"iter":          state.Iteration,
+		"failed_checks": strings.Join(failed, ", "),
+	}
+	httpext.AddMissing(meta, requestFields, tags)
+	state.Logger.Warn(httpext.DebugMessage("Check(s) Failed", meta, dump))
 }
