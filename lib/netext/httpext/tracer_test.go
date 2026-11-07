@@ -244,7 +244,8 @@ func TestTracerSendingStartsAtGotConn(t *testing.T) {
 	t.Parallel()
 
 	const interval = time.Millisecond
-	getConn := time.Now().Add(-5 * interval).UnixNano()
+	start := time.Now().Add(-5 * interval)
+	getConn := int64(start.Sub(monotonicOrigin))
 	// With an HTTPS proxy and target, k6 keeps the first TLS handshake completion,
 	// which occurs before the target connection is available and GotConn() is called.
 	firstTLSHandshakeDone := getConn + int64(interval)
@@ -259,7 +260,7 @@ func TestTracerSendingStartsAtGotConn(t *testing.T) {
 	trail := tracer.Done()
 	assert.Equal(t, 3*interval, trail.Blocked)
 	assert.Equal(t, interval, trail.Sending)
-	assert.Equal(t, trail.EndTime.Sub(time.Unix(0, getConn)), trail.Blocked+trail.Duration)
+	assert.Equal(t, trail.EndTime.Sub(start), trail.Blocked+trail.Duration)
 }
 
 func TestTracerError(t *testing.T) {
@@ -311,5 +312,45 @@ func TestCancelledRequest(t *testing.T) {
 					cancelTest(t)
 				})
 		}
+	})
+}
+
+func TestTracerDoneMeasuresElapsedTime(t *testing.T) {
+	t.Parallel()
+
+	const hold = 20 * time.Millisecond
+
+	t.Run("receiving", func(t *testing.T) {
+		t.Parallel()
+
+		tracer := &Tracer{}
+		start := time.Now()
+		tracer.WroteRequest(httptrace.WroteRequestInfo{})
+		tracer.GotFirstResponseByte()
+		time.Sleep(hold)
+		trail := tracer.Done()
+		elapsed := time.Since(start)
+
+		assert.GreaterOrEqual(t, trail.Receiving, hold)
+		assert.LessOrEqual(t, trail.Receiving, elapsed)
+		assert.GreaterOrEqual(t, trail.Duration, hold)
+		assert.LessOrEqual(t, trail.Duration, elapsed)
+		assert.WithinDuration(t, time.Now().Round(0), trail.EndTime.Round(0), time.Second)
+	})
+
+	t.Run("waiting without a first byte", func(t *testing.T) {
+		t.Parallel()
+		tracer := &Tracer{}
+		start := time.Now()
+		tracer.WroteRequest(httptrace.WroteRequestInfo{})
+		time.Sleep(hold)
+		trail := tracer.Done()
+		elapsed := time.Since(start)
+
+		assert.GreaterOrEqual(t, trail.Waiting, hold)
+		assert.LessOrEqual(t, trail.Waiting, elapsed)
+		assert.Zero(t, trail.Receiving)
+		assert.GreaterOrEqual(t, trail.Duration, hold)
+		assert.LessOrEqual(t, trail.Duration, elapsed)
 	})
 }
