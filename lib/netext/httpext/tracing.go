@@ -21,6 +21,9 @@ import (
 // to correlate the HTTP metric samples with the request trace.
 const metadataTraceID = "trace_id"
 
+// attrRequestName is the k6-specific span attribute holding the name tag of the request.
+const attrRequestName = "k6.http.request.name"
+
 // redactedValue replaces the value of the sensitive query parameters in url.full.
 const redactedValue = "REDACTED"
 
@@ -40,7 +43,7 @@ func startSpan(
 		attrs = append(attrs, semconv.ServerPort(port))
 	}
 	if name, ok := preq.TagsAndMeta.Tags.Get(metrics.TagName.String()); ok {
-		attrs = append(attrs, semconv.URLTemplate(name))
+		attrs = append(attrs, attribute.String(attrRequestName, name))
 	}
 	ctx, span := tracer.Start(ctx, req.Method,
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient), oteltrace.WithAttributes(attrs...))
