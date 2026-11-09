@@ -112,21 +112,23 @@ func sortHuffmanTree(v0 huffmanTree, v1 huffmanTree) bool {
 	return v0.index_right_or_value_ > v1.index_right_or_value_
 }
 
-/* This function will create a Huffman tree.
+/*
+This function will create a Huffman tree.
 
-   The catch here is that the tree cannot be arbitrarily deep.
-   Brotli specifies a maximum depth of 15 bits for "code trees"
-   and 7 bits for "code length code trees."
+	The catch here is that the tree cannot be arbitrarily deep.
+	Brotli specifies a maximum depth of 15 bits for "code trees"
+	and 7 bits for "code length code trees."
 
-   count_limit is the value that is to be faked as the minimum value
-   and this minimum value is raised until the tree matches the
-   maximum length requirement.
+	count_limit is the value that is to be faked as the minimum value
+	and this minimum value is raised until the tree matches the
+	maximum length requirement.
 
-   This algorithm is not of excellent performance for very long data blocks,
-   especially when population counts are longer than 2**tree_limit, but
-   we are not planning to use this with extremely long blocks.
+	This algorithm is not of excellent performance for very long data blocks,
+	especially when population counts are longer than 2**tree_limit, but
+	we are not planning to use this with extremely long blocks.
 
-   See http://en.wikipedia.org/wiki/Huffman_coding */
+	See http://en.wikipedia.org/wiki/Huffman_coding
+*/
 func createHuffmanTree(data []uint32, length uint, tree_limit int, tree []huffmanTree, depth []byte) {
 	var count_limit uint32
 	var sentinel huffmanTree
@@ -297,13 +299,16 @@ func writeHuffmanTreeRepetitionsZeros(repetitions uint, tree_size *uint, tree []
 	}
 }
 
-/* Change the population counts in a way that the consequent
-   Huffman tree compression, especially its RLE-part will be more
-   likely to compress this data more efficiently.
+/*
+Change the population counts in a way that the consequent
 
-   length contains the size of the histogram.
-   counts contains the population counts.
-   good_for_rle is a buffer of at least length size */
+	Huffman tree compression, especially its RLE-part will be more
+	likely to compress this data more efficiently.
+
+	length contains the size of the histogram.
+	counts contains the population counts.
+	good_for_rle is a buffer of at least length size
+*/
 func optimizeHuffmanCountsForRLE(length uint, counts []uint32, good_for_rle []byte) {
 	var nonzero_count uint = 0
 	var stride uint
@@ -481,9 +486,12 @@ func decideOverRLEUse(depth []byte, length uint, use_rle_for_non_zero *bool, use
 	*use_rle_for_zero = total_reps_zero > count_reps_zero*2
 }
 
-/* Write a Huffman tree from bit depths into the bit-stream representation
-   of a Huffman tree. The generated Huffman tree is to be compressed once
-   more using a Huffman tree */
+/*
+Write a Huffman tree from bit depths into the bit-stream representation
+
+	of a Huffman tree. The generated Huffman tree is to be compressed once
+	more using a Huffman tree
+*/
 func writeHuffmanTree(depth []byte, length uint, tree_size *uint, tree []byte, extra_bits_data []byte) {
 	var previous_value byte = initialRepeatedCodeLength
 	var i uint

@@ -120,17 +120,35 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 	// Append src to the history buffer.
 	historyLen := len(q.history)
 	q.history = append(q.history, src...)
-	q.chain = append(q.chain, make([]uint32, len(src))...)
+	oldLen := len(q.chain)
+	newLen := oldLen + len(src)
+	if cap(q.chain) < newLen {
+		newCap := 2 * cap(q.chain)
+		if newCap < newLen {
+			newCap = newLen
+		}
+		newChain := make([]uint32, newLen, newCap)
+		copy(newChain, q.chain)
+		q.chain = newChain
+	} else {
+		q.chain = q.chain[:newLen]
+		clear(q.chain[oldLen:])
+	}
 	src = q.history
+
+	hashMask := (uint64(1) << (8 * q.HashLen)) - 1
+	hashShift := uint(64 - q.TableBits)
+	table := q.table
+	chain := q.chain
 
 	// Calculate hashes and build the chain.
 	for i := historyLen; i < len(src)-7; i++ {
-		h := ((binary.LittleEndian.Uint64(src[i:]) & (1<<(8*q.HashLen) - 1)) * hashMul64) >> (64 - q.TableBits)
-		candidate := int(q.table[h])
-		q.table[h] = uint32(i)
+		cv := binary.LittleEndian.Uint64(src[i:])
+		h := ((cv & hashMask) * hashMul64) >> hashShift
+		candidate := int(table[h])
+		table[h] = uint32(i)
 		if candidate != 0 {
-			delta := i - candidate
-			q.chain[i] = uint32(delta)
+			chain[i] = uint32(i - candidate)
 		}
 	}
 
@@ -140,7 +158,7 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 	var prevMatch absoluteMatch
 	i := historyLen
 	for i < len(src)-7 {
-		delta := q.chain[i]
+		delta := chain[i]
 		if delta == 0 {
 			i++
 			continue
@@ -165,7 +183,8 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 			}
 		}
 
-		if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
+		iVal := binary.LittleEndian.Uint32(src[i:])
+		if binary.LittleEndian.Uint32(src[candidate:]) == iVal {
 			m := extendMatch2(src, i, candidate, max(historyLen, prevMatch.Start))
 			if m.End-m.Start > q.MinLength {
 				currentMatch = m
@@ -174,7 +193,7 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 		}
 
 		for range q.ChainLength {
-			delta := q.chain[candidate]
+			delta := chain[candidate]
 			if delta == 0 {
 				break
 			}
@@ -182,7 +201,7 @@ func (q *Pathfinder) FindMatches(dst []Match, src []byte) []Match {
 			if candidate <= 0 || i-candidate > q.MaxDistance {
 				break
 			}
-			if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
+			if binary.LittleEndian.Uint32(src[candidate:]) == iVal {
 				m := extendMatch2(src, i, candidate, max(historyLen, prevMatch.Start))
 				if m.End-m.Start > q.MinLength && m.End-m.Start > currentMatch.End-currentMatch.Start {
 					currentMatch = m
