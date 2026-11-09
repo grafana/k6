@@ -756,7 +756,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
-			var mehs []mapping
+			mehs := make([]mapping, 0, len(ehs))
 			for _, eh := range ehs {
 				ehm := mapElementHandle(vu, eh)
 				mehs = append(mehs, ehm)

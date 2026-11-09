@@ -23,6 +23,26 @@ type orderedMapIter struct {
 	cur *mapEntry
 }
 
+func (m *orderedMap) insert(key, value Value, h uint64, hPrev *mapEntry) {
+	if key == _negativeZero {
+		key = intToValue(0)
+	}
+	entry := &mapEntry{key: key, value: value}
+	if hPrev == nil {
+		m.hashTable[h] = entry
+	} else {
+		hPrev.hNext = entry
+	}
+	if m.iterLast != nil {
+		entry.iterPrev = m.iterLast
+		m.iterLast.iterNext = entry
+	} else {
+		m.iterFirst = entry
+	}
+	m.iterLast = entry
+	m.size++
+}
+
 func (m *orderedMap) lookup(key Value) (h uint64, entry, hPrev *mapEntry) {
 	if key == _negativeZero {
 		key = intToValue(0)
@@ -38,23 +58,7 @@ func (m *orderedMap) set(key, value Value) {
 	if entry != nil {
 		entry.value = value
 	} else {
-		if key == _negativeZero {
-			key = intToValue(0)
-		}
-		entry = &mapEntry{key: key, value: value}
-		if hPrev == nil {
-			m.hashTable[h] = entry
-		} else {
-			hPrev.hNext = entry
-		}
-		if m.iterLast != nil {
-			entry.iterPrev = m.iterLast
-			m.iterLast.iterNext = entry
-		} else {
-			m.iterFirst = entry
-		}
-		m.iterLast = entry
-		m.size++
+		m.insert(key, value, h, hPrev)
 	}
 }
 
@@ -65,6 +69,15 @@ func (m *orderedMap) get(key Value) Value {
 	}
 
 	return nil
+}
+
+func (m *orderedMap) getOrInsert(key, value Value) Value {
+	h, entry, hPrev := m.lookup(key)
+	if entry != nil {
+		return entry.value
+	}
+	m.insert(key, value, h, hPrev)
+	return value
 }
 
 func (m *orderedMap) remove(key Value) bool {
@@ -166,4 +179,10 @@ func (m *orderedMap) clear() {
 	m.iterLast = nil
 	m.hashTable = make(map[uint64]*mapEntry)
 	m.size = 0
+}
+
+func (m *orderedMap) copyTo(dest *orderedMap) {
+	for entry := m.iterFirst; entry != nil; entry = entry.iterNext {
+		dest.set(entry.key, entry.value)
+	}
 }

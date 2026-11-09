@@ -413,7 +413,7 @@ func (s Selection) Map(v sobek.Value) []sobek.Value {
 		common.Throw(s.rt, errors.New("the argument to map() must be a function"))
 	}
 
-	var values []sobek.Value
+	values := make([]sobek.Value, 0, s.sel.Length())
 	s.sel.Each(func(idx int, sel *goquery.Selection) {
 		selection := &Selection{sel: sel, URL: s.URL, rt: s.rt}
 
@@ -439,7 +439,7 @@ func (s Selection) Slice(start int, def ...int) Selection {
 func (s Selection) Get(def ...int) sobek.Value {
 	switch {
 	case len(def) == 0:
-		var items []sobek.Value
+		items := make([]sobek.Value, 0, len(s.sel.Nodes))
 		for i := 0; i < len(s.sel.Nodes); i++ {
 			items = append(items, selToElement(s.Eq(i)))
 		}

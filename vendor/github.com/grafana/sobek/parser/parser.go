@@ -91,16 +91,21 @@ type _parser struct {
 	chrOffset int  // The offset of current character
 	offset    int  // The offset after current character (may be greater than 1)
 
-	idx           file.Idx    // The index of token
-	token         token.Token // The token
-	literal       string      // The literal of the token, if any
-	parsedLiteral unistring.String
+	idx            file.Idx    // The index of token
+	prevTokenEnd   file.Idx    // The index right after the previous token
+	token          token.Token // The token
+	literal        string      // The literal of the token, if any
+	parsedLiteral  unistring.String
+	sloppyLiteral  bool                  // The string literal token has a legacy octal or \8, \9 escape sequence
+	numLiteralKind ast.NumberLiteralKind // The lexical form of the current numeric literal token, if any
 
 	scope             *_scope
 	insertSemicolon   bool // If we see a newline, then insert an implicit semicolon
 	implicitSemicolon bool // An implicit semicolon exists
 
 	errors ErrorList
+
+	depth int
 
 	recover struct {
 		// Scratch when trying to seek to the next statement, etc.
@@ -226,8 +231,28 @@ func (self *_parser) parse() (*ast.Program, error) {
 	return program, self.errors.Err()
 }
 
+const maxNestingDepth = 10000
+
+func (self *_parser) enterNesting() {
+	self.depth++
+	if self.depth == maxNestingDepth+1 {
+		self.nestingExceeded()
+	}
+}
+
+func (self *_parser) nestingExceeded() {
+	self.error(self.idx, "Maximum nesting depth exceeded")
+	self.chr, self.chrOffset, self.offset = -1, self.length, self.length
+	self.token, self.literal, self.parsedLiteral, self.sloppyLiteral, self.numLiteralKind, self.idx = token.EOF, "", "", false, ast.NumberLiteralPlain, self.idxOf(self.length)
+}
+
+func (self *_parser) leaveNesting() {
+	self.depth--
+}
+
 func (self *_parser) next() {
-	self.token, self.literal, self.parsedLiteral, self.idx = self.scan()
+	self.prevTokenEnd = self.idxOf(self.chrOffset)
+	self.token, self.literal, self.parsedLiteral, self.sloppyLiteral, self.numLiteralKind, self.idx = self.scan()
 }
 
 func (self *_parser) optionalSemicolon() {

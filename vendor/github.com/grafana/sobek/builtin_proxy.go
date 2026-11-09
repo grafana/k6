@@ -157,6 +157,17 @@ func (h *nativeProxyHandler) getSym(target *Object, prop *Symbol, receiver Value
 	return nil, false
 }
 
+func (h *nativeProxyHandler) hasAndGetStr(target *Object, prop unistring.String, receiver Value) (Value, bool, bool) {
+	if trap := h.handler.HasAndGet; trap != nil {
+		// nil means the property does not exist
+		if v := trap(target, prop.String(), receiver); v != nil {
+			return v, true, true
+		}
+		return nil, false, true
+	}
+	return nil, false, false
+}
+
 func (h *nativeProxyHandler) setStr(target *Object, prop unistring.String, value Value, receiver Value) (bool, bool) {
 	if trap := h.handler.SetIdx; trap != nil {
 		if idx, ok := strToInt(prop); ok {
@@ -295,6 +306,14 @@ type ProxyTrapConfig struct {
 
 	// A trap for getting property values, Reflect.get (string properties)
 	Get func(target *Object, property string, receiver Value) (value Value)
+
+	// A combined has+get trap equivalent to calling the Has and Get traps separately (e.g. for
+	// resolving bindings in a 'with' statement). It allows implementing the two steps in a single
+	// Go call. Returning nil means the property does not exist; a property with the value
+	// undefined must be returned as sobek.Undefined() rather than nil. The same invariant checks
+	// are applied to the result as to the separate Has and Get traps. If not set, the Has and Get
+	// traps are used separately.
+	HasAndGet func(target *Object, property string, receiver Value) (value Value)
 
 	// A trap for getting property values, Reflect.get (integer properties)
 	GetIdx func(target *Object, property int, receiver Value) (value Value)

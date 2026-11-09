@@ -496,7 +496,7 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 	if err != nil {
 		return nil, err
 	}
-	var rtn []MethodInfo
+	rtn := []MethodInfo{}
 	if c.mds == nil {
 		// This allows us to call load() multiple times, without overwriting the
 		// previously loaded definitions.
