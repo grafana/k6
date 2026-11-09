@@ -358,3 +358,27 @@ func TestServerPort(t *testing.T) {
 	_, ok := serverPort(&url.URL{Scheme: "ftp", Host: "example.com"})
 	assert.False(t, ok, "no default port for an unknown scheme")
 }
+
+func TestRedactURL(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct{ in, want string }{
+		"no query":     {"https://a.com/p", "https://a.com/p"},
+		"no sensitive": {"https://a.com/p?q=1&r=2", "https://a.com/p?q=1&r=2"},
+		"aws": {
+			"https://a.com/p?X-Amz-Signature=abc&q=1&X-Amz-Security-Token=tok&X-Amz-Credential=c",
+			"https://a.com/p?X-Amz-Signature=REDACTED&q=1&X-Amz-Security-Token=REDACTED&X-Amz-Credential=REDACTED",
+		},
+		"sig and goog":   {"https://a.com/p?sig=x&X-Goog-Signature=y", "https://a.com/p?sig=REDACTED&X-Goog-Signature=REDACTED"},
+		"case-sensitive": {"https://a.com/p?SIG=x", "https://a.com/p?SIG=x"},
+		"fragment":       {"https://a.com/p?sig=x#f", "https://a.com/p?sig=REDACTED#f"},
+		"encoded key":    {"https://a.com/p?X%2DAmz%2DSignature=x", "https://a.com/p?X%2DAmz%2DSignature=REDACTED"},
+		"no value":       {"https://a.com/p?sig", "https://a.com/p?sig"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, redactURL(tc.in))
+		})
+	}
+}

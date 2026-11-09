@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -20,6 +21,9 @@ import (
 // to correlate the HTTP metric samples with the request trace.
 const metadataTraceID = "trace_id"
 
+// redactedValue replaces the value of the sensitive query parameters in url.full.
+const redactedValue = "REDACTED"
+
 // startSpan starts the span of an HTTP request, child of the span in ctx (the iteration span),
 // covering all its round trips, e.g. its redirects. It propagates the span to the server, and
 // adds its trace ID to the metadata of the request metric samples.
@@ -30,7 +34,7 @@ func startSpan(
 	attrs := []attribute.KeyValue{
 		semconv.HTTPRequestMethodKey.String(req.Method),
 		semconv.ServerAddress(req.URL.Hostname()),
-		semconv.URLFull(preq.URL.Clean()),
+		semconv.URLFull(redactURL(preq.URL.Clean())),
 	}
 	if port, ok := serverPort(req.URL); ok {
 		attrs = append(attrs, semconv.ServerPort(port))
@@ -52,6 +56,40 @@ func startSpan(
 		preq.TagsAndMeta.SetMetadata(metadataTraceID, span.SpanContext().TraceID().String())
 	}
 	return ctx, span
+}
+
+// redactURL replaces the values of the sensitive query parameters of rawURL with REDACTED. The
+// rest of the URL is kept as is, including the order and the encoding of the other parameters.
+func redactURL(rawURL string) string {
+	rest, fragment, hasFragment := strings.Cut(rawURL, "#")
+	base, query, hasQuery := strings.Cut(rest, "?")
+	if !hasQuery {
+		return rawURL
+	}
+
+	params := strings.Split(query, "&")
+	for i, param := range params {
+		key, _, hasValue := strings.Cut(param, "=")
+		if !hasValue {
+			continue
+		}
+		// The key may be percent-encoded.
+		if decoded, err := url.QueryUnescape(key); err == nil {
+			key = decoded
+		}
+		// The query parameters whose values the OpenTelemetry semantic conventions require to
+		// redact by default in url.full. The match is case-sensitive.
+		switch key {
+		case "X-Amz-Signature", "X-Amz-Credential", "X-Amz-Security-Token", "sig", "X-Goog-Signature":
+			params[i] = param[:strings.IndexByte(param, '=')+1] + redactedValue
+		}
+	}
+
+	out := base + "?" + strings.Join(params, "&")
+	if hasFragment {
+		out += "#" + fragment
+	}
+	return out
 }
 
 // endSpan completes and ends the span of an HTTP request, from the result of MakeRequest. Like
