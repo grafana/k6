@@ -382,7 +382,7 @@ func (p *parser) lowerFunction(
 
 		// Forward the arguments to the wrapper function
 		usesArgumentsRef := !isArrow && p.fnOnlyDataVisit.argumentsRef != nil &&
-			p.symbolUses[*p.fnOnlyDataVisit.argumentsRef].CountEstimate > 0
+			p.currentPart.SymbolUses[*p.fnOnlyDataVisit.argumentsRef].CountEstimate > 0
 		var forwardedArgs js_ast.Expr
 		if !couldThrowErrors && !usesArgumentsRef {
 			// Simple case: the arguments can stay on the outer function. It's
@@ -849,6 +849,26 @@ func (p *parser) lowerAssignmentOperator(value js_ast.Expr, callback func(js_ast
 		}
 
 	case *js_ast.EIdentifier:
+		// Make sure we record this usage in the usage count so that duplicating
+		// a single-use reference means it's no longer considered a single-use
+		// reference. Otherwise the single-use reference inlining code may
+		// incorrectly inline the initializer into the first reference, leaving
+		// the second reference without a definition. For example:
+		//
+		//   let x;
+		//   x ||= {};
+		//
+		// We're changing that to this:
+		//
+		//   let x;
+		//   x || (x = {});
+		//
+		// And we don't want to believe that "x" still has a single reference, as
+		// then we may incorrectly inline the undefined value like this:
+		//
+		//   void 0 || (x = {});
+		//
+		p.recordUsage(left.Ref)
 		return callback(
 			js_ast.Expr{Loc: value.Loc, Data: &js_ast.EIdentifier{Ref: left.Ref}},
 			value,
@@ -2011,7 +2031,7 @@ func (ctx *lowerUsingDeclarationContext) finalize(p *parser, stmts []js_ast.Stmt
 	}
 	isTopLevel := scope == p.moduleScope
 	scope.Generated = append(scope.Generated, ctx.stackRef, caughtRef, errorRef, hasErrorRef)
-	p.declaredSymbols = append(p.declaredSymbols,
+	p.currentPart.DeclaredSymbols = append(p.currentPart.DeclaredSymbols,
 		js_ast.DeclaredSymbol{IsTopLevel: isTopLevel, Ref: ctx.stackRef},
 		js_ast.DeclaredSymbol{IsTopLevel: isTopLevel, Ref: caughtRef},
 		js_ast.DeclaredSymbol{IsTopLevel: isTopLevel, Ref: errorRef},
@@ -2034,7 +2054,7 @@ func (ctx *lowerUsingDeclarationContext) finalize(p *parser, stmts []js_ast.Stmt
 	if ctx.hasAwaitUsing {
 		promiseRef := p.generateTempRef(tempRefNoDeclare, "_promise")
 		scope.Generated = append(scope.Generated, promiseRef)
-		p.declaredSymbols = append(p.declaredSymbols, js_ast.DeclaredSymbol{IsTopLevel: isTopLevel, Ref: promiseRef})
+		p.currentPart.DeclaredSymbols = append(p.currentPart.DeclaredSymbols, js_ast.DeclaredSymbol{IsTopLevel: isTopLevel, Ref: promiseRef})
 
 		// "await" expressions turn into "yield" expressions when lowering
 		p.recordUsage(promiseRef)

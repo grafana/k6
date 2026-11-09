@@ -14,13 +14,11 @@ func Format(err error) (string, map[string]any) {
 
 	errText := err.Error()
 	fields := FieldsFromErr(err)
-	var xerr Exception
-	if errors.As(err, &xerr) {
+	if xerr, ok := errors.AsType[Exception](err); ok {
 		errText = xerr.StackTrace()
 		fields["source"] = "stacktrace"
 	}
-	var herr HasHint
-	if errors.As(err, &herr) {
+	if herr, ok := errors.AsType[HasHint](err); ok {
 		fields["hint"] = herr.Hint()
 	}
 

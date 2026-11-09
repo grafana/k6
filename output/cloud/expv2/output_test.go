@@ -274,9 +274,9 @@ func TestOutputPeriodicInvoke(t *testing.T) {
 	t.Parallel()
 
 	stop := make(chan struct{})
-	var called uint64
+	var called atomic.Uint64
 	cb := func() {
-		updated := atomic.AddUint64(&called, 1)
+		updated := called.Add(1)
 		if updated == 2 {
 			close(stop)
 		}
@@ -284,7 +284,7 @@ func TestOutputPeriodicInvoke(t *testing.T) {
 	o := Output{stop: stop}
 	o.periodicInvoke(time.Duration(1), cb) // loop
 	<-stop
-	assert.Greater(t, atomic.LoadUint64(&called), uint64(1))
+	assert.Greater(t, called.Load(), uint64(1))
 }
 
 func TestOutputStopWithTestError(t *testing.T) {
@@ -315,9 +315,9 @@ func TestOutputFlushTicks(t *testing.T) {
 		// operations continues concurrently if one more tick is sent in the meantime.
 		//
 		// The second request unblocks.
-		var requestsCount int64
+		var requestsCount atomic.Int64
 		flusherMock := func(context.Context) {
-			updated := atomic.AddInt64(&requestsCount, 1)
+			updated := requestsCount.Add(1)
 			if updated == 2 {
 				close(done)
 				return
@@ -336,7 +336,7 @@ func TestOutputFlushTicks(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Error("timed out")
 		case <-done:
-			assert.NotZero(t, atomic.LoadInt64(&requestsCount))
+			assert.NotZero(t, requestsCount.Load())
 		}
 		close(o.stop)
 		synctest.Wait()
@@ -416,9 +416,9 @@ func TestOutputFlushRequestMetadatasConcurrently(t *testing.T) {
 		// operations continues concurrently if one more tick is sent in the meantime.
 		//
 		// The second request unblocks.
-		var requestsCount int64
+		var requestsCount atomic.Int64
 		flusherMock := func(context.Context) {
-			updated := atomic.AddInt64(&requestsCount, 1)
+			updated := requestsCount.Add(1)
 			if updated == 2 {
 				close(done)
 				return
@@ -439,7 +439,7 @@ func TestOutputFlushRequestMetadatasConcurrently(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Error("timed out")
 		case <-done:
-			assert.NotZero(t, atomic.LoadInt64(&requestsCount))
+			assert.NotZero(t, requestsCount.Load())
 		}
 		close(o.stop)
 		synctest.Wait()
@@ -561,6 +561,36 @@ type requestMetadatasFlusherFunc func(context.Context)
 func (ff requestMetadatasFlusherFunc) Flush(ctx context.Context) error {
 	ff(ctx)
 	return nil
+}
+
+func TestOutputSetters_OverrideMetricsClientAndURL(t *testing.T) {
+	t.Parallel()
+
+	conf := cloudapi.Config{
+		Host:                  null.StringFrom("host-not-used-for-override"),
+		Token:                 null.StringFrom("a-fake-token"),
+		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
+		AggregationPeriod:     types.NewNullDuration(1*time.Hour, true),
+		MetricPushInterval:    types.NewNullDuration(1*time.Hour, true),
+	}
+	logger := testutils.NewLogger(t)
+	o, err := New(logger, conf, nil)
+	require.NoError(t, err)
+
+	stub := &mockMetricsHTTPClient{}
+	o.SetMetricsHTTPClient(stub)
+	o.SetMetricsURL("https://override.example/m/123")
+	o.SetTestRunID("run-42")
+
+	require.NoError(t, o.Start())
+	defer func() { require.NoError(t, o.StopWithTestError(nil)) }()
+
+	mf, ok := o.flushing.(*metricsFlusher)
+	require.True(t, ok)
+	mc, ok := mf.client.(*metricsClient)
+	require.True(t, ok)
+	assert.Equal(t, "https://override.example/m/123", mc.url)
+	assert.Equal(t, stub, mc.httpClient)
 }
 
 func TestPrintableConfig(t *testing.T) {

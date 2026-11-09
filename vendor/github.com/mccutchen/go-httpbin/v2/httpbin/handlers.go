@@ -472,20 +472,11 @@ func (h *HTTPBin) RedirectTo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If we're given a URL that includes a domain name and we have a list of
-	// allowed domains, ensure that the domain is allowed.
-	//
-	// Note: This checks the hostname directly rather than using the net.URL's
-	// IsAbs() method, because IsAbs() will return false for URLs that omit
-	// the scheme but include a domain name, like "//evil.com" and it's
-	// important that we validate the domain in these cases as well.
-	if u.Hostname() != "" && len(h.AllowedRedirectDomains) > 0 {
-		if _, ok := h.AllowedRedirectDomains[u.Hostname()]; !ok {
-			// for this error message we do not use our standard JSON response
-			// because we want it to be more obviously human readable.
-			writeResponse(w, http.StatusForbidden, "text/plain", []byte(h.forbiddenRedirectError))
-			return
-		}
+	if !h.redirectAllowed(u) {
+		// for this error message we do not use our standard JSON response
+		// because we want it to be more obviously human readable.
+		writeResponse(w, http.StatusForbidden, "text/plain", []byte(h.forbiddenRedirectError))
+		return
 	}
 
 	statusCode := http.StatusFound
@@ -498,6 +489,22 @@ func (h *HTTPBin) RedirectTo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.doRedirect(w, u.String(), statusCode)
+}
+
+// redirectAllowed checks whether the given redirect target is permitted.
+//
+// If a hostname allowlist is configured and the target is an absolute URL,
+// its hostname must be in the allowlist.
+//
+// Otherwise, the target must be either an absolute or root-relative URL.
+func (h *HTTPBin) redirectAllowed(target *url.URL) bool {
+	if len(h.AllowedRedirectDomains) > 0 {
+		if host := target.Hostname(); host != "" {
+			_, ok := h.AllowedRedirectDomains[host]
+			return ok
+		}
+	}
+	return target.IsAbs() || strings.HasPrefix(target.Path, "/")
 }
 
 // Cookies responds with the cookies in the incoming request

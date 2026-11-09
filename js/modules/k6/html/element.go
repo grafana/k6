@@ -360,7 +360,7 @@ func (e Element) ClassList() []string {
 		return strings.Fields(clsName)
 	}
 
-	return nil
+	return []string{}
 }
 
 func (e Element) ClassName() sobek.Value {

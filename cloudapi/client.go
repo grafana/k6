@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 const (
@@ -151,7 +152,7 @@ func (c *Client) prepareHeaders(req *http.Request) {
 }
 
 func (c *Client) do(req *http.Request, v any, attempt int) (retry bool, err error) {
-	resp, err := c.client.Do(req) //nolint:gosec
+	resp, err := c.client.Do(req)
 
 	defer func() {
 		if resp != nil {
@@ -204,11 +205,8 @@ func CheckResponse(r *http.Response) error {
 		Error ResponseError `json:"error"`
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
-		if r.StatusCode == http.StatusUnauthorized {
-			return errNotAuthenticated
-		}
-		if r.StatusCode == http.StatusForbidden {
-			return errNotAuthorized
+		if classified := httperr.ClassifyStatus(r.StatusCode); classified != nil {
+			return classified
 		}
 		return fmt.Errorf(
 			"unexpected HTTP error from %s: %d %s",

@@ -30,8 +30,12 @@ func NewGRPC(t testing.TB) *GRPC {
 	}
 
 	features := grpcservice.LoadFeatures("")
-	grpcservice.RegisterRouteGuideServer(grpcServer, grpcservice.NewRouteGuideServer(features...))
-	grpcservice.RegisterFeatureExplorerServer(grpcServer, grpcservice.NewFeatureExplorerServer(features...))
+	routeGuide := grpcservice.NewRouteGuideServer(features...)
+	routeGuide.Logf = t.Logf
+	grpcservice.RegisterRouteGuideServer(grpcServer, routeGuide)
+	featureExplorer := grpcservice.NewFeatureExplorerServer(features...)
+	featureExplorer.Logf = t.Logf
+	grpcservice.RegisterFeatureExplorerServer(grpcServer, featureExplorer)
 	reflection.Register(grpcServer)
 
 	go func() {

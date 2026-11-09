@@ -249,10 +249,11 @@ type Options struct {
 	ExecutionSegmentSequence *ExecutionSegmentSequence `json:"executionSegmentSequence" ignored:"true"`
 
 	// Timeouts for the setup() and teardown() functions
-	NoSetup         null.Bool          `json:"noSetup" envconfig:"K6_NO_SETUP"`
-	SetupTimeout    types.NullDuration `json:"setupTimeout" envconfig:"K6_SETUP_TIMEOUT"`
-	NoTeardown      null.Bool          `json:"noTeardown" envconfig:"K6_NO_TEARDOWN"`
-	TeardownTimeout types.NullDuration `json:"teardownTimeout" envconfig:"K6_TEARDOWN_TIMEOUT"`
+	NoSetup              null.Bool          `json:"noSetup" envconfig:"K6_NO_SETUP"`
+	SetupTimeout         types.NullDuration `json:"setupTimeout" envconfig:"K6_SETUP_TIMEOUT"`
+	NoTeardown           null.Bool          `json:"noTeardown" envconfig:"K6_NO_TEARDOWN"`
+	TeardownTimeout      types.NullDuration `json:"teardownTimeout" envconfig:"K6_TEARDOWN_TIMEOUT"`
+	HandleSummaryTimeout types.NullDuration `json:"handleSummaryTimeout" envconfig:"K6_HANDLE_SUMMARY_TIMEOUT"`
 
 	// Limit HTTP requests per second.
 	RPS null.Int `json:"rps" envconfig:"K6_RPS"`
@@ -273,6 +274,9 @@ type Options struct {
 	// Should all HTTP requests and responses be logged (excluding body)?
 	HTTPDebug null.String `json:"httpDebug" envconfig:"K6_HTTP_DEBUG"`
 
+	// Should credential headers be masked in the HTTP debug output?
+	HTTPDebugRedact null.Bool `json:"httpDebugRedact" envconfig:"K6_HTTP_DEBUG_REDACT"`
+
 	// Accept invalid or untrusted TLS certificates.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_INSECURE_SKIP_TLS_VERIFY"`
 
@@ -280,6 +284,12 @@ type Options struct {
 	TLSCipherSuites *TLSCipherSuites `json:"tlsCipherSuites" envconfig:"K6_TLS_CIPHER_SUITES"`
 	TLSVersion      *TLSVersions     `json:"tlsVersion" ignored:"true"`
 	TLSAuth         []*TLSAuth       `json:"tlsAuth" envconfig:"K6_TLSAUTH"`
+
+	// Fetch missing intermediate certificates via the AIA (Authority Information Access)
+	// extension when the server presents an incomplete chain. Mirrors what browsers do.
+	// Disabled by default; opt in via tlsAIAFetch: true or K6_TLS_AIA_FETCH=true.
+	// Has no effect when InsecureSkipTLSVerify is true.
+	TLSAIAFetch null.Bool `json:"tlsAIAFetch" envconfig:"K6_TLS_AIA_FETCH"`
 
 	// Throw warnings (eg. failed HTTP requests) as errors instead of simply logging them.
 	Throw null.Bool `json:"throw" envconfig:"K6_THROW"`
@@ -421,6 +431,9 @@ func (o Options) Apply(opts Options) Options {
 	if opts.TeardownTimeout.Valid {
 		o.TeardownTimeout = opts.TeardownTimeout
 	}
+	if opts.HandleSummaryTimeout.Valid {
+		o.HandleSummaryTimeout = opts.HandleSummaryTimeout
+	}
 	if opts.RPS.Valid {
 		o.RPS = opts.RPS
 	}
@@ -439,8 +452,14 @@ func (o Options) Apply(opts Options) Options {
 	if opts.HTTPDebug.Valid {
 		o.HTTPDebug = opts.HTTPDebug
 	}
+	if opts.HTTPDebugRedact.Valid {
+		o.HTTPDebugRedact = opts.HTTPDebugRedact
+	}
 	if opts.InsecureSkipTLSVerify.Valid {
 		o.InsecureSkipTLSVerify = opts.InsecureSkipTLSVerify
+	}
+	if opts.TLSAIAFetch.Valid {
+		o.TLSAIAFetch = opts.TLSAIAFetch
 	}
 	if opts.TLSCipherSuites != nil {
 		o.TLSCipherSuites = opts.TLSCipherSuites
@@ -573,7 +592,7 @@ func (o Options) ForEachSpecified(structTag string, callback func(key string, va
 			shouldCall = fieldVal.Len() > 0
 		case reflect.Map:
 			shouldCall = fieldVal.Len() > 0
-		case reflect.Ptr:
+		case reflect.Pointer:
 			shouldCall = !fieldVal.IsNil()
 		default:
 			panic(fmt.Sprintf("Unknown Options field %#v", fieldType))

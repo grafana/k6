@@ -2,11 +2,11 @@
 package eventloop
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/grafana/sobek"
 
+	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
 )
@@ -186,41 +186,74 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 		// This will get a random unhandled rejection instead of the first one, for example.
 		// But that seems to be the case in other tools as well so it seems to not be that big of a problem.
 		for promise := range e.pendingPromiseRejections {
-			value := promise.Result()
-			if !common.IsNullish(value) {
-				if o := value.ToObject(e.vu.Runtime()); o != nil {
-					if stack := o.Get("stack"); stack != nil {
-						value = stack
-					}
+			return newRejectionError(e.vu.Runtime(), promise.Result())
+		}
+	}
+}
+
+func newRejectionError(rt *sobek.Runtime, res sobek.Value) error {
+	var rejection *rejectionError
+	// Reading stack, converting to a string, and exporting can all execute JavaScript.
+	// Use a callable boundary since Runtime.Try does not catch interruptions.
+	call, _ := sobek.AssertFunction(rt.ToValue(func() {
+		v := res
+		if !common.IsNullish(v) {
+			if o := v.ToObject(rt); o != nil {
+				if stack := o.Get("stack"); stack != nil {
+					v = stack
 				}
 			}
-			return newRejectionError(promise.Result(), value)
 		}
+		var s string
+		if v != nil {
+			s = v.String()
+		}
+		// this is the de facto wording in both firefox and deno at least
+		rejection = &rejectionError{msg: "Uncaught (in promise) " + s}
+		if !common.IsNullish(res) {
+			if cause, ok := res.Export().(error); ok {
+				rejection.cause = cause
+			}
+		}
+	}))
+	if _, err := call(sobek.Undefined()); err != nil {
+		return err
 	}
+	return rejection
 }
 
-func newRejectionError(res, v sobek.Value) error {
-	var s string
-	if v != nil {
-		s = v.String()
-	}
-	// this is the de facto wording in both firefox and deno at least
-	msg := "Uncaught (in promise) " + s
-	if !common.IsNullish(res) {
-		if cause, ok := res.Export().(error); ok {
-			return &rejectionError{msg: msg, cause: cause}
-		}
-	}
-	return errors.New(msg)
-}
-
+// rejectionError is the error a rejected promise with no handler ends the event
+// loop with. It is an [errext.Exception]: a rejection that reaches here is a
+// script error that happens to have been raised asynchronously, and reporting
+// it as anything else makes it indistinguishable from k6's own failures for
+// anything reading the logs.
 type rejectionError struct {
 	msg   string
 	cause error
 }
 
+var _ interface {
+	errext.Exception
+	errext.HasHint
+} = &rejectionError{}
+
 func (e *rejectionError) Error() string { return e.msg }
 func (e *rejectionError) Unwrap() error { return e.cause }
+
+// StackTrace returns the message, which already carries the stack: newRejectionError
+// resolves the rejected value's `stack` property before building it, exactly as
+// a thrown exception's own String() carries its stack. A rejected value with no
+// stack -- `Promise.reject('some string')` -- has nothing better to give, and
+// the message is still the most informative thing available.
+func (e *rejectionError) StackTrace() string { return e.msg }
+
+// AbortReason reports the same reason a synchronous throw does, since the two
+// differ only in when the script raised the error.
+func (e *rejectionError) AbortReason() errext.AbortReason { return errext.AbortedByScriptError }
+
+// Hint distinguishes this from the "script exception" a synchronous throw
+// reports, so the log line says which of the two happened.
+func (e *rejectionError) Hint() string { return "unhandled script exception" }
 
 // WaitOnRegistered waits on all registered callbacks so we know nothing is still doing work.
 // This does call back the callbacks and more can be queued over time.

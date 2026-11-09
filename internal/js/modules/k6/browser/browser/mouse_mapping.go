@@ -12,8 +12,12 @@ import (
 
 func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 	rt := vu.Runtime()
+	return finishMapping(newMouseMapping(vu, m, rt))
+}
+
+func newMouseMapping(vu moduleVU, m *common.Mouse, rt *sobek.Runtime) mapping {
 	return mapping{
-		"click": func(x float64, y float64, opts sobek.Value) (*sobek.Promise, error) {
+		"click": networkCall(func(x float64, y float64, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseMouseClickOptions(rt, opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse click options: %w", err)
@@ -21,8 +25,8 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			return promise(vu, func() (any, error) {
 				return nil, m.Click(x, y, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"dblClick": func(x float64, y float64, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"dblClick": networkCall(func(x float64, y float64, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseMouseDblClickOptions(rt, opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse double click options: %w", err)
@@ -30,8 +34,8 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			return promise(vu, func() (any, error) {
 				return nil, m.DblClick(x, y, popts) //nolint:wrapcheck
 			}), nil
-		},
-		"down": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"down": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseMouseDownUpOptions(rt, opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse down options: %w", err)
@@ -39,8 +43,8 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			return promise(vu, func() (any, error) {
 				return nil, m.Down(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"up": func(opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"up": networkCall(func(opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseMouseDownUpOptions(rt, opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse up options: %w", err)
@@ -48,8 +52,8 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			return promise(vu, func() (any, error) {
 				return nil, m.Up(popts) //nolint:wrapcheck
 			}), nil
-		},
-		"move": func(x float64, y float64, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"move": networkCall(func(x float64, y float64, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseMouseMoveOptions(rt, opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing mouse move options: %w", err)
@@ -57,7 +61,7 @@ func mapMouse(vu moduleVU, m *common.Mouse) mapping {
 			return promise(vu, func() (any, error) {
 				return nil, m.Move(x, y, popts) //nolint:wrapcheck
 			}), nil
-		},
+		}),
 	}
 }
 

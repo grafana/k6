@@ -7,7 +7,6 @@ type weakSetObject struct {
 
 func (ws *weakSetObject) init() {
 	ws.baseObject.init()
-	ws.s = weakMap(ws.val.runtime.genId())
 }
 
 func (r *Runtime) weakSetProto_add(call FunctionCall) Value {
@@ -16,7 +15,7 @@ func (r *Runtime) weakSetProto_add(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakSet.prototype.add called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
-	wso.s.set(r.toObject(call.Argument(0)), nil)
+	wso.s.set(r.weakSetValueRefs(call.Argument(0)), nil)
 	return call.This
 }
 
@@ -26,8 +25,7 @@ func (r *Runtime) weakSetProto_delete(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakSet.prototype.delete called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
-	obj, ok := call.Argument(0).(*Object)
-	if ok && wso.s.remove(obj) {
+	if wso.s.remove(r.getWeakMapRefs(call.Argument(0), false)) {
 		return valueTrue
 	}
 	return valueFalse
@@ -39,11 +37,17 @@ func (r *Runtime) weakSetProto_has(call FunctionCall) Value {
 	if !ok {
 		panic(r.NewTypeError("Method WeakSet.prototype.has called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 	}
-	obj, ok := call.Argument(0).(*Object)
-	if ok && wso.s.has(obj) {
+	if wso.s.has(r.getWeakMapRefs(call.Argument(0), false)) {
 		return valueTrue
 	}
 	return valueFalse
+}
+
+func (r *Runtime) weakSetValueRefs(v Value) *weakMapRefs {
+	if refs := r.getWeakMapRefs(v, true); refs != nil {
+		return refs
+	}
+	panic(r.NewTypeError("Invalid value used in weak set: %s", nilSafe(v).String()))
 }
 
 func (r *Runtime) builtin_newWeakSet(args []Value, newTarget *Object) *Object {
@@ -63,15 +67,16 @@ func (r *Runtime) builtin_newWeakSet(args []Value, newTarget *Object) *Object {
 	if len(args) > 0 {
 		if arg := args[0]; arg != nil && arg != _undefined && arg != _null {
 			adder := wso.getStr("add", nil)
-			stdArr := r.checkStdArrayIter(arg)
+			stdArr := r.checkStdArray(arg)
 			if adder == r.global.weakSetAdder {
-				if stdArr != nil {
+				ir := r.getIterator(arg, nil)
+				if stdArr != nil && ir.nextRes != nil {
 					for _, v := range stdArr.values {
-						wso.s.set(r.toObject(v), nil)
+						wso.s.set(r.weakSetValueRefs(v), nil)
 					}
 				} else {
-					r.getIterator(arg, nil).iterate(func(item Value) {
-						wso.s.set(r.toObject(item), nil)
+					ir.iterate(func(item Value) {
+						wso.s.set(r.weakSetValueRefs(item), nil)
 					})
 				}
 			} else {
@@ -79,12 +84,13 @@ func (r *Runtime) builtin_newWeakSet(args []Value, newTarget *Object) *Object {
 				if adderFn == nil {
 					panic(r.NewTypeError("WeakSet.add in missing"))
 				}
-				if stdArr != nil {
+				ir := r.getIterator(arg, nil)
+				if stdArr != nil && ir.nextRes != nil {
 					for _, item := range stdArr.values {
 						adderFn(FunctionCall{This: o, Arguments: []Value{item}})
 					}
 				} else {
-					r.getIterator(arg, nil).iterate(func(item Value) {
+					ir.iterate(func(item Value) {
 						adderFn(FunctionCall{This: o, Arguments: []Value{item}})
 					})
 				}

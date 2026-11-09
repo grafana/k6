@@ -385,12 +385,12 @@ func (r *Runtime) asyncModuleExecutionRejected(state *evaluationState, c CyclicM
 	}
 	state.evaluationError[c] = ex
 	state.status[c] = Evaluated
-	for _, m := range state.asyncParentModules[c] {
-		r.asyncModuleExecutionRejected(state, m, ex)
-	}
 	// TODO handle top level capabiltiy better
 	if cap := state.topLevelCapability[r.findModuleRecord(c).(CyclicModuleRecord)]; cap != nil {
 		cap.reject(r.ToValue(ex))
+	}
+	for _, m := range state.asyncParentModules[c] {
+		r.asyncModuleExecutionRejected(state, m, ex)
 	}
 }
 
@@ -496,6 +496,9 @@ func (r *Runtime) continueDynamicImport(promiseCapability *promiseCapability, re
 		return nil
 	})
 	linkAndEvaluateClosure := r.ToValue(func(call FunctionCall) Value {
+		// Evaluation must not drain promise jobs before its reactions are attached.
+		r.vm.pushCtx()
+		defer r.vm.popCtx()
 		// a. a. Let link be Completion(module.Link()).
 		err := module.Link()
 		if err != nil {

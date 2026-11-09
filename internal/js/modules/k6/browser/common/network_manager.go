@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -17,6 +16,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 	k6lib "go.k6.io/k6/v2/lib"
 	k6netext "go.k6.io/k6/v2/lib/netext"
@@ -33,7 +33,7 @@ import (
 // Credentials holds HTTP authentication credentials.
 type Credentials struct {
 	Username string `js:"username"`
-	Password string `js:"password"` //nolint:gosec
+	Password string `js:"password"`
 }
 
 // IsEmpty returns true if the credentials are empty.
@@ -210,15 +210,66 @@ func (m *NetworkManager) deleteRequestByID(reqID network.RequestID) {
 	delete(m.reqIDToRequest, reqID)
 }
 
+func (m *NetworkManager) networkTagsAndMeta(
+	state *k6lib.State,
+	event *network.EventRequestWillBeSent,
+	redirectChain []*Request,
+) (k6metrics.TagsAndMeta, *networkOperationContext) {
+	if !k6common.AsyncMetricContextEnabled(state) {
+		return k6metrics.TagsAndMeta{}, nil
+	}
+	if len(redirectChain) > 0 {
+		previous := redirectChain[len(redirectChain)-1]
+		operation := previous.networkOperation
+		if m.frameManager != nil && m.frameManager.page != nil {
+			_, bindLoaderContext := requestLoaderContext(event)
+			if bindLoaderContext {
+				m.frameManager.page.bindNetworkLoaderOperation(event.FrameID, event.LoaderID, operation)
+			}
+		}
+		return previous.tagsAndMeta, operation
+	}
+	if m.frameManager != nil && m.frameManager.page != nil {
+		preferLoaderContext, bindLoaderContext := requestLoaderContext(event)
+		if tagsAndMeta, operation, ok := m.frameManager.page.getNetworkTagsAndMetaForRequest(
+			event.FrameID, event.LoaderID, preferLoaderContext, bindLoaderContext,
+		); ok {
+			return tagsAndMeta, operation
+		}
+	}
+	return state.Tags.GetCurrentValues(), nil
+}
+
+func requestLoaderContext(event *network.EventRequestWillBeSent) (prefer, bind bool) {
+	bind = event.Type == network.ResourceTypeDocument
+	initiatorType := network.InitiatorTypeOther
+	if event.Initiator != nil {
+		initiatorType = event.Initiator.Type
+	}
+	// A loader identifies navigation and parser-driven resource traffic, but it is also shared by
+	// unrelated fetches later in the document. Keep script traffic on the operation fallback.
+	prefer = bind || initiatorType == network.InitiatorTypeParser ||
+		initiatorType == network.InitiatorTypePreload ||
+		initiatorType == network.InitiatorTypeSignedExchange
+	return prefer, bind
+}
+
 func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	state := m.vu.State()
+	if state == nil {
+		return // CDP events can arrive after iteration teardown.
+	}
 
-	tags := state.Tags.GetCurrentValues().Tags
+	tagsAndMeta := req.tagsAndMeta
+	if tagsAndMeta.Tags == nil {
+		tagsAndMeta = state.Tags.GetCurrentValues()
+	}
+	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags = tags.With("method", req.method)
+		tags = tags.With("method", req.Method())
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.eventInterceptor, req.URL(), req.method, tags)
+		tags = handleURLTag(m.eventInterceptor, req.URL(), req.Method(), tags)
 	}
 	tags = tags.With("resource_type", req.ResourceType())
 
@@ -228,28 +279,31 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataSent, Tags: tags},
 				Value:      float64(req.Size().Total()),
 				Time:       req.wallTime,
+				Metadata:   tagsAndMeta.Metadata,
 			},
 		},
 	})
 }
 
-func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
+func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request, encodedDataLength float64) { //nolint:funlen
 	state := m.vu.State()
+	if state == nil {
+		return // CDP events can arrive after iteration teardown.
+	}
 
 	// In some scenarios we might not receive a ResponseReceived CDP event, in
 	// which case the response won't be created. So to emit as much metric data
 	// as possible we set some sensible defaults instead.
 	var (
-		status, bodySize                    int64
+		status                              int64
 		ipAddress, protocol                 string
 		fromCache, fromPreCache, fromSvcWrk bool
-		url                                 = req.url.String()
+		url                                 = req.URL()
 		wallTime                            = time.Now()
 		failed                              float64
 	)
 	if resp != nil {
 		status = resp.status
-		bodySize = resp.Size().Total()
 		ipAddress = resp.remoteAddress.IPAddress
 		protocol = resp.protocol
 		fromCache = resp.fromDiskCache
@@ -264,15 +318,19 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		}
 	} else {
 		m.logger.Debugf("NetworkManager:emitResponseMetrics",
-			"response is nil url:%s method:%s", req.url, req.method)
+			"response is nil url:%s method:%s", req.URL(), req.Method())
 	}
 
-	tags := state.Tags.GetCurrentValues().Tags
+	tagsAndMeta := req.tagsAndMeta
+	if tagsAndMeta.Tags == nil {
+		tagsAndMeta = state.Tags.GetCurrentValues()
+	}
+	tags := tagsAndMeta.Tags
 	if state.Options.SystemTags.Has(k6metrics.TagMethod) {
-		tags = tags.With("method", req.method)
+		tags = tags.With("method", req.Method())
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.eventInterceptor, url, req.method, tags)
+		tags = handleURLTag(m.eventInterceptor, url, req.Method(), tags)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags = tags.With("ip", ipAddress)
@@ -289,19 +347,26 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 	tags = tags.With("resource_type", req.ResourceType())
 
-	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
-		Samples: []k6metrics.Sample{
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
-				Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
-				Time:       wallTime,
-			},
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataReceived, Tags: tags},
-				Value:      float64(bodySize),
-				Time:       wallTime,
-			},
+	samples := []k6metrics.Sample{
+		{
+			TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
+			Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
+			Time:       wallTime,
+			Metadata:   tagsAndMeta.Metadata,
 		},
+	}
+
+	if encodedDataLength >= 0 {
+		samples = append(samples, k6metrics.Sample{
+			TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataReceived, Tags: tags},
+			Value:      encodedDataLength,
+			Time:       wallTime,
+			Metadata:   tagsAndMeta.Metadata,
+		})
+	}
+
+	pushIfNotDone(m.vu.Context(), m.logger, state.Samples, k6metrics.ConnectedSamples{
+		Samples: samples,
 	})
 
 	if resp != nil && resp.timing != nil {
@@ -311,6 +376,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
 					Value:      failed,
 					Time:       wallTime,
+					Metadata:   tagsAndMeta.Metadata,
 				},
 			},
 		})
@@ -334,7 +400,7 @@ func handleURLTag(mi eventInterceptor, url string, method string, tags *k6metric
 }
 
 func (m *NetworkManager) handleRequestRedirect(
-	req *Request, redirectResponse *network.Response, hasExtraInfo bool, timestamp *cdp.MonotonicTime,
+	req *Request, redirectResponse *network.Response, hasExtraInfo bool, timestamp cdp.MonotonicTime,
 ) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
 	m.extraInfoTracker.processResponse(req.requestID, resp, hasExtraInfo)
@@ -348,7 +414,7 @@ func (m *NetworkManager) handleRequestRedirect(
 	// them (the redirect's ExtraInfo may still be in flight here).
 	m.wg.Go(func() {
 		resp.WaitForRawHeaders()
-		m.emitResponseMetrics(resp, req)
+		m.emitResponseMetrics(resp, req, redirectResponse.EncodedDataLength)
 	})
 	m.deleteRequestByID(req.requestID)
 
@@ -363,16 +429,18 @@ func (m *NetworkManager) handleRequestRedirect(
 }
 
 func (m *NetworkManager) initDomains() error {
-	actions := []Action{network.Enable()}
+	actions := []Action{newCommand(network.Enable, network.EnableParams{
 
-	// Only enable the Fetch domain if necessary, as it has a performance overhead.
+		// Only enable the Fetch domain if necessary, as it has a performance overhead.
+	})}
+
 	if m.userReqInterceptionEnabled {
-		actions = append(actions,
-			network.SetCacheDisabled(true),
-			fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*"}}))
+		actions = append(actions, newCommand(network.SetCacheDisabled,
+			network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable,
+			fetch.EnableParams{Patterns: []*fetch.RequestPattern{{URLPattern: "*"}}}))
 	}
 	for _, action := range actions {
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		if err := action.Do(m.ctx, m.session); err != nil {
 			return fmt.Errorf("initializing networking %T: %w", action, err)
 		}
 	}
@@ -446,7 +514,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 	}
 
 	req.setErrorText(event.ErrorText)
-	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	req.responseEndTiming = float64(protocolTime(float64(event.Timestamp)).Unix()-req.timestamp.Unix()) * 1000
 	m.eventInterceptor.onRequestFailed(req)
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFailed(event.RequestID)
@@ -461,7 +529,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		return
 	}
 
-	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	req.responseEndTiming = float64(protocolTime(float64(event.Timestamp)).Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
 	m.extraInfoTracker.loadingFinished(event.RequestID)
 	req.resolveRawHeaders()
@@ -469,16 +537,15 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	m.eventInterceptor.onRequestFinished(req)
 
 	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
-	if isInternalURL(req.url) {
+	if isInternalURL(req.parsedURL()) {
 		return
 	}
 	// Emit the response metrics in a separate goroutine, once the raw headers
-	// are resolved, so the reported size is computed from a stable source.
-	// This must not run on the NetworkManager event goroutine: waiting for the
-	// raw headers there would block the goroutine that resolves them. Spawning
-	// a goroutine is also required for intercepted requests, so that CDP
-	// requestPaused messages can still be processed while a redirected main
-	// page request waits for its subrequest to finish loading.
+	// are resolved. This must not run on the NetworkManager event goroutine:
+	// waiting for the raw headers there would block the goroutine that resolves
+	// them. Spawning a goroutine is also required for intercepted requests, so
+	// that CDP requestPaused messages can still be processed while a redirected
+	// main page request waits for its subrequest to finish loading.
 	m.wg.Go(func() {
 		req.responseMu.RLock()
 		resp := req.response
@@ -486,7 +553,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		if resp != nil {
 			resp.WaitForRawHeaders()
 		}
-		m.emitResponseMetrics(resp, req)
+		m.emitResponseMetrics(resp, req, event.EncodedDataLength)
 	})
 }
 
@@ -541,6 +608,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 	} else {
 		redirectChain = make([]*Request, 0)
 	}
+	tagsAndMeta, networkOperation := m.networkTagsAndMeta(m.vu.State(), event, redirectChain)
 
 	var frame *Frame = nil
 	var ok bool
@@ -577,6 +645,8 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent,
 		redirectChain:     redirectChain,
 		interceptionID:    interceptionID,
 		allowInterception: m.userReqInterceptionEnabled,
+		tagsAndMeta:       tagsAndMeta,
+		networkOperation:  networkOperation,
 	})
 	if err != nil {
 		m.logger.Errorf("NetworkManager", "creating request: %s", err)
@@ -662,8 +732,12 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		}
 
 		if failErr != nil {
-			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
-			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+			action := newCommand(fetch.FailRequest,
+				fetch.FailRequestParams{
+					RequestID:   event.RequestID,
+					ErrorReason: network.ErrorReasonBlockedByClient,
+				})
+			if err := action.Do(m.ctx, m.session); err != nil {
 				// Avoid logging as error when context is canceled.
 				// Most probably this happens when trying to fail a site's background request
 				// while the iteration is ending and therefore the browser context is being closed.
@@ -765,14 +839,13 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 		// See: https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#type-AuthChallengeResponse
 		username, password = m.credentials.Username, m.credentials.Password
 	}
-	err := fetch.ContinueWithAuth(
-		rid,
-		&fetch.AuthChallengeResponse{
+	err := newCommand(fetch.ContinueWithAuth,
+		fetch.ContinueWithAuthParams{RequestID: rid, AuthChallengeResponse: &fetch.AuthChallengeResponse{
 			Response: res,
 			Username: username,
 			Password: password,
-		},
-	).Do(cdp.WithExecutor(m.ctx, m.session))
+		}}).
+		Do(m.ctx, m.session)
 	if err != nil {
 		m.logger.Debugf("NetworkManager:onAuthRequired", "continueWithAuth url:%q err:%v", event.Request.URL, err)
 	} else {
@@ -846,8 +919,8 @@ func (m *NetworkManager) setRequestInterception(value bool) error {
 }
 
 func (m *NetworkManager) updateProtocolCacheDisabled() error {
-	action := network.SetCacheDisabled(m.userCacheDisabled)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	action := newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: m.userCacheDisabled})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		errAction := "enabling"
 		if m.userCacheDisabled {
 			errAction = "disabling"
@@ -868,24 +941,21 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 		"updating request interception to %t (session: %s)", enabled, m.session.ID())
 
 	actions := []Action{
-		network.SetCacheDisabled(true),
-		fetch.Enable().
-			WithHandleAuthRequests(true).
-			WithPatterns([]*fetch.RequestPattern{
+		newCommand(network.SetCacheDisabled, network.SetCacheDisabledParams{CacheDisabled: true}), newCommand(fetch.Enable,
+			fetch.EnableParams{HandleAuthRequests: new(true), Patterns: []*fetch.RequestPattern{
 				{
 					URLPattern:   "*",
 					RequestStage: fetch.RequestStageRequest,
 				},
-			}),
+			}}),
 	}
 	if !enabled {
-		actions = []Action{
-			network.SetCacheDisabled(false),
-			fetch.Disable(),
-		}
+		actions = []Action{newCommand(network.SetCacheDisabled,
+			network.SetCacheDisabledParams{CacheDisabled: false}), newCommand(fetch.Disable,
+			cdp.Empty{})}
 	}
 	for _, action := range actions {
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		if err := action.Do(m.ctx, m.session); err != nil {
 			return fmt.Errorf("internal error while updating protocol request interception %T: %w", action, err)
 		}
 	}
@@ -914,8 +984,8 @@ func (m *NetworkManager) AbortRequest(requestID fetch.RequestID, errorReason str
 		return fmt.Errorf("unknown error code: %s", errorReason)
 	}
 
-	action := fetch.FailRequest(requestID, netErrorReason)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	action := newCommand(fetch.FailRequest, fetch.FailRequestParams{RequestID: requestID, ErrorReason: netErrorReason})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
 		// while the iteration is ending and therefore the browser context is being closed.
@@ -935,23 +1005,22 @@ func (m *NetworkManager) ContinueRequest(
 	originalHeaders []HTTPHeader,
 ) error {
 	m.logger.Debugf("NetworkManager:ContinueRequest", "continuing request (id: %s)", requestID)
-	action := fetch.ContinueRequest(requestID)
+	action := newCommand(fetch.ContinueRequest, fetch.ContinueRequestParams{RequestID: requestID})
 
 	if len(opts.Headers) > 0 {
-		action = action.WithHeaders(toFetchHeaders(opts.Headers))
+		action.params.Headers = toFetchHeaders(opts.Headers)
 	}
 	if opts.URL != "" {
-		action = action.WithURL(opts.URL)
+		action.params.URL = opts.URL
 	}
 	if opts.Method != "" {
-		action = action.WithMethod(opts.Method)
+		action.params.Method = opts.Method
 	}
 	if len(opts.PostData) > 0 {
-		b64PostData := base64.StdEncoding.EncodeToString(opts.PostData)
-		action = action.WithPostData(b64PostData)
+		action.params.PostData = opts.PostData
 	}
 
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := action.Do(m.ctx, m.session); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
 		// while the iteration is ending and therefore the browser context is being closed.
@@ -982,7 +1051,8 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts FulfillOptions) e
 		responseCode = opts.Status
 	}
 
-	action := fetch.FulfillRequest(request.interceptionID, responseCode)
+	action := newCommand(fetch.FulfillRequest,
+		fetch.FulfillRequestParams{RequestID: request.interceptionID, ResponseCode: responseCode})
 
 	if opts.ContentType != "" {
 		opts.Headers = append(opts.Headers, HTTPHeader{
@@ -993,15 +1063,14 @@ func (m *NetworkManager) FulfillRequest(request *Request, opts FulfillOptions) e
 
 	headers := toFetchHeaders(opts.Headers)
 	if len(headers) > 0 {
-		action = action.WithResponseHeaders(headers)
+		action.params.ResponseHeaders = headers
 	}
 
 	if len(opts.Body) > 0 {
-		b64Body := base64.StdEncoding.EncodeToString(opts.Body)
-		action = action.WithBody(b64Body)
+		action.params.Body = opts.Body
 	}
 
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := action.Do(m.ctx, m.session); err != nil {
 		// Avoid logging as error when context is canceled.
 		// Most probably this happens when trying to fail a site's background request
 		// while the iteration is ending and therefore the browser context is being closed.
@@ -1034,11 +1103,44 @@ func toFetchHeaders(headers []HTTPHeader) []*fetch.HeaderEntry {
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
 func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) error {
-	err := network.
-		SetExtraHTTPHeaders(headers).
-		Do(cdp.WithExecutor(m.ctx, m.session))
+	err := newCommand(network.
+		SetExtraHTTPHeaders, network.SetExtraHTTPHeadersParams{Headers: headers}).
+		Do(m.ctx, m.session)
 	if err != nil {
 		return fmt.Errorf("setting extra HTTP headers: %w", err)
+	}
+
+	return nil
+}
+
+// emulateNetworkConditions applies the current offline/networkProfile state
+// to the browser. emulateNetworkConditionsByRule throttles actual traffic,
+// and overrideNetworkState updates the navigator.onLine/navigator.connection
+// state exposed to page JS.
+func (m *NetworkManager) emulateNetworkConditions() error {
+	// Empty URLPattern applies these as global conditions.
+	byRule := newCommand(network.EmulateNetworkConditionsByRule, network.EmulateNetworkConditionsByRuleParams{
+		MatchedNetworkConditions: []*network.Conditions{{
+			Offline:            m.offline,
+			Latency:            m.networkProfile.Latency,
+			DownloadThroughput: m.networkProfile.Download,
+			UploadThroughput:   m.networkProfile.Upload,
+		}},
+	})
+	_, err := byRule.Result(m.ctx, m.session)
+	if err != nil {
+		return fmt.Errorf("emulating network conditions by rule: %w", err)
+	}
+
+	override := newCommand(network.OverrideNetworkState, network.OverrideNetworkStateParams{
+		Offline:            m.offline,
+		Latency:            m.networkProfile.Latency,
+		DownloadThroughput: m.networkProfile.Download,
+		UploadThroughput:   m.networkProfile.Upload,
+	})
+
+	if err := override.Do(m.ctx, m.session); err != nil {
+		return fmt.Errorf("overriding network state: %w", err)
 	}
 
 	return nil
@@ -1051,13 +1153,7 @@ func (m *NetworkManager) SetOfflineMode(offline bool) error {
 	}
 	m.offline = offline
 
-	action := network.EmulateNetworkConditions(
-		m.offline,
-		m.networkProfile.Latency,
-		m.networkProfile.Download,
-		m.networkProfile.Upload,
-	)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := m.emulateNetworkConditions(); err != nil {
 		return fmt.Errorf("emulating network conditions: %w", err)
 	}
 
@@ -1072,13 +1168,7 @@ func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
 	}
 	m.networkProfile = networkProfile
 
-	action := network.EmulateNetworkConditions(
-		m.offline,
-		m.networkProfile.Latency,
-		m.networkProfile.Download,
-		m.networkProfile.Upload,
-	)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	if err := m.emulateNetworkConditions(); err != nil {
 		return fmt.Errorf("throttling network: %w", err)
 	}
 
@@ -1087,8 +1177,8 @@ func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
 
 // SetUserAgent overrides the browser user agent string.
 func (m *NetworkManager) SetUserAgent(userAgent string) {
-	action := emulation.SetUserAgentOverride(userAgent)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	action := newCommand(emulation.SetUserAgentOverride, emulation.SetUserAgentOverrideParams{UserAgent: userAgent})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		k6ext.Panicf(m.ctx, "setting user agent: %w", err)
 	}
 }

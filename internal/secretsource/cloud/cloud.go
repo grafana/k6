@@ -72,6 +72,22 @@ func (cs *SecretSource) Description() string {
 	return "Grafana Cloud k6 secret source"
 }
 
+// notConfiguredError explains why no secrets configuration is available. When a test run is
+// reused via the K6_CLOUD_PUSH_REF_ID env var, CreateTestRun is skipped (see #5814) so the
+// config can't come from its response and must instead be supplied via the K6_CLOUD_SECRETS_*
+// env vars; otherwise the generic 'k6 cloud run --local-execution' guidance applies (#6050).
+func (cs *SecretSource) notConfiguredError() error {
+	const prefix = "cloud secrets not configured: no secrets configuration available. "
+	if cs.params.Environment["K6_CLOUD_PUSH_REF_ID"] != "" {
+		return errors.New(prefix +
+			"When an existing test run is reused via K6_CLOUD_PUSH_REF_ID, set " +
+			"K6_CLOUD_SECRETS_TOKEN and K6_CLOUD_SECRETS_ENDPOINT to enable cloud secrets")
+	}
+	return errors.New(prefix +
+		"Make sure you're using 'k6 cloud run --local-execution' and the cloud API " +
+		"returned secrets configuration")
+}
+
 // ensureInitialized builds (or rebuilds) the URL source from configPtr.
 func (cs *SecretSource) ensureInitialized() (secretsource.Source, error) {
 	cs.mu.Lock()
@@ -90,9 +106,7 @@ func (cs *SecretSource) ensureInitialized() (secretsource.Source, error) {
 	cs.initErr = nil
 
 	if current == nil {
-		cs.initErr = errors.New("cloud secrets not configured: no secrets configuration available. " +
-			"Make sure you're using 'k6 cloud run --local-execution' and the cloud API " +
-			"returned secrets configuration")
+		cs.initErr = cs.notConfiguredError()
 		return nil, cs.initErr
 	}
 

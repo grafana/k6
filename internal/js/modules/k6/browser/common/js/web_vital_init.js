@@ -19,12 +19,12 @@ function print(metric) {
 }
 
 function load() {
-  webVitals.onCLS(print);
-  webVitals.onLCP(print);
+  webVitals.onCLS(print, {reportAllChanges: true});
+  webVitals.onLCP(print, {reportAllChanges: true});
 
-  webVitals.onFCP(print);
-  webVitals.onINP(print);
-  webVitals.onTTFB(print);
+  webVitals.onFCP(print, {reportAllChanges: true});
+  webVitals.onINP(print, {reportAllChanges: true});
+  webVitals.onTTFB(print, {reportAllChanges: true});
 }
 
 load();

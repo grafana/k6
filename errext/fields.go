@@ -28,8 +28,7 @@ func WithFields(err error, fields map[string]any) error {
 // FieldsFromErr returns structured log fields attached to err.
 func FieldsFromErr(err error) map[string]any {
 	fields := map[string]any{}
-	var ferr fieldsError
-	if errors.As(err, &ferr) {
+	if ferr, ok := errors.AsType[fieldsError](err); ok {
 		maps.Copy(fields, ferr.fields)
 	}
 	return fields

@@ -8,15 +8,17 @@ package browser
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
 	"github.com/grafana/sobek"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/chromium"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
-	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 
+	k6common "go.k6.io/k6/v2/js/common"
 	k6modules "go.k6.io/k6/v2/js/modules"
 )
 
@@ -41,6 +43,7 @@ type (
 	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
 		Browser         *sobek.Object
+		Chromium        *sobek.Object
 		Devices         map[string]common.Device
 		NetworkProfiles map[string]common.NetworkProfile `js:"networkProfiles"`
 	}
@@ -76,22 +79,25 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 		m.initialize(vu)
 	})
 
+	mvu := moduleVU{
+		VU:          vu,
+		pidRegistry: m.PidRegistry,
+		browserRegistry: newBrowserRegistry(
+			context.Background(),
+			vu,
+			m.remoteRegistry,
+			m.PidRegistry,
+			m.tracesMetadata,
+		),
+		taskQueueRegistry: newTaskQueueRegistry(vu),
+		filePersister:     m.filePersister,
+		testRunID:         m.testRunID,
+	}
+
 	return &ModuleInstance{
 		mod: &JSModule{
-			Browser: mapBrowserToSobek(moduleVU{
-				VU:          vu,
-				pidRegistry: m.PidRegistry,
-				browserRegistry: newBrowserRegistry(
-					context.Background(),
-					vu,
-					m.remoteRegistry,
-					m.PidRegistry,
-					m.tracesMetadata,
-				),
-				taskQueueRegistry: newTaskQueueRegistry(vu),
-				filePersister:     m.filePersister,
-				testRunID:         m.testRunID,
-			}),
+			Browser:         mapToSobek(mvu, mapBrowser(mvu, mvu.browser)),
+			Chromium:        mapToSobek(mvu, mapChromium(mvu, chromium.NewBrowserType(vu))),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),
 		},
@@ -113,15 +119,15 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	)
 	m.remoteRegistry, err = newRemoteRegistry(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abortf(vu.Context(), "failed to create remote registry: %v", err)
+		k6common.Throw(vu.Runtime(), fmt.Errorf("failed to create remote registry: %w", err))
 	}
 	m.tracesMetadata, err = parseTracesMetadata(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abortf(vu.Context(), "parsing browser traces metadata: %v", err)
+		k6common.Throw(vu.Runtime(), fmt.Errorf("parsing browser traces metadata: %w", err))
 	}
 	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv)
 	if err != nil {
-		k6ext.Abortf(vu.Context(), "failed to create file persister: %v", err)
+		k6common.Throw(vu.Runtime(), fmt.Errorf("failed to create file persister: %w", err))
 	}
 	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
 		m.testRunID = e

@@ -9,7 +9,6 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 
-	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 )
 
@@ -87,6 +86,19 @@ func (h *BaseJSHandle) AsElement() *ElementHandle {
 	return nil
 }
 
+// Page returns the page that owns this handle, or nil when the handle is not
+// associated with a frame (e.g. a worker or isolated-world execution context).
+func (h *BaseJSHandle) Page() *Page {
+	if h == nil || h.execCtx == nil {
+		return nil
+	}
+	frame := h.execCtx.Frame()
+	if frame == nil {
+		return nil
+	}
+	return frame.Page()
+}
+
 // Dispose releases the remote object.
 func (h *BaseJSHandle) Dispose() error {
 	err := h.dispose()
@@ -123,8 +135,8 @@ func (h *BaseJSHandle) dispose() error {
 	if h.remoteObject.ObjectID == "" {
 		return nil
 	}
-	act := runtime.ReleaseObject(h.remoteObject.ObjectID)
-	if err := act.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	act := newCommand(runtime.ReleaseObject, runtime.ReleaseObjectParams{ObjectID: h.remoteObject.ObjectID})
+	if err := act.Do(h.ctx, h.session); err != nil {
 		return fmt.Errorf("disposing element with ID %s: %w",
 			h.remoteObject.ObjectID, err)
 	}
@@ -171,8 +183,11 @@ func (h *BaseJSHandle) GetProperties() (map[string]JSHandleAPI, error) {
 
 // getProperties is like GetProperties, but does not panic.
 func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
-	act := runtime.GetProperties(h.remoteObject.ObjectID).WithOwnProperties(true)
-	result, _, _, _, err := act.Do(cdp.WithExecutor(h.ctx, h.session)) //nolint:dogsled
+	act := newCommand(runtime.GetProperties,
+		runtime.GetPropertiesParams{ObjectID: h.remoteObject.ObjectID, OwnProperties: new(true)})
+	commandResult, err := act.Result(h.ctx, h.session)
+	result := commandResult.Result
+
 	if err != nil {
 		return nil, fmt.Errorf("getting properties for element with ID %s: %w",
 			h.remoteObject.ObjectID, err)
@@ -194,11 +209,15 @@ func (h *BaseJSHandle) JSONValue() (string, error) {
 	remoteObject := h.remoteObject
 	if remoteObject.ObjectID != "" {
 		var err error
-		action := runtime.CallFunctionOn("function() { return this; }").
-			WithReturnByValue(true).
-			WithAwaitPromise(true).
-			WithObjectID(h.remoteObject.ObjectID)
-		if remoteObject, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+		action := newCommand(runtime.CallFunctionOn, runtime.CallFunctionOnParams{
+			FunctionDeclaration: "function() { return this; }",
+			ReturnByValue:       new(true),
+			AwaitPromise:        new(true),
+			ObjectID:            h.remoteObject.ObjectID,
+		})
+		result, err := action.Result(h.ctx, h.session)
+		remoteObject = result.Result
+		if err != nil {
 			return "", fmt.Errorf("retrieving json value: %w", err)
 		}
 	}

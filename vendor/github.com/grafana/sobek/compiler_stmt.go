@@ -68,7 +68,7 @@ func (c *compiler) compileLabeledStatement(v *ast.LabelledStatement, needResult 
 	}
 	for b := c.block; b != nil; b = b.outer {
 		if b.label == label {
-			c.throwSyntaxError(int(v.Label.Idx-1), "Label '%s' has already been declared", label)
+			c.throwSyntaxErrorf(int(v.Label.Idx-1), "Label '%s' has already been declared", label)
 		}
 	}
 	switch s := v.Statement.(type) {
@@ -154,7 +154,12 @@ func (c *compiler) compileTryStatement(v *ast.TryStatement, needResult bool) {
 						c.throwSyntaxError(offset, "Catch variable may not be eval or arguments in strict mode")
 					}
 				}
-				c.scope.bindNameLexical(name, true, offset)
+				b, _ := c.scope.bindNameLexical(name, true, offset)
+				if _, ok := v.Catch.Parameter.(*ast.Identifier); ok {
+					// A simple catch parameter may be redeclared with var in the catch block,
+					// including by a direct eval() (B.3.4).
+					b.isVar = true
+				}
 			})
 			enter := &enterBlock{}
 			c.emit(enter)
@@ -328,7 +333,7 @@ func (c *compiler) compileLabeledForStatement(v *ast.ForStatement, needResult bo
 		c.compileExpression(v.Update).emitGetter(false)
 	}
 	if enterIterBlock != nil {
-		if c.scope.needStash || c.scope.isDynamic() {
+		if c.scope.hasStash() {
 			c.p.code[start-1] = copyStash{}
 			c.p.code[loopBlock.cont] = copyStash{}
 		} else {
@@ -362,9 +367,6 @@ func (c *compiler) compileForInto(into ast.ForInto, needResult bool) (enter *ent
 	case *ast.ForIntoExpression:
 		c.compileExpression(into.Expression).emitSetter(&c.enumGetExpr, false)
 	case *ast.ForIntoVar:
-		if c.scope.strict && into.Binding.Initializer != nil {
-			c.throwSyntaxError(int(into.Binding.Initializer.Idx0())-1, "for-in loop variable declaration may not have an initializer.")
-		}
 		switch target := into.Binding.Target.(type) {
 		case *ast.Identifier:
 			c.compileIdentifierExpression(target).emitSetter(&c.enumGetExpr, false)
@@ -372,7 +374,7 @@ func (c *compiler) compileForInto(into ast.ForInto, needResult bool) (enter *ent
 			c.emit(enumGet)
 			c.emitPattern(target, c.emitPatternVarAssign, false)
 		default:
-			c.throwSyntaxError(int(target.Idx0()-1), "unsupported for-in var target: %T", target)
+			c.throwSyntaxErrorf(int(target.Idx0()-1), "unsupported for-in var target: %T", target)
 		}
 	case *ast.ForDeclaration:
 
@@ -407,12 +409,13 @@ func (c *compiler) compileForInto(into ast.ForInto, needResult bool) (enter *ent
 	return
 }
 
-func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.Expression, body ast.Statement, iter, needResult bool, label unistring.String) {
+func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.Expression, body ast.Statement, iter, async, needResult bool, label unistring.String) {
 	c.block = &block{
 		typ:        blockLoopEnum,
 		outer:      c.block,
 		label:      label,
 		needResult: needResult,
+		async:      async,
 	}
 	enterPos := -1
 	if forDecl, ok := into.(*ast.ForDeclaration); ok {
@@ -452,7 +455,9 @@ func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.E
 		}
 		c.popScope()
 	}
-	if iter {
+	if async {
+		c.emit(iterateAsyncP)
+	} else if iter {
 		c.emit(iterateP)
 	} else {
 		c.emit(enumerate)
@@ -462,7 +467,20 @@ func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.E
 	}
 	start := len(c.p.code)
 	c.block.cont = start
+	if async {
+		c.emit(asyncIterNext)
+	}
+	next := len(c.p.code)
 	c.emit(nil)
+	tryPos := len(c.p.code)
+	if async {
+		// exceptions thrown by the binding or the body close the iterator
+		c.block = &block{
+			typ:   blockTry,
+			outer: c.block,
+		}
+		c.emit(nil)
+	}
 	enterIterBlock := c.compileForInto(into, needResult)
 	if needResult {
 		c.emit(clearResult)
@@ -472,19 +490,46 @@ func (c *compiler) compileLabeledForInOfStatement(into ast.ForInto, source ast.E
 		c.leaveScopeBlock(enterIterBlock)
 		c.popScope()
 	}
-	c.emit(jump(start - len(c.p.code)))
-	if iter {
-		c.p.code[start] = iterNext(len(c.p.code) - start)
-	} else {
-		c.p.code[start] = enumNext(len(c.p.code) - start)
+	if async {
+		c.emit(leaveTry{})
+		c.block = c.block.outer
 	}
-	c.emit(enumPop, jump(2))
+	c.emit(jump(start - len(c.p.code)))
+	if async {
+		c.p.code[tryPos] = try{catchOffset: int32(len(c.p.code) - tryPos)}
+		// catch: close the iterator, ignoring any errors, then rethrow the original exception
+		c.emit(try{catchOffset: 5}, asyncIterClose(2), pop, leaveTry{}, jump(2), pop, enumPop, throw)
+		c.p.code[next] = asyncIterStep(len(c.p.code) - next)
+	} else if iter {
+		c.p.code[next] = iterNext(len(c.p.code) - next)
+	} else {
+		c.p.code[next] = enumNext(len(c.p.code) - next)
+	}
+	c.emit(enumPop)
+	end := len(c.p.code)
+	c.emit(nil)
 	c.leaveBlock()
-	c.emit(enumPopClose)
+	c.emitIterClose(async)
+	c.p.code[end] = jump(len(c.p.code) - end)
+}
+
+func (c *compiler) emitIterClose(async bool) {
+	if async {
+		c.emit(asyncIterClose(2), checkObjectP, enumPop)
+	} else {
+		c.emit(enumPopClose)
+	}
 }
 
 func (c *compiler) compileLabeledForInStatement(v *ast.ForInStatement, needResult bool, label unistring.String) {
-	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, false, needResult, label)
+	if into, ok := v.Into.(*ast.ForIntoVar); ok && into.Binding.Initializer != nil {
+		// B.3.5 Initializers in ForIn Statement Heads
+		if c.scope.strict {
+			c.throwSyntaxError(int(into.Binding.Initializer.Idx0())-1, "for-in loop variable declaration may not have an initializer.")
+		}
+		c.compileVarBinding(into.Binding)
+	}
+	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, false, false, needResult, label)
 }
 
 func (c *compiler) compileForOfStatement(v *ast.ForOfStatement, needResult bool) {
@@ -492,7 +537,7 @@ func (c *compiler) compileForOfStatement(v *ast.ForOfStatement, needResult bool)
 }
 
 func (c *compiler) compileLabeledForOfStatement(v *ast.ForOfStatement, needResult bool, label unistring.String) {
-	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, true, needResult, label)
+	c.compileLabeledForInOfStatement(v.Into, v.Source, v.Body, true, v.Await, needResult, label)
 }
 
 func (c *compiler) compileWhileStatement(v *ast.WhileStatement, needResult bool) {
@@ -590,7 +635,7 @@ func (c *compiler) findBreakBlock(label *ast.Identifier, isBreak bool) (res *blo
 			}
 		}
 		if !isBreak && found != nil && found.typ != blockLoop && found.typ != blockLoopEnum {
-			c.throwSyntaxError(int(label.Idx)-1, "Illegal continue statement: '%s' does not denote an iteration statement", label.Name)
+			c.throwSyntaxErrorf(int(label.Idx)-1, "Illegal continue statement: '%s' does not denote an iteration statement", label.Name)
 		}
 		if res == nil {
 			res = found
@@ -643,7 +688,7 @@ L:
 		case blockWith:
 			c.emit(leaveWith)
 		case blockLoopEnum:
-			c.emit(enumPopClose)
+			c.emitIterClose(b.async)
 		}
 	}
 	return block
@@ -744,7 +789,7 @@ func (c *compiler) compileReturnStatement(v *ast.ReturnStatement) {
 		case blockTry:
 			c.emit(saveResult, leaveTry{}, loadResult)
 		case blockLoopEnum:
-			c.emit(enumPopClose)
+			c.emitIterClose(b.async)
 		}
 	}
 	if s := c.scope.nearestFunction(); s != nil && s.funcType == funcDerivedCtor {
@@ -758,7 +803,7 @@ func (c *compiler) compileReturnStatement(v *ast.ReturnStatement) {
 func (c *compiler) checkVarConflict(name unistring.String, offset int) {
 	for sc := c.scope; sc != nil; sc = sc.outer {
 		if b, exists := sc.boundNames[name]; exists && !b.isVar && !(b.isArg && sc != c.scope) {
-			c.throwSyntaxError(offset, "Identifier '%s' has already been declared", name)
+			c.throwSyntaxErrorf(offset, "Identifier '%s' has already been declared", name)
 		}
 		if sc.isFunction() {
 			break
@@ -839,7 +884,7 @@ func (c *compiler) compileExportDeclaration(expr *ast.ExportDeclaration) {
 			}
 			localB, _ := c.scope.lookupName(n)
 			if localB == nil {
-				c.throwSyntaxError(int(expr.Idx0()), "couldn't lookup  %s", n)
+				c.throwSyntaxErrorf(int(expr.Idx0()), "couldn't lookup  %s", n)
 			}
 			identifier := name.IdentifierName.String()
 			localB.getIndirect = func(vm *vm) Value {
@@ -898,7 +943,7 @@ func (c *compiler) compileImportDeclaration(expr *ast.ImportDeclaration) {
 				c.checkIdentifierLName(n, int(expr.Idx))
 				localB, _ := c.scope.lookupName(n)
 				if localB == nil {
-					c.throwSyntaxError(int(expr.Idx0()), "couldn't lookup  %s", n)
+					c.throwSyntaxErrorf(int(expr.Idx0()), "couldn't lookup  %s", n)
 				}
 				identifier := unistring.NewFromString(value.BindingName).String()
 				localB.getIndirect = func(vm *vm) Value {
@@ -920,7 +965,7 @@ func (c *compiler) compileImportDeclaration(expr *ast.ImportDeclaration) {
 
 			localB, _ := c.scope.lookupName(def.Name)
 			if localB == nil {
-				c.throwSyntaxError(int(expr.Idx0()), "couldn't lookup  %s", def.Name)
+				c.throwSyntaxErrorf(int(expr.Idx0()), "couldn't lookup  %s", def.Name)
 			}
 			if value.BindingName == "*namespace*" {
 				idx := expr.Idx
@@ -955,7 +1000,7 @@ func (c *compiler) compileVarBinding(expr *ast.Binding) {
 		c.compileExpression(expr.Initializer).emitGetter(true)
 		c.emitPattern(target, c.emitPatternVarAssign, false)
 	default:
-		c.throwSyntaxError(int(target.Idx0()-1), "unsupported variable binding target: %T", target)
+		c.throwSyntaxErrorf(int(target.Idx0()-1), "unsupported variable binding target: %T", target)
 	}
 }
 
@@ -988,6 +1033,9 @@ func (c *compiler) emitPatternAssign(target, init compiledExpr) {
 	if id, ok := target.(*compiledIdentifierExpr); ok {
 		b, noDyn := c.scope.lookupName(id.name)
 		if noDyn {
+			if c.scope.strict {
+				c.checkIdentifierLName(id.name, id.offset)
+			}
 			c.emitNamedOrConst(init, id.name)
 			b.emitSetP()
 		} else {
@@ -1012,7 +1060,7 @@ func (c *compiler) compileLexicalBinding(expr *ast.Binding) {
 			c.emitPatternLexicalAssign(target, init)
 		}, false)
 	default:
-		c.throwSyntaxError(int(target.Idx0()-1), "unsupported lexical binding target: %T", target)
+		c.throwSyntaxErrorf(int(target.Idx0()-1), "unsupported lexical binding target: %T", target)
 	}
 }
 
@@ -1065,10 +1113,27 @@ func (c *compiler) scanStatements(list []ast.Statement) (lastProducingIdx int, b
 	return
 }
 
+// isHoistedFunctionDecl returns true if st is a function declaration in a statement list, which is hoisted and
+// compiled by compileFunctions(). In non-strict code this includes labelled function declarations (B.3.1).
+// Other labelled declarations are compiled as statements, which results in a SyntaxError.
+func (c *compiler) isHoistedFunctionDecl(st ast.Statement) bool {
+	switch st := st.(type) {
+	case *ast.FunctionDeclaration:
+		return true
+	case *ast.LabelledStatement:
+		if !c.scope.strict {
+			if decl, ok := c.extractLabelled(st).(*ast.FunctionDeclaration); ok {
+				return !decl.Function.Async && !decl.Function.Generator
+			}
+		}
+	}
+	return false
+}
+
 func (c *compiler) compileStatementsNeedResult(list []ast.Statement, lastProducingIdx int) {
 	if lastProducingIdx >= 0 {
 		for _, st := range list[:lastProducingIdx] {
-			if _, ok := st.(*ast.FunctionDeclaration); ok {
+			if c.isHoistedFunctionDecl(st) {
 				continue
 			}
 			c.compileStatement(st, false)
@@ -1082,7 +1147,7 @@ func (c *compiler) compileStatementsNeedResult(list []ast.Statement, lastProduci
 		}
 	}()
 	for _, st := range list[lastProducingIdx+1:] {
-		if _, ok := st.(*ast.FunctionDeclaration); ok {
+		if c.isHoistedFunctionDecl(st) {
 			continue
 		}
 		c.compileStatement(st, false)
@@ -1104,7 +1169,7 @@ func (c *compiler) compileStatements(list []ast.Statement, needResult bool) {
 		return
 	}
 	for _, st := range list {
-		if _, ok := st.(*ast.FunctionDeclaration); ok {
+		if c.isHoistedFunctionDecl(st) {
 			continue
 		}
 		c.compileStatement(st, false)

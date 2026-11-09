@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
+	sobekencoding "github.com/grafana/sobek-webapi-encoding"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/errext"
@@ -245,7 +246,7 @@ func beautifyOptionsJSONUnmarshalError(data []byte, err error) error {
 	if errors.As(err, &unmarshalTypError) {
 		e := unmarshalTypError
 		previousNewLineIndex := max(bytes.LastIndexByte(data[:e.Offset], '\n'), 0)
-		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), (int)(e.Offset))
+		nextNewLineIndex := max(min(bytes.IndexByte(data[e.Offset:], '\n'), len(data)-1), int(e.Offset))
 
 		info := strings.TrimSpace(string(data[previousNewLineIndex:nextNewLineIndex]))
 		err = fmt.Errorf("parsing options from script got error while parsing %q: %w", info, e)
@@ -264,6 +265,9 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 			global: b.preInitState.Events,
 			local:  event.NewEventSystem(100, b.preInitState.Logger),
 		},
+	}
+	if b.preInitState.FeatureFlags != nil && b.preInitState.FeatureFlags.AsyncMetricContext {
+		vuImpl.runtime.SetAsyncContextTracker(common.NewMetricContextTracker(vuImpl.State))
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	bi, err := b.instantiate(vuImpl, vuID)
@@ -373,8 +377,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	}
 
 	if err != nil {
-		var exception *sobek.Exception
-		if errors.As(err, &exception) {
+		if exception, ok := errors.AsType[*sobek.Exception](err); ok {
 			err = &scriptExceptionError{inner: exception}
 		}
 		return nil, err
@@ -392,26 +395,30 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 }
 
 // registerGlobals registers the globals for the runtime.
-// e.g. timers and webcrypto.
+// e.g. timers, webcrypto, and encoding.
 func registerGlobals(vuImpl *moduleVUImpl) error {
 	err := timers.SetupGlobally(vuImpl)
 	if err != nil {
 		return err
 	}
 
-	return webcrypto.SetupGlobally(vuImpl)
+	err = webcrypto.SetupGlobally(vuImpl)
+	if err != nil {
+		return err
+	}
+
+	return sobekencoding.RegisterGlobally(vuImpl.runtime)
 }
 
 func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.FieldLogger) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
-	maps.Copy(env, b.preInitState.RuntimeOptions.Env)
-	err := rt.Set("__ENV", env)
-	if err != nil {
+	if err := setupEnvObject(rt, b.preInitState.RuntimeOptions.Env, b.preInitState.FeatureFlags); err != nil {
 		return err
 	}
+
+	var err error
 	err = rt.Set("__VU", vuID)
 	if err != nil {
 		return err

@@ -1,20 +1,28 @@
 package sobek
 
 import (
+	"bytes"
 	"errors"
 	"hash/maphash"
 	"io"
-	"math"
+	"math/big"
 	"reflect"
+	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
+	"unsafe"
 
-	"github.com/grafana/sobek/parser"
 	"github.com/grafana/sobek/unistring"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
+	"golang.org/x/text/unicode/rangetable"
 )
+
+const utf16IndexNaiveCrossover = 32
 
 type unicodeString []uint16
 
@@ -52,6 +60,24 @@ type unicodeStringBuilder struct {
 var (
 	InvalidRuneError = errors.New("invalid rune")
 )
+
+var caseIgnorable = rangetable.Merge(
+	unicode.Mn, unicode.Me, unicode.Cf, unicode.Lm, unicode.Sk,
+	// Go's unicode package doesn't expose Word_Break
+	rangetable.New(
+		0x0027, 0x002E, 0x003A, 0x00B7, 0x0387, 0x055F, 0x05F4,
+		0x2018, 0x2019, 0x2024, 0x2027, 0xFE13, 0xFE52, 0xFE55,
+		0xFF07, 0xFF0E, 0xFF1A,
+	),
+)
+
+var cased = rangetable.Merge(
+	unicode.Lu, unicode.Ll, unicode.Lt,
+	unicode.Other_Lowercase, unicode.Other_Uppercase,
+)
+
+func isCaseIgnorable(r rune) bool { return unicode.Is(caseIgnorable, r) }
+func isCased(r rune) bool         { return unicode.Is(cased, r) }
 
 func (rr *utf16RuneReader) readChar() (c uint16, err error) {
 	if rr.pos < len(rr.s) {
@@ -136,11 +162,17 @@ func (rr *unicodeRuneReader) ReadRune() (r rune, size int, err error) {
 }
 
 func (b *unicodeStringBuilder) Grow(n int) {
+	if n < 0 {
+		panic(rangeError("Invalid string length"))
+	}
 	if len(b.buf) == 0 {
-		n++
+		// Reserve room for the BOM. With n == math.MaxInt the increment
+		// wraps around to a negative length.
+		n = toStringLen(n + 1)
 	}
 	if cap(b.buf)-len(b.buf) < n {
-		buf := make([]uint16, len(b.buf), 2*cap(b.buf)+n)
+		newCap := safeMul(2, cap(b.buf)) + n
+		buf := make([]uint16, len(b.buf), newCap)
 		copy(buf, b.buf)
 		b.buf = buf
 	}
@@ -280,7 +312,7 @@ func (b *StringBuilder) String() String {
 
 func (b *StringBuilder) Grow(n int) {
 	if b.ascii() {
-		b.asciiBuilder.Grow(n)
+		b.asciiBuilder.Grow(toStringLen(n))
 	} else {
 		b.unicodeBuilder.Grow(n)
 	}
@@ -367,7 +399,7 @@ func (s unicodeString) utf16Runes() []rune {
 }
 
 func (s unicodeString) ToInteger() int64 {
-	return 0
+	return trimmedToInteger(s.toTrimmedUTF8())
 }
 
 func (s unicodeString) toString() String {
@@ -379,7 +411,7 @@ func (s unicodeString) ToString() Value {
 }
 
 func (s unicodeString) ToFloat() float64 {
-	return math.NaN()
+	return trimmedToFloat(s.toTrimmedUTF8())
 }
 
 func (s unicodeString) ToBoolean() bool {
@@ -390,7 +422,7 @@ func (s unicodeString) toTrimmedUTF8() string {
 	if len(s) == 0 {
 		return ""
 	}
-	return strings.Trim(s.String(), parser.WhitespaceChars)
+	return strings.Trim(s.String(), WhitespaceChars)
 }
 
 func (s unicodeString) ToNumber() Value {
@@ -422,6 +454,36 @@ func (s unicodeString) Equals(other Value) bool {
 		return true
 	}
 
+	if o, ok := other.(valueInt); ok {
+		ss := s.toTrimmedUTF8()
+		if o1, e := stringToInt(ss); e == nil {
+			return o1 == int64(o)
+		}
+		if f, e := stringToFloat(ss); e == nil {
+			return f == float64(o)
+		}
+		return false
+	}
+
+	if o, ok := other.(valueFloat); ok {
+		return s.ToFloat() == float64(o)
+	}
+
+	if o, ok := other.(valueBool); ok {
+		if o1, e := stringToFloat(s.toTrimmedUTF8()); e == nil {
+			return o1 == o.ToFloat()
+		}
+		return false
+	}
+
+	if o, ok := other.(*valueBigInt); ok {
+		bigInt, err := stringToBigInt(s.toTrimmedUTF8())
+		if err != nil {
+			return false
+		}
+		return bigInt.Cmp((*big.Int)(o)) == 0
+	}
+
 	if o, ok := other.(*Object); ok {
 		return s.Equals(o.toPrimitive())
 	}
@@ -429,14 +491,16 @@ func (s unicodeString) Equals(other Value) bool {
 }
 
 func (s unicodeString) StrictEquals(other Value) bool {
-	if otherStr, ok := other.(unicodeString); ok {
-		return s.equals(otherStr)
-	}
-	if otherStr, ok := other.(*importedString); ok {
-		otherStr.ensureScanned()
-		if otherStr.u != nil {
-			return s.equals(otherStr.u)
+	switch o := other.(type) {
+	case unicodeString:
+		return s.equals(o)
+	case *importedString:
+		o.ensureScanned()
+		if o.u != nil {
+			return s.equals(o.u)
 		}
+	case *concatString:
+		return s.StrictEquals(o.flatten())
 	}
 
 	return false
@@ -457,21 +521,76 @@ func (s unicodeString) Length() int {
 	return len(s) - 1
 }
 
+// loneSurrogateIndex returns the index of the first code unit in s that is not part of a valid surrogate pair,
+// or -1 if s is a well-formed UTF-16 string.
+func (s unicodeString) loneSurrogateIndex() int {
+	for i := 1; i < len(s); i++ {
+		c := s[i]
+		if isUTF16FirstSurrogate(c) {
+			if i+1 < len(s) && isUTF16SecondSurrogate(s[i+1]) {
+				i++
+				continue
+			}
+			return i - 1
+		}
+		if isUTF16SecondSurrogate(c) {
+			return i - 1
+		}
+	}
+	return -1
+}
+
 func (s unicodeString) Concat(other String) String {
-	a, u := devirtualizeString(other)
-	if u != nil {
-		b := make(unicodeString, len(s)+len(u)-1)
+	switch o := other.(type) {
+	case asciiString:
+		totalLen := s.Length() + len(o)
+		if totalLen > concatThreshold {
+			return &concatString{left: s, right: o, length: totalLen}
+		}
+		b := make([]uint16, len(s)+len(o))
 		copy(b, s)
-		copy(b[len(s):], u[1:])
+		b1 := b[len(s):]
+		for i := 0; i < len(o); i++ {
+			b1[i] = uint16(o[i])
+		}
+		return unicodeString(b)
+	case unicodeString:
+		totalLen := s.Length() + o.Length()
+		if totalLen > concatThreshold {
+			return &concatString{left: s, right: o, length: totalLen}
+		}
+		b := make(unicodeString, len(s)+len(o)-1)
+		copy(b, s)
+		copy(b[len(s):], o[1:])
 		return b
+	case *importedString:
+		o.ensureScanned()
+		if o.u != nil {
+			totalLen := s.Length() + o.u.Length()
+			if totalLen > concatThreshold {
+				return &concatString{left: s, right: o.u, length: totalLen}
+			}
+			b := make(unicodeString, len(s)+len(o.u)-1)
+			copy(b, s)
+			copy(b[len(s):], o.u[1:])
+			return b
+		}
+		totalLen := s.Length() + len(o.s)
+		if totalLen > concatThreshold {
+			return &concatString{left: s, right: asciiString(o.s), length: totalLen}
+		}
+		b := make([]uint16, len(s)+len(o.s))
+		copy(b, s)
+		b1 := b[len(s):]
+		for i := 0; i < len(o.s); i++ {
+			b1[i] = uint16(o.s[i])
+		}
+		return unicodeString(b)
+	case *concatString:
+		return &concatString{left: s, right: o, length: s.Length() + o.length}
+	default:
+		panic(unknownStringTypeErr(other))
 	}
-	b := make([]uint16, len(s)+len(a))
-	copy(b, s)
-	b1 := b[len(s):]
-	for i := 0; i < len(a); i++ {
-		b1[i] = uint16(a[i])
-	}
-	return unicodeString(b)
 }
 
 func (s unicodeString) Substring(start, end int) String {
@@ -495,35 +614,177 @@ func (s unicodeString) String() string {
 	return string(utf16.Decode(s[1:]))
 }
 
+func (s unicodeString) compareToAscii(s2 asciiString) int {
+	s1 := s[1:]
+	for i := range s1 {
+		if i >= len(s2) {
+			return 1
+		}
+		c1 := s1[i]
+		c2 := uint16(s2[i])
+		if c1 < c2 {
+			return -1
+		}
+		if c1 > c2 {
+			return 1
+		}
+	}
+	// This condition will never be true as long as unicodeString contains at least one
+	// Unicode character, but is left here for completeness.
+	if len(s2) > len(s1) {
+		return -1
+	}
+	return 0
+}
+
 func (s unicodeString) CompareTo(other String) int {
-	// TODO handle invalid UTF-16
-	return strings.Compare(s.String(), other.String())
+	oa, ou := devirtualizeString(other)
+	if ou != nil {
+		return slices.Compare(s[1:], ou[1:])
+	}
+	return s.compareToAscii(oa)
+}
+
+func utf16Index(s, substr []uint16) int {
+	if len(s) < utf16IndexNaiveCrossover {
+		return utf16IndexNaive(s, substr)
+	}
+	return utf16IndexBytes(s, substr)
+}
+
+func utf16IndexNaive(s, sep []uint16) int {
+	n := len(sep)
+	if n == 0 {
+		return 0
+	}
+	if n > len(s) {
+		return -1
+	}
+	for i := 0; i+n <= len(s); i++ {
+		if s[i] == sep[0] {
+			match := true
+			for j := 1; j < n; j++ {
+				if s[i+j] != sep[j] {
+					match = false
+					break
+				}
+			}
+			if match {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func uint16AsBytes(s []uint16) []byte {
+	if len(s) == 0 {
+		return nil
+	}
+	return unsafe.Slice((*byte)(unsafe.Pointer(&s[0])), len(s)*2)
+}
+
+func utf16IndexBytes(s, sep []uint16) int {
+	if len(sep) == 0 {
+		return 0
+	}
+	if len(sep) > len(s) {
+		return -1
+	}
+
+	sb := uint16AsBytes(s)
+	sepb := uint16AsBytes(sep)
+
+	offset := 0
+	for {
+		i := bytes.Index(sb[offset:], sepb)
+		if i < 0 {
+			return -1
+		}
+		pos := offset + i
+		if pos%2 == 0 {
+			return pos / 2
+		}
+		// False match, not aligned, continue
+		offset = pos + 1
+	}
 }
 
 func (s unicodeString) index(substr String, start int) int {
+	if start > s.Length() {
+		return -1
+	}
 	var ss []uint16
 	a, u := devirtualizeString(substr)
 	if u != nil {
 		ss = u[1:]
 	} else {
-		ss = make([]uint16, len(a))
-		for i := 0; i < len(a); i++ {
-			ss[i] = uint16(a[i])
-		}
+		ss = a.utf16()
 	}
-	s1 := s[1:]
-	// TODO: optimise
-	end := len(s1) - len(ss)
-	for start <= end {
-		for i := 0; i < len(ss); i++ {
-			if s1[start+i] != ss[i] {
-				goto nomatch
+	idx := utf16Index(s[1+start:], ss)
+	if idx != -1 {
+		return idx + start
+	}
+	return -1
+}
+
+func utf16LastIndex(s, sep []uint16) int {
+	if len(s) < utf16IndexNaiveCrossover {
+		return utf16LastIndexNaive(s, sep)
+	}
+	return utf16LastIndexBytes(s, sep)
+}
+
+func utf16LastIndexNaive(s, sep []uint16) int {
+	n := len(sep)
+	if n == 0 {
+		return len(s)
+	}
+	if n > len(s) {
+		return -1
+	}
+	for i := len(s) - n; i >= 0; i-- {
+		if s[i] == sep[0] {
+			match := true
+			for j := 1; j < n; j++ {
+				if s[i+j] != sep[j] {
+					match = false
+					break
+				}
+			}
+			if match {
+				return i
 			}
 		}
+	}
+	return -1
+}
 
-		return start
-	nomatch:
-		start++
+func utf16LastIndexBytes(s, sep []uint16) int {
+	if len(sep) == 0 {
+		return len(s)
+	}
+	if len(sep) > len(s) {
+		return -1
+	}
+
+	sb := uint16AsBytes(s)
+	sepb := uint16AsBytes(sep)
+
+	end := len(sb)
+	for end >= len(sepb) {
+		i := bytes.LastIndex(sb[:end], sepb)
+		if i < 0 {
+			return -1
+		}
+		if i%2 == 0 {
+			return i / 2
+		}
+		// False match starting at odd byte offset i. Shrink the window so
+		// the next search can still find a match starting at i-1 (i.e.
+		// end must be >= (i-1)+len(sepb)) while excluding this same match
+		// (end must be < i+len(sepb)). end = i+len(sepb)-1 satisfies both.
+		end = i + len(sepb) - 1
 	}
 	return -1
 }
@@ -534,65 +795,144 @@ func (s unicodeString) lastIndex(substr String, start int) int {
 	if u != nil {
 		ss = u[1:]
 	} else {
-		ss = make([]uint16, len(a))
-		for i := 0; i < len(a); i++ {
-			ss[i] = uint16(a[i])
-		}
+		ss = a.utf16()
 	}
-
-	s1 := s[1:]
-	if maxStart := len(s1) - len(ss); start > maxStart {
-		start = maxStart
-	}
-	// TODO: optimise
-	for start >= 0 {
-		for i := 0; i < len(ss); i++ {
-			if s1[start+i] != ss[i] {
-				goto nomatch
-			}
-		}
-
-		return start
-	nomatch:
-		start--
-	}
-	return -1
+	return utf16LastIndex(s[1:min(start+1+len(ss), len(s))], ss)
 }
 
 func unicodeStringFromRunes(r []rune) unicodeString {
 	return unistring.NewFromRunes(r).AsUtf16()
 }
 
-func toLower(s string) String {
+func caserTransform(caser cases.Caser, s string) string {
+	if s == "" {
+		return s
+	}
+	dst := make([]byte, len(s))
+	src := unsafe.Slice(unsafe.StringData(s), len(s))
+
+	for {
+		nDst, _, err := caser.Transform(dst, src, true)
+		if errors.Is(err, transform.ErrShortDst) {
+			// Replicating the grow() logic from the text package
+			m := len(dst)
+			if m <= 32 {
+				m = 64
+			} else if m <= 256 {
+				m *= 2
+			} else {
+				m += m >> 1
+			}
+			dst = make([]byte, m)
+			caser.Reset()
+			continue
+		}
+		if nDst == 0 {
+			return ""
+		}
+		return unsafe.String(&dst[0], nDst)
+	}
+}
+
+// isFinalSigma reports whether the Σ at byte offset i in s is final.
+// Ignorability is tested BEFORE casedness, as per ECMAScript rules.
+func isFinalSigma(s string, i int) bool {
+	// Backward: skip ignorables, next rune must be cased.
+	before := false
+	for j := i; j > 0; {
+		r, n := utf8.DecodeLastRuneInString(s[:j])
+		j -= n
+		if isCaseIgnorable(r) {
+			continue
+		}
+		before = isCased(r)
+		break
+	}
+	if !before {
+		return false
+	}
+	// Forward: skip ignorables, next rune must NOT be cased.
+	for j := i + len("Σ"); j < len(s); {
+		r, n := utf8.DecodeRuneInString(s[j:])
+		j += n
+		if isCaseIgnorable(r) {
+			continue
+		}
+		return !isCased(r)
+	}
+	return true
+}
+
+func toLower(s string, sb *StringBuilder) {
 	caser := cases.Lower(language.Und)
-	r := []rune(caser.String(s))
-	// Workaround
-	ascii := true
-	for i := 0; i < len(r)-1; i++ {
-		if (i == 0 || r[i-1] != 0x3b1) && r[i] == 0x345 && r[i+1] == 0x3c2 {
-			i++
-			r[i] = 0x3c3
+
+	// Workaround for the final sigma rule
+	start := 0
+	for {
+		k := strings.IndexRune(s[start:], 'Σ')
+		if k < 0 {
+			sb.WriteUTF8String(caserTransform(caser, s[start:]))
+			return
 		}
-		if r[i] >= utf8.RuneSelf {
-			ascii = false
+		k += start
+		sb.WriteUTF8String(caserTransform(caser, s[start:k]))
+		if isFinalSigma(s, k) {
+			sb.WriteRune('ς')
+		} else {
+			sb.WriteRune('σ')
+		}
+		start = k + len("Σ")
+	}
+}
+
+func toUpper(s string, sb *StringBuilder) {
+	sb.WriteUTF8String(caserTransform(cases.Upper(language.Und), s))
+}
+
+// transform normalizes or maps valid Unicode spans while preserving lone UTF-16 units.
+func (s unicodeString) transform(conv func(string, *StringBuilder)) String {
+	var b StringBuilder
+	u := s[1:]
+	b.LikelyUnicode(len(u))
+	start := 0
+	for i := 0; i < len(u); i++ {
+		c := u[i]
+		if isUTF16FirstSurrogate(c) {
+			if i+1 < len(u) && isUTF16SecondSurrogate(u[i+1]) {
+				i++
+				continue
+			}
+			if start < i {
+				conv(string(utf16.Decode(u[start:i])), &b)
+			}
+			b.WriteRune(rune(c))
+			start = i + 1
+		} else if isUTF16SecondSurrogate(c) {
+			if start < i {
+				conv(string(utf16.Decode(u[start:i])), &b)
+			}
+			b.WriteRune(rune(c))
+			start = i + 1
 		}
 	}
-	if ascii {
-		ascii = r[len(r)-1] < utf8.RuneSelf
+	if start < len(u) {
+		conv(string(utf16.Decode(u[start:])), &b)
 	}
-	if ascii {
-		return asciiString(r)
-	}
-	return unicodeStringFromRunes(r)
+	return b.String()
 }
 
 func (s unicodeString) toLower() String {
-	return toLower(s.String())
+	return s.transform(toLower)
 }
 
 func (s unicodeString) toUpper() String {
-	caser := cases.Upper(language.Und)
-	return newStringValue(caser.String(s.String()))
+	return s.transform(toUpper)
+}
+
+func (s unicodeString) normalize(form norm.Form) String {
+	return s.transform(func(span string, b *StringBuilder) {
+		b.WriteUTF8String(form.String(span))
+	})
 }
 
 func (s unicodeString) Export() interface{} {

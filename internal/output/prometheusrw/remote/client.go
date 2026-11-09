@@ -23,6 +23,8 @@ import (
 type HTTPConfig struct {
 	Timeout   time.Duration
 	TLSConfig *tls.Config
+	// ProxyURL, if set, is the HTTP proxy used for all the requests.
+	ProxyURL  *url.URL
 	BasicAuth *BasicAuth
 	SigV4     *sigv4.Config
 	Headers   http.Header
@@ -30,7 +32,7 @@ type HTTPConfig struct {
 
 // BasicAuth holds the config for basic authentication.
 type BasicAuth struct {
-	Username, Password string //nolint:gosec
+	Username, Password string
 }
 
 // WriteClient is a client implementation of the Prometheus remote write protocol.
@@ -58,10 +60,14 @@ func NewWriteClient(endpoint string, cfg *HTTPConfig) (*WriteClient, error) {
 		url: u,
 		cfg: cfg,
 	}
-	if cfg.TLSConfig != nil {
-		wc.hc.Transport = &http.Transport{
+	if cfg.TLSConfig != nil || cfg.ProxyURL != nil {
+		transport := &http.Transport{
 			TLSClientConfig: cfg.TLSConfig,
 		}
+		if cfg.ProxyURL != nil {
+			transport.Proxy = http.ProxyURL(cfg.ProxyURL)
+		}
+		wc.hc.Transport = transport
 	}
 	if cfg.SigV4 != nil {
 		tripper, err := sigv4.NewRoundTripper(cfg.SigV4, wc.hc.Transport)
@@ -100,7 +106,7 @@ func (c *WriteClient) Store(ctx context.Context, series []*prompb.TimeSeries) er
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("X-Prometheus-Remote-Write-Version", "0.1.0")
 
-	resp, err := c.hc.Do(req) //nolint:gosec
+	resp, err := c.hc.Do(req)
 	if err != nil {
 		return fmt.Errorf("HTTP POST request failed: %w", err)
 	}
@@ -128,7 +134,7 @@ func newWriteRequestBody(series []*prompb.TimeSeries) ([]byte, error) {
 	}
 	if snappy.MaxEncodedLen(len(b)) < 0 {
 		return nil, fmt.Errorf("the protobuf message is too large to be handled by Snappy encoder; "+
-			"size: %d, limit: %d", len(b), math.MaxUint32)
+			"size: %d, limit: %d", len(b), uint64(math.MaxUint32))
 	}
 	return snappy.Encode(nil, b), nil
 }

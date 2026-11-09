@@ -278,6 +278,17 @@ func (c *APIClient) callAPI(request *http.Request) (*http.Response, error) {
 	var resp *http.Response
 	var err error
 	for i := 0; i <= c.cfg.MaxRetries; i++ {
+		// http.Client.Do consumes request.Body as it sends the request, so on
+		// any retry we must reset it to a fresh reader. GetBody is non-nil only
+		// when the body is rewindable; leave streaming bodies untouched.
+		if i > 0 && request.GetBody != nil {
+			body, bodyErr := request.GetBody()
+			if bodyErr != nil {
+				return resp, bodyErr
+			}
+			request.Body = body
+		}
+
 		resp, err = c.cfg.HTTPClient.Do(request)
 		if shouldRetry(resp, err, i, c.cfg.MaxRetries) {
 			if c.cfg.Debug {

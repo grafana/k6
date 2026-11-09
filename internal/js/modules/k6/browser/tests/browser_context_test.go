@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/browser"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
 )
 
 func TestBrowserContextAddCookies(t *testing.T) {
@@ -991,4 +993,128 @@ func TestBrowserContextMappingBehavior(t *testing.T) {
 	value, err = tb.runtime().RunString(`browser.context()?.pages() != null`)
 	require.NoError(t, err)
 	require.True(t, value.ToBoolean())
+}
+
+// TestChromiumConnectOverCDPContextBrowserPlain covers a connectOverCDP script
+// with no managed browser in the registry: the owning browser must be reachable
+// via context().browser().
+func TestChromiumConnectOverCDPContextBrowserPlain(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+
+	// No StartIteration, so the managed-browser registry stays empty (as in a
+	// script with no options.browser).
+	vu := k6test.NewVU(t)
+	mod := browser.New().NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+	vu.ActivateVU()
+	vu.SetVar(t, "chromium", jsMod.Chromium)
+
+	_, err := vu.RunAsync(t, `
+		const b = await chromium.connectOverCDP("%s");
+		const p = await b.newPage();
+		p.context().browser().version();
+		await b.close();
+	`, tb.wsURL)
+	require.NoError(t, err)
+}
+
+// TestChromiumConnectOverCDPContextBrowserOwner covers the silent wrong-browser
+// case: with a managed browser also present, context().browser() must return the
+// connectOverCDP browser that owns the context, not the managed one. Closing the
+// connectOverCDP browser must therefore disconnect the browser reached via
+// context().browser().
+func TestChromiumConnectOverCDPContextBrowserOwner(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	vu := setupChromiumVU(t) // StartIteration also builds a managed browser
+
+	// context().browser() must be the connectOverCDP browser that owns the
+	// context, so closing that browser disconnects the one reached via
+	// context().browser() (isConnected() flips synchronously on close).
+	_, err := vu.RunAsync(t, `
+		const b = await chromium.connectOverCDP("%s");
+		const p = await b.newPage();
+		const owner = p.context().browser();
+		await b.close();
+		if (owner.isConnected()) {
+			throw new Error("context().browser() should be the connectOverCDP browser, disconnected after close");
+		}
+	`, tb.wsURL)
+	require.NoError(t, err)
+}
+
+// TestChromiumConnectOverCDPContextBrowserExposesClose verifies that a
+// connectOverCDP browser reached via context().browser() exposes a working
+// close().
+func TestChromiumConnectOverCDPContextBrowserExposesClose(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	vu := setupChromiumVU(t)
+
+	_, err := vu.RunAsync(t, `
+		const b = await chromium.connectOverCDP("%s");
+		const p = await b.newPage();
+		const owner = p.context().browser();
+		if (typeof owner.close !== "function") {
+			throw new Error("expected close() on connectOverCDP browser via context().browser()");
+		}
+		await owner.close(); // close via context().browser()
+		if (owner.isConnected()) {
+			throw new Error("close() via context().browser() should disconnect the browser");
+		}
+	`, tb.wsURL)
+	require.NoError(t, err)
+}
+
+// TestBrowserContextBrowserNoCloseForManaged verifies that a managed browser
+// reached via context().browser() does NOT expose close(): the registry owns its
+// lifecycle. Only user-managed (connectOverCDP) browsers get close().
+func TestBrowserContextBrowserNoCloseForManaged(t *testing.T) {
+	t.Parallel()
+
+	vu := k6test.NewVU(t)
+	mod := browser.New().NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+	vu.ActivateVU()
+	vu.StartIteration(t) // builds the managed browser
+	vu.SetVar(t, "browser", jsMod.Browser)
+
+	_, err := vu.RunAsync(t, `
+		const p = await browser.newPage();
+		if (typeof p.context().browser().close !== "undefined") {
+			throw new Error("managed browser via context().browser() must not expose close()");
+		}
+		await p.close();
+	`)
+	require.NoError(t, err)
+}
+
+// TestChromiumConnectOverCDPUseAfterClose verifies that using a connectOverCDP
+// browser after close() gives a clear "browser has been closed" error.
+func TestChromiumConnectOverCDPUseAfterClose(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	vu := setupChromiumVU(t)
+
+	_, err := vu.RunAsync(t, `
+		const b = await chromium.connectOverCDP("%s");
+		await b.close();
+		let msg = "";
+		try {
+			await b.newPage();
+		} catch (e) {
+			msg = String(e);
+		}
+		if (!msg.includes("browser has been closed")) {
+			throw new Error("expected 'browser has been closed', got: " + msg);
+		}
+	`, tb.wsURL)
+	require.NoError(t, err)
 }

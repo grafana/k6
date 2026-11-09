@@ -59,16 +59,18 @@ func encodeBlockBetterGo(dst, src []byte) (d int) {
 	// Initialize the hash tables.
 	const (
 		// Long hash matches.
-		lTableBits    = 17
-		maxLTableSize = 1 << lTableBits
+		lTableBits    = betterLongTableBits
+		maxLTableSize = betterLongTableSize
 
 		// Short hash matches.
-		sTableBits    = 14
-		maxSTableSize = 1 << sTableBits
+		sTableBits    = betterShortTableBits
+		maxSTableSize = betterShortTableSize
 	)
 
-	var lTable [maxLTableSize]uint32
-	var sTable [maxSTableSize]uint32
+	tbl := getBetterTables()
+	lTable := &tbl.lTable
+	sTable := &tbl.sTable
+	defer betterTablePool.Put(tbl)
 
 	// Bail if we can't compress to at least this.
 	dstLimit := len(src) - len(src)>>5 - 6
@@ -84,12 +86,18 @@ func encodeBlockBetterGo(dst, src []byte) (d int) {
 	// We initialize repeat to 0, so we never match on first attempt
 	repeat := 0
 
+	// Cap the adaptive skip, as encodeBetterBlockAsm and the snappy Go encoder
+	// below already do. Without a cap, a long stretch with no matches lets the
+	// skip grow geometrically until it strides past the start of the next
+	// compressible region and loses the matches there.
+	const maxSkip = 100
+
 	for {
 		candidateL := 0
 		nextS := 0
 		for {
 			// Next src position to check
-			nextS = s + (s-nextEmit)>>7 + 1
+			nextS = s + min((s-nextEmit)>>7+1, maxSkip)
 			if nextS > sLimit {
 				goto emitRemainder
 			}
@@ -317,16 +325,18 @@ func encodeBlockBetterSnappyGo(dst, src []byte) (d int) {
 	// Initialize the hash tables.
 	const (
 		// Long hash matches.
-		lTableBits    = 16
-		maxLTableSize = 1 << lTableBits
+		lTableBits    = betterSnappyLongTableBits
+		maxLTableSize = betterSnappyLongTableSize
 
 		// Short hash matches.
-		sTableBits    = 14
-		maxSTableSize = 1 << sTableBits
+		sTableBits    = betterShortTableBits
+		maxSTableSize = betterShortTableSize
 	)
 
-	var lTable [maxLTableSize]uint32
-	var sTable [maxSTableSize]uint32
+	tbl := getBetterSnappyTables()
+	lTable := &tbl.lTable
+	sTable := &tbl.sTable
+	defer betterSnappyTablePool.Put(tbl)
 
 	// Bail if we can't compress to at least this.
 	dstLimit := len(src) - len(src)>>5 - 6
@@ -902,12 +912,12 @@ func encodeBlockBetterDict(dst, src []byte, dict *Dict) (d int) {
 	// Initialize the hash tables.
 	const (
 		// Long hash matches.
-		lTableBits    = 17
-		maxLTableSize = 1 << lTableBits
+		lTableBits    = betterLongTableBits
+		maxLTableSize = betterLongTableSize
 
 		// Short hash matches.
-		sTableBits    = 14
-		maxSTableSize = 1 << sTableBits
+		sTableBits    = betterShortTableBits
+		maxSTableSize = betterShortTableSize
 
 		maxAhead = 8 // maximum bytes ahead without checking sLimit
 
@@ -921,8 +931,10 @@ func encodeBlockBetterDict(dst, src []byte, dict *Dict) (d int) {
 
 	dict.initBetter()
 
-	var lTable [maxLTableSize]uint32
-	var sTable [maxSTableSize]uint32
+	tbl := getBetterTables()
+	lTable := &tbl.lTable
+	sTable := &tbl.sTable
+	defer betterTablePool.Put(tbl)
 
 	// Bail if we can't compress to at least this.
 	dstLimit := len(src) - len(src)>>5 - 6

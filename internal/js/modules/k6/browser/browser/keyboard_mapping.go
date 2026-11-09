@@ -9,18 +9,22 @@ import (
 )
 
 func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
+	return finishMapping(newKeyboardMapping(vu, kb))
+}
+
+func newKeyboardMapping(vu moduleVU, kb *common.Keyboard) mapping {
 	return mapping{
-		"down": func(key string) *sobek.Promise {
+		"down": networkCall(func(key string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, kb.Down(key) //nolint:wrapcheck
 			})
-		},
-		"up": func(key string) *sobek.Promise {
+		}),
+		"up": networkCall(func(key string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, kb.Up(key) //nolint:wrapcheck
 			})
-		},
-		"press": func(key string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"press": networkCall(func(key string, opts sobek.Value) (*sobek.Promise, error) {
 			kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing keyboard options: %w", err)
@@ -28,8 +32,8 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 			return promise(vu, func() (any, error) {
 				return nil, kb.Press(key, kbopts)
 			}), nil
-		},
-		"type": func(text string, opts sobek.Value) (*sobek.Promise, error) {
+		}),
+		"type": networkCall(func(text string, opts sobek.Value) (*sobek.Promise, error) {
 			kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing keyboard options: %w", err)
@@ -37,11 +41,11 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 			return promise(vu, func() (any, error) {
 				return nil, kb.Type(text, kbopts)
 			}), nil
-		},
-		"insertText": func(text string) *sobek.Promise {
+		}),
+		"insertText": networkCall(func(text string) *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, kb.InsertText(text) //nolint:wrapcheck
 			})
-		},
+		}),
 	}
 }

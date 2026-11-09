@@ -105,6 +105,12 @@ func TestOptions(t *testing.T) {
 		assert.True(t, opts.HTTPDebug.Valid)
 		assert.Equal(t, "foo", opts.HTTPDebug.String)
 	})
+	t.Run("HTTPDebugRedact", func(t *testing.T) {
+		t.Parallel()
+		opts := Options{}.Apply(Options{HTTPDebugRedact: null.BoolFrom(true)})
+		assert.True(t, opts.HTTPDebugRedact.Valid)
+		assert.True(t, opts.HTTPDebugRedact.Bool)
+	})
 	t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
 		t.Parallel()
 		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
@@ -119,7 +125,7 @@ func TestOptions(t *testing.T) {
 				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
 
 				assert.NotNil(t, opts.TLSCipherSuites)
-				assert.Len(t, *(opts.TLSCipherSuites), 1)
+				assert.Len(t, *opts.TLSCipherSuites, 1)
 				assert.Equal(t, suiteID, (*opts.TLSCipherSuites)[0])
 			})
 		}
@@ -142,6 +148,18 @@ func TestOptions(t *testing.T) {
 					assert.NoError(t, json.Unmarshal(data, &vers2))
 					assert.Equal(t, &vers2, opts.TLSCipherSuites)
 				})
+			})
+			t.Run("Standard ChaCha20 names", func(t *testing.T) {
+				t.Parallel()
+				var opts Options
+				jsonStr := `{"tlsCipherSuites":[` +
+					`"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256",` +
+					`"TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"]}`
+				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
+				assert.Equal(t, &TLSCipherSuites{
+					tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+					tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+				}, opts.TLSCipherSuites)
 			})
 			t.Run("Not a string", func(t *testing.T) {
 				t.Parallel()
@@ -658,6 +676,12 @@ func TestOptionsEnv(t *testing.T) {
 			"":      null.Bool{},
 			"true":  null.BoolFrom(true),
 			"false": null.BoolFrom(false),
+		},
+		{"HandleSummaryTimeout", "K6_HANDLE_SUMMARY_TIMEOUT"}: {
+			"":     types.NullDuration{},
+			"10s":  types.NullDurationFrom(10 * time.Second),
+			"3m":   types.NullDurationFrom(3 * time.Minute),
+			"300s": types.NullDurationFrom(300 * time.Second),
 		},
 		// Thresholds
 		// External

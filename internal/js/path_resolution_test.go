@@ -154,7 +154,7 @@ func TestPathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
-			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk.`,
+			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk at`,
 		},
 		"ESM and require": {
 			fsMap: map[string]any{
@@ -198,7 +198,7 @@ func TestPathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
-			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk.`,
+			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk at`,
 		},
 		"full ESM": {
 			fsMap: map[string]any{
@@ -244,7 +244,7 @@ func TestPathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
-			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk.`,
+			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk at`,
 		},
 	}
 	for name, testCase := range testCases {
@@ -484,7 +484,7 @@ func TestImportMetaResolve(t *testing.T) {
 					export default function() {}
 				`,
 			},
-			expectedError: `The moduleSpecifier "file:///A/C/data.js" couldn't be found on local disk.`,
+			expectedError: `The moduleSpecifier "file:///A/C/data.js" couldn't be found on local disk at`,
 		},
 		"full ESM": {
 			fsMap: map[string]any{

@@ -80,6 +80,16 @@ func TestGaugeSink(t *testing.T) {
 			assert.Equal(t, true, sink.minSet)
 			assert.Equal(t, 1.0, sink.Max)
 		})
+		t.Run("negative values", func(t *testing.T) {
+			t.Parallel()
+			sink := GaugeSink{}
+			for _, s := range []float64{-5.0, -3.0, -8.0} {
+				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
+			}
+			assert.Equal(t, -8.0, sink.Value)
+			assert.Equal(t, -8.0, sink.Min)
+			assert.Equal(t, -3.0, sink.Max)
+		})
 		t.Run("values", func(t *testing.T) {
 			t.Parallel()
 			sink := GaugeSink{}

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/errext"
 	"go.k6.io/k6/v2/errext/exitcodes"
 	"go.k6.io/k6/v2/internal/execution"
@@ -34,22 +35,29 @@ type cmdCloudRun struct {
 	// noCloudSecrets stores the state of the --no-cloud-secrets flag.
 	noCloudSecrets bool
 
+	// noCloudLogs stores the state of the --no-cloud-logs flag.
+	noCloudLogs bool
+
 	// runCmd holds an instance of the k6 run command that we store
 	// in order to be able to call its run method to support
 	// the --local-execution flag mode.
 	runCmd *cmdRun
 
-	// deprecatedCloudCmd holds an instance of the k6 cloud command that we store
-	// in order to be able to call its run method to support the cloud execution
-	// feature, and to have access to its flagSet if necessary.
-	deprecatedCloudCmd *cmdCloud
+	// gs holds the global state, used to run the test in the cloud.
+	gs *state.GlobalState
+
+	// showCloudLogs stores the state of the --show-logs flag.
+	showCloudLogs bool
+
+	// exitOnRunning stores the state of the --exit-on-running flag.
+	exitOnRunning bool
 }
 
-func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
+func getCmdCloudRun(gs *state.GlobalState) *cobra.Command {
 	// We instantiate the run command here to be able to call its run method
 	// when the --local-execution flag is set.
 	runCmd := &cmdRun{
-		gs: cloudCmd.gs,
+		gs: gs,
 
 		// We override the loadConfiguredTest func to use the local execution
 		// configuration which enforces the use of the cloud output among other
@@ -59,17 +67,18 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 			execution.Controller,
 			error,
 		) {
-			test, err := loadAndConfigureLocalTest(cloudCmd.gs, cmd, args, getCloudRunLocalExecutionConfig)
+			test, err := loadAndConfigureLocalTest(gs, cmd, args, getCloudRunLocalExecutionConfig)
 			return test, local.NewController(), err
 		},
 	}
 
 	cloudRunCmd := &cmdCloudRun{
-		deprecatedCloudCmd: cloudCmd,
-		runCmd:             runCmd,
+		gs:            gs,
+		runCmd:        runCmd,
+		showCloudLogs: true,
 	}
 
-	exampleText := getExampleText(cloudCmd.gs, `
+	exampleText := getExampleText(gs, `
   # Run a test script in Grafana Cloud
   $ {{.}} cloud run script.js
 
@@ -94,12 +103,12 @@ func getCmdCloudRun(cloudCmd *cmdCloud) *cobra.Command {
 
 	thisCmd.Flags().SortFlags = false
 	thisCmd.Flags().AddFlagSet(cloudRunCmd.flagSet())
-	thisCmd.Flags().AddFlagSet(cloudCmd.flagSet())
+	thisCmd.Flags().AddFlagSet(cloudCmdFlagSet(&cloudRunCmd.showCloudLogs, &cloudRunCmd.exitOnRunning))
 
 	return thisCmd
 }
 
-func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
+func (c *cmdCloudRun) preRun(cmd *cobra.Command, _ []string) error {
 	if c.localExecution {
 		if cmd.Flags().Changed("exit-on-running") {
 			return errext.WithExitCodeIfNone(
@@ -132,7 +141,14 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	return c.deprecatedCloudCmd.preRun(cmd, args)
+	if c.noCloudLogs {
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("the --no-cloud-logs flag can only be used in conjunction with the --local-execution flag"),
+			exitcodes.InvalidConfig,
+		)
+	}
+
+	return applyCloudEnvOverrides(c.gs, cmd, &c.showCloudLogs, &c.exitOnRunning)
 }
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
@@ -158,7 +174,10 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	// When running the `k6 cloud run` command explicitly disable the usage report.
 	c.noUsageReport = true
 
-	return c.deprecatedCloudCmd.run(cmd, args)
+	return runCloudTest(c.gs, cmd, args, cloudTestRunOptions{
+		showCloudLogs: c.showCloudLogs,
+		exitOnRunning: c.exitOnRunning,
+	})
 }
 
 func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
@@ -191,6 +210,12 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		"no-cloud-secrets",
 		c.noCloudSecrets,
 		"only when using the local-execution mode, don't automatically configure the cloud secret source",
+	)
+	flags.BoolVar(
+		&c.noCloudLogs,
+		"no-cloud-logs",
+		c.noCloudLogs,
+		"only when using the local-execution mode, don't push logs to the cloud",
 	)
 	flags.StringArray("features", nil, "enable feature flags (comma-separated)")
 

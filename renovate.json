@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>grafana/grafana-renovate-config//presets/k6/k6-engine-base.json",
-    "schedule:weekly"
+    "schedule:weekly",
+    "github>grafana/grafana-renovate-config//presets/k6/k6-engine-automerge.json"
   ],
   "ignorePaths": [
     "**/vendor/**",
@@ -101,6 +102,19 @@
       "extends": [
         "schedule:quarterly"
       ]
+    },
+    {
+      "description": "The influxdb-v1 example must stay on InfluxDB v1.x: allow minor/patch/digest updates only",
+      "matchFileNames": [
+        "examples/docker-compose/influxdb-v1/**"
+      ],
+      "matchPackageNames": [
+        "influxdb"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
     },
 	{
       "matchBaseBranches": ["v1.x"],

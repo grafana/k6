@@ -23,6 +23,22 @@ const (
 	PropertyKindMethod PropertyKind = "method"
 )
 
+// NumberLiteralKind describes the lexical form of a numeric literal, in
+// particular whether it uses legacy syntax that is only allowed in sloppy mode.
+type NumberLiteralKind uint8
+
+const (
+	// NumberLiteralPlain is a numeric literal that does not use any legacy
+	// syntax, e.g. 10, 0, 0.5, 0e1, 0x10, 0o17, 0b1 or 1_000.
+	NumberLiteralPlain NumberLiteralKind = iota
+	// NumberLiteralLegacyOctal is a legacy octal integer literal, e.g. 0777.
+	// Legacy octal literals are only allowed in sloppy mode.
+	NumberLiteralLegacyOctal
+	// NumberLiteralNonOctalDecimal is a decimal integer literal with a leading
+	// zero, e.g. 089 or 08e5. It is only allowed in sloppy mode.
+	NumberLiteralNonOctalDecimal
+)
+
 // All nodes implement the Node interface.
 type Node interface {
 	Idx0() file.Idx // The index of the first character belonging to the node
@@ -83,6 +99,10 @@ type (
 		Operator token.Token
 		Left     Expression
 		Right    Expression
+
+		// Left is an identifier in parentheses, e.g. (a) = function() {}. It's not an IdentifierRef,
+		// so an anonymous function or class on the right does not get its name.
+		ParenthesizedLeft bool
 	}
 
 	BadExpression struct {
@@ -177,6 +197,7 @@ type (
 		Body            ConciseBody
 		Source          string
 		DeclarationList []*VariableDeclaration
+		End             file.Idx
 		Async           bool
 	}
 
@@ -206,6 +227,7 @@ type (
 		Idx     file.Idx
 		Literal string
 		Value   interface{}
+		Kind    NumberLiteralKind
 	}
 
 	ObjectLiteral struct {
@@ -264,6 +286,7 @@ type (
 		Idx     file.Idx
 		Literal string
 		Value   unistring.String
+		Sloppy  bool // Has a legacy octal or \8, \9 escape sequence, which is not allowed in strict mode
 	}
 
 	TemplateElement struct {
@@ -415,6 +438,7 @@ type (
 		Into   ForInto
 		Source Expression
 		Body   Statement
+		Await  bool
 	}
 
 	ForStatement struct {
@@ -820,8 +844,9 @@ func (self *DotExpression) Idx1() file.Idx         { return self.Identifier.Idx1
 func (self *PrivateDotExpression) Idx1() file.Idx  { return self.Identifier.Idx1() }
 func (self *FunctionLiteral) Idx1() file.Idx       { return self.Body.Idx1() }
 func (self *ClassLiteral) Idx1() file.Idx          { return self.RightBrace + 1 }
-func (self *ArrowFunctionLiteral) Idx1() file.Idx  { return self.Body.Idx1() }
-func (self *Identifier) Idx1() file.Idx            { return file.Idx(int(self.Idx) + len(self.Name)) }
+func (self *ArrowFunctionLiteral) Idx1() file.Idx  { return self.End }
+func (self *Identifier) Idx1() file.Idx            { return file.Idx(int(self.Idx) + len(self.Name.String())) }
+func (self *PrivateIdentifier) Idx1() file.Idx     { return self.Identifier.Idx1() + 1 }
 func (self *NewExpression) Idx1() file.Idx {
 	if self.ArgumentList != nil {
 		return self.RightParenthesis + 1

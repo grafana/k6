@@ -14,7 +14,7 @@ import (
 
 // TODO: unit test
 func mapTimeSeriesLabelsProto(tags *metrics.TagSet) ([]*pbcloud.Label, []string) {
-	labels := make([]*pbcloud.Label, 0, ((*atlas.Node)(tags)).Len())
+	labels := make([]*pbcloud.Label, 0, (*atlas.Node)(tags).Len())
 	var discardedLabels []string
 
 	// TODO: move this as a shared func

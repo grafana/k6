@@ -47,10 +47,18 @@ For alternative ways of cloning the k6 repository, please refer to [GitHub's clo
 
 #### Running the linter
 
-We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) tool to lint the code in CI. The actual version you can find in our [`.golangci.yml`](https://github.com/grafana/k6/blob/master/.golangci.yml#L1). To run it locally, first [install it](https://golangci-lint.run/welcome/install/#local-installation), then run:
+We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) tool to lint the code in CI. The base configuration, including the golangci-lint version, lives in [grafana/k6-ci](https://github.com/grafana/k6-ci), and k6-specific changes to it are kept in [`.golangci.patch`](https://github.com/grafana/k6/blob/master/.golangci.patch). To run it locally with the same version and configuration as CI, run:
 
 ```bash
 make lint
+```
+
+There is no need to install golangci-lint yourself. `make lint` downloads the configuration into `build/lint/`, applies the patch and runs the matching golangci-lint version with `go run`.
+
+If you need to change the linter configuration, edit `build/lint/.golangci.yml` after running `make lint`, then regenerate the patch with:
+
+```bash
+make update-lint-patch
 ```
 
 #### Running the test suite

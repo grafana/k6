@@ -1,8 +1,10 @@
 package cloudapi
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -198,6 +200,41 @@ func TestListLoadTests(t *testing.T) {
 	assert.Equal(t, int64(2), tests[1].ID)
 }
 
+func TestListLoadZones(t *testing.T) {
+	t.Parallel()
+
+	loadZone := func(id int64, k6LoadZoneID, name string, public, available bool) map[string]any {
+		return map[string]any{
+			"id":                       id,
+			"k6_load_zone_id":          k6LoadZoneID,
+			"name":                     name,
+			"public":                   public,
+			"available":                available,
+			"custom_load_runner_image": nil,
+		}
+	}
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/cloud/v6/load_zones", r.URL.Path)
+		writeJSON(t, w, http.StatusOK, map[string]any{
+			"value": []any{
+				loadZone(1, "amazon:us:ashburn", "US East (Ashburn)", true, true),
+				loadZone(2, "my-cluster", "My private cluster", false, false),
+			},
+		})
+	}))
+
+	zones, err := client.ListLoadZones(t.Context())
+	require.NoError(t, err)
+	require.Len(t, zones, 2)
+	assert.Equal(t,
+		LoadZone{ID: 1, K6LoadZoneID: "amazon:us:ashburn", Name: "US East (Ashburn)", Public: true, Available: true},
+		zones[0])
+	assert.Equal(t,
+		LoadZone{ID: 2, K6LoadZoneID: "my-cluster", Name: "My private cluster", Public: false, Available: false},
+		zones[1])
+}
+
 func TestRetryWithConnectionClose(t *testing.T) {
 	t.Parallel()
 
@@ -353,6 +390,115 @@ func TestUploadTest(t *testing.T) {
 	})
 }
 
+func TestCreateOrFindLoadTest(t *testing.T) {
+	t.Parallel()
+
+	var (
+		method     string
+		path       string
+		stackID    string
+		authHeader string
+		formName   string
+		hasScript  bool
+	)
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method = r.Method
+		path = r.URL.Path
+		stackID = r.Header.Get("X-Stack-Id")
+		authHeader = r.Header.Get("Authorization")
+
+		require.NoError(t, r.ParseMultipartForm(1<<20))
+		formName = r.FormValue("name")
+		_, _, err := r.FormFile("script")
+		hasScript = err == nil
+
+		res := k6cloud.NewLoadTestApiModelWithDefaults()
+		res.SetId(12345)
+		writeJSON(t, w, http.StatusOK, res)
+	}))
+
+	id, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	require.NoError(t, err)
+	assert.Equal(t, int64(12345), id)
+	assert.Equal(t, http.MethodPost, method)
+	assert.Equal(t, "/cloud/v6/projects/99/load_tests", path)
+	assert.Equal(t, "my-test", formName)
+	assert.False(t, hasScript, "request must not include a script part")
+	assert.Equal(t, "1", stackID)
+	assert.Equal(t, "Bearer test-token", authHeader)
+}
+
+func TestCreateOrFindLoadTest_ConflictFallsBackToFindByName(t *testing.T) {
+	t.Parallel()
+
+	var (
+		getHit  bool
+		getName string
+		getTop  string
+	)
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			writeError(t, w, http.StatusConflict, "conflict", "already exists")
+		case http.MethodGet:
+			getHit = true
+			getName = r.URL.Query().Get("name")
+			getTop = r.URL.Query().Get("$top")
+			lt := k6cloud.NewLoadTestApiModelWithDefaults()
+			lt.SetId(67890)
+			writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{lt}})
+		}
+	}))
+
+	id, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	require.NoError(t, err)
+	assert.Equal(t, int64(67890), id)
+	assert.True(t, getHit, "GET fallback should have been called")
+	assert.Equal(t, "my-test", getName)
+	assert.Equal(t, "1", getTop)
+}
+
+func TestCreateOrFindLoadTest_ConflictWithNoMatchReturnsError(t *testing.T) {
+	t.Parallel()
+
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			writeError(t, w, http.StatusConflict, "conflict", "already exists")
+		case http.MethodGet:
+			writeJSON(t, w, http.StatusOK, map[string]any{"value": []any{}})
+		}
+	}))
+
+	_, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	assert.ErrorIs(t, err, errTestNotExists)
+}
+
+func TestCreateOrFindLoadTest_NonConflictHTTPErrorReturned(t *testing.T) {
+	t.Parallel()
+
+	var getHit bool
+	client := newTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			writeError(t, w, http.StatusInternalServerError, "server_error", "internal error")
+		case http.MethodGet:
+			getHit = true
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+
+	_, err := client.CreateOrFindLoadTest(t.Context(), 99, "my-test")
+	require.Error(t, err)
+
+	var rerr ResponseError
+	assert.True(t, errors.As(err, &rerr))
+	assert.Equal(t, http.StatusInternalServerError, rerr.Response.StatusCode)
+	assert.False(t, getHit, "GET fallback should not be called on non-conflict error")
+}
+
 func TestStartTest(t *testing.T) {
 	t.Parallel()
 
@@ -476,9 +622,35 @@ func assertJSONEqual(t *testing.T, want, got any) {
 	assert.JSONEq(t, string(w), string(g))
 }
 
+// assertArchiveEqual checks that got is the serialized form of want.
+// Archive.Write stamps the current time into the tar headers,
+// so the entries are compared with their timestamps cleared.
 func assertArchiveEqual(t *testing.T, want *lib.Archive, got []byte) {
 	t.Helper()
 	var b bytes.Buffer
 	require.NoError(t, want.Write(&b))
-	assert.Equal(t, b.Bytes(), got)
+	assert.Equal(t, readTarEntries(t, b.Bytes()), readTarEntries(t, got))
+}
+
+type tarEntry struct {
+	Header tar.Header
+	Data   []byte
+}
+
+func readTarEntries(t *testing.T, data []byte) []tarEntry {
+	t.Helper()
+	var entries []tarEntry
+	r := tar.NewReader(bytes.NewReader(data))
+	for {
+		hdr, err := r.Next()
+		if errors.Is(err, io.EOF) {
+			return entries
+		}
+		require.NoError(t, err)
+		content, err := io.ReadAll(r)
+		require.NoError(t, err)
+		h := *hdr
+		h.ModTime, h.AccessTime, h.ChangeTime = time.Time{}, time.Time{}, time.Time{}
+		entries = append(entries, tarEntry{Header: h, Data: content})
+	}
 }

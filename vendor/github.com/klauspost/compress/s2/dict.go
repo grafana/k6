@@ -56,10 +56,12 @@ func NewDict(dict []byte) *Dict {
 	if len(dict) < MinDictSize || len(dict) > MaxDictSize {
 		return nil
 	}
-	d.repeat = int(r)
-	if d.repeat > len(dict) {
+	// Compare as uint64: int(r) would wrap negative for r > MaxInt64,
+	// slipping past the bounds check and causing an OOB read in encode.
+	if r > uint64(len(dict)) {
 		return nil
 	}
+	d.repeat = int(r)
 	return &d
 }
 
