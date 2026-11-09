@@ -116,8 +116,8 @@ func TestMappings(t *testing.T) {
 		}
 		// detect redundant mappings.
 		for m := range mapped {
-			// ignore keys starting by __ (internal keys)
-			if strings.HasPrefix(m, "__") {
+			// __locator holds the underlying Go locator for or()
+			if m == "__locator" {
 				continue
 			}
 			if !tested[m] {

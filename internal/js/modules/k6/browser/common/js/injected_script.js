@@ -1784,6 +1784,9 @@ class InjectedScript {
         new k6BrowserNative.Map(),
         originalRoot
       );
+      if (typeof orRoots === "string") {
+        return orRoots;
+      }
       const merged = [...roots, ...orRoots];
       const seen = new k6BrowserNative.Set();
       const unique = [];

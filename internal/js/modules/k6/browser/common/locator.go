@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -445,6 +446,9 @@ func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 // locator or the given locator. The resulting locator resolves to all elements
 // that match either selector, merged and sorted in DOM order.
 func (l *Locator) Or(locator *Locator) (*Locator, error) {
+	l.log.Debugf("Locator:Or", "fid:%s furl:%q sel:%q other:%q",
+		l.frame.ID(), l.frame.URL(), l.selector, locator.selector)
+
 	if l.frame != locator.frame {
 		return nil, fmt.Errorf(
 			"combining locators from different frames is not supported: this(frame_id:%s) locator(frame_id:%s)",
@@ -456,6 +460,15 @@ func (l *Locator) Or(locator *Locator) (*Locator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse selector: %w", err)
 	}
+	// The other locator is nested inside internal:or and re-queried by the
+	// injected script, which cannot resolve internal:control=enter-frame.
+	// TODO: Playwright splices the common frame prefix off the nested selector so shared frameLocator prefixes work.
+	for _, part := range parsed.Parts {
+		if part.Name == "internal:control" && part.Body == "enter-frame" {
+			return nil, errors.New("combining frameLocator-based locators with or() is not yet supported")
+		}
+	}
+
 	encoded, err := json.Marshal(parsed)
 	if err != nil {
 		return nil, fmt.Errorf("encoding selector: %w", err)

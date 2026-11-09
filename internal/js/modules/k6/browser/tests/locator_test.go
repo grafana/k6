@@ -472,6 +472,33 @@ func TestLocator(t *testing.T) {
 				assert.Equal(t, "original text", text1)
 			},
 		},
+		{
+			"Or frameLocator on the right is rejected", func(_ *testBrowser, p *common.Page) {
+				fl := p.FrameLocator("#does-not-matter")
+				_, err := p.Locator("#a", nil).Or(fl.Locator("#b", nil))
+				require.ErrorContains(t, err, "combining frameLocator-based locators with or() is not yet supported")
+
+				_, err = fl.Locator("#a", nil).Or(fl.Locator("#b", nil))
+				require.ErrorContains(t, err, "combining frameLocator-based locators with or() is not yet supported")
+			},
+		},
+		{
+			"Or frameLocator on the left is allowed", func(_ *testBrowser, p *common.Page) {
+				fl := p.FrameLocator("#does-not-matter")
+				_, err := fl.Locator("#a", nil).Or(p.Locator("#b", nil))
+				require.NoError(t, err)
+			},
+		},
+		{
+			"Or strict mode violation on click", func(_ *testBrowser, p *common.Page) {
+				// Both match, a strict action must fail.
+				lo, err := p.Locator("#link", nil).Or(p.Locator("#linkdbl", nil))
+				require.NoError(t, err)
+
+				err = lo.Click(common.NewFrameClickOptions(lo.Timeout()))
+				require.ErrorContains(t, err, "strict mode violation")
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1786,6 +1813,56 @@ func TestFrameLocator(t *testing.T) {
 		n, err := combined.Count()
 		require.NoError(t, err)
 		assert.Equal(t, 1, n)
+	})
+
+	t.Run("or_different_frames_rejected", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		wopts := common.NewFrameWaitForSelectorOptions(p.MainFrame().Timeout())
+		iframe1, err := p.WaitForSelector("iframe[id='iframe1']", wopts)
+		require.NoError(t, err)
+		require.NotNil(t, iframe1)
+
+		frame1, err := iframe1.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame1)
+
+		iframe2, err := frame1.WaitForSelector("iframe[id='iframe2']", common.NewFrameWaitForSelectorOptions(frame1.Timeout()))
+		require.NoError(t, err)
+		require.NotNil(t, iframe2)
+
+		frame2, err := iframe2.ContentFrame()
+		require.NoError(t, err)
+		require.NotNil(t, frame2)
+
+		_, err = frame1.Locator("#anything", nil).Or(frame2.Locator("#button1", nil))
+		require.ErrorContains(t, err, "combining locators from different frames is not supported")
+	})
+
+	t.Run("or_frameLocator_api_rejected", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t, withFileServer())
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := p.Goto(tb.staticURL("iframe_test_main.html"), opts)
+		require.NoError(t, err)
+
+		fl := p.FrameLocator("#iframe1")
+		_, err = fl.Locator("#button1", nil).Or(fl.Locator("#missing", nil))
+		require.ErrorContains(t, err, "combining frameLocator-based locators with or() is not yet supported")
 	})
 
 	t.Run("or_frame_locator_click", func(t *testing.T) {
