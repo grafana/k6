@@ -243,6 +243,28 @@ func TestMakeRequestTracing(t *testing.T) {
 		}
 	})
 
+	t.Run("sensitive query params are redacted from the error", func(t *testing.T) {
+		t.Parallel()
+		srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+		f := newTracingFixture(t, srv, true)
+		addr := srv.URL + "/p?sig=secret&q=1"
+		srv.Close()
+
+		_, err := f.do(t, addr, func(p *ParsedHTTPRequest) { p.Throw = true })
+		require.Error(t, err)
+
+		spans := f.rec.ByName("GET")
+		require.Len(t, spans, 1)
+		assert.NotContains(t, spans[0].Status().Description, "secret")
+		assert.Contains(t, spans[0].Status().Description, "sig=REDACTED&q=1")
+		require.NotEmpty(t, spans[0].Events())
+		for _, kv := range spans[0].Events()[0].Attributes {
+			assert.NotContains(t, kv.Value.String(), "secret", string(kv.Key))
+		}
+		errType, _ := spanAttr(spans[0], "error.type")
+		assert.Equal(t, strconv.Itoa(int(tcpDialRefusedErrorCode)), errType.AsString())
+	})
+
 	t.Run("http-debug dumps the sent trace context", func(t *testing.T) {
 		t.Parallel()
 		srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
@@ -392,6 +414,26 @@ func TestRedactURL(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, tc.want, redactURL(tc.in))
+		})
+	}
+}
+
+func TestRedactText(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct{ in, want string }{
+		"no url": {"connection refused", "connection refused"},
+		"url error": {
+			`Get "https://a.com/p?q=1&sig=abc&X%2DAmz%2DSignature=def#f": dial tcp: lookup a.com: no such host`,
+			`Get "https://a.com/p?q=1&sig=REDACTED&X%2DAmz%2DSignature=REDACTED#f": dial tcp: lookup a.com: no such host`,
+		},
+		"no sensitive":   {`Get "https://a.com/p?q=1&r=2": EOF`, `Get "https://a.com/p?q=1&r=2": EOF`},
+		"case-sensitive": {"https://a.com/p?SIG=x", "https://a.com/p?SIG=x"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tc.want, redactText(tc.in))
 		})
 	}
 }

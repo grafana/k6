@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -68,6 +69,19 @@ func startSpan(
 	return ctx, span
 }
 
+// isSensitiveParam reports whether the value of the query parameter key must be redacted. These
+// are the parameters the OpenTelemetry semantic conventions require to redact by default in url.full.
+func isSensitiveParam(key string) bool {
+	if decoded, err := url.QueryUnescape(key); err == nil {
+		key = decoded
+	}
+	switch key {
+	case "X-Amz-Signature", "X-Amz-Credential", "X-Amz-Security-Token", "sig", "X-Goog-Signature":
+		return true
+	}
+	return false
+}
+
 // redactURL replaces the values of the sensitive query parameters of rawURL with REDACTED. The
 // rest of the URL is kept as is, including the order and the encoding of the other parameters.
 func redactURL(rawURL string) string {
@@ -83,14 +97,7 @@ func redactURL(rawURL string) string {
 		if !hasValue {
 			continue
 		}
-		// The key may be percent-encoded.
-		if decoded, err := url.QueryUnescape(key); err == nil {
-			key = decoded
-		}
-		// The query parameters whose values the OpenTelemetry semantic conventions require to
-		// redact by default in url.full. The match is case-sensitive.
-		switch key {
-		case "X-Amz-Signature", "X-Amz-Credential", "X-Amz-Security-Token", "sig", "X-Goog-Signature":
+		if isSensitiveParam(key) {
 			params[i] = param[:strings.IndexByte(param, '=')+1] + redactedValue
 		}
 	}
@@ -100,6 +107,24 @@ func redactURL(rawURL string) string {
 		out += "#" + fragment
 	}
 	return out
+}
+
+// queryParamRe matches a query parameter with a value inside of a free-form text.
+var queryParamRe = regexp.MustCompile(`[?&][^=&#\s"'<>]+=[^&#\s"'<>]*`)
+
+// redactText replaces the values of the sensitive query parameters of the URLs embedded in text
+// with REDACTED, like redactURL does for a URL.
+func redactText(text string) string {
+	if !strings.ContainsAny(text, "?&") {
+		return text
+	}
+	return queryParamRe.ReplaceAllStringFunc(text, func(match string) string {
+		keyPart, _, _ := strings.Cut(match, "=")
+		if !isSensitiveParam(keyPart[1:]) {
+			return match
+		}
+		return keyPart + "=" + redactedValue
+	})
 }
 
 // endSpan completes and ends the span of an HTTP request, from the result of MakeRequest. Like
@@ -125,6 +150,13 @@ func endSpan(span oteltrace.Span, preq *ParsedHTTPRequest, resp *Response, err e
 		}
 	}
 
+	if err != nil {
+		// The error message usually embeds the URL of the request, e.g. url.Error. This is done
+		// last, as the error code above is derived from the type of the original error.
+		if msg := err.Error(); redactText(msg) != msg {
+			err = errors.New(redactText(msg))
+		}
+	}
 	k6trace.EndSpan(span, err)
 }
 
