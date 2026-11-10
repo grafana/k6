@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -50,8 +51,9 @@ type Browser struct {
 
 	// Needed as the targets map will be accessed from multiple Go routines,
 	// the main VU/JS go routine and the Go routine listening for CDP messages.
-	pagesMu sync.RWMutex
-	pages   map[target.ID]*Page
+	pagesMu   sync.RWMutex
+	pages     map[target.ID]*Page
+	pageOrder []target.ID
 
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
@@ -197,8 +199,8 @@ func (b *Browser) getPages() []*Page {
 	b.pagesMu.RLock()
 	defer b.pagesMu.RUnlock()
 	pages := make([]*Page, 0, len(b.pages))
-	for _, p := range b.pages {
-		pages = append(pages, p)
+	for _, id := range b.pageOrder {
+		pages = append(pages, b.pages[id])
 	}
 	return pages
 }
@@ -386,6 +388,9 @@ func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) error
 			"sid:%v tid:%v pageType:%s",
 			ev.SessionID, targetPage.TargetID, targetPage.Type,
 		)
+		if _, exists := b.pages[targetPage.TargetID]; !exists {
+			b.pageOrder = append(b.pageOrder, targetPage.TargetID)
+		}
 		b.pages[targetPage.TargetID] = p
 
 		return nil
@@ -501,6 +506,9 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 		b.logger.Debugf("Browser:onDetachedFromTarget:deletePage", "sid:%v tid:%v", ev.SessionID, targetID)
 
 		delete(b.pages, targetID)
+		if i := slices.Index(b.pageOrder, targetID); i >= 0 {
+			b.pageOrder = slices.Delete(b.pageOrder, i, i+1)
+		}
 		t.didClose()
 	}
 }
