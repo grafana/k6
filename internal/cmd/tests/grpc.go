@@ -22,12 +22,12 @@ type GRPC struct {
 func NewGRPC(t testing.TB) *GRPC {
 	grpcServer := grpc.NewServer()
 
-	addr := getFreeBindAddr(t)
-
-	lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", addr)
+	// Port 0: the OS picks a free port, and the listener keeps it until the server stops.
+	lis, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "localhost:0")
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
 	}
+	addr := lis.Addr().String()
 
 	features := grpcservice.LoadFeatures("")
 	routeGuide := grpcservice.NewRouteGuideServer(features...)

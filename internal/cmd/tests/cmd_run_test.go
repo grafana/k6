@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -83,7 +84,7 @@ func TestHTTPAPIServerAddr(t *testing.T) {
 		},
 		{
 			name:          "addr flag set",
-			args:          []string{"-a", getFreeBindAddr(t)},
+			args:          []string{"-a", "localhost:0"},
 			expectStarted: true,
 		},
 	}
@@ -103,8 +104,56 @@ func TestHTTPAPIServerAddr(t *testing.T) {
 			assert.Equal(t,
 				tc.expectStarted,
 				testutils.LogContains(logEntries, logrus.DebugLevel, "Starting the REST API server"))
+			if tc.expectStarted {
+				// With port 0 the log must show the port the OS picked, not ":0".
+				_, port, err := net.SplitHostPort(apiServerAddr(t, ts))
+				require.NoError(t, err)
+				assert.NotEqual(t, "0", port)
+			}
 		})
 	}
+}
+
+func TestHTTPAPIServerAddrInUse(t *testing.T) {
+	t.Parallel()
+
+	busy, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "localhost:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, busy.Close()) })
+	busyAddr := busy.Addr().String()
+
+	t.Run("flag", func(t *testing.T) {
+		t.Parallel()
+
+		// An address set with --address that can't be used stops k6.
+		ts := NewGlobalTestState(t)
+		ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "-a", busyAddr, "-"}
+		ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+		ts.ExpectedExitCode = int(exitcodes.CannotStartRESTAPI)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		logEntries := ts.LoggerHook.Drain()
+		assert.True(t, testutils.LogContains(logEntries, logrus.ErrorLevel, "could not start the REST API server"))
+		assert.False(t, testutils.LogContains(logEntries, logrus.DebugLevel, "Starting the REST API server"))
+	})
+
+	t.Run("env", func(t *testing.T) {
+		t.Parallel()
+
+		// Without --address (e.g. from K6_ADDRESS), it's only a warning, and the test runs
+		// without the API server.
+		ts := NewGlobalTestState(t)
+		ts.CmdArgs = []string{"k6", "run", "-v", "--log-output=stdout", "-"}
+		ts.Flags.Address = busyAddr
+		ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		logEntries := ts.LoggerHook.Drain()
+		assert.True(t, testutils.LogContains(logEntries, logrus.WarnLevel, "Error from API server"))
+		assert.False(t, testutils.LogContains(logEntries, logrus.DebugLevel, "Starting the REST API server"))
+	})
 }
 
 func TestSimpleTestStdin(t *testing.T) {
@@ -670,10 +719,8 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`)
 
-	addr := getFreeBindAddr(t)
-	cliFlags := []string{"-v", "--log-output=stdout", "--linger", "--address", addr}
+	cliFlags := []string{"-v", "--log-output=stdout", "--linger", "--address", "localhost:0"}
 	ts := getSimpleCloudOutputTestState(t, script, cliFlags, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
-	ts.Flags.Address = addr
 
 	sendSignal := injectMockSignalNotifier(ts)
 	asyncWaitForStdoutAndRun(t, ts, 20, 500*time.Millisecond, "waiting for Ctrl+C to continue", func() {
@@ -683,7 +730,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		}()
 		t.Logf("Linger reached, running teardown again and stopping the test...")
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.Address), nil,
+			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", apiServerAddr(t, ts)), nil,
 		)
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
@@ -934,7 +981,7 @@ func asyncWaitForStdoutAndStopTestFromRESTAPI(
 ) {
 	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
 		req, err := http.NewRequestWithContext(
-			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", ts.Flags.Address),
+			ts.Ctx, http.MethodPatch, fmt.Sprintf("http://%s/v1/status", apiServerAddr(t, ts)),
 			bytes.NewBufferString(`{"data":{"type":"status","id":"default","attributes":{"stopped":true}}}`),
 		)
 		require.NoError(t, err)
@@ -965,12 +1012,10 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 		}
 	`
 
-	addr := getFreeBindAddr(t)
 	ts := getSimpleCloudOutputTestState(
-		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20", "--address", addr},
+		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20", "--address", "localhost:0"},
 		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
 	)
-	ts.Flags.Address = addr
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
 
@@ -1190,14 +1235,12 @@ func runTestWithLinger(t *testing.T, ts *GlobalTestState) {
 func TestExecutionResultWithLinger(t *testing.T) {
 	t.Parallel()
 
-	addr := getFreeBindAddr(t)
 	script := `
 		import exec from 'k6/execution';
 		export default function () { exec.test.abort('foo'); }
 	`
 	ts := getSingleFileTestState(t, script,
-		[]string{"-v", "--log-output=stdout", "--linger", "--address", addr}, exitcodes.ScriptAborted)
-	ts.Flags.Address = addr
+		[]string{"-v", "--log-output=stdout", "--linger", "--address", "localhost:0"}, exitcodes.ScriptAborted)
 
 	sendSignal := injectMockSignalNotifier(ts)
 	asyncWaitForStdoutAndRun(t, ts, 15, time.Second, "waiting for Ctrl+C to continue", func() {
@@ -1206,7 +1249,9 @@ func TestExecutionResultWithLinger(t *testing.T) {
 			<-sendSignal
 		}()
 
-		req, err := http.NewRequestWithContext(ts.Ctx, http.MethodGet, fmt.Sprintf("http://%s/v1/status", addr), nil)
+		req, err := http.NewRequestWithContext(
+			ts.Ctx, http.MethodGet, fmt.Sprintf("http://%s/v1/status", apiServerAddr(t, ts)), nil,
+		)
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)

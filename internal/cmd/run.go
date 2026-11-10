@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"slices"
@@ -314,49 +315,67 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if c.gs.Flags.Address != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 
-		// We cannot use backgroundProcesses here, since we need the REST API to
-		// be down before we can close the samples channel above and finish the
-		// processing the metrics pipeline.
-		apiWG := &sync.WaitGroup{}
-		apiWG.Add(2)
-		defer apiWG.Wait()
+		addressSet := cmd.Flags().Lookup("address").Changed
 
-		srvCtx, srvCancel := context.WithCancel(globalCtx)
-		defer srvCancel()
+		// Listen before serving: the port is held from here on, and with port 0 (e.g.
+		// --address localhost:0) the OS picks a free one, which is logged below.
+		listener, lerr := (&net.ListenConfig{}).Listen(globalCtx, "tcp", c.gs.Flags.Address)
+		if lerr != nil {
+			// Only stop k6 if the user has explicitly set the REST API address. The test
+			// hasn't started yet, so return the error instead of exiting.
+			if addressSet {
+				return errext.WithExitCodeIfNone(
+					fmt.Errorf("could not start the REST API server: %w", lerr), exitcodes.CannotStartRESTAPI,
+				)
+			}
+			logger.WithError(lerr).Warn("Error from API server")
+		} else {
+			apiAddr := listener.Addr().String()
 
-		srv := api.GetServer(
-			runCtx,
-			c.gs.Flags.Address, c.gs.Flags.ProfilingEnabled,
-			testRunState,
-			samples,
-			metricsEngine,
-			execScheduler,
-		)
-		go func() {
-			defer apiWG.Done()
-			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
+			// We cannot use backgroundProcesses here, since we need the REST API to
+			// be down before we can close the samples channel above and finish the
+			// processing the metrics pipeline.
+			apiWG := &sync.WaitGroup{}
+			apiWG.Add(2)
+			defer apiWG.Wait()
+
+			srvCtx, srvCancel := context.WithCancel(globalCtx)
+			defer srvCancel()
+
+			srv := api.GetServer(
+				runCtx,
+				apiAddr, c.gs.Flags.ProfilingEnabled,
+				testRunState,
+				samples,
+				metricsEngine,
+				execScheduler,
+			)
+			logger.Debugf("Starting the REST API server on %s", apiAddr)
 			if c.gs.Flags.ProfilingEnabled {
-				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
+				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", apiAddr)
 			}
-			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
-				// Only exit k6 if the user has explicitly set the REST API address
-				if cmd.Flags().Lookup("address").Changed {
-					logger.WithError(aerr).Error("Error from API server")
-					c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
-				} else {
-					logger.WithError(aerr).Warn("Error from API server")
+			go func() {
+				defer apiWG.Done()
+				if aerr := srv.Serve(listener); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
+					// Only exit k6 if the user has explicitly set the REST API address
+					if addressSet {
+						logger.WithError(aerr).Error("Error from API server")
+						c.gs.OSExit(int(exitcodes.CannotStartRESTAPI))
+					} else {
+						logger.WithError(aerr).Warn("Error from API server")
+					}
 				}
-			}
-		}()
-		go func() {
-			defer apiWG.Done()
-			<-srvCtx.Done()
-			shutdCtx, shutdCancel := context.WithTimeout(globalCtx, 1*time.Second)
-			defer shutdCancel()
-			if aerr := srv.Shutdown(shutdCtx); aerr != nil {
-				logger.WithError(aerr).Debug("REST API server did not shut down correctly")
-			}
-		}()
+			}()
+			go func() {
+				defer apiWG.Done()
+				<-srvCtx.Done()
+				shutdCtx, shutdCancel := context.WithTimeout(globalCtx, 1*time.Second)
+				defer shutdCancel()
+				if aerr := srv.Shutdown(shutdCtx); aerr != nil {
+					logger.WithError(aerr).Debug("REST API server did not shut down correctly")
+				}
+			}()
+		}
 	}
 
 	waitOutputsFlushed, stopOutputs, err := outputManager.Start(samples)
