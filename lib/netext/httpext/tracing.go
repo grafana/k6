@@ -24,6 +24,12 @@ const metadataTraceID = "trace_id"
 // attrRequestName is the k6-specific span attribute holding the name tag of the request.
 const attrRequestName = "k6.http.request.name"
 
+// traceparentHeader is the W3C Trace Context header.
+const traceparentHeader = "Traceparent"
+
+// jaegerTraceHeader is the header carrying the trace context in the Jaeger propagation format.
+const jaegerTraceHeader = "Uber-Trace-Id"
+
 // redactedValue replaces the value of the sensitive query parameters in url.full.
 const redactedValue = "REDACTED"
 
@@ -48,8 +54,9 @@ func startSpan(
 	ctx, span := tracer.Start(ctx, req.Method,
 		oteltrace.WithSpanKind(oteltrace.SpanKindClient), oteltrace.WithAttributes(attrs...))
 
-	// A trace context set by the script is kept.
-	if req.Header.Get("Traceparent") != "" {
+	// A trace context set by the script is kept, either W3C Trace Context or Jaeger's
+	// uber-trace-id header.
+	if req.Header.Get(traceparentHeader) != "" || req.Header.Get(jaegerTraceHeader) != "" {
 		return ctx, span
 	}
 

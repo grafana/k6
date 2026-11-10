@@ -282,26 +282,39 @@ func TestMakeRequestTracing(t *testing.T) {
 		assert.Empty(t, f.samples, "no metrics are emitted for the request, as before")
 	})
 
-	t.Run("script traceparent is kept", func(t *testing.T) {
+	t.Run("script trace context is kept", func(t *testing.T) {
 		t.Parallel()
-		const own = "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"
-		var mu sync.Mutex
-		var got []string
-		srv := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-			mu.Lock()
-			defer mu.Unlock()
-			got = r.Header.Values("traceparent")
-		}))
-		t.Cleanup(srv.Close)
-		f := newTracingFixture(t, srv, true)
 
-		f.get(t, srv.URL, func(p *ParsedHTTPRequest) { p.Req.Header.Set("traceparent", own) })
+		tests := map[string]struct{ header, value string }{
+			"traceparent": {"traceparent", "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"},
+			"jaeger":      {"uber-trace-id", "0af7651916cd43dd8448eb211c80319c:b7ad6b7169203331:0:1"},
+		}
+		for name, tc := range tests {
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				var mu sync.Mutex
+				var got, gotTraceparent []string
+				srv := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					mu.Lock()
+					defer mu.Unlock()
+					got = r.Header.Values(tc.header)
+					gotTraceparent = r.Header.Values("traceparent")
+				}))
+				t.Cleanup(srv.Close)
+				f := newTracingFixture(t, srv, true)
 
-		_, hasTraceID := f.traceIDMetadata(t)
-		assert.False(t, hasTraceID, "the samples aren't linked to a trace the server isn't part of")
-		mu.Lock()
-		defer mu.Unlock()
-		assert.Equal(t, []string{own}, got)
+				f.get(t, srv.URL, func(p *ParsedHTTPRequest) { p.Req.Header.Set(tc.header, tc.value) })
+
+				_, hasTraceID := f.traceIDMetadata(t)
+				assert.False(t, hasTraceID, "the samples aren't linked to a trace the server isn't part of")
+				mu.Lock()
+				defer mu.Unlock()
+				assert.Equal(t, []string{tc.value}, got)
+				if tc.header != "traceparent" {
+					assert.Empty(t, gotTraceparent, "k6 must not inject its own trace context")
+				}
+			})
+		}
 	})
 
 	t.Run("not sampled", func(t *testing.T) {
