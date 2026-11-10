@@ -2,7 +2,6 @@ package common
 
 import (
 	"encoding/json"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -123,14 +122,49 @@ func TestSelectorParseInternalOrQuotedJSON(t *testing.T) {
 	require.NoError(t, err)
 	encoded, err := json.Marshal(parsed)
 	require.NoError(t, err)
-	quoted := strconv.Quote(string(encoded))
-	input := "button >> internal:or=" + quoted
+	quoted, err := json.Marshal(string(encoded))
+	require.NoError(t, err)
+	input := "button >> internal:or=" + string(quoted)
 
 	sel, err := NewSelector(input)
 	require.NoError(t, err)
 
 	assert.Equal(t, []*SelectorPart{
 		{Name: "css", Body: "button"},
-		{Name: "internal:or", Body: quoted},
+		{Name: "internal:or", Body: string(quoted)},
 	}, sel.Parts)
+}
+
+// TestWithControlCharInSelector checks wire encoding with control characters, ensuring it will decode correctly in JS.
+func TestWithControlCharInSelector(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := NewSelector("text=\u007f")
+	require.NoError(t, err)
+	encoded, err := json.Marshal(parsed)
+	require.NoError(t, err)
+
+	// Must match Locator.Or's outer encoding.
+	quoted, err := json.Marshal(string(encoded))
+	require.NoError(t, err)
+
+	got, err := decodeInternalOrBody(string(quoted))
+	require.NoError(t, err)
+	require.Len(t, got.Parts, 1)
+	assert.Equal(t, "text", got.Parts[0].Name)
+	assert.Equal(t, "\u007f", got.Parts[0].Body)
+}
+
+// decodeInternalOrBody mirrors the injected script's
+// JSON.parse(JSON.parse(part.body)) for internal:or.
+func decodeInternalOrBody(body string) (*Selector, error) {
+	var once string
+	if err := json.Unmarshal([]byte(body), &once); err != nil {
+		return nil, err
+	}
+	var sel Selector
+	if err := json.Unmarshal([]byte(once), &sel); err != nil {
+		return nil, err
+	}
+	return &sel, nil
 }
