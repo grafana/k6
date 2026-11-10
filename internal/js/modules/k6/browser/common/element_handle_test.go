@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"strconv"
 	"testing"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
@@ -247,14 +246,15 @@ func TestReconstructSelectorInternalStability(t *testing.T) {
 	require.NoError(t, err)
 	encoded, err := json.Marshal(inner)
 	require.NoError(t, err)
-	quoted := strconv.Quote(string(encoded))
+	quoted, err := json.Marshal(string(encoded))
+	require.NoError(t, err)
 
 	after := &Selector{
 		Parts: []*SelectorPart{
 			{Name: "css", Body: "#iframe2"},
 			{Name: "internal:control", Body: "enter-frame"},
 			{Name: "css", Body: "#does-not-match"},
-			{Name: "internal:or", Body: quoted},
+			{Name: "internal:or", Body: string(quoted)},
 		},
 	}
 	var h ElementHandle
@@ -264,7 +264,7 @@ func TestReconstructSelectorInternalStability(t *testing.T) {
 	require.NoError(t, err, "selector after reconstruct must parse: %s", out)
 	require.Len(t, parsed.Parts, 4)
 	assert.Equal(t, "internal:or", parsed.Parts[3].Name)
-	assert.Equal(t, quoted, parsed.Parts[3].Body)
+	assert.Equal(t, string(quoted), parsed.Parts[3].Body)
 }
 
 type jsHandleStub struct {

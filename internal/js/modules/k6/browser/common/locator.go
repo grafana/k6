@@ -482,8 +482,15 @@ func (l *Locator) Or(locator *Locator) (*Locator, error) {
 		return nil, fmt.Errorf("encoding selector: %w", err)
 	}
 
+	// JSON-encode the outer string too: strconv.Quote can emit Go escapes
+	// such as \x7f which do not match behavior of JSON.parse on JS side
+	quoted, err := json.Marshal(string(encoded))
+	if err != nil {
+		return nil, fmt.Errorf("encoding selector: %w", err)
+	}
+
 	return NewLocator(l.ctx, nil,
-		l.selector+" >> internal:or="+strconv.Quote(string(encoded)),
+		l.selector+" >> internal:or="+string(quoted),
 		l.frame, l.log), nil
 }
 
