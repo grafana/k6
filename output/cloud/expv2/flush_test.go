@@ -320,11 +320,11 @@ type pusherMock struct {
 	// errFn if this defined, it is called at the end of push
 	// and result error is returned.
 	errFn      func() error
-	pushCalled int64
+	pushCalled atomic.Int64
 }
 
 func (pm *pusherMock) timesCalled() int {
-	return int(atomic.LoadInt64(&pm.pushCalled))
+	return int(pm.pushCalled.Load())
 }
 
 func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
@@ -332,7 +332,7 @@ func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
 		pm.hook(ms)
 	}
 
-	atomic.AddInt64(&pm.pushCalled, 1)
+	pm.pushCalled.Add(1)
 
 	if pm.errFn != nil {
 		return pm.errFn()

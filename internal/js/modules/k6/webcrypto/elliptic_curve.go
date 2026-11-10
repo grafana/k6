@@ -1,3 +1,4 @@
+//nolint:staticcheck // legacy key representation requires deprecated coordinate access
 package webcrypto
 
 import (

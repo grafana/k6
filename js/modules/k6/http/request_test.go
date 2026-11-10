@@ -21,6 +21,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -1447,8 +1448,8 @@ func TestRequestCompression(t *testing.T) {
 		var prev io.Reader = compressedBuf
 
 		if expectedEncoding != "" {
-			for i := len(algos) - 1; i >= 0; i-- {
-				prev = decompress(algos[i], prev)
+			for _, algo := range slices.Backward(algos) {
+				prev = decompress(algo, prev)
 			}
 		}
 

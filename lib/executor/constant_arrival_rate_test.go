@@ -72,9 +72,9 @@ func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
 
-	var count int64
+	var count atomic.Int64
 	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-		atomic.AddInt64(&count, 1)
+		count.Add(1)
 		return nil
 	})
 
@@ -93,7 +93,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 			if i == 0 {
 				break
 			}
-			currentCount := atomic.SwapInt64(&count, 0)
+			currentCount := count.Swap(0)
 			totalCount += currentCount
 			// We have a relatively relaxed constraint here, but we also check
 			// the final iteration count exactly below:
@@ -102,7 +102,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 
 		time.Sleep(200 * time.Millisecond) // just in case
 
-		assert.InDelta(t, 250, totalCount+atomic.LoadInt64(&count), 2)
+		assert.InDelta(t, 250, totalCount+count.Load(), 2)
 	})
 	engineOut := make(chan metrics.SampleContainer, 1000)
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
@@ -169,11 +169,11 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("segment %s sequence %s", test.segment, test.sequence), func(t *testing.T) {
-			var count int64
+			var count atomic.Int64
 			startTime := time.Now()
 			expectedTimeInt64 := int64(test.start)
 			runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
-				current := atomic.AddInt64(&count, 1)
+				current := count.Add(1)
 
 				expectedTime := test.start
 				if current != 1 {
@@ -212,7 +212,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 
 				for i := range seconds {
 					time.Sleep(time.Second)
-					currentCount = atomic.LoadInt64(&count)
+					currentCount = count.Load()
 					assert.InDelta(t, int64(i+1)*rateScaled, currentCount, 3)
 				}
 			})

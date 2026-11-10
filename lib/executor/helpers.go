@@ -96,8 +96,7 @@ func getIterationRunner(
 					return false
 				}
 
-				var exception errext.Exception
-				if errors.As(err, &exception) {
+				if exception, ok := errors.AsType[errext.Exception](err); ok {
 					// TODO don't count this as a full iteration?
 					logger.WithField("source", "stacktrace").Error(exception.StackTrace())
 				} else {
@@ -148,7 +147,8 @@ func getDurationContexts(parentCtx context.Context, regularDuration, gracefulSto
 	if gracefulStop == 0 {
 		return startTime, maxDurationCtx, maxDurationCtx, maxDurationCancel
 	}
-	regDurationCtx, _ = context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration)) //nolint:govet
+	// The regular deadline or the parent cancellation releases this child context.
+	regDurationCtx, _ = context.WithDeadline(maxDurationCtx, startTime.Add(regularDuration)) //nolint:govet,gosec
 	return startTime, maxDurationCtx, regDurationCtx, maxDurationCancel
 }
 

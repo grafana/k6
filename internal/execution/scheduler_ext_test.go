@@ -1116,13 +1116,13 @@ func TestDNSResolverCache(t *testing.T) {
 			require.NoError(t, err)
 
 			mr := mockresolver.New(map[string][]net.IP{"myhost": {net.ParseIP(sr("HTTPBIN_IP"))}})
-			var newResolutions uint32
+			var newResolutions atomic.Uint32
 			resolveHook := func(_ string, result []net.IP) {
 				require.Len(t, result, 1)
 				if result[0].String() == "127.0.0.1" {
 					mr.Set("myhost", "127.0.0.254")
 				} else {
-					atomic.AddUint32(&newResolutions, 1)
+					newResolutions.Add(1)
 				}
 			}
 			mr.ResolveHook = resolveHook
@@ -1137,7 +1137,7 @@ func TestDNSResolverCache(t *testing.T) {
 			select {
 			case err := <-errCh:
 				require.NoError(t, err)
-				assert.Equal(t, tc.expNewResolutions, atomic.LoadUint32(&newResolutions))
+				assert.Equal(t, tc.expNewResolutions, newResolutions.Load())
 			case <-time.After(10 * time.Second):
 				t.Fatal("timed out")
 			}
