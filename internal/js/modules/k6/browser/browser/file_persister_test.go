@@ -143,7 +143,7 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 		{
 			name:        "empty",
 			envVarValue: "",
-			wantErr:     `format of value must be k=v, received ""`,
+			wantErr:     "format of value must be k=v, at entry 1",
 		},
 		{
 			name:        "missing_url",
@@ -208,6 +208,32 @@ func Test_parsePresignedURLEnvVar(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_parsePresignedURLEnvVarErrorsDoNotLeakValues(t *testing.T) {
+	t.Parallel()
+
+	const secret = "s3cr3t"
+
+	tests := []struct {
+		name        string
+		envVarValue string
+	}{
+		{name: "missing_equals", envVarValue: "url=https://127.0.0.1/," + secret},
+		{name: "invalid_header_format", envVarValue: "url=https://127.0.0.1/,header..x=Basic " + secret},
+		{name: "empty_header_key", envVarValue: "url=https://127.0.0.1/,header.=Basic " + secret},
+		{name: "invalid_url", envVarValue: "url=:" + secret},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := parsePresignedURLEnvVar(tt.envVarValue)
+			if assert.Error(t, err) {
+				assert.NotContains(t, err.Error(), secret)
+			}
 		})
 	}
 }

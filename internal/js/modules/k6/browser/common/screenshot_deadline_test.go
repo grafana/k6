@@ -35,7 +35,7 @@ func (s *screenshotDeadlineSession) Execute(ctx context.Context, method string, 
 
 	switch method {
 	case "Page.getLayoutMetrics":
-		result.(*page.GetLayoutMetricsReturns).CSSVisualViewport = &page.VisualViewport{Scale: 1}
+		result.(*page.GetLayoutMetricsResult).CSSVisualViewport = &page.VisualViewport{Scale: 1}
 	case "Page.captureScreenshot":
 	case "Emulation.setDefaultBackgroundColorOverride":
 		color := params.(*emulation.SetDefaultBackgroundColorOverrideParams).Color

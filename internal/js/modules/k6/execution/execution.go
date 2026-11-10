@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/v2/errext"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
 	"go.k6.io/k6/v2/lib"
@@ -193,6 +194,7 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 
 				mi.vu.State().Logger.Errorf(reason)
 				mi.vu.State().TestStatus.MarkFailed()
+				k6trace.MarkIterationFailed(mi.vu.Context(), reason)
 			}
 		},
 		"options": func() any {

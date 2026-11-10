@@ -6,10 +6,10 @@ require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.36.12-20261001224011-d7f6cfecf2b8.2
 	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/PuerkitoBio/goquery v1.12.0
-	github.com/andybalholm/brotli v1.2.6
+	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/andybalholm/brotli v1.2.8
 	github.com/bufbuild/protocompile v0.14.1
-	github.com/chromedp/cdproto v0.0.0-20260922220944-a19bff23514f
+	github.com/chromedp/cdproto v0.158.3
 	github.com/evanw/esbuild v0.28.2
 	github.com/fatih/color v1.19.0
 	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3
@@ -19,7 +19,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/k6-cloud-openapi-client-go v0.0.3-0.20260716125012-97c96146fa7c
 	github.com/grafana/k6provider v0.5.1
-	github.com/grafana/sobek v0.0.0-20260908083152-4698bc773ae7
+	github.com/grafana/sobek v0.0.0-20261105103427-a5b602015248
 	github.com/grafana/sobek-webapi-encoding v0.1.0
 	github.com/grafana/xk6-dashboard-assets v0.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -70,12 +70,11 @@ require (
 
 require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.36.12-20240617172848-e1dbca2775a7.2 // indirect
-	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/andybalholm/cascadia v1.3.4 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/chromedp/sysutil v1.1.0 // indirect
-	github.com/dlclark/regexp2/v2 v2.7.2 // indirect
+	github.com/dlclark/regexp2/v2 v2.11.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect

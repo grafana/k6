@@ -31,7 +31,7 @@ type fakeSession struct {
 	cdpCalls []string
 }
 
-// Execute implements the cdp.Executor interface to record calls made to it and
+// Execute implements the executor interface to record calls made to it and
 // allow assertions in tests.
 func (s *fakeSession) Execute(
 	ctx context.Context, method string, params, res any,
@@ -296,23 +296,23 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 			req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 				event: &network.EventRequestWillBeSent{
 					Request:   &network.Request{},
-					Timestamp: (*cdp.MonotonicTime)(&tt.req.ts),
-					WallTime:  (*cdp.TimeSinceEpoch)(&tt.req.wt),
+					Timestamp: cdp.MonotonicTime(float64(tt.req.ts.UnixNano()) / 1e9),
+					WallTime:  cdp.TimeSinceEpoch(float64(tt.req.wt.UnixNano()) / 1e9),
 				},
 			})
 			require.NoError(t, err)
 			nm.emitRequestMetrics(req)
 			n := vu.AssertSamples(func(s k6metrics.Sample) {
-				assert.Equalf(t, tt.wantReq.wt, s.Time, "timing skew in %s", s.Metric.Name)
+				assert.WithinDurationf(t, tt.wantReq.wt, s.Time, time.Microsecond, "timing skew in %s", s.Metric.Name)
 			})
 			assert.Equalf(t, 1, n, "should emit %d request metric", 1)
 			res := NewHTTPResponse(vu.Context(), req,
 				&network.Response{Timing: &network.ResourceTiming{}},
-				(*cdp.MonotonicTime)(&tt.res.ts),
+				cdp.MonotonicTime(float64(tt.res.ts.UnixNano())/1e9),
 			)
 			nm.emitResponseMetrics(res, req, 1)
 			n = vu.AssertSamples(func(s k6metrics.Sample) {
-				assert.Equalf(t, tt.wantRes.wt, s.Time, "timing skew in %s", s.Metric.Name)
+				assert.WithinDurationf(t, tt.wantRes.wt, s.Time, time.Microsecond, "timing skew in %s", s.Metric.Name)
 			})
 			assert.Equalf(t, 3, n, "should emit 8 response metrics")
 		})
@@ -338,8 +338,8 @@ func TestNetworkManagerMetricsRetainRequestTagsAndMetadata(t *testing.T) {
 	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 		event: &network.EventRequestWillBeSent{
 			Request:   &network.Request{URL: "https://example.test/"},
-			Timestamp: (*cdp.MonotonicTime)(&now),
-			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+			Timestamp: cdp.MonotonicTime(float64(now.UnixNano()) / 1e9),
+			WallTime:  cdp.TimeSinceEpoch(float64(now.UnixNano()) / 1e9),
 		},
 		tagsAndMeta: state.Tags.GetCurrentValues(),
 	})
@@ -361,7 +361,7 @@ func TestNetworkManagerMetricsRetainRequestTagsAndMetadata(t *testing.T) {
 	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
 		URL:    req.URL(),
 		Timing: &network.ResourceTiming{},
-	}, (*cdp.MonotonicTime)(&now))
+	}, cdp.MonotonicTime(float64(now.UnixNano())/1e9))
 	nm.emitResponseMetrics(resp, req, 1)
 
 	n := vu.AssertSamples(func(sample k6metrics.Sample) {
@@ -395,8 +395,8 @@ func TestBrowserDataReceivedUsesEncodedDataLength(t *testing.T) {
 	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 		event: &network.EventRequestWillBeSent{
 			Request:   &network.Request{URL: "https://example.test/"},
-			Timestamp: (*cdp.MonotonicTime)(&now),
-			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+			Timestamp: cdp.MonotonicTime(float64(now.UnixNano()) / 1e9),
+			WallTime:  cdp.TimeSinceEpoch(float64(now.UnixNano()) / 1e9),
 		},
 		tagsAndMeta: vu.State().Tags.GetCurrentValues(),
 	})
@@ -406,7 +406,7 @@ func TestBrowserDataReceivedUsesEncodedDataLength(t *testing.T) {
 	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
 		URL:    req.URL(),
 		Timing: &network.ResourceTiming{},
-	}, (*cdp.MonotonicTime)(&now))
+	}, cdp.MonotonicTime(float64(now.UnixNano())/1e9))
 	nm.emitResponseMetrics(resp, req, encodedDataLength)
 
 	foundDataReceived := false
@@ -439,8 +439,8 @@ func TestBrowserDataReceivedOmitsNegativeEncodedDataLength(t *testing.T) {
 	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 		event: &network.EventRequestWillBeSent{
 			Request:   &network.Request{URL: "https://example.test/"},
-			Timestamp: (*cdp.MonotonicTime)(&now),
-			WallTime:  (*cdp.TimeSinceEpoch)(&now),
+			Timestamp: cdp.MonotonicTime(float64(now.UnixNano()) / 1e9),
+			WallTime:  cdp.TimeSinceEpoch(float64(now.UnixNano()) / 1e9),
 		},
 		tagsAndMeta: vu.State().Tags.GetCurrentValues(),
 	})
@@ -449,7 +449,7 @@ func TestBrowserDataReceivedOmitsNegativeEncodedDataLength(t *testing.T) {
 	resp := NewHTTPResponse(vu.Context(), req, &network.Response{
 		URL:    req.URL(),
 		Timing: &network.ResourceTiming{},
-	}, (*cdp.MonotonicTime)(&now))
+	}, cdp.MonotonicTime(float64(now.UnixNano())/1e9))
 
 	nm.emitResponseMetrics(resp, req, -1)
 
