@@ -1,6 +1,7 @@
 package netext
 
 import (
+	"errors"
 	"net"
 	"testing"
 
@@ -217,4 +218,62 @@ func newResolver() *mockresolver.MockResolver {
 			"example-ipv6-deny-resolver.com": {net.ParseIP("::1")},
 		},
 	)
+}
+
+// noLookupResolver fails any lookup, so a test can prove that no DNS resolution happened.
+type noLookupResolver struct{ t *testing.T }
+
+func (r noLookupResolver) LookupIP(host string) (net.IP, error) {
+	r.t.Errorf("unexpected DNS lookup of %q", host)
+	return nil, errors.New("unexpected DNS lookup")
+}
+
+func TestDialerCheckTargetAddr(t *testing.T) {
+	t.Parallel()
+	dialer := NewDialer(net.Dialer{}, noLookupResolver{t: t})
+	hosts, err := types.NewHosts(map[string]types.Host{
+		"example.com":               {IP: net.ParseIP("3.4.5.6")},
+		"example-deny-host.com":     {IP: net.ParseIP("8.9.10.11")},
+		"example-deny-port.com:443": {IP: net.ParseIP("8.9.10.12"), Port: 8443},
+	})
+	require.NoError(t, err)
+	dialer.Hosts = hosts
+
+	ipNet, err := lib.ParseCIDR("8.9.10.0/24")
+	require.NoError(t, err)
+	ipV6Net, err := lib.ParseCIDR("::1/24")
+	require.NoError(t, err)
+	dialer.Blacklist = []*lib.IPNet{ipNet, ipV6Net}
+
+	blocked, err := types.NewHostnameTrie([]string{"*.blocked.com"})
+	require.NoError(t, err)
+	dialer.BlockedHostnames = blocked
+
+	testCases := []struct {
+		address, expErr string
+	}{
+		{"example.com:443", ""},
+		{"only-the-proxy-resolves-this.internal:443", ""},
+		{"1.2.3.4:443", ""},
+		{"[2001:db8::68]:443", ""},
+		{"api.blocked.com:443", "hostname (api.blocked.com) is in a blocked pattern (*.blocked.com)"},
+		{"8.9.10.11:443", "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)"},
+		{"[::1]:443", "IP (::1) is in a blacklisted range (::/24)"},
+		{"example-deny-host.com:443", "IP (8.9.10.11) is in a blacklisted range (8.9.10.0/24)"},
+		{"example-deny-port.com:443", "IP (8.9.10.12) is in a blacklisted range (8.9.10.0/24)"},
+		{"example-deny-port.com:80", ""},
+		{"example.com", "address example.com: missing port in address"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.address, func(t *testing.T) {
+			t.Parallel()
+			err := dialer.CheckTargetAddr(tc.address)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

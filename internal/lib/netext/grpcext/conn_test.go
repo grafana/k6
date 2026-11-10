@@ -40,6 +40,7 @@ import (
 
 const (
 	grpcProxyTargetAddr = "grpc.example:443"
+	testGRPCProxyAddr   = "proxy.example:3128"
 	sayHelloMethod      = "/hello.HelloService/SayHello"
 )
 
@@ -271,7 +272,7 @@ func TestHTTPConnectHandshakeAlreadyCanceledContext(t *testing.T) {
 	clientConn, serverConn := net.Pipe()
 	defer func() { _ = serverConn.Close() }()
 
-	conn, err := doHTTPConnectHandshake(ctx, clientConn, grpcProxyTargetAddr, nil)
+	conn, err := doHTTPConnectHandshake(ctx, clientConn, testGRPCProxyAddr, grpcProxyTargetAddr, nil)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, conn)
 
@@ -301,7 +302,7 @@ func TestHTTPConnectHandshakeCanceledDuringSuccessfulHandshake(t *testing.T) {
 				_, _ = serverConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 			}()
 
-			conn, err := doHTTPConnectHandshake(ctx, clientConn, grpcProxyTargetAddr, nil)
+			conn, err := doHTTPConnectHandshake(ctx, clientConn, testGRPCProxyAddr, grpcProxyTargetAddr, nil)
 			require.ErrorIs(t, err, context.Canceled)
 			require.Nil(t, conn)
 		})
@@ -696,21 +697,33 @@ func TestHTTPConnectHandshakeStopsOnContextCancellation(t *testing.T) {
 	releaseProxy := make(chan struct{})
 	defer close(releaseProxy)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	start := time.Now()
+	// Cancel only once the proxy has the CONNECT request and stalls before answering, so the
+	// handshake is waiting for the response. A fixed timeout could fire before the proxy reads
+	// the request on a busy machine, and the proxy would then see EOF instead of the request.
+	canceledAt := make(chan time.Time, 1)
+	sawRequest := make(chan proxyRequestResult, 1)
+	go func() {
+		proxyReq := <-proxyReqCh
+		sawRequest <- proxyReq
+		canceledAt <- time.Now()
+		cancel()
+	}()
+
 	conn, err := doHTTPConnectHandshake(
 		ctx,
 		acceptStalledProxyConnect(proxyReqCh, releaseProxy),
+		testGRPCProxyAddr,
 		grpcProxyTargetAddr,
 		nil,
 	)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, conn)
-	assert.Less(t, time.Since(start), time.Second)
+	assert.Less(t, time.Since(<-canceledAt), time.Second)
 
-	proxyReq := <-proxyReqCh
+	proxyReq := <-sawRequest
 	require.NoError(t, proxyReq.err)
 	assert.Equal(t, http.MethodConnect, proxyReq.req.Method)
 }
@@ -731,6 +744,7 @@ func TestHTTPConnectHandshakeDoesNotDrainSuccessfulTunnel(t *testing.T) {
 		conn, err := doHTTPConnectHandshake(
 			context.Background(),
 			acceptProxyConnectWithBodyHeader(proxyReqCh, releaseProxy),
+			testGRPCProxyAddr,
 			grpcProxyTargetAddr,
 			nil,
 		)

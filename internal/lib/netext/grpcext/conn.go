@@ -137,12 +137,28 @@ func dialGRPCContextWithProxy(
 	return dialGRPCContextViaProxy(ctx, state, addr, proxyURL)
 }
 
+// targetChecker is implemented by dialers that can apply blockHostnames, blacklistIPs and hosts
+// to an address without dialing it, such as *netext.Dialer.
+type targetChecker interface {
+	CheckTargetAddr(addr string) error
+}
+
 func dialGRPCContextViaProxy(
 	ctx context.Context, state *lib.State, addr string, proxyURL *url.URL,
 ) (net.Conn, error) {
 	proxyAddr, useTLS, err := proxyDialAddress(proxyURL)
 	if err != nil {
 		return nil, err
+	}
+
+	// The VU dialer only dials the proxy, and the target only goes into the CONNECT request, so
+	// check the target here, before anything reaches the proxy. This is done without DNS, to keep
+	// targets that only the proxy can resolve working. A hostname that resolves to a blocked IP
+	// on the proxy side is therefore not caught.
+	if checker, ok := state.Dialer.(targetChecker); ok {
+		if err := checker.CheckTargetAddr(addr); err != nil {
+			return nil, err
+		}
 	}
 
 	conn, err := state.Dialer.DialContext(ctx, "tcp", proxyAddr)
@@ -159,7 +175,7 @@ func dialGRPCContextViaProxy(
 		conn = tlsConn
 	}
 
-	return doHTTPConnectHandshake(ctx, conn, addr, proxyURL.User)
+	return doHTTPConnectHandshake(ctx, conn, proxyAddr, addr, proxyURL.User)
 }
 
 // proxyTLSConfig returns the TLS config for talking to an https:// proxy. Like net/http, it starts
@@ -214,7 +230,7 @@ func (c *proxyBufferConn) Read(b []byte) (int, error) {
 }
 
 func doHTTPConnectHandshake(
-	ctx context.Context, conn net.Conn, addr string, user *url.Userinfo,
+	ctx context.Context, conn net.Conn, proxyAddr, addr string, user *url.Userinfo,
 ) (result net.Conn, err error) {
 	stopCloseOnCancel := context.AfterFunc(ctx, func() {
 		_ = conn.Close()
@@ -251,7 +267,7 @@ func doHTTPConnectHandshake(
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, fmt.Errorf("failed to write proxy CONNECT request: %w", err)
+		return nil, fmt.Errorf("failed to write CONNECT request for %s to grpc proxy %s: %w", addr, proxyAddr, err)
 	}
 
 	reader := bufio.NewReader(conn)
@@ -260,10 +276,10 @@ func doHTTPConnectHandshake(
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		return nil, fmt.Errorf("failed to read proxy CONNECT response: %w", err)
+		return nil, fmt.Errorf("failed to read CONNECT response for %s from grpc proxy %s: %w", addr, proxyAddr, err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("proxy CONNECT failed: %s", resp.Status)
+		return nil, fmt.Errorf("CONNECT to %s through grpc proxy %s failed: %s", addr, proxyAddr, resp.Status)
 	}
 	if reader.Buffered() > 0 {
 		// Bytes after the CONNECT response already belong to the tunnel; keep them.
