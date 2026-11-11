@@ -60,6 +60,46 @@ func TestParseURL(t *testing.T) {
 	}
 }
 
+func TestParseURLCredentials(t *testing.T) {
+	t.Parallel()
+	testdata := map[string]Config{
+		"http://user@localhost:8086": {
+			Addr:     null.StringFrom("http://localhost:8086"),
+			Username: null.StringFrom("user"),
+		},
+		"http://user:@localhost:8086": {
+			Addr:     null.StringFrom("http://localhost:8086"),
+			Username: null.StringFrom("user"),
+			Password: null.StringFrom(""),
+		},
+		"http://user:pass@localhost:8086": {
+			Addr:     null.StringFrom("http://localhost:8086"),
+			Username: null.StringFrom("user"),
+			Password: null.StringFrom("pass"),
+		},
+	}
+	for str, data := range testdata {
+		t.Run(str, func(t *testing.T) {
+			t.Parallel()
+			config, err := ParseURL(str)
+			assert.NoError(t, err)
+			assert.Equal(t, data, config)
+		})
+	}
+}
+
+func TestGetConsolidatedConfigURLUsernameKeepsEnvPassword(t *testing.T) {
+	t.Parallel()
+	env := map[string]string{
+		"K6_INFLUXDB_USERNAME": "envuser",
+		"K6_INFLUXDB_PASSWORD": "envpass",
+	}
+	config, err := GetConsolidatedConfig(nil, env, "http://urluser@localhost:8086/k6")
+	assert.NoError(t, err)
+	assert.Equal(t, "urluser", config.Username.String)
+	assert.Equal(t, null.StringFrom("envpass"), config.Password)
+}
+
 func TestGetConsolidatedConfigHTTPProxy(t *testing.T) {
 	t.Parallel()
 	t.Run("Valid Proxy URL", func(t *testing.T) {
