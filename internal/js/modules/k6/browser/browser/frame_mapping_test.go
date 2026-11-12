@@ -1369,6 +1369,18 @@ func TestParseFrameWaitForFunctionOptions(t *testing.T) {
 			input:   `({polling: "bogus"})`,
 			wantErr: "wrong polling option value",
 		},
+		{
+			// Sobek's undefined/null ExportType() is a nil reflect.Type; calling
+			// .Kind() panics. Treat missing polling like an omitted key.
+			name:  "undefined_polling",
+			input: `({polling: undefined})`,
+			want:  common.NewFrameWaitForFunctionOptions(defaultTimeout),
+		},
+		{
+			name:  "null_polling",
+			input: `({polling: null})`,
+			want:  common.NewFrameWaitForFunctionOptions(defaultTimeout),
+		},
 	}
 
 	for _, tt := range tests {
