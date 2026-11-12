@@ -165,6 +165,11 @@ func (v *VU) SetVar(tb testing.TB, name string, value any) {
 func ToPromise(tb testing.TB, gv sobek.Value) *sobek.Promise {
 	tb.Helper()
 
+	// RunAsync can return a nil value when the event loop is interrupted
+	// (e.g. Abortf during IterStart). Guard before Export to avoid a nil
+	// pointer panic and surface a clear assertion failure instead.
+	require.NotNil(tb, gv, "expected a Promise, got nil sobek.Value (event loop likely interrupted)")
+
 	p, ok := gv.Export().(*sobek.Promise)
 	require.True(tb, ok, "got: %T, want *sobek.Promise", gv.Export())
 	return p
