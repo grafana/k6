@@ -162,19 +162,21 @@ func TestOutputStartVersionError(t *testing.T) {
 func TestOutputStartVersionedOutputV2(t *testing.T) {
 	t.Parallel()
 
+	conf := cloudapi.NewConfig()
+	conf.APIVersion = null.IntFrom(2)
+	conf.Host = null.StringFrom("fake-cloud-url")
+	conf.Token = null.StringFrom("fake-token")
+	conf.AggregationWaitPeriod = types.NullDurationFrom(1 * time.Second)
+	// Here, we are enabling it but silencing the related async ops
+	conf.AggregationPeriod = types.NullDurationFrom(1 * time.Hour)
+	conf.MetricPushInterval = types.NullDurationFrom(1 * time.Hour)
+	conf.TracesEnabled = null.BoolFrom(false)
+
 	o := Output{
 		logger:    testutils.NewLogger(t),
 		testRunID: "123",
-		config: cloudapi.Config{
-			APIVersion:            null.IntFrom(2),
-			Host:                  null.StringFrom("fake-cloud-url"),
-			Token:                 null.StringFrom("fake-token"),
-			AggregationWaitPeriod: types.NullDurationFrom(1 * time.Second),
-			// Here, we are enabling it but silencing the related async ops
-			AggregationPeriod:  types.NullDurationFrom(1 * time.Hour),
-			MetricPushInterval: types.NullDurationFrom(1 * time.Hour),
-		},
-		usage: usage.New(),
+		config:    conf,
+		usage:     usage.New(),
 	}
 
 	o.client = cloudapi.NewClient(
