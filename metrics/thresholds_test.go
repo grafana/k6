@@ -315,6 +315,28 @@ func TestThresholdsParse(t *testing.T) {
 	})
 }
 
+func TestThresholdsRejectBarePercentile(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	_, err := registry.NewMetric("test_trend", Trend)
+	require.NoError(t, err)
+
+	for _, source := range []string{"p<100", " p <= 100 ", "p>100", "p>=100", "p==100", "p===100", "p!=100"} {
+		t.Run(source, func(t *testing.T) {
+			t.Parallel()
+
+			thresholds := NewThresholds([]string{source})
+			assert.Error(t, thresholds.Parse())
+			assert.Nil(t, thresholds.Thresholds[0].parsed)
+
+			thresholds = NewThresholds([]string{source})
+			assert.Error(t, thresholds.Validate("test_trend", registry))
+			assert.Nil(t, thresholds.Thresholds[0].parsed)
+		})
+	}
+}
+
 func TestThresholdsValidate(t *testing.T) {
 	t.Parallel()
 
