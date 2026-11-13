@@ -26,6 +26,7 @@ func Compress(in []byte, s *Scratch) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer s.cleanup()
 
 	// Create histogram, if none was provided.
 	maxCount := s.maxCount
@@ -659,7 +660,8 @@ func (s *Scratch) validateNorm() (err error) {
 		if v >= 0 {
 			total += int(v)
 		} else {
-			total -= int(v)
+			// -1 takes one cell. Adding -v would let a wrapped -32768 pass.
+			total++
 		}
 	}
 	defer func() {

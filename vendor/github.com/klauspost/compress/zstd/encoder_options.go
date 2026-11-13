@@ -14,22 +14,23 @@ type EOption func(*encoderOptions) error
 
 // options retains accumulated state of multiple options.
 type encoderOptions struct {
-	resetOpt        bool
-	concurrent      int
-	level           EncoderLevel
-	single          *bool
-	pad             int
-	blockSize       int
-	windowSize      int
-	crc             bool
-	fullZero        bool
-	noEntropy       bool
-	allLitEntropy   bool
-	customWindow    bool
-	customALEntropy bool
-	customBlockSize bool
-	lowMem          bool
-	dict            *dict
+	resetOpt         bool
+	concurrent       int
+	level            EncoderLevel
+	single           *bool
+	pad              int
+	blockSize        int
+	windowSize       int
+	crc              bool
+	fullZero         bool
+	noEntropy        bool
+	allLitEntropy    bool
+	customWindow     bool
+	customALEntropy  bool
+	customBlockSize  bool
+	lowMem           bool
+	dict             *dict
+	concurrentBlocks bool
 }
 
 func (o *encoderOptions) setDefault() {
@@ -331,6 +332,49 @@ func WithLowerEncoderMem(b bool) EOption {
 		o.lowMem = b
 		return nil
 	}
+}
+
+// WithConcurrentBlocks enables job-based parallel compression for streams.
+// When enabled and concurrent > 1, input is split into large sections (jobs)
+// that are compressed simultaneously by multiple goroutines.
+// Each non-first job receives an overlap prefix from the previous job for match context.
+// Output is flushed in order, producing a valid single-frame zstd stream.
+//
+// Currently disabled when used with dictionary encoding.
+// Cannot be changed with ResetWithOptions.
+func WithConcurrentBlocks(b bool) EOption {
+	return func(o *encoderOptions) error {
+		if o.resetOpt && b != o.concurrentBlocks {
+			return errors.New("WithConcurrentBlocks cannot be changed on Reset")
+		}
+		o.concurrentBlocks = b
+		return nil
+	}
+}
+
+// maxJobSize caps the job size, so large windows still give several jobs.
+// A variable so tests can exercise the cap with small inputs.
+var maxJobSize = 256 << 20
+
+// jobSize returns the input section size per parallel job.
+func (o *encoderOptions) jobSize() int {
+	// Clamp before multiplying: windowSize*4 overflows a 32-bit int for
+	// windows of 512 MiB.
+	return max(min(o.windowSize, maxJobSize/4)*4, 512<<10)
+}
+
+// overlapSize returns the overlap prefix size for parallel jobs.
+func (o *encoderOptions) overlapSize() int {
+	var s int
+	switch o.level {
+	case SpeedBestCompression:
+		s = o.windowSize / 2
+	case SpeedBetterCompression:
+		s = o.windowSize / 4
+	default:
+		s = o.windowSize / 8
+	}
+	return min(s, o.jobSize()/2)
 }
 
 // WithEncoderDict allows to register a dictionary that will be used for the encode.

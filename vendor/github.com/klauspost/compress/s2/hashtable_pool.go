@@ -25,7 +25,7 @@ type betterTables struct {
 	sTable [betterShortTableSize]uint32
 }
 
-var betterTablePool = sync.Pool{New: func() interface{} { return &betterTables{} }}
+var betterTablePool = sync.Pool{New: func() any { return &betterTables{} }}
 
 // betterSnappyTables holds better-snappy compression hash tables.
 type betterSnappyTables struct {
@@ -33,7 +33,7 @@ type betterSnappyTables struct {
 	sTable [betterShortTableSize]uint32
 }
 
-var betterSnappyTablePool = sync.Pool{New: func() interface{} { return &betterSnappyTables{} }}
+var betterSnappyTablePool = sync.Pool{New: func() any { return &betterSnappyTables{} }}
 
 // bestTables holds best compression hash tables.
 type bestTables struct {
@@ -41,7 +41,7 @@ type bestTables struct {
 	sTable [bestShortTableSize]uint64
 }
 
-var bestTablePool = sync.Pool{New: func() interface{} { return &bestTables{} }}
+var bestTablePool = sync.Pool{New: func() any { return &bestTables{} }}
 
 // getBetterTables gets a zeroed betterTables from the pool.
 func getBetterTables() *betterTables {

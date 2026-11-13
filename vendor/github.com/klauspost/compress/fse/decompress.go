@@ -3,6 +3,7 @@ package fse
 import (
 	"errors"
 	"fmt"
+	"math"
 )
 
 const (
@@ -21,6 +22,7 @@ func Decompress(b []byte, s *Scratch) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer s.cleanup()
 	s.Out = s.Out[:0]
 	err = s.readNCount()
 	if err != nil {
@@ -122,6 +124,11 @@ func (s *Scratch) readNCount() error {
 		} else {
 			remaining -= count
 			gotTotal += count
+		}
+		if count > math.MaxInt16 {
+			// Only one symbol filling a tableLog 15 table, which cannot be decoded.
+			// Truncated, it would leave the decoding table unwritten.
+			return fmt.Errorf("corruption detected (count %d > %d)", count, math.MaxInt16)
 		}
 		s.norm[charnum&0xff] = int16(count)
 		charnum++

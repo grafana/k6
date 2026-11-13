@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/bits"
 
 	"github.com/klauspost/compress/internal/le"
+	"github.com/klauspost/compress/internal/regmask"
 )
 
 // bitReader reads a bitstream in reverse.
@@ -206,8 +208,105 @@ func (b *bitReaderShifted) fill() {
 	}
 }
 
+// shiftedState is the part of a bitReaderShifted that changes while
+// reading. Decode loops hold it by value so it stays in registers.
+// value is always le.Load64(in, off) << bitsRead.
+type shiftedState struct {
+	value    uint64
+	off      uint
+	bitsRead uint8
+}
+
+func (b *bitReaderShifted) state() shiftedState {
+	return shiftedState{value: b.value, off: b.off, bitsRead: b.bitsRead}
+}
+
+func (b *bitReaderShifted) setState(s shiftedState) {
+	b.value, b.off, b.bitsRead = s.value, s.off, s.bitsRead
+}
+
+// refill reloads the whole container with one load and no branch,
+// leaving at least 57 bits. off must be at least bitsRead/8.
+func (s shiftedState) refill(in []byte) shiftedState {
+	s.off -= uint(s.bitsRead >> 3)
+	s.bitsRead &= 7
+	s.value = le.Load64(in, s.off) << (s.bitsRead & regmask.Shift64ByUint8)
+	return s
+}
+
+// decode reads one symbol from a table indexed by the top bits of the
+// container, value >> peek.
+func (s shiftedState) decode(single *[1 << tableLogMax]dEntrySingle, peek uint8) (shiftedState, uint8) {
+	v := single[(s.value>>(peek&regmask.Shift64ByUint8))&(1<<tableLogMax-1)].entry
+	s.bitsRead += uint8(v)
+	s.value <<= uint8(v) & regmask.Shift64ByUint8
+	return s, uint8(v >> 8)
+}
+
 func (b *bitReaderShifted) remaining() uint {
 	return b.off*8 + uint(64-b.bitsRead)
+}
+
+// canUseAsm reports whether the reader has a full 8-byte window ahead of
+// its read pointer, which the Decompress4X asm loops need to take over.
+func (b *bitReaderShifted) canUseAsm() bool {
+	return b.off >= 8
+}
+
+// prepareForAsm establishes the invariant the Decompress4X asm loops rely
+// on: value == load64(in[off:off+8]) << bitsRead with bitsRead <= 7, so
+// that a full group of symbols can never shift their sentinel bit out of
+// the container. init leaves bitsRead == 8 when the final byte of the
+// stream is exactly 0x01; that whole byte is consumed, so the same position
+// is the window one byte lower with nothing consumed. Requires canUseAsm.
+func (b *bitReaderShifted) prepareForAsm() {
+	if b.bitsRead >= 8 {
+		b.off--
+		b.value = le.Load64(b.in, b.off)
+		b.bitsRead -= 8
+	}
+}
+
+// restoreFromAsm converts the state left behind by the Decompress4X asm
+// loops back to the invariant the Go code relies on: value holds the 8
+// bytes at in[off:off+8] shifted left by bitsRead, with the low bitsRead
+// bits zero.
+//
+// The asm keeps a sentinel bit in value just below the unread bits, so its
+// trailing zero count is the number of consumed bits. The sentinel is ORed
+// over the lowest bit of the window, which the loop never consumes before
+// re-reading memory, so the window is re-read here too rather than taken
+// from value. The asm reports off as the signed distance from the start of
+// the stream, and it can be negative: a reload always reads a whole 8-byte
+// window, so a stream that is nearly drained ends with up to 7 bytes of the
+// previous stream (or the jump table) below its start inside the window.
+// Those bytes sit below the stream's own bits and count as consumed.
+// Anything further below, or more bits consumed than the stream holds, is
+// corruption.
+func (b *bitReaderShifted) restoreFromAsm() error {
+	off := int(b.off)
+	consumed := uint(bits.TrailingZeros64(b.value))
+	if off < 0 {
+		if off < -7 {
+			return errors.New("corruption detected: stream underrun")
+		}
+		consumed += uint(-off) * 8
+		if consumed > 64 {
+			return errors.New("corruption detected: stream underrun")
+		}
+		off = 0
+	}
+	if off+8 > len(b.in) {
+		return errors.New("corruption detected: stream overrun")
+	}
+	b.off = uint(off)
+	b.bitsRead = uint8(consumed)
+	if consumed >= 64 {
+		b.value = 0
+	} else {
+		b.value = le.Load64(b.in, b.off) << consumed
+	}
+	return nil
 }
 
 // close the bitstream and returns an error if out-of-buffer reads occurred.

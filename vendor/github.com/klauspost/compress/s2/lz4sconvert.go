@@ -21,6 +21,7 @@ import (
 // For Min Match of 4 bytes, Copy length value 1-15 means length 4-18 with 18 bytes adding an extra byte.
 // ONLY "Min match of 4 bytes" is supported.
 type LZ4sConverter struct {
+	noAsm bool
 }
 
 // ConvertBlock will convert an LZ4s block and append it as an S2
@@ -37,7 +38,15 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 
 	s, d := 0, len(dst)
 	dst = dst[:cap(dst)]
-	if !debug && hasAmd64Asm {
+	if d == len(dst) {
+		if len(src) == 1 && src[0] == 0 {
+			// An empty block converts to nothing, so no room is needed.
+			return dst[:d], 0, nil
+		}
+		// No room to write anything; keep a nil dst away from the assembly.
+		return nil, 0, ErrDstTooSmall
+	}
+	if !debug && hasAsm && !l.noAsm {
 		res, sz := cvtLZ4sBlockAsm(dst[d:], src)
 		if res < 0 {
 			const (
@@ -87,6 +96,10 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 				}
 				val := src[s]
 				ll += int(val)
+				// Checking per byte keeps ll from overflowing on 32-bit.
+				if ll >= len(src)-s {
+					return nil, 0, ErrCorrupt
+				}
 				if val != 255 {
 					break
 				}
@@ -101,7 +114,8 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 		}
 		s++
 		if ll > 0 {
-			if d+ll > dLimit {
+			// Leave room for a 5-byte literal header and an 8-byte copy.
+			if d+ll > len(dst)-13 {
 				return nil, 0, ErrDstTooSmall
 			}
 			if debug {
@@ -110,6 +124,9 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 			d += emitLiteralGo(dst[d:], src[s:s+ll])
 			s += ll
 			uncompressed += ll
+			if uncompressed < 0 {
+				return nil, 0, ErrTooLarge
+			}
 		}
 
 		// Check if we are done...
@@ -153,6 +170,10 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 				val := src[s]
 				s++
 				ml += int(val)
+				// ml and uncompressed can overflow on 32-bit.
+				if ml < 0 {
+					return nil, 0, ErrTooLarge
+				}
 				if val != 255 {
 					if s >= len(src) {
 						if debug {
@@ -218,11 +239,13 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 					dst[2] = uint8(length >> 0)
 					dst[1] = 0
 					dst[0] = 7<<2 | tagCopy1
-					if left > 0 {
-						d += 5 + emitRepeat16(dst[5:], offset, left)
-						break
-					}
 					d += 5
+					if left > 0 {
+						// The loop condition checks room for the next chunk.
+						dst = dst[5:]
+						length = left
+						continue
+					}
 					break
 				}
 			}
@@ -275,6 +298,9 @@ func (l *LZ4sConverter) ConvertBlock(dst, src []byte) ([]byte, int, error) {
 			lastOffset = offset
 		}
 		uncompressed += ml
+		if uncompressed < 0 {
+			return nil, 0, ErrTooLarge
+		}
 		if d > dLimit {
 			return nil, 0, ErrDstTooSmall
 		}
@@ -296,8 +322,16 @@ func (l *LZ4sConverter) ConvertBlockSnappy(dst, src []byte) ([]byte, int, error)
 
 	s, d := 0, len(dst)
 	dst = dst[:cap(dst)]
+	if d == len(dst) {
+		if len(src) == 1 && src[0] == 0 {
+			// An empty block converts to nothing, so no room is needed.
+			return dst[:d], 0, nil
+		}
+		// No room to write anything; keep a nil dst away from the assembly.
+		return nil, 0, ErrDstTooSmall
+	}
 	// Use assembly when possible
-	if !debug && hasAmd64Asm {
+	if !debug && hasAsm && !l.noAsm {
 		res, sz := cvtLZ4sBlockSnappyAsm(dst[d:], src)
 		if res < 0 {
 			const (
@@ -346,6 +380,10 @@ func (l *LZ4sConverter) ConvertBlockSnappy(dst, src []byte) ([]byte, int, error)
 				}
 				val := src[s]
 				ll += int(val)
+				// Checking per byte keeps ll from overflowing on 32-bit.
+				if ll >= len(src)-s {
+					return nil, 0, ErrCorrupt
+				}
 				if val != 255 {
 					break
 				}
@@ -369,6 +407,9 @@ func (l *LZ4sConverter) ConvertBlockSnappy(dst, src []byte) ([]byte, int, error)
 			d += emitLiteralGo(dst[d:], src[s:s+ll])
 			s += ll
 			uncompressed += ll
+			if uncompressed < 0 {
+				return nil, 0, ErrTooLarge
+			}
 		}
 
 		// Check if we are done...
@@ -412,6 +453,10 @@ func (l *LZ4sConverter) ConvertBlockSnappy(dst, src []byte) ([]byte, int, error)
 				val := src[s]
 				s++
 				ml += int(val)
+				// ml and uncompressed can overflow on 32-bit.
+				if ml < 0 {
+					return nil, 0, ErrTooLarge
+				}
 				if val != 255 {
 					if s >= len(src) {
 						if debug {
@@ -458,6 +503,9 @@ func (l *LZ4sConverter) ConvertBlockSnappy(dst, src []byte) ([]byte, int, error)
 			break
 		}
 		uncompressed += ml
+		if uncompressed < 0 {
+			return nil, 0, ErrTooLarge
+		}
 		if d > dLimit {
 			return nil, 0, ErrDstTooSmall
 		}
