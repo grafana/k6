@@ -205,12 +205,8 @@ encodeLoop:
 		candidateL := e.longTable[nextHashL]
 		candidateS := e.table[nextHashS]
 
-		// Set m to a match at offset if it looks like that will improve compression.
-		improve := func(m *match, offset int32, s int32, first uint32, rep int32) {
-			delta := s - offset
-			if delta >= e.maxMatchOff || delta <= 0 || load3232(src, offset) != first {
-				return
-			}
+		// improveSlow evaluates a candidate that passed improve's checks.
+		improveSlow := func(m *match, offset int32, s int32, first uint32, rep int32) {
 			// Try to quick reject if we already have a long match.
 			if m.length > 16 {
 				left := len(src) - int(m.s+m.length)
@@ -252,6 +248,14 @@ encodeLoop:
 			cand.estBits(bitsPerByte)
 			if m.est >= highScore || cand.est-m.est+(cand.s-m.s)*bitsPerByte>>10 < 0 {
 				*m = cand
+			}
+		}
+
+		// Set m to a match at offset if it looks like that will improve compression.
+		// The reject path is kept small so it inlines at every call site.
+		improve := func(m *match, offset int32, s int32, first uint32, rep int32) {
+			if delta := s - offset; delta < e.maxMatchOff && delta > 0 && load3232(src, offset) == first {
+				improveSlow(m, offset, s, first, rep)
 			}
 		}
 
@@ -550,4 +554,19 @@ func (e *bestFastEncoder) Reset(d *dict, singleBlock bool) {
 	e.cur = e.maxMatchOff
 	// Reset table to initial state
 	copy(e.table[:], e.dictTable)
+}
+
+func (e *bestFastEncoder) ResetPrefix(prefix []byte) {
+	e.resetBasePrefix(prefix)
+	if len(prefix) < 8 {
+		return
+	}
+	end := e.cur + int32(len(prefix)) - 8
+	for i := e.cur; i < end; i++ {
+		cv := load6432(prefix, i-e.cur)
+		h := hashLen(cv, bestLongTableBits, bestLongLen)
+		e.longTable[h] = prevEntry{offset: i, prev: e.longTable[h].offset}
+		h0 := hashLen(cv, bestShortTableBits, bestShortLen)
+		e.table[h0] = prevEntry{offset: i, prev: e.table[h0].offset}
+	}
 }
