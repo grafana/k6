@@ -13,5 +13,6 @@ message RequestMetadata {
 	TestRunLabels TestRunLabels = 4;
 	oneof ProtocolLabels {
 		HTTPLabels HTTPLabels = 5;
+		GRPCLabels GRPCLabels = 6;
 	}
 }
