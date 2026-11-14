@@ -136,8 +136,9 @@ func (m *Mouse) move(x float64, y float64, opts *MouseMoveOptions) error {
 	m.x = x
 	m.y = y
 	for i := int64(1); i <= opts.Steps; i++ {
-		x := fromX + (m.x-fromX)*float64(i/opts.Steps)
-		y := fromY + (m.y-fromY)*float64(i/opts.Steps)
+		progress := float64(i) / float64(opts.Steps)
+		x := fromX + (m.x-fromX)*progress
+		y := fromY + (m.y-fromY)*progress
 		action := newCommand(input.DispatchMouseEvent, input.DispatchMouseEventParams{
 			Type:      input.DispatchMouseEventTypeMouseMoved,
 			X:         x,
