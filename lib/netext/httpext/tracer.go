@@ -172,8 +172,13 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 	}
 }
 
+// The one-second lead reserves zero for callbacks that have not fired.
+//
+//nolint:gochecknoglobals // Shared immutable reference keeps the zero-value tracer usable.
+var monotonicOrigin = time.Now().Add(-time.Second)
+
 func now() int64 {
-	return time.Now().UnixNano()
+	return int64(time.Since(monotonicOrigin))
 }
 
 // GetConn is called before a connection is created or
@@ -314,6 +319,7 @@ func (t *Tracer) GotFirstResponseByte() {
 // Done calculates all metrics and should be called when the request is finished.
 func (t *Tracer) Done() *Trail {
 	done := time.Now()
+	doneStamp := int64(done.Sub(monotonicOrigin))
 
 	trail := Trail{
 		ConnReused:     t.connReused,
@@ -359,11 +365,11 @@ func (t *Tracer) Done() *Trail {
 			}
 		} else {
 			// The server never responded to our request
-			trail.Waiting = done.Sub(time.Unix(0, wroteRequest))
+			trail.Waiting = time.Duration(doneStamp - wroteRequest)
 		}
 	}
 	if gotFirstResponseByte != 0 {
-		trail.Receiving = done.Sub(time.Unix(0, gotFirstResponseByte))
+		trail.Receiving = time.Duration(doneStamp - gotFirstResponseByte)
 	}
 
 	// Calculate total times using adjusted values.
