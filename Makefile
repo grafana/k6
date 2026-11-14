@@ -38,7 +38,7 @@ proto-dependencies:
 	rm $(PROTOC_ARCHIVE)
 
 generate-tools-installs: proto-dependencies
-	go install github.com/mstoykov/enumer@v0.0.1 # TODO figure out if we shouldn't move to a different fork
+	go install github.com/mstoykov/enumer@v0.0.2 # TODO figure out if we shouldn't move to a different fork
 	go install mvdan.cc/gofumpt@v0.8.0 # TODO maybe just use go fmt for this case
 
 generate: generate-tools-installs
