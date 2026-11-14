@@ -141,8 +141,11 @@ func ParseURL(text string) (Config, error) {
 	}
 	if u.User != nil {
 		c.Username = null.StringFrom(u.User.Username())
-		pass, _ := u.User.Password()
-		c.Password = null.StringFrom(pass)
+		// Only override the password when the URL has one, so a URL with just
+		// a username keeps the password from the JSON config or env vars.
+		if pass, ok := u.User.Password(); ok {
+			c.Password = null.StringFrom(pass)
+		}
 	}
 	for k, vs := range u.Query() {
 		switch k {
