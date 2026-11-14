@@ -41,6 +41,12 @@ func (m *Mouse) Click(x float64, y float64, opts *MouseClickOptions) error {
 }
 
 func (m *Mouse) click(x float64, y float64, opts *MouseClickOptions) error {
+	return m.keyboard.withModifiers(opts.modifiers, func() error {
+		return m.clickWithModifiers(x, y, opts)
+	})
+}
+
+func (m *Mouse) clickWithModifiers(x float64, y float64, opts *MouseClickOptions) error {
 	mouseDownUpOpts := opts.ToMouseDownUpOptions()
 	if err := m.move(x, y, NewMouseMoveOptions()); err != nil {
 		return err
