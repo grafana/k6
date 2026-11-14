@@ -20,17 +20,16 @@
       "matchManagers": [
         "gomod"
       ],
-      "enabled": true,
       "postUpdateOptions": [
         "gomodTidy",
         "gomodUpdateImportPaths"
       ]
     },
     {
-      "description": "Do not update indirect dependencies",
+      "description": "Allow indirect Go vulnerability fixes; the shared schedule suppresses routine updates",
       "matchManagers": ["gomod"],
       "matchDepTypes": ["indirect"],
-      "enabled": false
+      "allowedVersions": null
     },
     {
       "groupName": "golangx",
@@ -74,8 +73,8 @@
       "matchManagers": [
         "docker"
       ],
-      "ignorePaths": [
-        "packaging/**"
+      "matchFileNames": [
+        "!packaging/**"
       ],
       "extends": [
         "schedule:monthly"
@@ -116,31 +115,23 @@
       ],
       "enabled": false
     },
-	{
+    {
       "matchBaseBranches": ["v1.x"],
-      "matchUpdateTypes": ["major", "minor", "patch", "pin", "digest"],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "pinDigest",
+        "lockfileUpdate",
+        "lockFileMaintenance",
+        "bump",
+        "rollback",
+        "replacement"
+      ],
       "enabled": false,
-      "description": "Disable all standard updates for v1"
-    },
-    {
-      "matchBaseBranches": ["v1.x"],
-      "matchUpdateTypes": ["security"],
-      "enabled": true,
-      "dependencyDashboardApproval": false,
-      "description": "Override and enable only security updates for v1"
-    },
-    {
-      "description": "v1.x Dockerfile",
-      "matchBaseBranches": ["v1.x"],
-      "matchManagers": [
-        "docker"
-      ],
-      "matchFileNames": [
-        "Dockerfile"
-      ],
-      "extends": [
-        "schedule:weekly"
-      ]
+      "description": "Disable routine updates for v1; vulnerability alerts bypass this rule"
     }
   ]
 }

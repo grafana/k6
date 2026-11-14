@@ -45,10 +45,15 @@ const (
 func getAllOutputConstructors() (map[string]output.Constructor, error) {
 	// Start with the built-in outputs
 	result := map[string]output.Constructor{
-		builtinOutputJSON.String():     json.New,
-		builtinOutputCloud.String():    cloud.New,
-		builtinOutputCSV.String():      csv.New,
-		builtinOutputInfluxdb.String(): influxdb.New,
+		builtinOutputJSON.String():  json.New,
+		builtinOutputCloud.String(): cloud.New,
+		builtinOutputCSV.String():   csv.New,
+		builtinOutputInfluxdb.String(): func(params output.Params) (output.Output, error) {
+			params.Logger.Warnf("%s output has been deprecated and is planned for removal in k6 v3. "+
+				"We recommend using %s for all your metrics output.",
+				builtinOutputInfluxdb.String(), builtinOutputOpentelemetry.String())
+			return influxdb.New(params)
+		},
 		builtinOutputKafka.String(): func(_ output.Params) (output.Output, error) {
 			return nil, errors.New("the kafka output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
 				"please use the new xk6 kafka output extension instead - https://github.com/k6io/xk6-output-kafka")
@@ -66,6 +71,9 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 			)
 		},
 		builtinOutputExperimentalPrometheusRW.String(): func(params output.Params) (output.Output, error) {
+			params.Logger.Warnf("%s output has been deprecated and is planned for removal in k6 v3. "+
+				"We recommend using %s for all your metrics output.",
+				builtinOutputExperimentalPrometheusRW.String(), builtinOutputOpentelemetry.String())
 			return remotewrite.New(params)
 		},
 		"web-dashboard": dashboard.New,

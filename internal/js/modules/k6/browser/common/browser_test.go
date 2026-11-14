@@ -17,6 +17,32 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
+func TestBrowserPageOrderOnReattachment(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	b := newBrowser(ctx, ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	first := &Page{targetID: "second-alphabetically"}
+	second := &Page{targetID: "first-alphabetically"}
+	reattached := &Page{targetID: first.targetID}
+
+	for _, page := range []*Page{first, second, reattached} {
+		require.NoError(t, b.attachNewPage(page, &target.EventAttachedToTarget{
+			SessionID: target.SessionID(page.targetID),
+			TargetInfo: &target.Info{
+				TargetID: page.targetID,
+				Type:     "page",
+			},
+		}))
+	}
+
+	pages := b.getPages()
+	require.Len(t, pages, 2)
+	require.Same(t, reattached, pages[0])
+	require.Same(t, second, pages[1])
+}
+
 func TestBrowserNewPageInContext(t *testing.T) {
 	t.Parallel()
 
