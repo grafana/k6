@@ -210,10 +210,21 @@ func newRejectionError(rt *sobek.Runtime, res sobek.Value) error {
 		}
 		// this is the de facto wording in both firefox and deno at least
 		rejection = &rejectionError{msg: "Uncaught (in promise) " + s}
-		if !common.IsNullish(res) {
-			if cause, ok := res.Export().(error); ok {
-				rejection.cause = cause
+		if common.IsNullish(res) {
+			return
+		}
+		// GoError keeps the original Go error in its value property.
+		if obj, ok := res.(*sobek.Object); ok && obj.ClassName() == "Error" {
+			var value sobek.Value
+			if ex := rt.Try(func() { value = obj.Get("value") }); ex != nil {
+				return
 			}
+			if value != nil {
+				res = value
+			}
+		}
+		if cause, ok := res.Export().(error); ok {
+			rejection.cause = cause
 		}
 	}))
 	if _, err := call(sobek.Undefined()); err != nil {

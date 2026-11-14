@@ -251,19 +251,29 @@ func TestEventLoopRejectSyntaxError(t *testing.T) {
 
 func TestEventLoopRejectPreservesErrorChain(t *testing.T) {
 	t.Parallel()
-	vu := &modulestest.VU{RuntimeField: sobek.New()}
-	loop := eventloop.New(vu)
-	rt := vu.Runtime()
-	original := fmt.Errorf("connection refused")
-	require.NoError(t, rt.Set("reason", rt.ToValue(original)))
-	err := loop.Start(func() error {
-		_, err := rt.RunString("Promise.reject(reason)")
-		return err
-	})
-	loop.WaitOnRegistered()
-	require.ErrorContains(t, err, "Uncaught (in promise)")
-	require.ErrorContains(t, err, "connection refused")
-	require.ErrorIs(t, err, original)
+	for _, nativeError := range []bool{false, true} {
+		t.Run(fmt.Sprintf("native_error=%t", nativeError), func(t *testing.T) {
+			t.Parallel()
+
+			vu := &modulestest.VU{RuntimeField: sobek.New()}
+			loop := eventloop.New(vu)
+			rt := vu.Runtime()
+			original := fmt.Errorf("connection refused")
+			value := rt.ToValue(original)
+			if nativeError {
+				value = rt.NewGoError(original)
+			}
+			require.NoError(t, rt.Set("reason", value))
+			err := loop.Start(func() error {
+				_, err := rt.RunString("Promise.reject(reason)")
+				return err
+			})
+			loop.WaitOnRegistered()
+			require.ErrorContains(t, err, "Uncaught (in promise)")
+			require.ErrorContains(t, err, "connection refused")
+			require.ErrorIs(t, err, original)
+		})
+	}
 }
 
 func TestEventLoopRejectFormatting(t *testing.T) {
@@ -339,6 +349,28 @@ func TestEventLoopRejectGoError(t *testing.T) {
 	})
 	loop.WaitOnRegistered()
 	require.EqualError(t, err, "Uncaught (in promise) GoError: some error\n\tat go.k6.io/k6/v2/internal/js/eventloop_test.TestEventLoopRejectGoError.func1 (native)\n\tat <eval>:1:31(2)\n")
+}
+
+func TestEventLoopRejectWithThrowingValueGetter(t *testing.T) {
+	t.Parallel()
+
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
+	loop := eventloop.New(vu)
+	var err error
+	require.NotPanics(t, func() {
+		err = loop.Start(func() error {
+			_, scriptErr := vu.Runtime().RunString(`
+				const reason = new Error('original failure');
+				Object.defineProperty(reason, 'value', {
+					get() { throw new Error('value getter failure'); }
+				});
+				Promise.reject(reason);
+			`)
+			return scriptErr
+		})
+	})
+	loop.WaitOnRegistered()
+	require.ErrorContains(t, err, "Uncaught (in promise) Error: original failure")
 }
 
 func TestEventLoopRejectThrow(t *testing.T) {
