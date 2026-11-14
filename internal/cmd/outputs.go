@@ -22,9 +22,7 @@ import (
 
 // builtinOutput marks the available builtin outputs.
 //
-// NOTE: that the enumer is the github.com/dmarkham/enumer
-//
-//go:generate go run github.com/dmarkham/enumer@v1.5.11 -type=builtinOutput -trimprefix builtinOutput -transform=kebab -output builtin_output_gen.go
+//go:generate enumer -type=builtinOutput -trimprefix builtinOutput -transform=kebab -output builtin_output_gen.go
 type builtinOutput uint32
 
 const (
