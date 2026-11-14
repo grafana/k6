@@ -2,6 +2,8 @@ package common
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -446,6 +448,50 @@ func (l *Locator) GetByTitle(title string, opts *GetByBaseOptions) *Locator {
 // Locator creates and returns a new locator chained/relative to the current locator.
 func (l *Locator) Locator(selector string, opts *LocatorOptions) *Locator {
 	return NewLocator(l.ctx, opts, l.selector+" >> "+selector, l.frame, l.log)
+}
+
+// Or returns a new locator that matches elements from either the current
+// locator or the given locator. The resulting locator resolves to all elements
+// that match either selector, merged and sorted in DOM order.
+func (l *Locator) Or(locator *Locator) (*Locator, error) {
+	l.log.Debugf("Locator:Or", "fid:%s furl:%q sel:%q other:%q",
+		l.frame.ID(), l.frame.URL(), l.selector, locator.selector)
+
+	if l.frame != locator.frame {
+		return nil, fmt.Errorf(
+			"combining locators from different frames is not supported: this(frame_id:%s) locator(frame_id:%s)",
+			l.frame.ID(), locator.frame.ID(),
+		)
+	}
+
+	parsed, err := NewSelector(locator.selector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse selector: %w", err)
+	}
+	// The other locator is nested inside internal:or and re-queried by the
+	// injected script, which cannot resolve internal:control=enter-frame.
+	// TODO: Playwright splices the common frame prefix off the nested selector so shared frameLocator prefixes work.
+	for _, part := range parsed.Parts {
+		if part.Name == "internal:control" && part.Body == "enter-frame" {
+			return nil, errors.New("combining frameLocator-based locators with or() is not yet supported")
+		}
+	}
+
+	encoded, err := json.Marshal(parsed)
+	if err != nil {
+		return nil, fmt.Errorf("encoding selector: %w", err)
+	}
+
+	// JSON-encode the outer string too: strconv.Quote can emit Go escapes
+	// such as \x7f which do not match behavior of JSON.parse on JS side
+	quoted, err := json.Marshal(string(encoded))
+	if err != nil {
+		return nil, fmt.Errorf("encoding selector: %w", err)
+	}
+
+	return NewLocator(l.ctx, nil,
+		l.selector+" >> internal:or="+string(quoted),
+		l.frame, l.log), nil
 }
 
 // FrameLocator creates a frame locator for an iframe matching the given selector
