@@ -21,6 +21,7 @@ import (
 
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/netext/httpext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -347,6 +348,9 @@ func (w *webSocket) establishConnection(ctx context.Context, params *wsParams) {
 		w.extensions = httpResponse.Header.Values("Sec-WebSocket-Extensions")
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, w.protocol)
 	}
+	if connErr != nil {
+		w.tagConnectionError(systemTags, httpResponse, connErr)
+	}
 	nameTagValue, nameTagManuallySet := params.tagsAndMeta.Tags.Get(metrics.TagName.String())
 	// After k6 v0.41.0, the name and URL tags have the same values.
 	if nameTagManuallySet {
@@ -384,6 +388,24 @@ func (w *webSocket) establishConnection(ctx context.Context, params *wsParams) {
 	w.tq.Queue(func() error {
 		return w.connectionConnected()
 	})
+}
+
+// tagConnectionError sets the error tags of a failed connection the way the HTTP module sets them:
+// an error status (400 and above) gets 1000 + the status as its error_code, and any other failure,
+// with no response or with a response that is not an upgrade (such as a 200 or a 3xx), gets the
+// error and error_code of connErr.
+func (w *webSocket) tagConnectionError(systemTags *metrics.SystemTagSet, httpResponse *http.Response, connErr error) {
+	if httpResponse != nil && httpResponse.StatusCode >= 400 {
+		errorCode := strconv.Itoa(1000 + httpResponse.StatusCode)
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagErrorCode, errorCode)
+		return
+	}
+	errorCode, errorMsg := httpext.ErrorCodeAndMessage(connErr)
+	w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagError, errorMsg)
+	w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagErrorCode, strconv.Itoa(errorCode))
+	if httpResponse == nil {
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagStatus, "0")
+	}
 }
 
 func (w *webSocket) dial(ctx context.Context, params *wsParams) (*websocket.Conn, *http.Response, error) {
