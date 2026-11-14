@@ -338,18 +338,18 @@ func (s Selection) Val() sobek.Value {
 		return s.rt.ToValue(val)
 
 	case TextAreaTagName:
-		return s.Html()
+		return s.rt.ToValue(s.sel.First().Text())
 
 	case OptionTagName:
-		return s.rt.ToValue(valueOrHTML(s.sel))
+		return s.rt.ToValue(optionValue(s.sel))
 
 	case SelectTagName:
 		selected := s.sel.First().Find("option[selected]")
 		if _, exists := s.sel.Attr("multiple"); exists {
-			return s.rt.ToValue(selected.Map(func(_ int, opt *goquery.Selection) string { return valueOrHTML(opt) }))
+			return s.rt.ToValue(selected.Map(func(_ int, opt *goquery.Selection) string { return optionValue(opt) }))
 		}
 
-		return s.rt.ToValue(valueOrHTML(selected))
+		return s.rt.ToValue(optionValue(selected))
 
 	default:
 		return sobek.Undefined()
