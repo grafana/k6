@@ -36,13 +36,28 @@ const (
 	InvocationStatusError     InvocationStatus = "Error"
 )
 
+// ToolID unique identifier of a registered tool. A new identifier is created
+// every time a tool is registered, so a tool that is unregistered and then
+// registered again under the same name gets a different identifier. Clients
+// should treat it as an opaque string.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/WebMCP#type-ToolId
+type ToolID string
+
+// String returns the ToolID as string value.
+func (t ToolID) String() string {
+	return string(t)
+}
+
 // Tool definition of a tool that can be invoked.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/WebMCP#type-Tool
 type Tool struct {
+	ToolID        ToolID              `json:"toolId"`      // Tool identifier.
 	Name          string              `json:"name"`        // Tool name.
 	Description   string              `json:"description"` // Tool description.
 	InputSchema   jsonv2.Value        `json:"inputSchema,omitempty,omitzero"`
+	OutputSchema  jsonv2.Value        `json:"outputSchema,omitempty,omitzero"`
 	Annotations   *Annotation         `json:"annotations,omitempty,omitzero"`   // Optional annotations for the tool.
 	FrameID       cdp.FrameID         `json:"frameId"`                          // Frame identifier associated with the tool registration.
 	BackendNodeID cdp.BackendNodeID   `json:"backendNodeId,omitempty,omitzero"` // Optional node ID for declarative tools.
@@ -53,6 +68,7 @@ type Tool struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/WebMCP#type-RemovedTool
 type RemovedTool struct {
+	ToolID  ToolID      `json:"toolId"`  // Identifier of the removed tool.
 	Name    string      `json:"name"`    // Tool name.
 	FrameID cdp.FrameID `json:"frameId"` // Frame identifier associated with the tool registration.
 }

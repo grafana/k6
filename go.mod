@@ -9,7 +9,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/andybalholm/brotli v1.2.8
 	github.com/bufbuild/protocompile v0.14.1
-	github.com/chromedp/cdproto v0.158.3
+	github.com/chromedp/cdproto v0.160.1
 	github.com/evanw/esbuild v0.28.2
 	github.com/fatih/color v1.19.0
 	github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3

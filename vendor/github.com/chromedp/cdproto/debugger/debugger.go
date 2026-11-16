@@ -95,6 +95,25 @@ type GetPossibleBreakpointsResult struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#method-getPossibleBreakpoints
 var GetPossibleBreakpoints = cdp.Command[GetPossibleBreakpointsParams, GetPossibleBreakpointsResult]{Method: CommandGetPossibleBreakpoints}
 
+// GetScopeChainParams are the parameters of the command
+// Debugger.getScopeChain.
+type GetScopeChainParams struct {
+	CallFrameID CallFrameID `json:"callFrameId"` // Call frame identifier to get the scope chain for.
+}
+
+// GetScopeChainResult is the result of the command Debugger.getScopeChain.
+type GetScopeChainResult struct {
+	ScopeChain []*Scope `json:"scopeChain,omitempty,omitzero"` // Scope chain for the call frame.
+}
+
+// GetScopeChain returns the current scope chain of the given call frame.
+// Unlike the scope chain reported with the paused event, it reflects changes
+// made to variables since then (e.g. via evaluateOnCallFrame or
+// setVariableValue).
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#method-getScopeChain
+var GetScopeChain = cdp.Command[GetScopeChainParams, GetScopeChainResult]{Method: CommandGetScopeChain}
+
 // GetScriptSourceParams are the parameters of the command
 // Debugger.getScriptSource.
 type GetScriptSourceParams struct {
@@ -493,6 +512,7 @@ const (
 	CommandEnable                       = "Debugger.enable"
 	CommandEvaluateOnCallFrame          = "Debugger.evaluateOnCallFrame"
 	CommandGetPossibleBreakpoints       = "Debugger.getPossibleBreakpoints"
+	CommandGetScopeChain                = "Debugger.getScopeChain"
 	CommandGetScriptSource              = "Debugger.getScriptSource"
 	CommandDisassembleWasmModule        = "Debugger.disassembleWasmModule"
 	CommandNextWasmDisassemblyChunk     = "Debugger.nextWasmDisassemblyChunk"

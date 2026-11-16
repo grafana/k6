@@ -84,7 +84,6 @@ const (
 	PermissionTypeSmartCard                PermissionType = "smartCard"
 	PermissionTypeSpeakerSelection         PermissionType = "speakerSelection"
 	PermissionTypeStorageAccess            PermissionType = "storageAccess"
-	PermissionTypeTopLevelStorageAccess    PermissionType = "topLevelStorageAccess"
 	PermissionTypeVideoCapture             PermissionType = "videoCapture"
 	PermissionTypeVr                       PermissionType = "vr"
 	PermissionTypeWakeLockScreen           PermissionType = "wakeLockScreen"

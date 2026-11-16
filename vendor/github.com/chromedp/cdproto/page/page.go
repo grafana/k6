@@ -575,10 +575,11 @@ var StartScreencast = cdp.Command[StartScreencastParams, cdp.Empty]{Method: Comm
 // StartScreenRecordingParams are the parameters of the command
 // Page.startScreenRecording.
 type StartScreenRecordingParams struct {
-	Audio     *bool `json:"audio,omitempty,omitzero"`
-	MaxWidth  int64 `json:"maxWidth,omitempty,omitzero"`  // Maximum frame width in pixels.
-	MaxHeight int64 `json:"maxHeight,omitempty,omitzero"` // Maximum frame height in pixels.
-	FrameRate int64 `json:"frameRate,omitempty,omitzero"` // Maximum frame rate in frames per second.
+	Audio       *bool                           `json:"audio,omitempty,omitzero"`
+	MaxWidth    int64                           `json:"maxWidth,omitempty,omitzero"`    // Maximum frame width in pixels.
+	MaxHeight   int64                           `json:"maxHeight,omitempty,omitzero"`   // Maximum frame height in pixels.
+	FrameRate   int64                           `json:"frameRate,omitempty,omitzero"`   // Maximum frame rate in frames per second.
+	CaptureArea StartScreenRecordingCaptureArea `json:"captureArea,omitempty,omitzero"` // The area to record. Defaults to target.
 }
 
 // StartScreenRecordingResult is the result of the command
