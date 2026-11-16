@@ -88,6 +88,62 @@ func TestToURLInvalidInput(t *testing.T) {
 	require.Error(t, err)
 }
 
+// Clean must never leak any part of the credentials, including when the
+// userinfo contains percent-encoded characters (a password with a '@', ':',
+// space, etc.), where the decoded username/password lengths no longer match the
+// bytes in the raw URL.
+func TestURLCleanMasksCredentials(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		rawURL   string
+		expected string
+	}{
+		{
+			name:     "plain credentials",
+			rawURL:   "http://user:pass@example.com/path", // trufflehog:ignore
+			expected: "http://****:****@example.com/path",
+		},
+		{
+			name:     "username only",
+			rawURL:   "http://user@example.com/path",
+			expected: "http://****@example.com/path",
+		},
+		{
+			name:     "encoded char in password",
+			rawURL:   "http://user:p%40ss@example.com/path", // trufflehog:ignore
+			expected: "http://****:****@example.com/path",
+		},
+		{
+			name:     "space in password",
+			rawURL:   "http://user:sp%20ace@example.com/", // trufflehog:ignore
+			expected: "http://****:****@example.com/",
+		},
+		{
+			name:     "encoded char in username",
+			rawURL:   "http://us%40er:pass@example.com/", // trufflehog:ignore
+			expected: "http://****:****@example.com/",
+		},
+		{
+			name:     "no path",
+			rawURL:   "https://user:pa%3Ass@example.com", // trufflehog:ignore
+			expected: "https://****:****@example.com",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			u, err := NewURL(tc.rawURL, "name")
+			require.NoError(t, err)
+			require.Equal(t, tc.expected, u.Clean())
+			require.Equal(t, tc.expected, u.CleanURL)
+		})
+	}
+}
+
 func passwordOf(t *testing.T, u URL) string {
 	t.Helper()
 	password, ok := u.GetURL().User.Password()
