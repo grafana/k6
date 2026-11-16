@@ -24,10 +24,14 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	const timeout = 5 * time.Second
 
 	testCases := []struct {
-		name, selector string
+		name, selector, path string
+		anchorInViewport     bool
 	}{
-		{name: "history", selector: "a#nav-history"},
-		{name: "anchor", selector: "a#nav-anchor"},
+		{name: "history", selector: "a#nav-history", path: "/nav2"},
+		{
+			name: "anchor", selector: "a#nav-anchor", path: "/static/nav_in_doc.html#anchor",
+			anchorInViewport: true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -41,9 +45,15 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 				WaitUntil: common.LifecycleEventNetworkIdle,
 				Timeout:   timeout,
 			}
-			resp, err := p.Goto(tb.staticURL("/nav_in_doc.html"), opts)
+			resp, err := p.Goto(tb.staticURL("nav_in_doc.html"), opts)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
+
+			anchor := p.Locator("#anchor", nil)
+			viewportOpts := common.NewFrameIsInViewportOptions(anchor.Timeout())
+			inViewport, err := anchor.IsInViewport(viewportOpts)
+			require.NoError(t, err)
+			require.False(t, inViewport, "the anchor should start below the viewport")
 
 			waitForNav := func() error {
 				opts := &common.FrameWaitForNavigationOptions{Timeout: timeout}
@@ -57,6 +67,14 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			defer cancel()
 			err = tb.run(ctx, waitForNav, click)
 			require.NoError(t, err)
+
+			url, err := p.URL()
+			require.NoError(t, err)
+			assert.Equal(t, tb.url(tc.path), url)
+
+			inViewport, err = anchor.IsInViewport(viewportOpts)
+			require.NoError(t, err)
+			assert.Equal(t, tc.anchorInViewport, inViewport, "anchor viewport state after %s navigation", tc.name)
 		})
 	}
 }
