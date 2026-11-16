@@ -72,15 +72,31 @@ type IterationInfo struct {
 	HasScenarioIterationNumbers bool
 }
 
-// StartTestRun starts the span of a test run, the root of a new trace.
+// StartTestRun starts the span of a test run. It is the root of a new trace, unless ctx
+// carries a remote span context (see ExtractParentFromEnv), whose trace it continues.
 func StartTestRun(
 	ctx context.Context, tracer oteltrace.Tracer, logger logrus.FieldLogger,
 ) (context.Context, oteltrace.Span) {
 	if tracer == nil {
 		return ctx, noop.Span{}
 	}
-	ctx, span := tracer.Start(ctx, SpanRun, oteltrace.WithNewRoot())
-	logger.WithField("trace_id", span.SpanContext().TraceID().String()).Debug("Tracing the test run")
+
+	var opts []oteltrace.SpanStartOption
+	parent := oteltrace.SpanContextFromContext(ctx)
+	continued := parent.IsValid() && parent.IsRemote()
+	if !continued {
+		// Any other span in ctx is not a parent, the run is then a new trace.
+		opts = append(opts, oteltrace.WithNewRoot())
+	}
+
+	ctx, span := tracer.Start(ctx, SpanRun, opts...)
+	entry := logger.WithField("trace_id", span.SpanContext().TraceID().String())
+	if continued {
+		entry = entry.WithField("parent_span_id", parent.SpanID().String())
+		entry.Debug("Tracing the test run, continuing the incoming trace")
+	} else {
+		entry.Debug("Tracing the test run")
+	}
 	return ctx, span
 }
 
