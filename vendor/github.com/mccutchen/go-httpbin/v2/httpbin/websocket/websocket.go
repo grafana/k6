@@ -51,6 +51,22 @@ const (
 	StatusServerError        StatusCode = 1011
 )
 
+// Errors indicating that the client violated the websocket protocol or
+// exceeded a configured limit.
+var (
+	errUnmaskedFrame          = errors.New("received unmasked client frame")
+	errUnsupportedRSV         = errors.New("frame has unsupported RSV bits set")
+	errInvalidPayloadLength   = errors.New("invalid payload length")
+	errFrameTooLarge          = errors.New("frame too large")
+	errInvalidControlFrame    = errors.New("invalid control frame")
+	errInvalidClosePayload    = errors.New("invalid close frame payload")
+	errUnsupportedOpcode      = errors.New("unsupported opcode")
+	errContinuationExpected   = errors.New("continuation frame expected")
+	errUnexpectedContinuation = errors.New("unexpected continuation frame")
+	errInvalidUTF8            = errors.New("invalid UTF-8")
+	errMessageTooLarge        = errors.New("message too large")
+)
+
 // Frame is a websocket protocol frame.
 type Frame struct {
 	Fin     bool
@@ -173,22 +189,23 @@ func (s *WebSocket) serveLoop(ctx context.Context, buf *bufio.ReadWriter, handle
 		default:
 		}
 
-		frame, err := nextFrame(buf)
-		if err != nil {
-			return writeCloseFrame(buf, StatusServerError, err)
+		var currentMsgSize int
+		if currentMsg != nil {
+			currentMsgSize = len(currentMsg.Payload)
 		}
 
-		if err := validateFrame(frame, s.maxFragmentSize); err != nil {
-			return writeCloseFrame(buf, StatusProtocolError, err)
+		frame, err := nextFrame(buf, s.maxFragmentSize, s.maxMessageSize, currentMsgSize)
+		if err != nil {
+			return closeWithError(buf, err)
 		}
 
 		switch frame.Opcode {
 		case OpcodeBinary, OpcodeText:
 			if currentMsg != nil {
-				return writeCloseFrame(buf, StatusProtocolError, errors.New("expected continuation frame"))
+				return closeWithError(buf, errContinuationExpected)
 			}
 			if frame.Opcode == OpcodeText && !utf8.Valid(frame.Payload) {
-				return writeCloseFrame(buf, StatusUnsupportedPayload, errors.New("invalid UTF-8"))
+				return closeWithError(buf, errInvalidUTF8)
 			}
 			currentMsg = &Message{
 				Binary:  frame.Opcode == OpcodeBinary,
@@ -196,15 +213,14 @@ func (s *WebSocket) serveLoop(ctx context.Context, buf *bufio.ReadWriter, handle
 			}
 		case OpcodeContinuation:
 			if currentMsg == nil {
-				return writeCloseFrame(buf, StatusProtocolError, errors.New("unexpected continuation frame"))
+				return closeWithError(buf, errUnexpectedContinuation)
 			}
 			if !currentMsg.Binary && !utf8.Valid(frame.Payload) {
-				return writeCloseFrame(buf, StatusUnsupportedPayload, errors.New("invalid UTF-8"))
+				return closeWithError(buf, errInvalidUTF8)
 			}
+			// nextFrame has already ensured that appending this frame's
+			// payload will not exceed the maximum message size
 			currentMsg.Payload = append(currentMsg.Payload, frame.Payload...)
-			if len(currentMsg.Payload) > s.maxMessageSize {
-				return writeCloseFrame(buf, StatusTooLarge, fmt.Errorf("message size %d exceeds maximum of %d bytes", len(currentMsg.Payload), s.maxMessageSize))
-			}
 		case OpcodeClose:
 			return writeCloseFrame(buf, StatusNormalClosure, nil)
 		case OpcodePing:
@@ -216,13 +232,13 @@ func (s *WebSocket) serveLoop(ctx context.Context, buf *bufio.ReadWriter, handle
 		case OpcodePong:
 			continue
 		default:
-			return writeCloseFrame(buf, StatusProtocolError, fmt.Errorf("unsupported opcode: %v", frame.Opcode))
+			return closeWithError(buf, fmt.Errorf("%w: %v", errUnsupportedOpcode, frame.Opcode))
 		}
 
 		if frame.Fin {
 			resp, err := handler(ctx, currentMsg)
 			if err != nil {
-				return writeCloseFrame(buf, StatusServerError, err)
+				return closeWithError(buf, err)
 			}
 			if resp == nil {
 				continue
@@ -237,7 +253,12 @@ func (s *WebSocket) serveLoop(ctx context.Context, buf *bufio.ReadWriter, handle
 	}
 }
 
-func nextFrame(buf *bufio.ReadWriter) (*Frame, error) {
+// nextFrame reads the next frame from buf. The frame header is validated
+// before its payload is read, so that a client cannot force arbitrarily large
+// allocations by claiming a huge payload length. currentMsgSize is the size of
+// any in-progress fragmented message, which a continuation frame's payload
+// would be appended to. Any returned frame is valid.
+func nextFrame(buf *bufio.ReadWriter, maxFragmentSize int, maxMessageSize int, currentMsgSize int) (*Frame, error) {
 	bb := make([]byte, 2)
 	if _, err := io.ReadFull(buf, bb); err != nil {
 		return nil, err
@@ -257,7 +278,7 @@ func nextFrame(buf *bufio.ReadWriter) (*Frame, error) {
 	// Per https://datatracker.ietf.org/doc/html/rfc6455#section-5.2, all
 	// client frames must be masked.
 	if masked := b1 & 0b10000000; masked == 0 {
-		return nil, fmt.Errorf("received unmasked client frame")
+		return nil, errUnmaskedFrame
 	}
 
 	var payloadLength uint64
@@ -277,6 +298,22 @@ func nextFrame(buf *bufio.ReadWriter) (*Frame, error) {
 		if err := binary.Read(buf, binary.BigEndian, &payloadLength); err != nil {
 			return nil, err
 		}
+		// Per https://datatracker.ietf.org/doc/html/rfc6455#section-5.2, the
+		// most significant bit of a 64-bit payload length MUST be 0.
+		if payloadLength&(1<<63) != 0 {
+			return nil, fmt.Errorf("%w: most significant bit of 64-bit length must be 0", errInvalidPayloadLength)
+		}
+	}
+
+	frame := &Frame{
+		Fin:    fin,
+		RSV1:   rsv1,
+		RSV2:   rsv2,
+		RSV3:   rsv3,
+		Opcode: opcode,
+	}
+	if err := validateFrameHeader(frame, payloadLength, maxFragmentSize, maxMessageSize, currentMsgSize); err != nil {
+		return nil, err
 	}
 
 	mask := make([]byte, 4)
@@ -292,15 +329,15 @@ func nextFrame(buf *bufio.ReadWriter) (*Frame, error) {
 	for i, b := range payload {
 		payload[i] = b ^ mask[i%4]
 	}
+	frame.Payload = payload
 
-	return &Frame{
-		Fin:     fin,
-		RSV1:    rsv1,
-		RSV2:    rsv2,
-		RSV3:    rsv3,
-		Opcode:  opcode,
-		Payload: payload,
-	}, nil
+	if frame.Opcode == OpcodeClose {
+		if err := validateClosePayload(frame.Payload); err != nil {
+			return nil, err
+		}
+	}
+
+	return frame, nil
 }
 
 func writeFrame(dst *bufio.ReadWriter, frame *Frame) error {
@@ -369,6 +406,36 @@ func writeCloseFrame(dst *bufio.ReadWriter, code StatusCode, err error) error {
 	})
 }
 
+// closeStatusForError returns the status code to use when closing the
+// connection due to err. Any error not explicitly handled here (e.g. an error
+// reading from the connection or returned by a Handler) is a server error.
+func closeStatusForError(err error) StatusCode {
+	switch {
+	case errors.Is(err, errFrameTooLarge),
+		errors.Is(err, errMessageTooLarge):
+		return StatusTooLarge
+	case errors.Is(err, errInvalidUTF8):
+		return StatusUnsupportedPayload
+	case errors.Is(err, errUnmaskedFrame),
+		errors.Is(err, errUnsupportedRSV),
+		errors.Is(err, errInvalidPayloadLength),
+		errors.Is(err, errInvalidControlFrame),
+		errors.Is(err, errInvalidClosePayload),
+		errors.Is(err, errUnsupportedOpcode),
+		errors.Is(err, errContinuationExpected),
+		errors.Is(err, errUnexpectedContinuation):
+		return StatusProtocolError
+	default:
+		return StatusServerError
+	}
+}
+
+// closeWithError closes the connection with the status code appropriate for
+// err, using err as the close reason.
+func closeWithError(dst *bufio.ReadWriter, err error) error {
+	return writeCloseFrame(dst, closeStatusForError(err), err)
+}
+
 // frameResponse splits a message into N frames with payloads of at most
 // fragmentSize bytes.
 func frameResponse(msg *Message, fragmentSize int) []*Frame {
@@ -420,50 +487,63 @@ var reservedStatusCodes = map[uint16]bool{
 	2999: true,
 }
 
-func validateFrame(frame *Frame, maxFragmentSize int) error {
+// validateFrameHeader validates a frame before its payload has been read.
+func validateFrameHeader(frame *Frame, payloadLength uint64, maxFragmentSize int, maxMessageSize int, currentMsgSize int) error {
 	// We do not support any extensions, per the spec all RSV bits must be 0:
 	// https://datatracker.ietf.org/doc/html/rfc6455#section-5.2
 	if frame.RSV1 || frame.RSV2 || frame.RSV3 {
-		return fmt.Errorf("frame has unsupported RSV bits set")
+		return errUnsupportedRSV
 	}
 
 	switch frame.Opcode {
 	case OpcodeContinuation, OpcodeText, OpcodeBinary:
-		if len(frame.Payload) > maxFragmentSize {
-			return fmt.Errorf("frame payload size %d exceeds maximum of %d bytes", len(frame.Payload), maxFragmentSize)
+		if payloadLength > uint64(maxFragmentSize) {
+			return fmt.Errorf("%w: payload size %d exceeds maximum of %d bytes", errFrameTooLarge, payloadLength, maxFragmentSize)
+		}
+		// A continuation frame's payload will be appended to the current
+		// message, so we must ensure the resulting message will not exceed
+		// the maximum message size before reading the payload.
+		if frame.Opcode == OpcodeContinuation {
+			if msgSize := uint64(currentMsgSize) + payloadLength; msgSize > uint64(maxMessageSize) {
+				return fmt.Errorf("%w: size %d exceeds maximum of %d bytes", errMessageTooLarge, msgSize, maxMessageSize)
+			}
 		}
 	case OpcodeClose, OpcodePing, OpcodePong:
 		// All control frames MUST have a payload length of 125 bytes or less
 		// and MUST NOT be fragmented.
 		// https://datatracker.ietf.org/doc/html/rfc6455#section-5.5
-		if len(frame.Payload) > 125 {
-			return fmt.Errorf("frame payload size %d exceeds 125 bytes", len(frame.Payload))
+		if payloadLength > 125 {
+			return fmt.Errorf("%w: payload size %d exceeds 125 bytes", errInvalidControlFrame, payloadLength)
 		}
 		if !frame.Fin {
-			return fmt.Errorf("control frame %v must not be fragmented", frame.Opcode)
+			return fmt.Errorf("%w: control frame %v must not be fragmented", errInvalidControlFrame, frame.Opcode)
 		}
 	}
 
-	if frame.Opcode == OpcodeClose {
-		if len(frame.Payload) == 0 {
-			return nil
-		}
-		if len(frame.Payload) == 1 {
-			return fmt.Errorf("close frame payload must be at least 2 bytes")
-		}
+	return nil
+}
 
-		code := binary.BigEndian.Uint16(frame.Payload[:2])
-		if code < 1000 || code >= 5000 {
-			return fmt.Errorf("close frame status code %d out of range", code)
-		}
-		if reservedStatusCodes[code] {
-			return fmt.Errorf("close frame status code %d is reserved", code)
-		}
+// validateClosePayload validates the status code and reason in a close
+// frame's payload.
+func validateClosePayload(payload []byte) error {
+	if len(payload) == 0 {
+		return nil
+	}
+	if len(payload) == 1 {
+		return fmt.Errorf("%w: must be at least 2 bytes", errInvalidClosePayload)
+	}
 
-		if len(frame.Payload) > 2 {
-			if !utf8.Valid(frame.Payload[2:]) {
-				return errors.New("close frame payload must be vaid UTF-8")
-			}
+	code := binary.BigEndian.Uint16(payload[:2])
+	if code < 1000 || code >= 5000 {
+		return fmt.Errorf("%w: status code %d out of range", errInvalidClosePayload, code)
+	}
+	if reservedStatusCodes[code] {
+		return fmt.Errorf("%w: status code %d is reserved", errInvalidClosePayload, code)
+	}
+
+	if len(payload) > 2 {
+		if !utf8.Valid(payload[2:]) {
+			return fmt.Errorf("%w: reason must be valid UTF-8", errInvalidClosePayload)
 		}
 	}
 
