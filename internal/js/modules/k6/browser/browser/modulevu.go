@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
@@ -26,9 +27,15 @@ type moduleVU struct {
 	testRunID string
 }
 
+var errBrowserInitContext = errors.New("the browser module can only be used in the iteration context (e.g. the default function), not in the init context")
+
 // browser returns the VU browser instance for the current iteration.
 func (vu moduleVU) browser() (*common.Browser, error) {
-	return vu.getBrowser(vu.State().Iteration)
+	state := vu.State()
+	if state == nil {
+		return nil, errBrowserInitContext
+	}
+	return vu.getBrowser(state.Iteration)
 }
 
 func (vu moduleVU) Context() context.Context {
