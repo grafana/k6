@@ -95,6 +95,9 @@ type State struct {
 	// Tracing instrumentation.
 	TracerProvider TracerProvider
 
+	// Tracer creates the spans of the native tracing. It is nil when tracing is disabled.
+	Tracer trace.Tracer
+
 	// Usage is a way to report usage statistics
 	Usage *usage.Usage
 
