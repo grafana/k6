@@ -83,6 +83,25 @@ func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
+// Assert logs an error when the first argument is falsy, following the WHATWG
+// console.assert format.
+func (c console) Assert(args ...sobek.Value) {
+	if len(args) > 0 && args[0].ToBoolean() {
+		return
+	}
+
+	var msg strings.Builder
+	msg.WriteString("Assertion failed")
+	if len(args) > 1 {
+		msg.WriteByte(':')
+		for _, arg := range args[1:] {
+			msg.WriteByte(' ')
+			msg.WriteString(c.valueString(arg))
+		}
+	}
+	c.logger.Error(msg.String())
+}
+
 const (
 	functionLog = "[object Function]"
 	circularLog = "[Circular]"

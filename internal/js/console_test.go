@@ -610,3 +610,24 @@ func TestFileConsole(t *testing.T) {
 		})
 	}
 }
+
+func TestConsoleAssert(t *testing.T) {
+	t.Parallel()
+
+	rt := sobek.New()
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
+
+	logger, hook := logtest.NewNullLogger()
+	_ = rt.Set("console", &console{logger})
+
+	_, err := rt.RunString(`console.assert(true, "ignored")`)
+	require.NoError(t, err)
+	assert.Nil(t, hook.LastEntry())
+
+	_, err = rt.RunString(`console.assert(false, "message", 42)`)
+	require.NoError(t, err)
+	entry := hook.LastEntry()
+	require.NotNil(t, entry)
+	assert.Equal(t, logrus.ErrorLevel, entry.Level)
+	assert.Equal(t, "Assertion failed: message 42", entry.Message)
+}
