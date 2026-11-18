@@ -383,6 +383,24 @@ func TestBrowserContextOptionsClientCertificates_Validation(t *testing.T) {
 		wantErr string
 	}{
 		{
+			name:   "cert_path",
+			script: `[{origin: 'https://x.test', certPath: '/c.pem', keyPath: '/k.pem'}]`,
+			wantErr: "clientCertificates[0].certPath: file paths are not supported; " +
+				"read the file with open() in the init context and pass its contents as cert",
+		},
+		{
+			name:   "key_path_with_inline_cert",
+			script: `[{origin: 'https://x.test', cert: rsaCert, key: rsaKey, keyPath: '/k.pem'}]`,
+			wantErr: "clientCertificates[0].keyPath: file paths are not supported; " +
+				"read the file with open() in the init context and pass its contents as key",
+		},
+		{
+			name:   "pfx_path",
+			script: `[{origin: 'https://x.test', pfxPath: '/c.p12', passphrase: sentinel}]`,
+			wantErr: "clientCertificates[0].pfxPath: file paths are not supported; " +
+				"read the file with open() in the init context and pass its contents as pfx",
+		},
+		{
 			name:    "missing_origin",
 			script:  `[{cert: rsaCert, key: rsaKey}]`,
 			wantErr: "clientCertificates[0]: clientCertificates.origin is required",

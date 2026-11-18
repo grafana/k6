@@ -76,6 +76,16 @@ func parseClientCertificateEntry(rt *sobek.Runtime, i int, v sobek.Value) (clien
 	if k6common.IsNullish(v) || !ok {
 		return e, fmt.Errorf("clientCertificates[%d]: expected object", i)
 	}
+	// Playwright's certPath/keyPath/pfxPath read files at newContext time, which bypasses
+	// open() and so k6 archives; reject them instead of silently ignoring them.
+	for _, f := range []struct{ path, field string }{
+		{"certPath", "cert"}, {"keyPath", "key"}, {"pfxPath", "pfx"},
+	} {
+		if !k6common.IsNullish(obj.Get(f.path)) {
+			return e, fmt.Errorf("clientCertificates[%d].%s: file paths are not supported; "+
+				"read the file with open() in the init context and pass its contents as %s", i, f.path, f.field)
+		}
+	}
 
 	var (
 		origin, passphrase = obj.Get("origin"), obj.Get("passphrase")
