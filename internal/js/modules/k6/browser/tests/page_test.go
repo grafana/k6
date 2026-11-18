@@ -2044,11 +2044,12 @@ func TestPageOnMetric(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		fun       string
-		want      string
-		wantRegex string
-		wantErr   string
+		name          string
+		requestMethod string
+		fun           string
+		want          string
+		wantRegex     string
+		wantErr       string
 	}{
 		{
 			// Just a single page.on.
@@ -2129,6 +2130,14 @@ func TestPageOnMetric(t *testing.T) {
 				});
 			});`,
 			want: "ping-4",
+		},
+		{
+			name:          "with_query_method",
+			requestMethod: "QUERY",
+			fun: `page.on('metric', (metric) => {
+				metric.tag({name: 'ping-query', matches: [{url: /ping/, method: 'QUERY'}]});
+			});`,
+			want: "ping-query",
 		},
 		{
 			// With method field GET, which is the correct method for the request.
@@ -2214,6 +2223,10 @@ func TestPageOnMetric(t *testing.T) {
 			// This page will perform many pings with a changing h query parameter.
 			// This URL should be grouped according to how page.on('metric') is used.
 			tb := newTestBrowser(t, withHTTPServer(), withSamples(samples))
+			method := tt.requestMethod
+			if method == "" {
+				method = http.MethodGet
+			}
 			tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
 				_, err := fmt.Fprintf(w, `
 		<html>
@@ -2222,12 +2235,12 @@ func TestPageOnMetric(t *testing.T) {
 				<script type="module">
 					await ping();
 					async function ping() {
-						await fetch('/ping?h=2kq2lo6n06');
-						await fetch('/ping?h=ej0ypprcjk');
+						await fetch('/ping?h=2kq2lo6n06', {method: %q});
+						await fetch('/ping?h=ej0ypprcjk', {method: %q});
 					}
 				</script>
 			</body>
-		</html>`)
+		</html>`, method, method)
 				require.NoError(t, err)
 			})
 			tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
