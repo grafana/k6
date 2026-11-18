@@ -2,6 +2,7 @@ package netext
 
 import (
 	"net"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -217,4 +218,65 @@ func newResolver() *mockresolver.MockResolver {
 			"example-ipv6-deny-resolver.com": {net.ParseIP("::1")},
 		},
 	)
+}
+
+func TestCheckTargetAddr(t *testing.T) {
+	t.Parallel()
+	dialer := NewDialer(net.Dialer{}, newResolver())
+	hosts, err := types.NewHosts(map[string]types.Host{
+		"mapped.example": {IP: net.ParseIP("10.1.2.3")},
+		"10.1.2.3":       {IP: net.ParseIP("203.0.113.1")},
+	})
+	require.NoError(t, err)
+	dialer.Hosts = hosts
+	blocked, err := types.NewHostnameTrie([]string{"blocked.example"})
+	require.NoError(t, err)
+	dialer.BlockedHostnames = blocked
+	ipNet, err := lib.ParseCIDR("10.0.0.0/8")
+	require.NoError(t, err)
+	ipV6Net, err := lib.ParseCIDR("fe80::/10")
+	require.NoError(t, err)
+	dialer.Blacklist = []*lib.IPNet{ipNet, ipV6Net}
+
+	testCases := []struct {
+		address, expErr string
+	}{
+		{"blocked.example:443", "hostname (blocked.example) is in a blocked pattern (blocked.example)"},
+		{"10.1.2.3:80", "IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)"},
+		{"mapped.example:80", "IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)"},
+		{"10.1.2.3:80", "IP (10.1.2.3) is in a blacklisted range (10.0.0.0/8)"},
+		{"[fe80::1%eth0]:80", "IP (fe80::1) is in a blacklisted range (fe80::/10)"},
+		{"allowed.example:80", ""},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.address, func(t *testing.T) {
+			t.Parallel()
+			err := dialer.CheckTargetAddr(tc.address)
+			if tc.expErr != "" {
+				require.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestProxyTargetAddr(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		raw, want string
+	}{
+		{"http://example.com/", "example.com:80"},
+		{"https://example.com/", "example.com:443"},
+		{"https://example.com:8443/", "example.com:8443"},
+		{"wss://example.com/", "example.com:443"},
+	} {
+		u, err := url.Parse(tc.raw)
+		require.NoError(t, err)
+		addr, err := proxyTargetAddr(u)
+		require.NoError(t, err)
+		require.Equal(t, tc.want, addr)
+	}
 }

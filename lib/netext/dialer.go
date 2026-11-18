@@ -4,7 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
+
+	"golang.org/x/net/idna"
 	"sync/atomic"
 	"time"
 
@@ -67,6 +72,140 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	}
 	conn = &Conn{conn, &d.BytesRead, &d.BytesWritten}
 	return conn, err
+}
+
+// CheckTargetAddr applies the configured hostname and IP restrictions to a
+// target without resolving a hostname. It is used before a request is handed
+// to a forward proxy, where DialContext only sees the proxy address.
+func (d *Dialer) CheckTargetAddr(addr string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+
+	// Scoped IPv6 literals are still IP destinations for the proxy; compare
+	// their zone-free address against the blacklist.
+	if i := strings.LastIndexByte(host, '%'); i >= 0 {
+		host = host[:i]
+	}
+	// Match the transport's ASCII form for IDNs and Unicode-mapped IPv4.
+	if ascii, err := idna.Lookup.ToASCII(host); err == nil && ascii != "" {
+		host = ascii
+	} else {
+		host = strings.ToLower(host)
+	}
+	host = strings.TrimSuffix(host, ".")
+	ip := net.ParseIP(host)
+	if ip != nil {
+		for _, ipnet := range d.Blacklist {
+			if ipnet.Contains(ip) {
+				return BlackListedIPError{ip: ip, net: ipnet}
+			}
+		}
+		return nil
+	}
+
+	if d.BlockedHostnames != nil {
+		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+			return BlockedHostError{hostname: host, match: match}
+		}
+	}
+
+	if d.Hosts != nil {
+		_, port, _ := net.SplitHostPort(addr)
+		remote := d.Hosts.Match(net.JoinHostPort(host, port))
+		if remote == nil {
+			remote = d.Hosts.Match(host)
+		}
+		if remote != nil && remote.IP != nil {
+			for _, ipnet := range d.Blacklist {
+				if ipnet.Contains(remote.IP) {
+					return BlackListedIPError{ip: remote.IP, net: ipnet}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// ProxyFromEnvironment returns the proxy for the request after checking the
+// effective destination the proxy will receive. DialContext cannot do that
+// check when a proxy is used because it receives the proxy address.
+func (d *Dialer) ProxyFromEnvironment(req *http.Request) (*url.URL, error) {
+	return d.proxyFromEnvironmentWithHostCheck(req, true)
+}
+
+func (d *Dialer) proxyFromEnvironmentWithHostCheck(req *http.Request, checkHost bool) (*url.URL, error) {
+	proxyURL, err := http.ProxyFromEnvironment(req)
+	if err != nil || proxyURL == nil {
+		return proxyURL, err
+	}
+
+	addr, err := proxyTargetAddr(req.URL)
+	if err != nil {
+		return nil, err
+	}
+	if err := d.CheckTargetAddr(addr); err != nil {
+		return nil, err
+	}
+
+	// For an HTTP/1 forward proxy Go writes the Host override into the absolute
+	// request target, so the proxy can receive an authority different from the URL.
+	// SOCKS proxies tunnel to the URL destination and only forward Host inside the
+	// tunnel, so they do not need this check.
+	if checkHost && req.URL.Scheme == "http" && req.Host != "" &&
+		proxyURL.Scheme != "socks5" && proxyURL.Scheme != "socks5h" {
+		host := req.Host
+		if h, port, err := net.SplitHostPort(host); err != nil {
+			if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+				host += ":80"
+			} else {
+				host = net.JoinHostPort(host, "80")
+			}
+		} else if port == "" {
+			host = net.JoinHostPort(h, "80")
+		}
+		if err := d.CheckTargetAddr(host); err != nil {
+			return nil, err
+		}
+	}
+
+	return proxyURL, nil
+}
+
+func proxyTargetAddr(u *url.URL) (string, error) {
+	port := u.Port()
+	if port == "" {
+		switch u.Scheme {
+		case "https", "wss":
+			port = "443"
+		default:
+			port = "80"
+		}
+	}
+	return net.JoinHostPort(u.Hostname(), port), nil
+}
+
+// ProxyFromEnvironment returns a proxy callback for a DialContexter. Custom
+// dialers that only implement DialContext keep the default environment lookup.
+func ProxyFromEnvironment(d lib.DialContexter) func(*http.Request) (*url.URL, error) {
+	if dialer, ok := d.(*Dialer); ok {
+		return dialer.ProxyFromEnvironment
+	}
+	return http.ProxyFromEnvironment
+}
+
+// ProxyFromEnvironmentURLOnly is like ProxyFromEnvironment but checks only the
+// URL destination. WebSocket dialers use it because they send CONNECT to the URL
+// authority and forward a Host override inside the tunnel.
+func ProxyFromEnvironmentURLOnly(d lib.DialContexter) func(*http.Request) (*url.URL, error) {
+	if dialer, ok := d.(*Dialer); ok {
+		return func(req *http.Request) (*url.URL, error) {
+			return dialer.proxyFromEnvironmentWithHostCheck(req, false)
+		}
+	}
+	return http.ProxyFromEnvironment
 }
 
 // ResolveAddr looks up the IP address for the given host and optionally port.
