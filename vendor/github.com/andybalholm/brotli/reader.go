@@ -19,9 +19,21 @@ var errInvalidState = errors.New("brotli: invalid state")
 // It is arbitrarily chosen to be equal to the constant used in io.Copy.
 const readBufSize = 32 * 1024
 
+// ReaderOptions controls optional Brotli decoding features.
+type ReaderOptions struct {
+	// LargeWindow accepts the large-window extension defined by RFC 9841.
+	// It is disabled by default. Applications such as PDF readers may require it.
+	LargeWindow bool
+}
+
 // NewReader creates a new Reader reading the given reader.
 func NewReader(src io.Reader) *Reader {
-	r := new(Reader)
+	return NewReaderOptions(src, ReaderOptions{})
+}
+
+// NewReaderOptions creates a Reader with the supplied decoding options.
+func NewReaderOptions(src io.Reader, options ReaderOptions) *Reader {
+	r := &Reader{largeWindow: options.LargeWindow}
 	r.Reset(src)
 	return r
 }
@@ -35,6 +47,7 @@ func (r *Reader) Reset(src io.Reader) error {
 		// There was an unrecoverable error, leaving the Reader's state
 		// undefined. Clear out everything but the buffers.
 		*r = Reader{
+			largeWindow:      r.largeWindow,
 			buf:              r.buf,
 			block_type_trees: r.block_type_trees,
 			literal_hgroup: huffmanTreeGroup{
@@ -53,6 +66,7 @@ func (r *Reader) Reset(src io.Reader) error {
 	}
 
 	decoderStateInit(r)
+	r.large_window = r.largeWindow
 	r.src = src
 	if r.buf == nil {
 		r.buf = make([]byte, readBufSize)
