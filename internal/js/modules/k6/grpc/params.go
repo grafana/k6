@@ -138,6 +138,15 @@ type connectParams struct {
 	// dialing its own. It only shares connections within a k6 instance, so in a
 	// distributed execution each instance keeps its own set of connections.
 	//
+	// A shared connection is dialed with the options of the VU that established
+	// it, and keeps them for its whole life. The data_sent and data_received
+	// metrics of every VU using it are counted by that VU's dialer and emitted
+	// with that VU's tags, and with the localIPs option all of its traffic,
+	// reconnects included, leaves from that VU's source IP. grpc_req_duration
+	// keeps the tags of the VU that made the request, except for the reflection
+	// requests of connect() with reflect: true, which get the tags of the VU
+	// that established the connection.
+	//
 	// This is experimental: the conditions under which a connection is shared
 	// may change in a future release.
 	ConnectionSharing bool
