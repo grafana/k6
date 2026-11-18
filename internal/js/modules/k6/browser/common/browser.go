@@ -16,6 +16,7 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/gorilla/websocket"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/clientcert"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
@@ -736,8 +737,31 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 		return nil, spanRecordError(span, err)
 	}
 
+	var (
+		clientCertificateProxy *clientcert.Proxy
+		credentials            *proxyCredentials
+	)
+	if len(opts.ClientCertificates) > 0 {
+		if b.browserOpts.isRemoteBrowser {
+			return nil, spanRecordError(span, errors.New("clientCertificates is not supported with a remote browser"))
+		}
+		var err error
+		if clientCertificateProxy, credentials, err = b.startClientCertificateProxy(opts); err != nil {
+			return nil, spanRecordError(span, err)
+		}
+		defer func() {
+			// The browser context closes the proxy once it owns it.
+			if clientCertificateProxy != nil {
+				_ = clientCertificateProxy.Close()
+			}
+		}()
+	}
+
 	action := newCommand(target.CreateBrowserContext, target.CreateBrowserContextParams{DisposeOnDetach: new(true)})
-	if opts.Proxy != nil {
+	if clientCertificateProxy != nil {
+		action.params.ProxyServer = "socks5://" + clientCertificateProxy.Addr()
+		action.params.ProxyBypassList = clientCertificateProxyBypassList(opts.Proxy)
+	} else if opts.Proxy != nil {
 		action.params.ProxyServer = strings.TrimSpace(opts.Proxy.Server)
 		if bypass := strings.TrimSpace(opts.Proxy.Bypass); bypass != "" {
 			action.params.ProxyBypassList = bypass
@@ -753,6 +777,11 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	browserCtx, err := NewBrowserContext(b.vuCtx, b, browserContextID, opts, b.logger)
 	if err != nil {
 		return nil, spanRecordErrorf(span, "new browser context: %w", err)
+	}
+	if clientCertificateProxy != nil {
+		browserCtx.clientCertificateProxy = clientCertificateProxy
+		browserCtx.proxyCredentials = credentials
+		clientCertificateProxy = nil
 	}
 	b.runOnClose = append(b.runOnClose, browserCtx.cleanup)
 

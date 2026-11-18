@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"sync"
 	"testing"
@@ -378,4 +379,19 @@ func (c fakeConn) Execute(
 	ctx context.Context, method string, params, res any,
 ) error {
 	return c.execute(ctx, method, params, res)
+}
+
+func TestBrowserNewContextClientCertificates_RemoteBrowser(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	// The browser has no connection, so any CDP call would panic.
+	b := newBrowser(context.Background(), ctx, cancel, nil, NewRemoteBrowserOptions(), log.NewNullLogger())
+	opts := DefaultBrowserContextOptions()
+	opts.ClientCertificates = map[string][]tls.Certificate{"https://x.test": {{}}}
+
+	bctx, err := b.NewContext(opts)
+	require.EqualError(t, err, "clientCertificates is not supported with a remote browser")
+	require.Nil(t, bctx)
 }
