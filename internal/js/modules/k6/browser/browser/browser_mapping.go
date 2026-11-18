@@ -165,5 +165,12 @@ func parseBrowserContextOptions(rt *sobek.Runtime, opts sobek.Value) (*common.Br
 	if err := b.Proxy.Validate(); err != nil {
 		return nil, err
 	}
+	if !k6common.IsNullish(opts) {
+		certs, err := parseClientCertificates(rt, opts.ToObject(rt).Get("clientCertificates"))
+		if err != nil {
+			return nil, err
+		}
+		b.ClientCertificates = certs
+	}
 	return b, nil
 }
