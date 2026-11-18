@@ -64,6 +64,13 @@ func elemList(s Selection) (items []sobek.Value) {
 }
 
 func nodeToElement(e Element, node *gohtml.Node) sobek.Value {
+	// firstChild/lastChild/previousSibling/nextSibling are nil when the node
+	// does not exist. Appending a nil node makes goquery report Length()==1,
+	// so selToElement would then dereference elem.node and panic.
+	if node == nil {
+		return sobek.Undefined()
+	}
+
 	// Goquery does not expose a way to build a goquery.Selection with an arbitrary html.Node.
 	// Workaround by adding a node to an empty Selection
 	emptySel := e.sel.emptySelection()
