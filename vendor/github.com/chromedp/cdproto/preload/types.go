@@ -214,6 +214,7 @@ const (
 	PrerenderFinalStatusPrerenderHostReused                                        PrerenderFinalStatus = "PrerenderHostReused"
 	PrerenderFinalStatusFormSubmitWhenPrerendering                                 PrerenderFinalStatus = "FormSubmitWhenPrerendering"
 	PrerenderFinalStatusCrossDocumentRestart                                       PrerenderFinalStatus = "CrossDocumentRestart"
+	PrerenderFinalStatusPrefetchFailedCrossOriginSubframe                          PrerenderFinalStatus = "PrefetchFailedCrossOriginSubframe"
 )
 
 // IngStatus preloading status values, see also PreloadingTriggeringOutcome.

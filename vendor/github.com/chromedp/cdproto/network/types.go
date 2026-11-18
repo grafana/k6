@@ -1302,6 +1302,7 @@ const (
 	DeviceBoundSessionFetchResultPreProvisionedKeyNotFound                         DeviceBoundSessionFetchResult = "PreProvisionedKeyNotFound"
 	DeviceBoundSessionFetchResultAttestationCertificationError                     DeviceBoundSessionFetchResult = "AttestationCertificationError"
 	DeviceBoundSessionFetchResultAttestationSigningError                           DeviceBoundSessionFetchResult = "AttestationSigningError"
+	DeviceBoundSessionFetchResultFederatedRegistrationRedirected                   DeviceBoundSessionFetchResult = "FederatedRegistrationRedirected"
 )
 
 // DeviceBoundSessionFailedRequest details about a failed device bound
