@@ -18,25 +18,15 @@ import (
 	"go.k6.io/k6/v2/metrics"
 )
 
-// metadataTraceID is the metric metadata key of the trace ID of a request, which the outputs use
-// to correlate the HTTP metric samples with the request trace.
-const metadataTraceID = "trace_id"
-
 // attrRequestName is the k6-specific span attribute holding the name tag of the request.
 const attrRequestName = "k6.http.request.name"
-
-// traceparentHeader is the W3C Trace Context header.
-const traceparentHeader = "Traceparent"
-
-// jaegerTraceHeader is the header carrying the trace context in the Jaeger propagation format.
-const jaegerTraceHeader = "Uber-Trace-Id"
 
 // redactedValue replaces the value of the sensitive query parameters in url.full.
 const redactedValue = "REDACTED"
 
 // startSpan starts the span of an HTTP request, child of the span in ctx (the iteration span),
-// covering all its round trips, e.g. its redirects. It propagates the span to the server, and
-// adds its trace ID to the metadata of the request metric samples.
+// covering all its round trips, e.g. its redirects. See k6trace.StartClientSpan for its
+// propagation to the server.
 func startSpan(
 	ctx context.Context, tracer oteltrace.Tracer, preq *ParsedHTTPRequest,
 ) (context.Context, oteltrace.Span) {
@@ -52,21 +42,8 @@ func startSpan(
 	if name, ok := preq.TagsAndMeta.Tags.Get(metrics.TagName.String()); ok {
 		attrs = append(attrs, attribute.String(attrRequestName, name))
 	}
-	ctx, span := tracer.Start(ctx, req.Method,
-		oteltrace.WithSpanKind(oteltrace.SpanKindClient), oteltrace.WithAttributes(attrs...))
-
-	// A trace context set by the script is kept, either W3C Trace Context or Jaeger's
-	// uber-trace-id header.
-	if req.Header.Get(traceparentHeader) != "" || req.Header.Get(jaegerTraceHeader) != "" {
-		return ctx, span
-	}
-
-	// Only support the W3C Trace Context propagator for injecting trace context into the request headers.
-	propagation.TraceContext{}.Inject(ctx, propagation.HeaderCarrier(req.Header))
-	if span.SpanContext().IsSampled() {
-		preq.TagsAndMeta.SetMetadata(metadataTraceID, span.SpanContext().TraceID().String())
-	}
-	return ctx, span
+	return k6trace.StartClientSpan(ctx, tracer, req.Method,
+		propagation.HeaderCarrier(req.Header), &preq.TagsAndMeta, attrs...)
 }
 
 // isSensitiveParam reports whether the value of the query parameter key must be redacted. These
