@@ -605,7 +605,7 @@ func (fs *FrameSession) initOptions() error {
 	if opts.BypassCSP {
 		optActions = append(optActions, newCommand(cdppage.SetBypassCSP, cdppage.SetBypassCSPParams{Enabled: true}))
 	}
-	if opts.IgnoreHTTPSErrors {
+	if opts.IgnoreHTTPSErrors || len(opts.ClientCertificates) > 0 {
 		optActions = append(optActions, newCommand(security.SetIgnoreCertificateErrors,
 			security.SetIgnoreCertificateErrorsParams{Ignore: true}))
 	}

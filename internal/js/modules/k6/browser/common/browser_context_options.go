@@ -1,6 +1,7 @@
 package common
 
 import (
+	"crypto/tls"
 	"fmt"
 	"strings"
 )
@@ -29,6 +30,10 @@ type BrowserContextOptions struct {
 	UserAgent         string            `js:"userAgent"`
 	VideosPath        string            `js:"videosPath"`
 	Viewport          Viewport          `js:"viewport"`
+
+	// ClientCertificates holds loaded client certificates keyed by normalized origin, in load
+	// order (PEM entries in option order, then PFX entries). Set by the option parser.
+	ClientCertificates map[string][]tls.Certificate `js:"-"`
 }
 
 // DefaultBrowserContextOptions returns the default browser context options.
