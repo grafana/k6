@@ -471,7 +471,7 @@ func (e *MetricEvent) Tag(rm RegExMatcher, matches TagMatches) error {
 			method = strings.ToUpper(method)
 			switch method {
 			case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
-				http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace:
+				http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace, "QUERY":
 			default:
 				return fmt.Errorf("method %q is invalid", m.Method)
 			}
