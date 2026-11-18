@@ -212,6 +212,20 @@ func TestRelay_ContextCancelled(t *testing.T) {
 	assert.True(t, upstream.isClosed())
 }
 
+func TestRelayRecord_ReleasesReplayAfterFirstUpstreamByte(t *testing.T) {
+	t.Parallel()
+
+	r := &relayState{protocol: "h2", replayLimit: defaultReplayLimit}
+	r.record([]byte("preface and settings"))
+	require.NotEmpty(t, r.replay)
+
+	r.firstByte.Store(true)
+	r.record([]byte("next frame"))
+
+	assert.Nil(t, r.replay, "a long-lived h2 connection must not keep the replay buffer")
+	assert.False(t, r.replayOverflow)
+}
+
 func TestServe503H2_Terminates(t *testing.T) {
 	t.Parallel()
 

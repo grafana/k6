@@ -128,9 +128,14 @@ func (r *relayState) copyBrowser() browserResult {
 }
 
 // record appends b to the h2 replay buffer until the first upstream byte, marking an overflow
-// beyond replayLimit.
+// beyond replayLimit. After the first upstream byte the buffer can no longer be replayed, so it
+// is released on the next browser read instead of being kept for the connection's lifetime.
 func (r *relayState) record(b []byte) {
-	if r.protocol != "h2" || r.replayOverflow || r.firstByte.Load() {
+	if r.firstByte.Load() {
+		r.replay = nil
+		return
+	}
+	if r.protocol != "h2" || r.replayOverflow {
 		return
 	}
 	if len(r.replay)+len(b) > r.replayLimit {
