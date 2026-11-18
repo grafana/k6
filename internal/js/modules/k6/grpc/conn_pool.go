@@ -52,6 +52,11 @@ func newConnectionKey(addr string, p *connectParams) (connectionKey, error) {
 
 // sharedConn holds a gRPC connection that can be shared across multiple VUs.
 type sharedConn struct {
+	// key identifies this entry in the pool. A failed or released entry can
+	// be replaced by a newer one under the same key, so the entry rather than
+	// the key is what a client gives back.
+	key connectionKey
+
 	// ready is closed once the client that created this entry is done dialing,
 	// after which conn and err are safe to read.
 	ready chan struct{}
@@ -82,14 +87,14 @@ func newConnectionPool() *connectionPool {
 // the given registry, so clients keep their own types even while sharing the
 // underlying connection.
 //
-// Every successful call must be paired with a release of the same key.
+// Every successful call must be paired with a release of the returned entry.
 func (p *connectionPool) getOrDial(
 	ctx context.Context,
 	key connectionKey,
 	addr string,
 	types *protoregistry.Types,
 	opts ...grpc.DialOption,
-) (*grpcext.Conn, error) {
+) (*grpcext.Conn, *sharedConn, error) {
 	p.mu.Lock()
 	if sc, ok := p.conns[key]; ok {
 		sc.refCount++
@@ -98,68 +103,75 @@ func (p *connectionPool) getOrDial(
 		// The connection may still be in the process of being dialed by
 		// another client. Wait on the entry rather than on the pool's mutex,
 		// which would also block every unrelated connect() in the meantime.
-		<-sc.ready
-		if sc.err != nil {
-			// The client that dialed has already dropped this entry from the
-			// pool, so give back the reference taken above instead of calling
-			// release, which by now may refer to a newer entry for this key.
-			p.mu.Lock()
-			sc.refCount--
-			p.mu.Unlock()
+		select {
+		case <-sc.ready:
+		case <-ctx.Done():
+			// The reference taken above can only be given back once the dial
+			// is over, since the connection to close isn't known before that.
+			// This client's timeout must not wait for it, so it is given back
+			// in the background: ready is always closed once the dialing
+			// client's own timeout expires.
+			go func() {
+				<-sc.ready
+				_ = p.release(sc)
+			}()
 
-			return nil, sc.err
+			return nil, nil, fmt.Errorf("waiting for the shared connection to %q: %w", addr, ctx.Err())
 		}
 
-		return sc.conn.WithTypes(types), nil
+		if sc.err != nil {
+			// The client that dialed has already dropped this entry from the
+			// pool, so there is no connection to give back.
+			return nil, nil, sc.err
+		}
+
+		return sc.conn.WithTypes(types), sc, nil
 	}
 
-	sc := &sharedConn{ready: make(chan struct{}), refCount: 1}
+	sc := &sharedConn{key: key, ready: make(chan struct{}), refCount: 1}
 	p.conns[key] = sc
 	p.mu.Unlock()
 
 	// Dialing is done outside of the pool's mutex: k6 dials with
 	// grpc.WithBlock(), so holding it here would serialize every VU's
 	// connect() behind this handshake.
-	sc.conn, sc.err = grpcext.Dial(ctx, addr, types, opts...)
+	conn, err := grpcext.Dial(ctx, addr, types, opts...)
+
+	p.mu.Lock()
+	sc.conn, sc.err = conn, err
+	if err != nil && p.conns[key] == sc {
+		// A failed connection must not be handed out to the clients coming
+		// after this one, they get to retry the dial themselves. It is dropped
+		// before ready is closed, so that no client waiting on it can find it
+		// in the pool anymore.
+		delete(p.conns, key)
+	}
+	p.mu.Unlock()
 	close(sc.ready)
 
-	if sc.err != nil {
-		// A failed connection must not be handed out to the clients coming
-		// after this one, they get to retry the dial themselves.
-		p.mu.Lock()
-		if p.conns[key] == sc {
-			delete(p.conns, key)
-		}
-		p.mu.Unlock()
-
-		return nil, sc.err
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return sc.conn, nil
+	return conn, sc, nil
 }
 
-// release gives back one reference to the connection shared under key. The
-// connection is closed and dropped from the pool once no client is using it.
-func (p *connectionPool) release(key connectionKey) error {
+// release gives back one reference to the given entry. The connection is closed
+// and dropped from the pool once no client is using it.
+//
+// It must only be called once the entry's dial is over.
+func (p *connectionPool) release(sc *sharedConn) error {
 	p.mu.Lock()
-	sc, ok := p.conns[key]
-	if !ok {
-		p.mu.Unlock()
-		return nil
-	}
-
 	sc.refCount--
-	if sc.refCount > 0 {
+	if sc.refCount > 0 || p.conns[sc.key] != sc {
+		// Either the connection is still in use, or the entry has already
+		// been dropped from the pool because its dial failed.
 		p.mu.Unlock()
 		return nil
 	}
 
-	delete(p.conns, key)
+	delete(p.conns, sc.key)
 	p.mu.Unlock()
-
-	if sc.conn == nil {
-		return nil
-	}
 
 	return sc.conn.Close()
 }

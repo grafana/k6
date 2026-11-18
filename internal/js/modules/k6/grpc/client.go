@@ -43,9 +43,9 @@ type Client struct {
 	typesMtx sync.Mutex
 
 	connPool *connectionPool
-	// sharedKey is set while this client uses a connection from connPool, and
-	// identifies the entry to give back when the client is closed.
-	sharedKey *connectionKey
+	// shared is set while this client uses a connection from connPool, and is
+	// the entry to give back when the client is closed or connects again.
+	shared *sharedConn
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
@@ -299,6 +299,17 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 func (c *Client) dial(
 	ctx context.Context, addr string, p *connectParams, opts ...grpc.DialOption,
 ) (*grpcext.Conn, error) {
+	// A client connecting again gives back the shared connection it was using
+	// first, otherwise the reference would never be released and Close() would
+	// release it in place of closing a new dedicated connection.
+	if c.shared != nil {
+		shared := c.shared
+		c.shared, c.conn = nil, nil
+		if err := c.connPool.release(shared); err != nil {
+			c.vu.State().Logger.WithError(err).Warn("unable to close the previous shared gRPC connection")
+		}
+	}
+
 	if !p.ConnectionSharing {
 		return grpcext.Dial(ctx, addr, c.types, opts...)
 	}
@@ -308,14 +319,14 @@ func (c *Client) dial(
 		return nil, err
 	}
 
-	conn, err := c.connPool.getOrDial(ctx, key, addr, c.types, opts...)
+	conn, shared, err := c.connPool.getOrDial(ctx, key, addr, c.types, opts...)
 	if err != nil {
 		return nil, err
 	}
 
 	// Only track the connection once it is ours to give back, so that a failed
 	// dial doesn't make a later Close() release somebody else's connection.
-	c.sharedKey = &key
+	c.shared = shared
 
 	return conn, nil
 }
@@ -511,9 +522,9 @@ func (c *Client) Close() error {
 	}
 
 	var err error
-	if c.sharedKey != nil {
-		err = c.connPool.release(*c.sharedKey)
-		c.sharedKey = nil
+	if c.shared != nil {
+		err = c.connPool.release(c.shared)
+		c.shared = nil
 	} else {
 		err = c.conn.Close()
 	}
