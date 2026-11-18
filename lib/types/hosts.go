@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -66,17 +64,13 @@ func (n *NullHosts) UnmarshalJSON(data []byte) error {
 
 	source := make(map[string]Host)
 	for k, v := range jsonSource {
-		ip, port, err := net.SplitHostPort(v)
-		if err == nil {
-			pInt, err := strconv.Atoi(port)
-			if err != nil {
-				return err
-			}
-
-			source[k] = Host{IP: net.ParseIP(ip), Port: pInt}
-		} else {
-			source[k] = Host{IP: net.ParseIP(v)}
+		// Reject anything that isn't an IP or IP:port. Storing a nil IP here would make the
+		// dialer connect to ":port", i.e. the local machine, instead of the intended address.
+		var h Host
+		if err := h.UnmarshalText([]byte(v)); err != nil {
+			return fmt.Errorf("invalid address %q for host %q, expected an IP or IP:port: %w", v, k, err)
 		}
+		source[k] = h
 	}
 
 	hosts, err := NewHosts(source)
