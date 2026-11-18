@@ -141,6 +141,34 @@ func TestTracesOutputExportsRunHierarchy(t *testing.T) {
 	}
 }
 
+// TestTracesOutputContinuesTraceparent checks that the TRACEPARENT and TRACESTATE environment
+// variables of the k6 process are read by the run command: the run span continues the incoming
+// trace and its children share the trace ID.
+func TestTracesOutputContinuesTraceparent(t *testing.T) {
+	t.Parallel()
+
+	const (
+		traceID = "0af7651916cd43dd8448eb211c80319c"
+		spanID  = "b7ad6b7169203331"
+	)
+
+	collector, endpoint := newOTLPCollector(t)
+	ts := getSingleFileTestState(t, tracingScript, []string{nativeTracingFlag, "--traces-output=otel=" + endpoint}, 0)
+	ts.Env["TRACEPARENT"] = "00-" + traceID + "-" + spanID + "-01"
+	ts.Env["TRACESTATE"] = "vendor=value"
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	runs := collector.byName("k6.run")
+	require.Len(t, runs, 1)
+	assert.Equal(t, traceID, fmt.Sprintf("%x", runs[0].GetTraceId()))
+	assert.Equal(t, spanID, fmt.Sprintf("%x", runs[0].GetParentSpanId()))
+	assert.Equal(t, "vendor=value", runs[0].GetTraceState())
+
+	for _, s := range collector.all() {
+		assert.Equal(t, runs[0].GetTraceId(), s.GetTraceId(), "%s must be part of the incoming trace", s.GetName())
+	}
+}
+
 // TestTracesOutputHTTPRequestSpans checks the wiring of the HTTP request spans in a test run:
 // they are children of their iteration, and the server receives their trace context. The span
 // contents are tested in lib/netext/httpext.
