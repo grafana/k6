@@ -91,8 +91,8 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 		}
 	}
 	if rsakgp.Name == RSAOaep {
-		privateKeyUsages = []CryptoKeyUsage{DecryptCryptoKeyUsage}
-		publicKeyUsages = []CryptoKeyUsage{EncryptCryptoKeyUsage}
+		privateKeyUsages = []CryptoKeyUsage{DecryptCryptoKeyUsage, UnwrapKeyCryptoKeyUsage}
+		publicKeyUsages = []CryptoKeyUsage{EncryptCryptoKeyUsage, WrapKeyCryptoKeyUsage}
 		for _, usage := range keyUsages {
 			switch usage {
 			case EncryptCryptoKeyUsage:
