@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"testing"
@@ -235,6 +236,35 @@ func TestQueryAll(t *testing.T) {
 			},
 		)
 	})
+}
+
+// Check that nested selector for or locator is stable after reconstructSelector
+func TestReconstructSelectorInternalStability(t *testing.T) {
+	t.Parallel()
+
+	inner, err := NewSelector("#button1")
+	require.NoError(t, err)
+	encoded, err := json.Marshal(inner)
+	require.NoError(t, err)
+	quoted, err := json.Marshal(string(encoded))
+	require.NoError(t, err)
+
+	after := &Selector{
+		Parts: []*SelectorPart{
+			{Name: "css", Body: "#iframe2"},
+			{Name: "internal:control", Body: "enter-frame"},
+			{Name: "css", Body: "#does-not-match"},
+			{Name: "internal:or", Body: string(quoted)},
+		},
+	}
+	var h ElementHandle
+	out := h.reconstructSelector(after)
+
+	parsed, err := NewSelector(out)
+	require.NoError(t, err, "selector after reconstruct must parse: %s", out)
+	require.Len(t, parsed.Parts, 4)
+	assert.Equal(t, "internal:or", parsed.Parts[3].Name)
+	assert.Equal(t, string(quoted), parsed.Parts[3].Body)
 }
 
 type jsHandleStub struct {
