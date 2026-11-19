@@ -35,17 +35,20 @@ func _TimeFormatNoOp() {
 var _TimeFormatValues = []TimeFormat{TimeFormatUnix, TimeFormatUnixMilli, TimeFormatUnixMicro, TimeFormatUnixNano, TimeFormatRFC3339, TimeFormatRFC3339Nano}
 
 var _TimeFormatNameToValueMap = map[string]TimeFormat{
-	_TimeFormatName[0:4]:        TimeFormatUnix,
+	_TimeFormatName[0:4]:   TimeFormatUnix,
+	_TimeFormatName[4:14]:  TimeFormatUnixMilli,
+	_TimeFormatName[14:24]: TimeFormatUnixMicro,
+	_TimeFormatName[24:33]: TimeFormatUnixNano,
+	_TimeFormatName[33:40]: TimeFormatRFC3339,
+	_TimeFormatName[40:52]: TimeFormatRFC3339Nano,
+}
+
+var _TimeFormatLowerNameToValueMap = map[string]TimeFormat{
 	_TimeFormatLowerName[0:4]:   TimeFormatUnix,
-	_TimeFormatName[4:14]:       TimeFormatUnixMilli,
 	_TimeFormatLowerName[4:14]:  TimeFormatUnixMilli,
-	_TimeFormatName[14:24]:      TimeFormatUnixMicro,
 	_TimeFormatLowerName[14:24]: TimeFormatUnixMicro,
-	_TimeFormatName[24:33]:      TimeFormatUnixNano,
 	_TimeFormatLowerName[24:33]: TimeFormatUnixNano,
-	_TimeFormatName[33:40]:      TimeFormatRFC3339,
 	_TimeFormatLowerName[33:40]: TimeFormatRFC3339,
-	_TimeFormatName[40:52]:      TimeFormatRFC3339Nano,
 	_TimeFormatLowerName[40:52]: TimeFormatRFC3339Nano,
 }
 
@@ -65,7 +68,7 @@ func TimeFormatString(s string) (TimeFormat, error) {
 		return val, nil
 	}
 
-	if val, ok := _TimeFormatNameToValueMap[strings.ToLower(s)]; ok {
+	if val, ok := _TimeFormatLowerNameToValueMap[strings.ToLower(s)]; ok {
 		return val, nil
 	}
 	return 0, fmt.Errorf("%s does not belong to TimeFormat values", s)
