@@ -3,12 +3,10 @@ package tests
 import (
 	"bytes"
 	"context"
-	"net"
 	"os/signal"
+	"regexp"
 	"runtime"
-	"strconv"
 	"sync"
-	"sync/atomic"
 	"testing"
 	_ "unsafe" //nolint:revive,nolintlint // needed for the go:linkname and nolintlint is buggy
 
@@ -142,23 +140,23 @@ func (ts *GlobalTestState) ReparseFlags() {
 //go:linkname getFlags go.k6.io/k6/v2/cmd/state.getFlags
 func getFlags(defaultFlags state.GlobalFlags, env map[string]string, args []string) state.GlobalFlags
 
-var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
+// apiServerAddrPattern matches the debug log line k6 writes when it starts the REST API server.
+var apiServerAddrPattern = regexp.MustCompile(`Starting the REST API server on ([^"\s]+)`) //nolint:gochecknoglobals
 
-func getFreeBindAddr(tb testing.TB) string {
-	for range 100 {
-		port := atomic.AddUint64(&portRangeStart, 1)
-		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
+// apiServerAddr returns the address the REST API server is listening on, as k6 logged it.
+//
+// Tests start k6 with --address localhost:0, so the OS picks a free port when k6 listens.
+// Nothing has to find a free port up front and release it again, which raced with other
+// tests and processes taking the same port. The test must run k6 with -v and
+// --log-output=stdout, and call this after the server has started.
+func apiServerAddr(tb testing.TB, ts *GlobalTestState) string {
+	tb.Helper()
 
-		listener, err := (&net.ListenConfig{}).Listen(tb.Context(), "tcp", addr)
-		if err != nil {
-			continue // port was busy for some reason
-		}
-		defer func() {
-			assert.NoError(tb, listener.Close())
-		}()
-		return addr
-	}
+	ts.OutMutex.Lock()
+	stdout := ts.Stdout.String()
+	ts.OutMutex.Unlock()
 
-	tb.Fatal("could not get a free port")
-	return ""
+	match := apiServerAddrPattern.FindStringSubmatch(stdout)
+	require.NotNil(tb, match, "the REST API server address was not logged")
+	return match[1]
 }
