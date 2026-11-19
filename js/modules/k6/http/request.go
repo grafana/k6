@@ -316,6 +316,11 @@ func (c *Client) parseRequest(
 	if !common.IsNullish(params) {
 		params := params.ToObject(rt)
 		for _, k := range params.Keys() {
+			// An explicit undefined or null means "not set" and keeps the default,
+			// except for responseCallback where null disables the callback.
+			if k != "responseCallback" && common.IsNullish(params.Get(k)) {
+				continue
+			}
 			switch k {
 			case "cookies":
 				cookiesV := params.Get(k)
