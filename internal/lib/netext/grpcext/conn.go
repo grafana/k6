@@ -369,7 +369,7 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 	}
 
 	// (rogchap) Re-using --http-debug flag as gRPC is technically still HTTP
-	if state.Options.HTTPDebug.String != "" {
+	if httpDebug := state.Options.HTTPDebug.String; httpDebug != "" && httpDebug != "error" {
 		logger := state.Logger.WithField("source", "http-debug")
 		DebugStat(logger, stat, state.Options.HTTPDebug.String, state.Options.HTTPDebugRedact.Bool)
 	}
