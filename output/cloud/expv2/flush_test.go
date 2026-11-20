@@ -418,6 +418,49 @@ func (bp *blockingPusher) push(ctx context.Context, _ *pbcloud.MetricSet) error 
 	}
 }
 
+func TestMetricsFlusherRejectsNonPositiveConcurrency(t *testing.T) {
+	t.Parallel()
+
+	r := metrics.NewRegistry()
+	m1 := r.MustNewMetric("metric1", metrics.Counter)
+	logger, _ := testutils.NewLoggerWithHook(t)
+
+	for _, concurrency := range []int{0, -1} {
+		t.Run(strconv.Itoa(concurrency), func(t *testing.T) {
+			t.Parallel()
+
+			bq := &bucketQ{}
+			pm := &pusherMock{}
+			mf := metricsFlusher{
+				bq:                   bq,
+				client:               pm,
+				logger:               logger,
+				discardedLabels:      make(map[string]struct{}),
+				maxSeriesInBatch:     10,
+				batchPushConcurrency: concurrency,
+			}
+
+			ts := metrics.TimeSeries{Metric: m1, Tags: r.RootTagSet().With("k", "v")}
+			bq.Push([]timeBucket{{
+				Time:  1,
+				Sinks: map[metrics.TimeSeries]metricValue{ts: &counter{Sum: 1}},
+			}})
+
+			done := make(chan error, 1)
+			go func() { done <- mf.flush(t.Context()) }()
+
+			select {
+			case err := <-done:
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "batch push concurrency must be a positive number")
+				assert.Equal(t, 0, pm.timesCalled())
+			case <-time.After(2 * time.Second):
+				t.Fatal("flush hung with non-positive batchPushConcurrency")
+			}
+		})
+	}
+}
+
 func TestMetricsFlusherErrorCase(t *testing.T) {
 	t.Parallel()
 
