@@ -122,13 +122,57 @@ func (d *Dialer) getDialAddr(addr string) (*types.Host, error) {
 		return nil, err
 	}
 
-	for _, ipnet := range d.Blacklist {
-		if ipnet.Contains(remote.IP) {
-			return nil, BlackListedIPError{ip: remote.IP, net: ipnet}
-		}
+	if err := d.checkBlacklist(remote.IP); err != nil {
+		return nil, err
 	}
 
 	return remote, nil
+}
+
+func (d *Dialer) checkBlacklist(ip net.IP) error {
+	for _, ipnet := range d.Blacklist {
+		if ipnet.Contains(ip) {
+			return BlackListedIPError{ip: ip, net: ipnet}
+		}
+	}
+	return nil
+}
+
+// CheckTargetAddr applies blockHostnames, blacklistIPs and hosts to addr ("host:port") without
+// resolving it through DNS. It is meant for connections that go through a proxy: the dialer then
+// only dials the proxy, and the target is resolved by the proxy, not by k6.
+//
+// A hostname is checked against blockHostnames, and an IP literal, or the IP that hosts maps the
+// address to, is checked against blacklistIPs. A hostname that only resolves to a blacklisted IP
+// on the proxy side is not caught, because resolving it locally would break targets that only
+// the proxy can resolve.
+func (d *Dialer) CheckTargetAddr(addr string) error {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+
+	ip := net.ParseIP(host)
+	if d.BlockedHostnames != nil && ip == nil {
+		if match, blocked := d.BlockedHostnames.Contains(host); blocked {
+			return BlockedHostError{hostname: host, match: match}
+		}
+	}
+
+	if d.Hosts != nil {
+		remote, err := d.getConfiguredHost(addr, host, port)
+		if err != nil {
+			return err
+		}
+		if remote != nil {
+			ip = remote.IP
+		}
+	}
+
+	if ip == nil {
+		return nil
+	}
+	return d.checkBlacklist(ip)
 }
 
 func (d *Dialer) findRemote(addr string) (*types.Host, error) {
