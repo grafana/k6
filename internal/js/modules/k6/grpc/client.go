@@ -295,6 +295,12 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 		opts = append(opts, grpc.WithAuthority(p.Authority))
 	}
 
+	// A client connecting again closes the connection it already has, which
+	// would otherwise stay open, unreachable, until k6 exits.
+	if err := c.Close(); err != nil {
+		state.Logger.WithError(err).Warn("unable to close the previous gRPC connection")
+	}
+
 	c.addr = addr
 	c.conn, err = grpcext.Dial(ctx, addr, c.types, opts...)
 	if err != nil {
