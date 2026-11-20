@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package nullvalue;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+
+service Service {
+  rpc Watch(google.protobuf.Empty) returns (stream google.protobuf.Value);
+}

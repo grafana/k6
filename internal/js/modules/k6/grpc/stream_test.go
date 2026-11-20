@@ -17,9 +17,12 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func TestStream_InvalidHeader(t *testing.T) {
@@ -650,6 +653,77 @@ func TestStream_MetricsTagsMetadata(t *testing.T) {
 			assertTags(t, sample, expTags)
 		}
 	}
+}
+
+func TestStream_NullProtobufValueDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	ts.httpBin.ServerGRPC.RegisterService(&grpc.ServiceDesc{
+		ServiceName: "nullvalue.Service",
+		HandlerType: (*any)(nil),
+		Streams: []grpc.StreamDesc{{
+			StreamName:    "Watch",
+			ServerStreams: true,
+			Handler: func(_ any, stream grpc.ServerStream) error {
+				var req emptypb.Empty
+				if err := stream.RecvMsg(&req); err != nil && !errors.Is(err, io.EOF) {
+					return err
+				}
+
+				nullValue, err := structpb.NewValue(nil)
+				if err != nil {
+					return err
+				}
+				if err := stream.SendMsg(nullValue); err != nil {
+					return err
+				}
+
+				okValue, err := structpb.NewValue("ok")
+				if err != nil {
+					return err
+				}
+				return stream.SendMsg(okValue)
+			},
+		}},
+	}, struct{}{})
+
+	replace := func(code string) (sobek.Value, error) {
+		return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
+	}
+
+	initString := codeBlock{
+		code: `
+		var client = new grpc.Client();
+		client.load([], "testdata/nullvalue.proto");`,
+	}
+	vuString := codeBlock{
+		code: `
+		client.connect("GRPCBIN_ADDR");
+		let stream = new grpc.Stream(client, "nullvalue.Service/Watch");
+		stream.on('data', function (data) {
+			if (data === null) {
+				call('null');
+			} else {
+				call(String(data));
+			}
+		});
+		stream.write({});
+		stream.end();
+		`,
+	}
+
+	val, err := replace(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	val, err = replace(vuString.code)
+	ts.EventLoop.WaitOnRegistered()
+
+	assertResponse(t, vuString, err, val, ts)
+	assert.Equal(t, []string{"null", "ok"}, ts.callRecorder.Recorded())
 }
 
 func assertTags(t *testing.T, sample metrics.Sample, tags map[string]string) {

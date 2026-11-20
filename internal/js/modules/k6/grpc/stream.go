@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"reflect"
 	"sync"
 	"time"
 
@@ -207,9 +206,10 @@ func (s *stream) readData(wg *sync.WaitGroup) {
 			return
 		}
 
-		if msg != nil || !reflect.ValueOf(msg).IsNil() {
-			s.queueMessage(msg)
-		}
+		// Successfully received a message. JSON null (for example google.protobuf.Value
+		// with a null payload) unmarshals to a nil interface; still deliver it so
+		// listeners see JS null instead of panicking on reflect.Value.IsNil.
+		s.queueMessage(msg)
 	}
 }
 
