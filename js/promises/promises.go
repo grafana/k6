@@ -12,6 +12,7 @@ import (
 // Calling the function will create a Sobek promise and return its `resolve` and `reject` callbacks, wrapped
 // in such a way that it will block the k6 JavaScript runtime's event loop from exiting before they are
 // called, even if the promise isn't resolved by the time the current script ends executing.
+// Go errors passed to reject are converted to JavaScript GoError objects.
 //
 // A typical usage would be:
 //
@@ -40,6 +41,9 @@ func New(vu modules.VU) (p *sobek.Promise, resolve func(result any), reject func
 
 	reject = func(reason any) {
 		callback(func() error {
+			if err, ok := reason.(error); ok {
+				reason = vu.Runtime().NewGoError(err)
+			}
 			return rejectFunc(reason)
 		})
 	}

@@ -243,9 +243,32 @@ func TestClient(t *testing.T) {
 				client.asyncInvoke("grpc.testing.TestService/EmptyCall", {}, { void: true }).then(function(resp) {
 					throw new Error("should not be here")
 				}, (err) => {
+					if (!(err instanceof Error) || err.name !== "GoError" ||
+						err.message !== 'invalid GRPC\'s client.invoke() parameters: unknown param: "void"') {
+						throw new Error("expected a GoError with the parameter error message");
+					}
 					throw new Error(err)
 				})`,
 				err: `unknown param: "void"`,
+			},
+		},
+		{
+			name: "AsyncInvokeInvalidProtobuf",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.asyncInvoke("grpc.testing.TestService/EmptyCall", { unknownField: true }).then(() => {
+					throw new Error("expected a rejection");
+				}, (err) => {
+					if (!(err instanceof Error) || err.name !== "GoError" ||
+						!err.message.includes("unable to serialise request object to protocol buffer:") ||
+						!err.message.includes('unknown field "unknownField"')) {
+						throw new Error("unexpected rejection: " + err);
+					}
+				})`,
 			},
 		},
 		{

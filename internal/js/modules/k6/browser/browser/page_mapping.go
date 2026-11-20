@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	k6common "go.k6.io/k6/v2/js/common"
+	"go.k6.io/k6/v2/js/promises"
 )
 
 // mapPage to the JS module.
@@ -425,19 +426,17 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
 
-			promise, res, rej := rt.NewPromise()
+			promise, res, rej := promises.New(vu)
 			callback := vu.RegisterCallback()
 			go func() {
 				bb, err := p.Screenshot(popts, vu.filePersister)
-				if err != nil {
-					callback(func() error {
-						return rej(err)
-					})
-					return
-				}
-
 				callback(func() error {
-					return res(rt.NewArrayBuffer(bb))
+					if err != nil {
+						rej(k6ext.BrowserError(err))
+						return nil
+					}
+					res(rt.NewArrayBuffer(bb))
+					return nil
 				})
 			}()
 
