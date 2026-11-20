@@ -28,7 +28,8 @@ func escape(b *bytes.Buffer, r rune, force bool) {
 
 	switch r {
 	case '\a':
-		b.WriteString(`\a`)
+		// \a is an identity escape in non-Unicode ECMAScript patterns.
+		b.WriteString(`\x07`)
 	case '\f':
 		b.WriteString(`\f`)
 	case '\n':
@@ -70,7 +71,7 @@ func Unescape(input string) (string, error) {
 		if p.rightMost() {
 			return "", p.getErr(ErrIllegalEndEscape)
 		}
-		r, err := p.scanCharEscape()
+		r, err := p.scanCharEscape(false)
 		if err != nil {
 			return "", err
 		}

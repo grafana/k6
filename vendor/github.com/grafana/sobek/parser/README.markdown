@@ -71,27 +71,6 @@ The parameter list, if any, should be a comma-separated list of identifiers.
 func ReadSource(filename string, src interface{}) ([]byte, error)
 ```
 
-#### func  TransformRegExp
-
-```go
-func TransformRegExp(pattern string) (string, error)
-```
-TransformRegExp transforms a JavaScript pattern into a Go "regexp" pattern.
-
-re2 (Go) cannot do backtracking, so the presence of a lookahead (?=) (?!) or
-backreference (\1, \2, ...) will cause an error.
-
-re2 (Go) has a different definition for \s: [\t\n\f\r ]. The JavaScript
-definition, on the other hand, also includes \v, Unicode "Separator, Space",
-etc.
-
-If the pattern is invalid (not valid even in JavaScript), then this function
-returns the empty string and an error.
-
-If the pattern is valid, but incompatible (contains a lookahead or
-backreference), then this function returns the transformation (a non-empty
-string) AND an error.
-
 #### type Error
 
 ```go

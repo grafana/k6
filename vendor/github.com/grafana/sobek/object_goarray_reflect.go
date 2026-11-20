@@ -109,6 +109,21 @@ func (o *objectGoArrayReflect) getIdx(idx valueInt, receiver Value) Value {
 	return o.objectGoReflect.getStr(idx.string(), receiver)
 }
 
+func (o *objectGoArrayReflect) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	var ownProp Value
+	if idx := strToGoIdx(name); idx >= 0 && idx < o.fieldsValue.Len() {
+		ownProp = o._getIdx(idx)
+	} else if name == "length" {
+		if o.fieldsValue.Kind() == reflect.Slice {
+			o.updateLen()
+		}
+		ownProp = &o.lengthProp
+	} else {
+		ownProp = o.objectGoReflect.getOwnPropStr(name)
+	}
+	return o.hasAndGetOwnStr(name, ownProp, receiver)
+}
+
 func (o *objectGoArrayReflect) getStr(name unistring.String, receiver Value) Value {
 	var ownProp Value
 	if idx := strToGoIdx(name); idx >= 0 && idx < o.fieldsValue.Len() {

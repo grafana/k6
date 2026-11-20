@@ -76,3 +76,12 @@ require(t);
 //# sourceMappingURL=k6://internal-should-not-leak/file.map`, code)
 	})
 }
+
+func TestStripTypesErrorLocation(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := StripTypes("const x = 1;\nconst y = ;", "script.ts")
+	var parseErr *parser.Error
+	require.ErrorAs(t, err, &parseErr)
+	assert.Equal(t, "script.ts: Line 2:10 Unexpected \";\"", parseErr.Error())
+}

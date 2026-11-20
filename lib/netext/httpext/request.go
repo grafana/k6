@@ -15,6 +15,7 @@ import (
 
 	"github.com/Azure/go-ntlmssp"
 	"github.com/sirupsen/logrus"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/v2/lib"
@@ -111,7 +112,9 @@ func updateK6Response(k6Response *Response, finishedReq *finishedRequest) {
 // TODO: split apart...
 //
 //nolint:cyclop, gocyclo, funlen, gocognit, nestif
-func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest) (*Response, error) {
+func MakeRequest(
+	ctx context.Context, state *lib.State, preq *ParsedHTTPRequest,
+) (result *Response, resultErr error) {
 	respReq := &Request{
 		Method:  preq.Req.Method,
 		URL:     preq.Req.URL.String(),
@@ -179,6 +182,12 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		if err := rpsLimit.Wait(ctx); err != nil {
 			return nil, err
 		}
+	}
+
+	if state.Tracer != nil {
+		var span oteltrace.Span
+		ctx, span = startSpan(ctx, state.Tracer, preq)
+		defer func() { endSpan(span, preq, result, resultErr) }()
 	}
 
 	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)

@@ -17,15 +17,15 @@ type mapIterObject struct {
 	kind iterationKind
 }
 
-func (o *mapIterObject) next() Value {
+func (o *mapIterObject) nextResult(Value) (Value, bool) {
 	if o.iter == nil {
-		return o.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 
 	entry := o.iter.next()
 	if entry == nil {
 		o.iter = nil
-		return o.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 
 	var result Value
@@ -38,7 +38,12 @@ func (o *mapIterObject) next() Value {
 		result = o.val.runtime.newArrayValues([]Value{entry.key, entry.value})
 	}
 
-	return o.val.runtime.createIterResultObject(result, false)
+	return result, true
+}
+
+func (o *mapIterObject) next() Value {
+	value, valid := o.nextResult(nil)
+	return o.val.runtime.createIterResultObject(value, !valid)
 }
 
 func (mo *mapObject) init() {
@@ -51,6 +56,9 @@ func (mo *mapObject) exportType() reflect.Type {
 }
 
 func (mo *mapObject) export(ctx *objectExportCtx) interface{} {
+	if v, exists := ctx.get(mo.val); exists {
+		return v
+	}
 	m := make([][2]interface{}, mo.m.size)
 	ctx.put(mo.val, m)
 
@@ -124,6 +132,35 @@ func (r *Runtime) mapProto_get(call FunctionCall) Value {
 	}
 
 	return nilSafe(mo.m.get(call.Argument(0)))
+}
+
+func (r *Runtime) mapProto_getOrInsert(call FunctionCall) Value {
+	thisObj := r.toObject(call.This)
+	mo, ok := thisObj.self.(*mapObject)
+	if !ok {
+		panic(r.NewTypeError("Method Map.prototype.getOrInsert called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
+	}
+	return mo.m.getOrInsert(call.Argument(0), call.Argument(1))
+}
+
+func (r *Runtime) mapProto_getOrInsertComputed(call FunctionCall) Value {
+	thisObj := r.toObject(call.This)
+	mo, ok := thisObj.self.(*mapObject)
+	if !ok {
+		panic(r.NewTypeError("Method Map.prototype.getOrInsertComputed called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
+	}
+	callbackFn := r.toCallable(call.Argument(1))
+	key := call.Argument(0)
+	if key == _negativeZero {
+		key = intToValue(0)
+	}
+	if v := mo.m.get(key); v != nil {
+		return v
+	}
+	value := callbackFn(FunctionCall{This: _undefined, Arguments: []Value{key}})
+	// The callback may have modified the map, so the entry is looked up again
+	mo.m.set(key, value)
+	return value
 }
 
 func (r *Runtime) mapProto_has(call FunctionCall) Value {
@@ -236,6 +273,16 @@ func (r *Runtime) builtin_newMap(args []Value, newTarget *Object) *Object {
 	return o
 }
 
+func (r *Runtime) map_groupBy(call FunctionCall) Value {
+	keys, groups := r.groupBy(call.Argument(0), call.Argument(1), false)
+	o := r.builtin_newMap(nil, r.getMap())
+	mo := o.self.(*mapObject)
+	for i, key := range keys {
+		mo.m.set(key, r.newArrayValues(groups[i]))
+	}
+	return o
+}
+
 func (r *Runtime) createMapIterator(mapValue Value, kind iterationKind) Value {
 	obj := r.toObject(mapValue)
 	mapObj, ok := obj.self.(*mapObject)
@@ -278,6 +325,8 @@ func (r *Runtime) createMapProto(val *Object) objectImpl {
 	o._putProp("forEach", r.newNativeFunc(r.mapProto_forEach, "forEach", 1), true, false, true)
 	o._putProp("has", r.newNativeFunc(r.mapProto_has, "has", 1), true, false, true)
 	o._putProp("get", r.newNativeFunc(r.mapProto_get, "get", 1), true, false, true)
+	o._putProp("getOrInsert", r.newNativeFunc(r.mapProto_getOrInsert, "getOrInsert", 2), true, false, true)
+	o._putProp("getOrInsertComputed", r.newNativeFunc(r.mapProto_getOrInsertComputed, "getOrInsertComputed", 2), true, false, true)
 	o.setOwnStr("size", &valueProperty{
 		getterFunc:   r.newNativeFunc(r.mapProto_getSize, "get size", 0),
 		accessor:     true,
@@ -297,6 +346,7 @@ func (r *Runtime) createMapProto(val *Object) objectImpl {
 
 func (r *Runtime) createMap(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.builtin_newMap, r.getMapPrototype(), "Map", 0)
+	o._putProp("groupBy", r.newNativeFunc(r.map_groupBy, "groupBy", 2), true, false, true)
 	r.putSpeciesReturnThis(o)
 
 	return o
@@ -305,7 +355,12 @@ func (r *Runtime) createMap(val *Object) objectImpl {
 func (r *Runtime) createMapIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
-	o._putProp("next", r.newNativeFunc(r.mapIterProto_next, "next", 0), true, false, true)
+	o._putProp("next", r.newIteratorNextFunc(r.mapIterProto_next, 0, func(iterator *Object) func(Value) (Value, bool) {
+		if i, ok := iterator.self.(*mapIterObject); ok {
+			return i.nextResult
+		}
+		return nil
+	}), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classMapIterator), false, false, true))
 
 	return o

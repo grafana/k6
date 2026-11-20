@@ -59,6 +59,19 @@ func newStringPrefixFilter(code *syntax.Code) StringPrefixFilter {
 	}
 }
 
+// Dense candidate prefixes benefit from checking alternatives together. Keep
+// the existing scanner for short inputs and sparse candidates, where its
+// string searches can skip farther with less work.
+func withEqualASCIIPrefixSearch(fallback StringPrefixFilter, search *equalASCIIPrefixSearch, minRequiredLength int) StringPrefixFilter {
+	return func(input string, startAt int) (int, bool) {
+		if !search.shouldUseString(input, startAt) {
+			return fallback(input, startAt)
+		}
+		index := search.indexString(input, startAt)
+		return index, index >= 0 && hasMinRequiredBytes(input, index, minRequiredLength)
+	}
+}
+
 type asciiSetStringScanner struct {
 	chars    string
 	first    byte

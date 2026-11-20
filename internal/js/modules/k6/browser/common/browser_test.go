@@ -17,6 +17,32 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
 
+func TestBrowserPageOrderOnReattachment(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	b := newBrowser(ctx, ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	first := &Page{targetID: "second-alphabetically"}
+	second := &Page{targetID: "first-alphabetically"}
+	reattached := &Page{targetID: first.targetID}
+
+	for _, page := range []*Page{first, second, reattached} {
+		require.NoError(t, b.attachNewPage(page, &target.EventAttachedToTarget{
+			SessionID: target.SessionID(page.targetID),
+			TargetInfo: &target.Info{
+				TargetID: page.targetID,
+				Type:     "page",
+			},
+		}))
+	}
+
+	pages := b.getPages()
+	require.Len(t, pages, 2)
+	require.Same(t, reattached, pages[0])
+	require.Same(t, second, pages[1])
+}
+
 func TestBrowserNewPageInContext(t *testing.T) {
 	t.Parallel()
 
@@ -56,8 +82,8 @@ func TestBrowserNewPageInContext(t *testing.T) {
 				// newPageInContext event handler will catch this target ID, and compare it to
 				// the new page's target ID to detect whether the page
 				// is loaded.
-				require.IsType(t, res, &target.CreateTargetReturns{})
-				v, _ := res.(*target.CreateTargetReturns)
+				require.IsType(t, res, &target.CreateTargetResult{})
+				v, _ := res.(*target.CreateTargetResult)
 				v.TargetID = targetID
 
 				// for the event handler to work, there needs to be an event called
@@ -328,8 +354,8 @@ func TestBrowserRejectedTarget(t *testing.T) {
 	evCh := make(chan Event)
 	conn.on(b.browserCtx, []string{cdproto.EventTargetAttachedToTarget}, evCh)
 
-	action := target.SetDiscoverTargets(true)
-	require.NoError(t, action.Do(cdp.WithExecutor(b.browserCtx, conn)))
+	action := newCommand(target.SetDiscoverTargets, target.SetDiscoverTargetsParams{Discover: true})
+	require.NoError(t, action.Do(b.browserCtx, conn))
 
 	select {
 	case event := <-evCh:

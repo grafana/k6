@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -305,6 +306,99 @@ func TestRemoteFilePersister(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestRemoteFilePersisterErrorsDoNotLeakURL(t *testing.T) {
+	t.Parallel()
+
+	const secret = "s3cr3t"
+
+	// A server that is closed straight away, so that any request to it fails
+	// with a connection error.
+	closed := httptest.NewServer(http.NotFoundHandler())
+	closedURL := closed.URL
+	closedHost := strings.TrimPrefix(closedURL, "http://")
+	closed.Close()
+
+	// A server that doesn't respond until the test is done.
+	release := make(chan struct{})
+	hanging := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-release
+	}))
+	t.Cleanup(func() {
+		close(release)
+		hanging.Close()
+	})
+	hangingHost := strings.TrimPrefix(hanging.URL, "http://")
+
+	presignServer := func(t *testing.T, presignedURL string) string {
+		t.Helper()
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w,
+				`{"service":"aws_s3","urls":[{"name":"a.png","pre_signed_url":%q,"method":"PUT","form_fields":{}}]}`,
+				presignedURL)
+		}))
+		t.Cleanup(s.Close)
+		return s.URL
+	}
+
+	tests := []struct {
+		name       string
+		presignURL func(t *testing.T) string
+		timeout    time.Duration
+		host       string
+		wantErr    string
+	}{
+		{
+			name:       "presign_connection_error",
+			presignURL: func(*testing.T) string { return closedURL + "/presign?token=" + secret },
+			host:       closedHost,
+			wantErr:    "requesting presigned url: performing request: connecting to host failed",
+		},
+		{
+			name:       "presign_timeout",
+			presignURL: func(*testing.T) string { return hanging.URL + "/presign?token=" + secret },
+			timeout:    100 * time.Millisecond,
+			host:       hangingHost,
+			wantErr:    "requesting presigned url: performing request: request timed out",
+		},
+		{
+			name: "upload_connection_error",
+			presignURL: func(t *testing.T) string {
+				return presignServer(t, closedURL+"/upload?X-Amz-Signature="+secret)
+			},
+			host:    closedHost,
+			wantErr: "performing upload request: connecting to host failed",
+		},
+		{
+			name: "upload_timeout",
+			presignURL: func(t *testing.T) string {
+				return presignServer(t, hanging.URL+"/upload?X-Amz-Signature="+secret)
+			},
+			timeout: 100 * time.Millisecond,
+			host:    hangingHost,
+			wantErr: "performing upload request: request timed out",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := context.Background()
+			if tt.timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tt.timeout)
+				defer cancel()
+			}
+
+			r := NewRemoteFilePersister(tt.presignURL(t), nil, "")
+			err := r.Persist(ctx, "a.png", strings.NewReader("data"))
+			require.Error(t, err)
+			assert.EqualError(t, err, tt.wantErr)
+			assert.NotContains(t, err.Error(), secret)
+			assert.NotContains(t, err.Error(), tt.host)
 		})
 	}
 }

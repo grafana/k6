@@ -365,6 +365,7 @@ func createGlobalObjectTemplate() *objectTemplate {
 	t.putStr("Map", func(r *Runtime) Value { return valueProp(r.getMap(), true, false, true) })
 	t.putStr("Set", func(r *Runtime) Value { return valueProp(r.getSet(), true, false, true) })
 	t.putStr("Promise", func(r *Runtime) Value { return valueProp(r.getPromise(), true, false, true) })
+	t.putStr("Iterator", func(r *Runtime) Value { return valueProp(r.getIteratorCtor(), true, false, true) })
 
 	t.putStr("globalThis", func(r *Runtime) Value { return valueProp(r.globalObject, true, false, true) })
 	t.putStr("NaN", func(r *Runtime) Value { return valueProp(_NaN, false, false, false) })
@@ -523,6 +524,9 @@ func parseInt(s string, base int) (Value, error) {
 	}
 
 	if sign {
+		if n == 0 {
+			return _negativeZero, nil
+		}
 		n = -n
 	}
 	return intToValue(n), nil

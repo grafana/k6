@@ -17,8 +17,8 @@ import (
 func TestRequest(t *testing.T) {
 	t.Parallel()
 
-	ts := cdp.MonotonicTime(time.Now())
-	wt := cdp.TimeSinceEpoch(time.Now())
+	ts := cdp.MonotonicTime(float64(time.Now().UnixNano()) / 1e9)
+	wt := cdp.TimeSinceEpoch(float64(time.Now().UnixNano()) / 1e9)
 	headers := map[string]any{"key": "value"}
 	evt := &network.EventRequestWillBeSent{
 		RequestID: network.RequestID("1234"),
@@ -26,10 +26,10 @@ func TestRequest(t *testing.T) {
 			URL:             "https://test/post",
 			Method:          "POST",
 			Headers:         network.Headers(headers),
-			PostDataEntries: []*network.PostDataEntry{{Bytes: "aGVsbG8="}}, // base64 encoded "hello"
+			PostDataEntries: []*network.PostDataEntry{{Bytes: []byte("hello")}},
 		},
-		Timestamp: &ts,
-		WallTime:  &wt,
+		Timestamp: ts,
+		WallTime:  wt,
 	}
 	vu := k6test.NewVU(t)
 	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
@@ -47,10 +47,10 @@ func TestRequest(t *testing.T) {
 				URL:             ":",
 				Method:          "POST",
 				Headers:         network.Headers(headers),
-				PostDataEntries: []*network.PostDataEntry{{Bytes: "aGVsbG8="}}, // base64 encoded "hello"
+				PostDataEntries: []*network.PostDataEntry{{Bytes: []byte("hello")}},
 			},
-			Timestamp: &ts,
-			WallTime:  &wt,
+			Timestamp: ts,
+			WallTime:  wt,
 		}
 		vu := k6test.NewVU(t)
 		req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
@@ -98,7 +98,7 @@ func TestRequest(t *testing.T) {
 func TestResponse(t *testing.T) {
 	t.Parallel()
 
-	ts := cdp.MonotonicTime(time.Now())
+	ts := cdp.MonotonicTime(float64(time.Now().UnixNano()) / 1e9)
 	headers := map[string]any{"key": "value"}
 	vu := k6test.NewVU(t)
 	vu.ActivateVU()
@@ -108,7 +108,7 @@ func TestResponse(t *testing.T) {
 	res := NewHTTPResponse(vu.Context(), req, &network.Response{
 		URL:     "https://test/post",
 		Headers: network.Headers(headers),
-	}, &ts)
+	}, ts)
 
 	t.Run("HeaderValue()_key", func(t *testing.T) {
 		t.Parallel()
@@ -130,7 +130,7 @@ func TestResponse(t *testing.T) {
 func TestResponseHeaderValuesExtraInfo(t *testing.T) {
 	t.Parallel()
 
-	ts := cdp.MonotonicTime(time.Now())
+	ts := cdp.MonotonicTime(float64(time.Now().UnixNano()) / 1e9)
 	vu := k6test.NewVU(t)
 	vu.ActivateVU()
 	req := &Request{
@@ -139,7 +139,7 @@ func TestResponseHeaderValuesExtraInfo(t *testing.T) {
 	res := NewHTTPResponse(vu.Context(), req, &network.Response{
 		URL:     "https://test/post",
 		Headers: network.Headers(map[string]any{"content-type": "text/plain"}),
-	}, &ts)
+	}, ts)
 
 	// Simulate the raw wire headers arriving via responseReceivedExtraInfo,
 	// where a multi-valued header (Set-Cookie) is carried as separate values.

@@ -398,6 +398,7 @@ func (ctx *_builtinJSON_stringifyContext) ja(array *Object) {
 	}
 	length := toLength(array.self.getStr("length", nil))
 	if length == 0 {
+		ctx.indent = stepback
 		ctx.buf.WriteString("[]")
 		return
 	}
@@ -476,6 +477,7 @@ func (ctx *_builtinJSON_stringifyContext) jo(object *Object) {
 
 	if empty {
 		ctx.buf.Truncate(mark)
+		ctx.indent = stepback
 	} else {
 		if ctx.gap != "" {
 			ctx.buf.WriteByte('\n')

@@ -262,17 +262,52 @@ func IndexStringIgnoreCaseASCII(s, prefix string) int {
 		return 0
 	}
 
+	lower := byte(foldASCII(rune(prefix[0])))
+	upper := lower
+	if lower >= 'a' && lower <= 'z' {
+		upper -= 'a' - 'A'
+	}
+	// Remember the next occurrence of each case separately. A search for a
+	// missing case then scans the input only once, instead of rescanning the
+	// whole suffix after every rejected prefix (for example, "ab" in "AAAA").
+	nextLower, nextUpper := -1, -1
 	for start, end := 0, len(s)-len(prefix); start <= end; {
-		offset := indexASCIIByteIgnoreCase(s[start:], prefix[0])
-		if offset < 0 || start+offset > end {
-			return -1
+		// Check nearby candidates directly before setting up the longer searches.
+		if s[start] != lower && s[start] != upper {
+			start++
+			if start > end {
+				return -1
+			}
+			if s[start] != lower && s[start] != upper {
+				if nextLower < start {
+					nextLower = strings.IndexByte(s[start:end+1], lower)
+					if nextLower < 0 {
+						nextLower = end + 1
+					} else {
+						nextLower += start
+					}
+				}
+				if upper == lower {
+					nextUpper = nextLower
+				} else if nextUpper < start {
+					nextUpper = strings.IndexByte(s[start:end+1], upper)
+					if nextUpper < 0 {
+						nextUpper = end + 1
+					} else {
+						nextUpper += start
+					}
+				}
+				start = min(nextLower, nextUpper)
+				if start > end {
+					return -1
+				}
+			}
 		}
 
-		i := start + offset
-		if EqualStringIgnoreCaseASCII(s[i:i+len(prefix)], prefix) {
-			return i
+		if EqualStringIgnoreCaseASCII(s[start:start+len(prefix)], prefix) {
+			return start
 		}
-		start = i + 1
+		start++
 	}
 	return -1
 }
@@ -287,22 +322,6 @@ func EqualStringIgnoreCaseASCII(s, prefix string) bool {
 		}
 	}
 	return true
-}
-
-func indexASCIIByteIgnoreCase(s string, ch byte) int {
-	ch = byte(foldASCII(rune(ch)))
-	lower := strings.IndexByte(s, ch)
-	if ch < 'a' || ch > 'z' {
-		return lower
-	}
-	upper := strings.IndexByte(s, ch-('a'-'A'))
-	if lower < 0 {
-		return upper
-	}
-	if upper >= 0 && upper < lower {
-		return upper
-	}
-	return lower
 }
 
 func foldASCII(c rune) rune {

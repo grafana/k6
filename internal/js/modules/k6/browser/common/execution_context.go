@@ -47,6 +47,7 @@ type ExecutionContext struct {
 	session        session
 	frame          *Frame
 	id             runtime.ExecutionContextID
+	uniqueID       string
 	isMutex        sync.RWMutex
 	injectedScript JSHandleAPI
 
@@ -97,11 +98,10 @@ func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (
 		err       error
 	)
 
-	action := dom.ResolveNode().
-		WithBackendNodeID(backendNodeID).
-		WithExecutionContextID(e.id)
-
-	if remoteObj, err = action.Do(cdp.WithExecutor(e.ctx, e.session)); err != nil {
+	action := newCommand(dom.ResolveNode, dom.ResolveNodeParams{BackendNodeID: backendNodeID, ExecutionContextID: e.id})
+	result, err := action.Result(e.ctx, e.session)
+	remoteObj = result.Object
+	if err != nil {
 		return nil, fmt.Errorf("resolving DOM node: %w", err)
 	}
 
@@ -144,8 +144,10 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 	var node *cdp.Node
 	var err error
 
-	action := dom.DescribeNode().WithObjectID(eh.remoteObject.ObjectID)
-	if node, err = action.Do(cdp.WithExecutor(e.ctx, e.session)); err != nil {
+	action := newCommand(dom.DescribeNode, dom.DescribeNodeParams{ObjectID: eh.remoteObject.ObjectID})
+	result, err := action.Result(e.ctx, e.session)
+	node = result.Node
+	if err != nil {
 		return nil, fmt.Errorf("describing DOM node: %w", err)
 	}
 
@@ -170,7 +172,7 @@ func (e *ExecutionContext) eval(
 	suffix := `//# sourceURL=` + evaluationScriptURL
 
 	var action interface {
-		Do(context.Context) (*runtime.RemoteObject, *runtime.ExceptionDetails, error)
+		execute(context.Context, executor, any) error
 	}
 
 	if !opts.forceCallable {
@@ -178,11 +180,13 @@ func (e *ExecutionContext) eval(
 			js += "\n" + suffix
 		}
 
-		action = runtime.Evaluate(js).
-			WithContextID(e.id).
-			WithReturnByValue(opts.returnByValue).
-			WithAwaitPromise(true).
-			WithUserGesture(true)
+		action = newCommand(runtime.Evaluate, runtime.EvaluateParams{
+			Expression:    js,
+			ContextID:     e.id,
+			ReturnByValue: new(opts.returnByValue),
+			AwaitPromise:  new(true),
+			UserGesture:   new(true),
+		})
 	} else {
 		var arguments []*runtime.CallArgument
 		for _, arg := range args {
@@ -196,12 +200,14 @@ func (e *ExecutionContext) eval(
 		}
 
 		js += "\n" + suffix + "\n"
-		action = runtime.CallFunctionOn(js).
-			WithArguments(arguments).
-			WithExecutionContextID(e.id).
-			WithReturnByValue(opts.returnByValue).
-			WithAwaitPromise(true).
-			WithUserGesture(true)
+		action = newCommand(runtime.CallFunctionOn, runtime.CallFunctionOnParams{
+			FunctionDeclaration: js,
+			Arguments:           arguments,
+			ExecutionContextID:  e.id,
+			ReturnByValue:       new(opts.returnByValue),
+			AwaitPromise:        new(true),
+			UserGesture:         new(true),
+		})
 	}
 
 	var (
@@ -209,7 +215,10 @@ func (e *ExecutionContext) eval(
 		exceptionDetails *runtime.ExceptionDetails
 		err              error
 	)
-	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
+	var result runtime.EvaluateResult
+	err = action.execute(apiCtx, e.session, &result)
+	remoteObject, exceptionDetails = result.Result, result.ExceptionDetails
+	if err != nil {
 		var cdpe *cdproto.Error
 		if errors.As(err, &cdpe) && cdpe.Code == devToolsServerErrorCode {
 			// By creating a new error instead of reusing it, we're removing the

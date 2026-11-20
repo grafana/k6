@@ -96,6 +96,9 @@ const (
 	// Selects and consumes the next character using a disjoint branch table.
 	// Operand 0 is an index into Code.Dispatches.
 	Dispatch InstOp = 48
+	// Removes the last capture, if present, with backtracking restore.
+	// Operand 0 is the dense capture slot.
+	ResetCapture InstOp = 49
 
 	// Modifiers for alternate modes
 
@@ -142,31 +145,39 @@ type DispatchTable struct {
 // captureSlotsInUse returns the capture slots whose values can affect matching.
 // Group 0 is always retained as the success marker. Ordinary captures that are
 // never referenced by the pattern may be omitted by bool-only matching APIs.
-func captureSlotsInUse(codes []int, capsize int) []bool {
+func captureSlotsInUse(root *RegexNode, capsize int, caps map[int]int) []bool {
 	inUse := make([]bool, capsize)
 	if capsize > 0 {
 		inUse[0] = true
 	}
-	for pos := 0; pos < len(codes); {
-		op := InstOp(codes[pos]) & Mask
-		switch op {
-		case Ref, Testref:
-			capnum := codes[pos+1]
-			if capnum >= 0 && capnum < len(inUse) {
-				inUse[capnum] = true
-			}
-		case Capturemark:
+	mark := func(number int) {
+		if number < 0 {
+			return
+		}
+		slot := number
+		if caps != nil {
+			slot = caps[number]
+		}
+		inUse[slot] = true
+	}
+	stack := []*RegexNode{root}
+	for len(stack) > 0 {
+		node := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		switch node.T {
+		case NtRef, NtBackRefCond:
+			mark(node.M)
+		case NtCapture:
 			// Balancing groups both observe and mutate capture state. Keep both
 			// sides live even if no later backreference refers to them.
-			if codes[pos+2] != -1 {
-				for _, capnum := range codes[pos+1 : pos+3] {
-					if capnum >= 0 && capnum < len(inUse) {
-						inUse[capnum] = true
-					}
-				}
+			if node.N != -1 {
+				mark(node.M)
+				mark(node.N)
 			}
 		}
-		pos += opcodeSize(op)
+		// Synthetic resets mutate state but do not observe it. A slot only
+		// needs retaining if an actual reference or balancing group uses it.
+		stack = append(stack, node.Children...)
 	}
 	return inUse
 }
@@ -199,7 +210,7 @@ func opcodeBacktracks(op InstOp) bool {
 	switch op {
 	case Oneloop, Notoneloop, Setloop, Onelazy, Notonelazy, Setlazy, Lazybranch, Branchmark, Lazybranchmark,
 		Nullcount, Setcount, Branchcount, Lazybranchcount, Setmark, Capturemark, Getmark, Setjump, Backjump,
-		Forejump, Goto:
+		Forejump, Goto, ResetCapture:
 		return true
 
 	default:
@@ -216,7 +227,7 @@ func opcodeSize(op InstOp) int {
 		return 1
 
 	case One, Notone, Multi, Ref, Testref, Goto, Nullcount, Setcount, Lazybranch, Branchmark, Lazybranchmark,
-		Prune, Set, Dispatch:
+		Prune, Set, Dispatch, ResetCapture:
 		return 2
 
 	case Capturemark, Branchcount, Lazybranchcount, Onerep, Notonerep, Oneloop, Notoneloop, Onelazy, Notonelazy,
@@ -243,7 +254,7 @@ var codeStr = []string{
 	"Prune", "Stop",
 	"ECMABoundary", "NonECMABoundary",
 	"Oneloopatomic", "Notoneloopatomic", "Setloopatomic",
-	"Bumpalong", "Grapheme", "Dispatch",
+	"Bumpalong", "Grapheme", "Dispatch", "ResetCapture",
 }
 
 func operatorDescription(op InstOp) string {
@@ -303,7 +314,7 @@ func (c *Code) OpcodeDescription(offset int) string {
 	case Multi:
 		fmt.Fprintf(buf, "String = %s", string(c.Strings[c.Codes[offset+1]]))
 
-	case Ref, Testref:
+	case Ref, Testref, ResetCapture:
 		fmt.Fprintf(buf, "Index = %d", c.Codes[offset+1])
 
 	case Capturemark:

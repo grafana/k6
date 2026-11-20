@@ -69,25 +69,26 @@ func tryFindFirstCharClass(node *RegexNode, ccIn **CharSet) int {
 	case NtNotone, NtNotoneloop, NtNotonelazy, NtNotoneloopatomic:
 		if cc == nil {
 			cc = &CharSet{}
-			*ccIn = cc
-		}
-		if cc.IsMergeable() {
 			cc.addChar(node.Ch)
 			cc.negate = true
-			/*if node.Ch > 0 {
-				// Add the range before the excluded char.
-				cc.addRange(0, (node.Ch - 1))
+			*ccIn = cc
+		} else if cc.IsMergeable() {
+			// Union the complement ranges with the accumulated characters
+			// before canonicalizing; negating the accumulator would exclude them.
+			if node.Ch > 0 {
+				cc.ranges = append(cc.ranges, SingleRange{0, node.Ch - 1})
 			}
 			if node.Ch < unicode.MaxRune {
-				// Add the range after the excluded char.
-				cc.addRange(node.Ch+1, unicode.MaxRune)
-			}*/
-			if node.T == NtNotone || node.M > 0 {
-				return 1
+				cc.ranges = append(cc.ranges, SingleRange{node.Ch + 1, unicode.MaxRune})
 			}
-			return -1
+			cc.canonicalize()
+		} else {
+			return 0
 		}
-		return 0
+		if node.T == NtNotone || node.M > 0 {
+			return 1
+		}
+		return -1
 
 	case NtSet, NtSetloop, NtSetlazy, NtSetloopatomic:
 		{
@@ -130,7 +131,7 @@ func tryFindFirstCharClass(node *RegexNode, ccIn **CharSet) int {
 
 	// Zero-width elements.  These don't contribute to the starting set, so return null to indicate a caller
 	// should keep looking past them.
-	case NtEmpty, NtNothing, NtBol, NtEol, NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary,
+	case NtEmpty, NtResetCapture, NtNothing, NtBol, NtEol, NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary,
 		NtBeginning, NtStart, NtEndZ, NtEnd, NtUpdateBumpalong, NtPosLook, NtNegLook:
 		return -1
 
@@ -242,6 +243,9 @@ func findPrefix(node *RegexNode) string {
 	return vsb.String()
 }
 
+// tryFindPrefix stops copying a loop body once another copy would make the prefix longer than this.
+const maxLoopPrefixLength = 256
+
 // Processes the node, adding any prefix text to the builder.
 // Returns whether processing should continue with subsequent nodes.
 func tryFindPrefix(node *RegexNode, vsb *bytes.Buffer) bool {
@@ -289,10 +293,14 @@ func tryFindPrefix(node *RegexNode, vsb *bytes.Buffer) bool {
 				// Find how much overlap there is between this branch's prefix
 				// and the smallest amount of prefix that overlapped with all
 				// the previously seen branches.
-				addedLength = commonPrefixLen(vsbSlice, alternateSb.Bytes())
+				addedLength = commonPrefixLen(vsbSlice[:addedLength], alternateSb.Bytes())
 			}
 
-			// Then cull back on what was added based on the other branches.
+			// Then cull back on what was added based on the other branches,
+			// without ending partway through a UTF-8 encoded rune.
+			for addedLength < len(vsbSlice) && !utf8.RuneStart(vsbSlice[addedLength]) {
+				addedLength--
+			}
 			vsb.Truncate(initialLength + addedLength)
 		}
 
@@ -335,9 +343,21 @@ func tryFindPrefix(node *RegexNode, vsb *bytes.Buffer) bool {
 		if node.M < limit {
 			limit = node.M
 		}
-		for i := 0; i < limit; i++ {
-			if tryFindPrefix(node.Children[0], vsb) {
-				return false
+
+		// Once the body is fully processed, further iterations add the same text, so
+		// copy it rather than processing the body again, which can be exponential in
+		// the nesting depth.
+		start := vsb.Len()
+		if !tryFindPrefix(node.Children[0], vsb) {
+			return false
+		}
+		if limit > 1 {
+			body := bytes.Clone(vsb.Bytes()[start:])
+			for i := 1; i < limit; i++ {
+				if vsb.Len()+len(body) > maxLoopPrefixLength {
+					return false
+				}
+				vsb.Write(body)
 			}
 		}
 		return limit == node.N && !rtl
@@ -837,7 +857,7 @@ func tryFindRawFixedSets(node *RegexNode, res *[]FixedDistanceSet, distance *int
 			*distance += node.M
 			return true
 		}
-	case NtBeginning, NtBol, NtBoundary, NtECMABoundary, NtEmpty, NtEnd, NtEndZ, NtEol,
+	case NtBeginning, NtBol, NtBoundary, NtECMABoundary, NtEmpty, NtResetCapture, NtEnd, NtEndZ, NtEol,
 		NtNonboundary, NtNonECMABoundary, NtUpdateBumpalong,
 		NtStart, NtNegLook, NtPosLook:
 		// Zero-width anchors and assertions.  In theory, for PositiveLookaround and NegativeLookaround we could also
@@ -1258,11 +1278,21 @@ func findRequiredLandmarkChain(node *RegexNode) *RequiredLandmarkChain {
 	// conservative prefilter: if any child cannot be described as a detectable
 	// landmark, we skip that child rather than making it part of the chain.
 	landmarks := make([]RequiredLandmark, 0, 2)
+	var anchors []NodeType
 	for _, child := range node.Children[1:] {
 		if landmark, ok := extractRequiredLandmark(child); ok {
 			landmarks = append(landmarks, landmark)
-		} else if len(landmarks) == 0 && !isZeroWidthLandmarkGap(child) {
-			return nil
+		} else if len(landmarks) == 0 {
+			if !isZeroWidthLandmarkGap(child) {
+				return nil
+			}
+			// The runner tests ECMAScript boundaries without the extra word
+			// characters of IgnoreCase|Unicode, so leave those out: fewer
+			// anchors only means fewer starts are skipped.
+			if child = unwrapTransparentNodes(child); child != nil && isLandmarkAnchor(child.T) && !slices.Contains(anchors, child.T) &&
+				!((child.T == NtECMABoundary || child.T == NtNonECMABoundary) && hasECMAWordCharExtras(child.Options)) {
+				anchors = append(anchors, child.T)
+			}
 		}
 	}
 	if len(landmarks) < 2 {
@@ -1271,7 +1301,18 @@ func findRequiredLandmarkChain(node *RegexNode) *RequiredLandmarkChain {
 
 	return &RequiredLandmarkChain{
 		LeadingLoopSet: firstChild.Set,
+		Anchors:        anchors,
 		Landmarks:      landmarks,
+	}
+}
+
+func isLandmarkAnchor(t NodeType) bool {
+	switch t {
+	case NtBeginning, NtBol, NtStart, NtEndZ, NtEnd, NtEol,
+		NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -1281,12 +1322,10 @@ func isZeroWidthLandmarkGap(node *RegexNode) bool {
 		return true
 	}
 	switch node.T {
-	case NtEmpty, NtUpdateBumpalong,
-		NtBeginning, NtBol, NtStart, NtEndZ, NtEnd, NtEol,
-		NtBoundary, NtNonboundary, NtECMABoundary, NtNonECMABoundary:
+	case NtEmpty, NtResetCapture, NtUpdateBumpalong:
 		return true
 	default:
-		return false
+		return isLandmarkAnchor(node.T)
 	}
 }
 

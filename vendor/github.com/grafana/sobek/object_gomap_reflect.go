@@ -59,6 +59,13 @@ func (o *objectGoMapReflect) _getStr(name string) Value {
 	return o._getKey(o.strToKey(name, false))
 }
 
+func (o *objectGoMapReflect) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	if v := o._getStr(name.String()); v != nil {
+		return v, true
+	}
+	return o.objectGoReflect.hasAndGetStr(name, receiver)
+}
+
 func (o *objectGoMapReflect) getStr(name unistring.String, receiver Value) Value {
 	if v := o._getStr(name.String()); v != nil {
 		return v
@@ -112,6 +119,9 @@ func (o *objectGoMapReflect) _put(key reflect.Value, val Value, throw bool) bool
 			v, ok := o.toValue(val, throw)
 			if !ok {
 				return false
+			}
+			if o.fieldsValue.IsNil() {
+				o.fieldsValue.Set(reflect.MakeMap(o.fieldsValue.Type()))
 			}
 			o.fieldsValue.SetMapIndex(key, v)
 		} else {

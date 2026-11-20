@@ -26,6 +26,13 @@ func (o *objectGoMapSimple) _getStr(name string) Value {
 	return o.val.runtime.ToValue(v)
 }
 
+func (o *objectGoMapSimple) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	if v := o._getStr(name.String()); v != nil {
+		return v, true
+	}
+	return o.baseObject.hasAndGetStr(name, receiver)
+}
+
 func (o *objectGoMapSimple) getStr(name unistring.String, receiver Value) Value {
 	if v := o._getStr(name.String()); v != nil {
 		return v

@@ -46,24 +46,29 @@ func negotiateContentEncoding(r *http.Request, offers []string) string {
 	bestQ := -1.0
 	specs := parseAccept(r.Header, "Accept-Encoding")
 	for _, offer := range offers {
+		// A spec that names the offer takes precedence over "*",
+		// wherever it appears in the header.
+		q, wildcardQ := -1.0, -1.0
 		for _, spec := range specs {
-			if spec.Q > bestQ && strings.EqualFold(spec.Value, offer) {
-				bestQ = spec.Q
-				bestOffer = offer
+			if strings.EqualFold(spec.Value, offer) {
+				if spec.Q > q {
+					q = spec.Q
+				}
+			} else if spec.Value == "*" && spec.Q > wildcardQ {
+				wildcardQ = spec.Q
 			}
+		}
+		if q < 0 {
+			q = wildcardQ
+		}
+		if q > bestQ {
+			bestQ = q
+			bestOffer = offer
 		}
 	}
-	switch bestQ {
-	case 0:
+
+	if bestQ == 0 {
 		bestOffer = ""
-	case -1.0:
-		// No specs matched, so we fall back to "*", if it is present.
-		for _, spec := range specs {
-			if spec.Value == "*" && spec.Q > bestQ {
-				bestQ = spec.Q
-				bestOffer = offers[0]
-			}
-		}
 	}
 	return bestOffer
 }

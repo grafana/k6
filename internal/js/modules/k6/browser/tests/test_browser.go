@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -178,14 +177,11 @@ func withFileServer() func(*testBrowser) {
 func (b *testBrowser) withFileServer() *testBrowser {
 	b.t.Helper()
 
-	const (
-		slash = string(os.PathSeparator) //nolint:forbidigo
-		path  = slash + testBrowserStaticDir + slash
-	)
+	const path = "/" + testBrowserStaticDir + "/"
 
 	fs := http.FileServer(http.Dir(testBrowserStaticDir))
 
-	return b.withHandler("/"+testBrowserStaticDir+"/", http.StripPrefix(path, fs).ServeHTTP)
+	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
 }
 
 // withHandler adds the given handler to the HTTP test server and makes it

@@ -17,9 +17,9 @@ type arrayIterObject struct {
 	kind    iterationKind
 }
 
-func (ai *arrayIterObject) next() Value {
+func (ai *arrayIterObject) nextResult(_ Value) (Value, bool) {
 	if ai.obj == nil {
-		return ai.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 	if ta, ok := ai.obj.self.(*typedArrayObject); ok {
 		ta.viewedArrayBuf.ensureNotDetached(true)
@@ -28,12 +28,12 @@ func (ai *arrayIterObject) next() Value {
 	index := ai.nextIdx
 	if index >= l {
 		ai.obj = nil
-		return ai.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 	ai.nextIdx++
 	idxVal := valueInt(index)
 	if ai.kind == iterationKindKey {
-		return ai.val.runtime.createIterResultObject(idxVal, false)
+		return idxVal, true
 	}
 	elementValue := nilSafe(ai.obj.self.getIdx(idxVal, nil))
 	var result Value
@@ -42,7 +42,12 @@ func (ai *arrayIterObject) next() Value {
 	} else {
 		result = ai.val.runtime.newArrayValues([]Value{idxVal, elementValue})
 	}
-	return ai.val.runtime.createIterResultObject(result, false)
+	return result, true
+}
+
+func (ai *arrayIterObject) next() Value {
+	value, valid := ai.nextResult(nil)
+	return ai.val.runtime.createIterResultObject(value, !valid)
 }
 
 func (r *Runtime) createArrayIterator(iterObj *Object, kind iterationKind) Value {
@@ -192,6 +197,12 @@ func (a *arrayObject) sortGet(i int) Value {
 
 func (a *arrayObject) swap(i int, j int) {
 	a.values[i], a.values[j] = a.values[j], a.values[i]
+}
+
+// 'length' is recomputed by getOwnPropStr (getLengthProp), so it must be consulted rather than
+// reading the shared (possibly stale) lengthProp directly from the values map.
+func (a *arrayObject) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	return a.hasAndGetOwnStr(name, a.getOwnPropStr(name), receiver)
 }
 
 func (a *arrayObject) getStr(name unistring.String, receiver Value) Value {
@@ -424,7 +435,7 @@ func (a *arrayObject) _defineIdxProperty(idx uint32, desc PropertyDescriptor, th
 	if idx < uint32(len(a.values)) {
 		existing = a.values[idx]
 	}
-	prop, ok := a.baseObject._defineOwnProperty(unistring.String(strconv.FormatUint(uint64(idx), 10)), existing, desc, throw)
+	prop, ok := a.baseObject._defineOwnProperty("", func() unistring.String { return unistring.String(strconv.FormatUint(uint64(idx), 10)) }, existing, desc, throw)
 	if ok {
 		if idx >= a.length {
 			if !a.setLengthInt(idx+1, throw) {
@@ -521,7 +532,12 @@ func (a *arrayObject) exportType() reflect.Type {
 
 func (a *arrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
 	r := a.val.runtime
-	if iter := a.getSym(SymIterator, nil); iter == r.getArrayValues() || iter == nil {
+	ir, err := r.getOptionalIterator(a.val, nil)
+	if err != nil {
+		return err
+	}
+
+	if (ir == nil || ir.nextRes != nil) && a.propValueCount == 0 && a.length == uint32(len(a.values)) && uint32(a.objCount) == a.length {
 		l := toIntStrict(int64(a.length))
 		if typ.Kind() == reflect.Array {
 			if dst.Len() != l {
@@ -531,7 +547,7 @@ func (a *arrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, 
 			dst.Set(reflect.MakeSlice(typ, l, l))
 		}
 		ctx.putTyped(a.val, typ, dst.Interface())
-		for i := 0; i < l; i++ {
+		for i := range l {
 			if i >= len(a.values) {
 				break
 			}
@@ -546,7 +562,7 @@ func (a *arrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, 
 		}
 		return nil
 	}
-	return a.baseObject.exportToArrayOrSlice(dst, typ, ctx)
+	return exportToArrayOrSliceWithIterator(ir, a.val, dst, typ, ctx)
 }
 
 func (a *arrayObject) setValuesFromSparse(items []sparseArrayItem, newMaxIdx int) {
