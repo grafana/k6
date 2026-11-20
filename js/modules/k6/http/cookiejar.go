@@ -27,10 +27,10 @@ type CookieJar struct {
 }
 
 // CookiesForURL return the cookies for a given url as a map of key and values
-func (j CookieJar) CookiesForURL(url string) map[string][]string {
+func (j CookieJar) CookiesForURL(url string) (map[string][]string, error) {
 	u, err := neturl.Parse(url)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	cookies := j.Jar.Cookies(u)
@@ -38,7 +38,7 @@ func (j CookieJar) CookiesForURL(url string) map[string][]string {
 	for _, c := range cookies {
 		objs[c.Name] = append(objs[c.Name], c.Value)
 	}
-	return objs
+	return objs, nil
 }
 
 // Set sets a cookie for a particular url with the given name value and additional opts
