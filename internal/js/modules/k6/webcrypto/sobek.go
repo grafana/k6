@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/grafana/sobek"
@@ -10,37 +11,168 @@ import (
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
 // and returns a copy of the underlying byte slice.
-func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value) ([]byte, error) {
+func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value, accessors bufferSourceAccessors) ([]byte, error) {
 	if common.IsNullish(v) {
-		return nil, NewError(TypeError, "data is null or undefined")
+		return nil, &bufferSourceTypeError{cause: NewError(TypeError, "data is null or undefined")}
 	}
 
-	asObject := v.ToObject(rt)
+	buffer, err := accessors.backingBuffer(v)
+	if err != nil {
+		return nil, err
+	}
 
-	var ab sobek.ArrayBuffer
-	var ok bool
+	// WebIDL copies detached BufferSources as empty bytes. ExportTo would slice
+	// nil using a detached view's old offset and panic instead.
+	if buffer.Detached() {
+		return []byte{}, nil
+	}
 
-	if IsTypedArray(rt, v) {
-		ab, ok = asObject.Get("buffer").Export().(sobek.ArrayBuffer)
-		if !ok {
-			return nil, NewError(TypeError, "TypedArray.buffer is not an ArrayBuffer")
-		}
-	} else {
-		ab, ok = asObject.Export().(sobek.ArrayBuffer)
-		if !ok {
-			return nil, NewError(OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
-		}
+	// Sobek exports views as bytes within their byteOffset and byteLength.
+	var bytes []byte
+	if err := rt.ExportTo(v, &bytes); err != nil {
+		return nil, NewError(OperationError, err.Error())
 	}
 
 	// Copy the underlying byte slice to avoid the caller modifying it.
-	// Ensures this step complies with the expactations of the
+	// Ensures this step complies with the expectations of the
 	// specification: "Let [...] be the result of getting a copy of the
 	// bytes held by the [...] parameter"
-	bytes := ab.Bytes()
 	bytesCopy := make([]byte, len(bytes))
 	copy(bytesCopy, bytes)
 
 	return bytesCopy, nil
+}
+
+// bufferSourceTypeError marks validation failures that need a native JS TypeError rejection.
+type bufferSourceTypeError struct {
+	cause *Error
+}
+
+func (e *bufferSourceTypeError) Error() string {
+	return e.cause.Error()
+}
+
+func (e *bufferSourceTypeError) Unwrap() error {
+	return e.cause
+}
+
+type bufferSourceAccessors struct {
+	isView           sobek.Callable
+	typedArrayBuffer sobek.Callable
+	dataViewBuffer   sobek.Callable
+}
+
+func (a bufferSourceAccessors) backingBuffer(v sobek.Value) (sobek.ArrayBuffer, error) {
+	if v.ExportType() == reflect.TypeFor[sobek.ArrayBuffer]() {
+		buffer, ok := v.Export().(sobek.ArrayBuffer)
+		if !ok {
+			return sobek.ArrayBuffer{}, NewError(ImplementationError, "ArrayBuffer export failed")
+		}
+		return buffer, nil
+	}
+	if a.isView == nil {
+		return sobek.ArrayBuffer{}, NewError(ImplementationError, "ArrayBuffer.isView was not captured")
+	}
+	isView, err := a.isView(nil, v)
+	if err != nil {
+		return sobek.ArrayBuffer{}, NewError(OperationError, err.Error())
+	}
+	if !isView.ToBoolean() {
+		return sobek.ArrayBuffer{}, &bufferSourceTypeError{
+			cause: NewError(TypeError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView"),
+		}
+	}
+	buffer, err := a.viewBuffer(v)
+	if err != nil {
+		return sobek.ArrayBuffer{}, NewError(ImplementationError, err.Error())
+	}
+	return buffer, nil
+}
+
+// viewBuffer calls a captured native getter, so an own JS .buffer property
+// cannot substitute another buffer or throw during detached-buffer validation.
+func (a bufferSourceAccessors) viewBuffer(v sobek.Value) (sobek.ArrayBuffer, error) {
+	getter := a.dataViewBuffer
+	if v.ExportType().Kind() == reflect.Slice {
+		getter = a.typedArrayBuffer
+	}
+	if getter == nil {
+		return sobek.ArrayBuffer{}, fmt.Errorf("BufferSource buffer getter was not captured")
+	}
+	value, err := getter(v)
+	if err != nil {
+		return sobek.ArrayBuffer{}, err
+	}
+	buffer, ok := value.Export().(sobek.ArrayBuffer)
+	if !ok {
+		return sobek.ArrayBuffer{}, fmt.Errorf("BufferSource buffer getter did not return an ArrayBuffer")
+	}
+	return buffer, nil
+}
+
+func getBufferSourceAccessors(rt *sobek.Runtime) (bufferSourceAccessors, error) {
+	isView, err := getArrayBufferIsView(rt)
+	if err != nil {
+		return bufferSourceAccessors{}, err
+	}
+
+	var descriptor, typedArrayProto, dataViewProto sobek.Value
+	if exception := rt.Try(func() {
+		object := rt.Get("Object").ToObject(rt)
+		descriptor = object.Get("getOwnPropertyDescriptor")
+		typedArrayProto = rt.Get("Uint8Array").ToObject(rt).Get("prototype").ToObject(rt).Prototype()
+		dataViewProto = rt.Get("DataView").ToObject(rt).Get("prototype")
+	}); exception != nil {
+		return bufferSourceAccessors{}, exception
+	}
+	getDescriptor, ok := sobek.AssertFunction(descriptor)
+	if !ok {
+		return bufferSourceAccessors{}, fmt.Errorf("Object.getOwnPropertyDescriptor is not a function")
+	}
+	typedArrayBuffer, err := getBufferGetter(rt, getDescriptor, typedArrayProto)
+	if err != nil {
+		return bufferSourceAccessors{}, err
+	}
+	dataViewBuffer, err := getBufferGetter(rt, getDescriptor, dataViewProto)
+	if err != nil {
+		return bufferSourceAccessors{}, err
+	}
+	return bufferSourceAccessors{
+		isView:           isView,
+		typedArrayBuffer: typedArrayBuffer,
+		dataViewBuffer:   dataViewBuffer,
+	}, nil
+}
+
+func getBufferGetter(rt *sobek.Runtime, getDescriptor sobek.Callable, proto sobek.Value) (sobek.Callable, error) {
+	property, err := getDescriptor(nil, proto, rt.ToValue("buffer"))
+	if err != nil {
+		return nil, err
+	}
+	var getterValue sobek.Value
+	if exception := rt.Try(func() { getterValue = property.ToObject(rt).Get("get") }); exception != nil {
+		return nil, exception
+	}
+	getter, ok := sobek.AssertFunction(getterValue)
+	if !ok {
+		return nil, fmt.Errorf("BufferSource buffer getter is not a function")
+	}
+	return getter, nil
+}
+
+func getArrayBufferIsView(rt *sobek.Runtime) (sobek.Callable, error) {
+	var value sobek.Value
+	if exception := rt.Try(func() {
+		value = rt.Get(string(ArrayBufferConstructor)).ToObject(rt).Get("isView")
+	}); exception != nil {
+		return nil, exception
+	}
+
+	isView, ok := sobek.AssertFunction(value)
+	if !ok {
+		return nil, fmt.Errorf("ArrayBuffer.isView is not a function")
+	}
+	return isView, nil
 }
 
 // traverseObject traverses the given object using the given fields and returns the value
