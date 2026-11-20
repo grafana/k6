@@ -216,6 +216,28 @@ func TestConnectionPool_AddressIsCaseInsensitive(t *testing.T) {
 	assert.Equal(t, 1, pool.size())
 }
 
+func TestConnectionPool_TargetCasingIsKept(t *testing.T) {
+	t.Parallel()
+
+	params := &connectParams{IsPlaintext: true}
+
+	// Only host names are case-insensitive. A path or a resolver target can
+	// name a different server when spelled with a different casing.
+	for _, pair := range [][2]string{
+		{"unix:///run/SvcA.sock", "unix:///run/svca.sock"},
+		{"unix:SvcA.sock", "unix:svca.sock"},
+		{"passthrough:///Svc:50051", "passthrough:///svc:50051"},
+	} {
+		a, err := newConnectionKey(pair[0], params)
+		require.NoError(t, err)
+
+		b, err := newConnectionKey(pair[1], params)
+		require.NoError(t, err)
+
+		assert.NotEqual(t, a, b, "%s and %s", pair[0], pair[1])
+	}
+}
+
 func TestConnectionPool_ReleaseDecrementsRefCount(t *testing.T) {
 	t.Parallel()
 

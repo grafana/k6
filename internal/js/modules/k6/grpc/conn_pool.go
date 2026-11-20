@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
@@ -39,15 +40,31 @@ func newConnectionKey(addr string, p *connectParams) (connectionKey, error) {
 	}
 
 	return connectionKey{
-		// Host names are case-insensitive, so clients that spell the same
-		// server differently still share a connection.
-		addr:           strings.ToLower(addr),
+		addr:           normalizeAddr(addr),
 		isPlaintext:    p.IsPlaintext,
 		authority:      p.Authority,
 		maxReceiveSize: p.MaxReceiveSize,
 		maxSendSize:    p.MaxSendSize,
 		tls:            string(tls),
 	}, nil
+}
+
+// normalizeAddr lower-cases the host of a plain host:port address, since host
+// names are case-insensitive and clients that spell the same server differently
+// should still share a connection. Any other target is kept as it is: a scheme
+// such as unix:// or passthrough:/// can carry a path or a name whose casing
+// identifies a different server.
+func normalizeAddr(addr string) string {
+	if strings.Contains(addr, ":/") || strings.HasPrefix(addr, "unix:") {
+		return addr
+	}
+
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+
+	return net.JoinHostPort(strings.ToLower(host), port)
 }
 
 // sharedConn holds a gRPC connection that can be shared across multiple VUs.
