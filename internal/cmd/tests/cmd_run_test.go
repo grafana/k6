@@ -34,6 +34,7 @@ import (
 	"go.k6.io/k6/v2/internal/lib/testutils"
 	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/fsext"
 )
 
@@ -1219,6 +1220,98 @@ func TestExecutionResultWithLinger(t *testing.T) {
 	})
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
+}
+
+// TestStatusNotRunningWithLinger checks that the REST API stops reporting the test as running once
+// it has finished, even when the run was aborted or marked as failed, see
+// https://github.com/grafana/k6/issues/6073
+func TestStatusNotRunningWithLinger(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		script      string
+		exitCode    exitcodes.ExitCode
+		wantStopped bool
+		wantStatus  lib.ExecutionStatus
+	}{
+		{
+			name: "finished normally",
+			script: `
+				export default function () {}
+			`,
+			exitCode:   0,
+			wantStatus: lib.ExecutionStatusEnded,
+		},
+		{
+			name: "aborted by test.abort()",
+			script: `
+				import exec from 'k6/execution';
+				export default function () { exec.test.abort('foo'); }
+			`,
+			exitCode:    exitcodes.ScriptAborted,
+			wantStopped: true,
+			wantStatus:  lib.ExecutionStatusInterrupted,
+		},
+		{
+			name: "aborted by a threshold",
+			script: `
+				import { Counter } from 'k6/metrics';
+				const boom = new Counter('boom');
+				export const options = {
+					vus: 1,
+					duration: '1m',
+					thresholds: { boom: [{ threshold: 'count<1', abortOnFail: true }] },
+				};
+				export default function () { boom.add(1); }
+			`,
+			exitCode:    exitcodes.ThresholdsHaveFailed,
+			wantStopped: true,
+			wantStatus:  lib.ExecutionStatusInterrupted,
+		},
+		{
+			name: "marked as failed by test.fail()",
+			script: `
+				import exec from 'k6/execution';
+				export default function () { exec.test.fail('foo'); }
+			`,
+			exitCode:   exitcodes.MarkedAsFailed,
+			wantStatus: lib.ExecutionStatusMarkedAsFailed,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			addr := getFreeBindAddr(t)
+			ts := getSingleFileTestState(t, tc.script,
+				[]string{"-v", "--log-output=stdout", "--linger", "--address", addr}, tc.exitCode)
+			ts.Flags.Address = addr
+
+			sendSignal := injectMockSignalNotifier(ts)
+			asyncWaitForStdoutAndRun(t, ts, 15, time.Second, "waiting for Ctrl+C to continue", func() {
+				defer func() {
+					sendSignal <- syscall.SIGINT
+					<-sendSignal
+				}()
+
+				req, err := http.NewRequestWithContext(ts.Ctx, http.MethodGet, fmt.Sprintf("http://%s/v1/status", addr), nil)
+				require.NoError(t, err)
+				resp, err := http.DefaultClient.Do(req)
+				require.NoError(t, err)
+				defer func() { assert.NoError(t, resp.Body.Close()) }()
+
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				assert.False(t, gjson.GetBytes(body, "data.attributes.running").Bool(), string(body))
+				assert.Equal(t, tc.wantStopped, gjson.GetBytes(body, "data.attributes.stopped").Bool(), string(body))
+				assert.Equal(t, int64(tc.wantStatus), gjson.GetBytes(body, "data.attributes.status").Int(), string(body))
+			})
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+		})
+	}
 }
 
 func TestAbortedByScriptSetupError(t *testing.T) {
