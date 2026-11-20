@@ -43,9 +43,7 @@ type Client struct {
 	typesMtx sync.Mutex
 
 	connPool *connectionPool
-	// shared is set while this client uses a connection from connPool, and is
-	// the entry to give back when the client is closed or connects again.
-	shared *sharedConn
+	shared   *sharedConn // set while the connection comes from connPool
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
@@ -293,15 +291,11 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	return true, err
 }
 
-// dial establishes a gRPC connection, either shared with the other clients
-// connected to the same server with the same parameters, or as a new dedicated
-// connection.
+// dial establishes a shared or a dedicated gRPC connection.
 func (c *Client) dial(
 	ctx context.Context, addr string, p *connectParams, opts ...grpc.DialOption,
 ) (*grpcext.Conn, error) {
-	// A client connecting again gives back the shared connection it was using
-	// first, otherwise the reference would never be released and Close() would
-	// release it in place of closing a new dedicated connection.
+	// Give back the shared connection of a previous connect().
 	if c.shared != nil {
 		shared := c.shared
 		c.shared, c.conn = nil, nil
@@ -324,8 +318,6 @@ func (c *Client) dial(
 		return nil, err
 	}
 
-	// Only track the connection once it is ours to give back, so that a failed
-	// dial doesn't make a later Close() release somebody else's connection.
 	c.shared = shared
 
 	return conn, nil

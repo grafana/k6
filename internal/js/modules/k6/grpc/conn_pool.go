@@ -14,25 +14,18 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-// connectionKey identifies a gRPC connection by every connect() parameter that
-// gRPC binds to the ClientConn at dial time: the transport credentials, the
-// authority and the maximum call sizes. Clients that disagree on any of them
-// cannot share a connection, since the first one to dial would silently impose
-// its own settings on all the later ones.
+// connectionKey holds the connect() parameters that are fixed at dial time,
+// so that only clients agreeing on all of them share a connection.
 type connectionKey struct {
 	addr           string
 	isPlaintext    bool
 	authority      string
 	maxReceiveSize int64
 	maxSendSize    int64
-
-	// tls is the canonical JSON encoding of the tls parameter, so that the key
-	// stays comparable and can be used as a map key.
-	tls string
+	tls            string // JSON encoded, so that the key stays comparable
 }
 
-// newConnectionKey builds the pool key for a connection made to addr with the
-// given parameters.
+// newConnectionKey builds the pool key for addr and the given parameters.
 func newConnectionKey(addr string, p *connectParams) (connectionKey, error) {
 	tls, err := json.Marshal(p.TLS)
 	if err != nil {
@@ -49,11 +42,8 @@ func newConnectionKey(addr string, p *connectParams) (connectionKey, error) {
 	}, nil
 }
 
-// normalizeAddr lower-cases the host of a plain host:port address, since host
-// names are case-insensitive and clients that spell the same server differently
-// should still share a connection. Any other target is kept as it is: a scheme
-// such as unix:// or passthrough:/// can carry a path or a name whose casing
-// identifies a different server.
+// normalizeAddr lower-cases the host of a host:port address. Targets with a
+// scheme are kept as they are, since their casing can matter.
 func normalizeAddr(addr string) string {
 	if strings.Contains(addr, ":/") || strings.HasPrefix(addr, "unix:") {
 		return addr
@@ -69,24 +59,16 @@ func normalizeAddr(addr string) string {
 
 // sharedConn holds a gRPC connection that can be shared across multiple VUs.
 type sharedConn struct {
-	// key identifies this entry in the pool. A failed or released entry can
-	// be replaced by a newer one under the same key, so the entry rather than
-	// the key is what a client gives back.
 	key connectionKey
 
-	// ready is closed once the client that created this entry is done dialing,
-	// after which conn and err are safe to read.
-	ready chan struct{}
+	ready chan struct{} // closed once the dial is over
 	conn  *grpcext.Conn
 	err   error
 
-	// refCount tracks how many clients are currently using this connection.
-	// It is guarded by the pool's mutex.
-	refCount int
+	refCount int // guarded by connectionPool.mu
 }
 
-// connectionPool manages shared gRPC connections keyed by their connection
-// parameters. It is held by RootModule and shared across all VU instances.
+// connectionPool holds the gRPC connections shared across VUs.
 type connectionPool struct {
 	mu    sync.Mutex
 	conns map[connectionKey]*sharedConn
@@ -99,11 +81,7 @@ func newConnectionPool() *connectionPool {
 	}
 }
 
-// getOrDial returns the connection shared under key, dialing addr if no client
-// has established it yet. The returned connection resolves protobuf types with
-// the given registry, so clients keep their own types even while sharing the
-// underlying connection.
-//
+// getOrDial returns the connection shared under key, dialing addr if needed.
 // Every successful call must be paired with a release of the returned entry.
 func (p *connectionPool) getOrDial(
 	ctx context.Context,
@@ -117,17 +95,11 @@ func (p *connectionPool) getOrDial(
 		sc.refCount++
 		p.mu.Unlock()
 
-		// The connection may still be in the process of being dialed by
-		// another client. Wait on the entry rather than on the pool's mutex,
-		// which would also block every unrelated connect() in the meantime.
+		// Another client may still be dialing it.
 		select {
 		case <-sc.ready:
 		case <-ctx.Done():
-			// The reference taken above can only be given back once the dial
-			// is over, since the connection to close isn't known before that.
-			// This client's timeout must not wait for it, so it is given back
-			// in the background: ready is always closed once the dialing
-			// client's own timeout expires.
+			// The reference can only be given back once the dial is over.
 			go func() {
 				<-sc.ready
 				_ = p.release(sc)
@@ -137,8 +109,6 @@ func (p *connectionPool) getOrDial(
 		}
 
 		if sc.err != nil {
-			// The client that dialed has already dropped this entry from the
-			// pool, so there is no connection to give back.
 			return nil, nil, sc.err
 		}
 
@@ -149,18 +119,13 @@ func (p *connectionPool) getOrDial(
 	p.conns[key] = sc
 	p.mu.Unlock()
 
-	// Dialing is done outside of the pool's mutex: k6 dials with
-	// grpc.WithBlock(), so holding it here would serialize every VU's
-	// connect() behind this handshake.
+	// Dial outside of the lock, since grpc.WithBlock() waits for the handshake.
 	conn, err := grpcext.Dial(ctx, addr, types, opts...)
 
 	p.mu.Lock()
 	sc.conn, sc.err = conn, err
 	if err != nil && p.conns[key] == sc {
-		// A failed connection must not be handed out to the clients coming
-		// after this one, they get to retry the dial themselves. It is dropped
-		// before ready is closed, so that no client waiting on it can find it
-		// in the pool anymore.
+		// Let the next clients dial again instead of getting this error.
 		delete(p.conns, key)
 	}
 	p.mu.Unlock()
@@ -173,16 +138,12 @@ func (p *connectionPool) getOrDial(
 	return conn, sc, nil
 }
 
-// release gives back one reference to the given entry. The connection is closed
-// and dropped from the pool once no client is using it.
-//
-// It must only be called once the entry's dial is over.
+// release gives back one reference to sc, and closes the connection once
+// nobody uses it anymore. It must only be called once the dial is over.
 func (p *connectionPool) release(sc *sharedConn) error {
 	p.mu.Lock()
 	sc.refCount--
 	if sc.refCount > 0 || p.conns[sc.key] != sc {
-		// Either the connection is still in use, or the entry has already
-		// been dropped from the pool because its dial failed.
 		p.mu.Unlock()
 		return nil
 	}
