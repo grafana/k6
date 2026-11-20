@@ -541,7 +541,7 @@ func (o OptionElement) Text() string {
 }
 
 func (o OptionElement) Value() string {
-	return valueOrHTML(o.sel.sel)
+	return optionValue(o.sel.sel)
 }
 
 func (o OutputElement) Form() sobek.Value {
@@ -651,7 +651,7 @@ func (s SelectElement) Value() string {
 	if option.Length() == 0 {
 		return ""
 	}
-	return valueOrHTML(option.First())
+	return optionValue(option)
 }
 
 func (s StyleElement) Type() string {
