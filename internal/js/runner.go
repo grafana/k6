@@ -609,7 +609,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		BlockedHostnames: opts.BlockedHostnames.Trie,
 		Hosts:            opts.Hosts.Trie,
 	}
-	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
+	r.aiaFetcher = netext.NewAIAFetcherFromDialer(runnerDialer)
 
 	// FIXME: add tests
 	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)

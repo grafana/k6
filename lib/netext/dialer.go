@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-
-	"golang.org/x/net/idna"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/net/idna"
 
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/lib/types"
@@ -133,20 +133,24 @@ func (d *Dialer) CheckTargetAddr(addr string) error {
 // effective destination the proxy will receive. DialContext cannot do that
 // check when a proxy is used because it receives the proxy address.
 func (d *Dialer) ProxyFromEnvironment(req *http.Request) (*url.URL, error) {
-	return d.proxyFromEnvironmentWithHostCheck(req, true)
+	return d.proxyWithHostCheck(req, true, http.ProxyFromEnvironment)
 }
 
 func (d *Dialer) proxyFromEnvironmentWithHostCheck(req *http.Request, checkHost bool) (*url.URL, error) {
-	proxyURL, err := http.ProxyFromEnvironment(req)
+	return d.proxyWithHostCheck(req, checkHost, http.ProxyFromEnvironment)
+}
+
+func (d *Dialer) proxyWithHostCheck(
+	req *http.Request,
+	checkHost bool,
+	proxyFunc func(*http.Request) (*url.URL, error),
+) (*url.URL, error) {
+	proxyURL, err := proxyFunc(req)
 	if err != nil || proxyURL == nil {
 		return proxyURL, err
 	}
 
-	addr, err := proxyTargetAddr(req.URL)
-	if err != nil {
-		return nil, err
-	}
-	if err := d.CheckTargetAddr(addr); err != nil {
+	if err := d.CheckTargetAddr(proxyTargetAddr(req.URL)); err != nil {
 		return nil, err
 	}
 
@@ -155,7 +159,8 @@ func (d *Dialer) proxyFromEnvironmentWithHostCheck(req *http.Request, checkHost 
 	// SOCKS proxies tunnel to the URL destination and only forward Host inside the
 	// tunnel, so they do not need this check.
 	if checkHost && req.URL.Scheme == "http" && req.Host != "" &&
-		proxyURL.Scheme != "socks5" && proxyURL.Scheme != "socks5h" {
+		proxyURL.Scheme != "socks5" &&
+		proxyURL.Scheme != "socks5h" {
 		host := req.Host
 		if h, port, err := net.SplitHostPort(host); err != nil {
 			if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
@@ -174,7 +179,7 @@ func (d *Dialer) proxyFromEnvironmentWithHostCheck(req *http.Request, checkHost 
 	return proxyURL, nil
 }
 
-func proxyTargetAddr(u *url.URL) (string, error) {
+func proxyTargetAddr(u *url.URL) string {
 	port := u.Port()
 	if port == "" {
 		switch u.Scheme {
@@ -184,7 +189,7 @@ func proxyTargetAddr(u *url.URL) (string, error) {
 			port = "80"
 		}
 	}
-	return net.JoinHostPort(u.Hostname(), port), nil
+	return net.JoinHostPort(u.Hostname(), port)
 }
 
 // ProxyFromEnvironment returns a proxy callback for a DialContexter. Custom

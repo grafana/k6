@@ -2,6 +2,8 @@ package netext
 
 import (
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -262,6 +264,50 @@ func TestCheckTargetAddr(t *testing.T) {
 	}
 }
 
+func TestProxyWithHostCheck(t *testing.T) {
+	t.Parallel()
+	dialer := NewDialer(net.Dialer{}, newResolver())
+	blocked, err := types.NewHostnameTrie([]string{"blocked.example"})
+	require.NoError(t, err)
+	dialer.BlockedHostnames = blocked
+	ipNet, err := lib.ParseCIDR("10.0.0.0/8")
+	require.NoError(t, err)
+	dialer.Blacklist = []*lib.IPNet{ipNet}
+
+	proxyURL, err := url.Parse("http://proxy.example:3128")
+	require.NoError(t, err)
+	proxyFunc := http.ProxyURL(proxyURL)
+
+	tests := []struct {
+		name        string
+		url         string
+		host        string
+		checkHost   bool
+		expectProxy bool
+	}{
+		{"allowed", "https://allowed.example/path", "", true, true},
+		{"blocked hostname", "https://blocked.example/path", "", true, false},
+		{"blocked ip", "http://10.1.2.3/path", "", true, false},
+		{"blocked host override", "http://allowed.example/path", "blocked.example", true, false},
+		{"url-only ignores host override", "http://allowed.example/path", "blocked.example", false, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			req := httptest.NewRequest(http.MethodGet, tc.url, nil)
+			req.Host = tc.host
+			got, err := dialer.proxyWithHostCheck(req, tc.checkHost, proxyFunc)
+			if !tc.expectProxy {
+				require.Error(t, err)
+				require.Nil(t, got)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, proxyURL, got)
+		})
+	}
+}
+
 func TestProxyTargetAddr(t *testing.T) {
 	t.Parallel()
 
@@ -275,8 +321,7 @@ func TestProxyTargetAddr(t *testing.T) {
 	} {
 		u, err := url.Parse(tc.raw)
 		require.NoError(t, err)
-		addr, err := proxyTargetAddr(u)
-		require.NoError(t, err)
+		addr := proxyTargetAddr(u)
 		require.Equal(t, tc.want, addr)
 	}
 }
