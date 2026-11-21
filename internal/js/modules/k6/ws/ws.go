@@ -149,7 +149,7 @@ func (mi *WS) Connect(url string, args ...sobek.Value) (*HTTPResponse, error) {
 	defer socket.Close()
 
 	// Run the user-provided set up function
-	if _, err := parsedArgs.setupFn(sobek.Undefined(), rt.ToValue(&socket)); err != nil {
+	if _, err := parsedArgs.setupFn(sobek.Undefined(), rt.ToValue(socket)); err != nil {
 		_ = socket.closeConnection(websocket.CloseGoingAway)
 		return nil, err
 	}

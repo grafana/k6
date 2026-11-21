@@ -43,6 +43,10 @@ func TestParseStringOrRegex(t *testing.T) {
 		{name: "string_with_single_quote", input: mk(`'abc\''`), doubleQuote: true, want: `"abc'"`},
 		{name: "string_with_double_quote", input: mk(`'abc"'`), doubleQuote: false, want: `'abc"'`},
 		{name: "string_with_double_quote", input: mk(`'abc"'`), doubleQuote: true, want: `"abc\""`},
+		{name: "string_with_backslash", input: mk(`'a\\b'`), doubleQuote: false, want: `'a\\b'`},
+		{name: "string_with_backslash", input: mk(`'a\\b'`), doubleQuote: true, want: `"a\\b"`},
+		{name: "string_with_newline", input: mk(`'a\nb'`), doubleQuote: true, want: `"a\nb"`},
+		{name: "string_with_ampersand", input: mk(`'a & b'`), doubleQuote: true, want: `"a & b"`},
 	}
 
 	for _, tc := range tests {

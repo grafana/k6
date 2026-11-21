@@ -59,10 +59,53 @@ func (p *pooledSliceBuffers[T]) put(bufp *[]T) {
 	p.pools[idx].Put(bufp)
 }
 
+// getExact uses size classes to share slice wrappers, but allocates exactly the
+// requested capacity. A returned match can then take the buffer without retaining
+// a much larger size-class allocation.
+func (p *pooledSliceBuffers[T]) getExact(neededSize, maxSize int) ([]T, *[]T) {
+	idx := p.poolIndex(neededSize, maxSize)
+	if idx < 0 {
+		return make([]T, neededSize), nil
+	}
+	var bufp *[]T
+	if v := p.pools[idx].Get(); v != nil {
+		bufp = v.(*[]T)
+	} else {
+		bufp = new([]T)
+	}
+	if cap(*bufp) != neededSize {
+		// Store new buffers in the wrapper only when they are returned. A
+		// successful search transfers the buffer and recycles an empty wrapper.
+		return make([]T, neededSize), bufp
+	}
+	return (*bufp)[:neededSize], bufp
+}
+
+func (p *pooledSliceBuffers[T]) putExact(bufp *[]T) {
+	idx := p.poolIndex(cap(*bufp), -1)
+	if idx < 0 {
+		return
+	}
+	*bufp = (*bufp)[:0]
+	p.pools[idx].Put(bufp)
+}
+
+// detach gives the caller ownership of the buffer and recycles its wrapper.
+// Only getExact may borrow these wrappers, since a detached one has no buffer.
+func (p *pooledSliceBuffers[T]) detach(bufp *[]T, bufferSize int) {
+	idx := p.poolIndex(bufferSize, -1)
+	*bufp = nil
+	if idx >= 0 {
+		p.pools[idx].Put(bufp)
+	}
+}
+
 // our specific pooled buffers
 var (
 	pooledRuneBuffers = newPooledSliceBuffers[rune](1<<10, 4<<10, 16<<10, 64<<10, 256<<10)
-	pooledByteBuffers = newPooledSliceBuffers[byte](4<<10, 16<<10, 64<<10, 256<<10, 1<<20)
+	// Match-returning string searches can transfer their exact-size buffers to callers.
+	pooledMatchRuneBuffers = newPooledSliceBuffers[rune](1<<10, 4<<10, 16<<10, 64<<10, 256<<10)
+	pooledByteBuffers      = newPooledSliceBuffers[byte](4<<10, 16<<10, 64<<10, 256<<10, 1<<20)
 )
 
 func getPooledReplaceBuffer(neededBytes, maxSize int) (*bytes.Buffer, *[]byte) {

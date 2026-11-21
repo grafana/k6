@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/errext"
+	k6trace "go.k6.io/k6/v2/internal/lib/trace"
 	"go.k6.io/k6/v2/internal/ui/pb"
 	"go.k6.io/k6/v2/lib"
 	"go.k6.io/k6/v2/metrics"
@@ -365,13 +366,22 @@ func (e *Scheduler) runExecutor(
 		pb.WithStatus(pb.Running),
 		pb.WithConstProgress(0, "started"),
 	)
+
+	scenarioCtx, scenarioSpan := k6trace.StartScenario(
+		runCtx, k6trace.Tracer(e.state.Test.TracerProvider, e.state.Test.FeatureFlags), k6trace.ScenarioInfo{
+			Name:     executorConfig.GetName(),
+			Executor: executorConfig.GetType(),
+		},
+	)
+
 	executorLogger.Debugf("Starting executor")
-	err := executor.Run(runCtx, engineOut) // executor should handle context cancel itself
+	err := executor.Run(scenarioCtx, engineOut) // executor should handle context cancel itself
 	if err == nil {
 		executorLogger.Debugf("Executor finished successfully")
 	} else {
 		executorLogger.WithField("error", err).Errorf("Executor error")
 	}
+	k6trace.EndSpan(scenarioSpan, err)
 	runResults <- err
 }
 

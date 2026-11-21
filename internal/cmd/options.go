@@ -42,6 +42,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("user-agent", fmt.Sprintf("Grafana k6/%s", build.Version), "user agent for http requests")
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'") //nolint:lll
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
+	flags.Bool("http-debug-redact", false, "mask credential headers in the --http-debug output")
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
 	flags.Bool("no-vu-connection-reuse", false, "don't reuse connections between iterations")
@@ -101,6 +102,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		RPS:                     getNullInt64(flags, "rps"),
 		UserAgent:               getNullString(flags, "user-agent"),
 		HTTPDebug:               getNullString(flags, "http-debug"),
+		HTTPDebugRedact:         getNullBool(flags, "http-debug-redact"),
 		InsecureSkipTLSVerify:   getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:       getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:     getNullBool(flags, "no-vu-connection-reuse"),

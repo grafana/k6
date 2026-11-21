@@ -522,7 +522,7 @@ func TestExecutionTestOptionsDefaultValues(t *testing.T) {
 	loglines := ts.LoggerHook.Drain()
 	require.Len(t, loglines, 1)
 
-	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"tlsAIAFetch":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"handleSummaryTimeout":null,"features":null}`
+	expected := `{"paused":null,"executionSegment":null,"executionSegmentSequence":null,"noSetup":null,"setupTimeout":null,"noTeardown":null,"teardownTimeout":null,"rps":null,"dns":{"ttl":null,"select":null,"policy":null},"maxRedirects":null,"userAgent":null,"batch":null,"batchPerHost":null,"httpDebug":null,"httpDebugRedact":null,"insecureSkipTLSVerify":null,"tlsCipherSuites":null,"tlsVersion":null,"tlsAuth":null,"tlsAIAFetch":null,"throw":null,"thresholds":null,"blacklistIPs":null,"blockHostnames":null,"hosts":null,"noConnectionReuse":null,"noVUConnectionReuse":null,"minIterationDuration":null,"ext":null,"summaryTrendStats":["avg", "min", "med", "max", "p(90)", "p(95)"],"summaryTimeUnit":null,"systemTags":["check","error","error_code","expected_response","group","method","name","proto","scenario","service","status","subproto","tls_version","url"],"tags":null,"metricSamplesBufferSize":null,"noCookiesReset":null,"discardResponseBodies":null,"consoleOutput":null,"scenarios":{"default":{"vus":null,"iterations":1,"executor":"shared-iterations","maxDuration":null,"startTime":null,"env":null,"tags":null,"gracefulStop":null,"exec":null}},"localIPs":null,"handleSummaryTimeout":null,"features":null}`
 	assert.JSONEq(t, expected, loglines[0].Message)
 }
 
@@ -2513,6 +2513,48 @@ func TestBrowserPermissions(t *testing.T) {
 			loglines := ts.LoggerHook.Drain()
 
 			assert.Contains(t, loglines[0].Message, tt.expectedError)
+		})
+	}
+}
+
+func TestBrowserInvalidInitConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		env     map[string]string
+		wantErr string
+	}{
+		{
+			name:    "screenshots_output",
+			env:     map[string]string{"K6_BROWSER_SCREENSHOTS_OUTPUT": "basePath=/screenshots"},
+			wantErr: "failed to create file persister: parsing K6_BROWSER_SCREENSHOTS_OUTPUT: missing required url",
+		},
+		{
+			name:    "traces_metadata",
+			env:     map[string]string{"K6_BROWSER_TRACES_METADATA": "foo"},
+			wantErr: `parsing browser traces metadata: "foo" is not a valid key=value metadata`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			const script = `
+				import { browser } from 'k6/browser';
+
+				export default function() {};
+			`
+
+			ts := getSingleFileTestState(t, script, []string{}, exitcodes.ScriptException)
+			maps.Copy(ts.Env, tt.env)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			loglines := ts.LoggerHook.Drain()
+			require.NotEmpty(t, loglines)
+			assert.Contains(t, loglines[0].Message, tt.wantErr)
+			assert.NotContains(t, loglines[0].Message, "panic")
 		})
 	}
 }

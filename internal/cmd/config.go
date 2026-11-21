@@ -257,6 +257,10 @@ func getConsolidatedConfig(
 
 	conf = applyDefault(conf)
 
+	if conf.HTTPDebugRedact.Bool && conf.HTTPDebug.String == "" {
+		gs.Logger.Warn("httpDebugRedact has no effect without httpDebug")
+	}
+
 	// TODO(imiric): Move this validation where it makes sense in the configuration
 	// refactor of #883. This repeats the trend stats validation already done
 	// for CLI flags in cmd.getOptions, in case other configuration sources

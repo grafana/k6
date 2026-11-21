@@ -3,6 +3,7 @@ package regexp2
 import (
 	"bytes"
 	"fmt"
+	"sync/atomic"
 	"unicode/utf8"
 )
 
@@ -13,22 +14,25 @@ import (
 type Match struct {
 	Group //embeded group 0
 
-	regex       *Regexp
-	otherGroups []Group
-
-	// input to the match
-	textpos   int
-	textstart int
-
-	capcount   int
+	// Keep pointers and slices ahead of scalar state to shorten the portion
+	// of each match that the garbage collector must scan.
+	regex      *Regexp
 	sparseCaps map[int]int
+	// landmarks holds the required landmark searches that found this match.
+	landmarks   *requiredLandmarkState
+	otherGroups []Group
 
 	// output from the match
 	matches    [][]int
 	matchcount []int
 
-	// whether we've done any balancing with this match.  If we
-	// have done balancing, we'll need to do extra work in Tidy().
+	// input to the match
+	textpos   int
+	textstart int
+	capcount  int
+
+	// whether we've done any balancing with this match. If we have, full
+	// matches need capture-history compaction in tidy.
 	balancing bool
 }
 
@@ -60,6 +64,13 @@ type matchText struct {
 	byteOffset       int // original-string byte index of runes[0]
 	byteOffsets      []int
 	byteOffsetsReady bool
+	// The first returned capture retains this metadata anyway. Store it here
+	// to avoid a separate allocation; subsequent matches need their own record.
+	initialCaptureUsed bool
+	initialCapture     [1]Capture
+	// landmarkMatch is the last match that FindNextMatch found in this text.
+	// The first call to continue from it takes its landmarks.
+	landmarkMatch atomic.Pointer[Match]
 }
 
 // String returns the captured text. For string input it is a slice of the
@@ -107,12 +118,8 @@ func newMatchText(r []rune) *matchText {
 	return &matchText{runes: r}
 }
 
-func newStringMatchText(input string, r []rune) *matchText {
-	return newStringMatchTextAt(input, r, 0, 0)
-}
-
-func newStringMatchTextAt(input string, r []rune, runeOffset, byteOffset int) *matchText {
-	return &matchText{
+func (t *matchText) resetString(input string, r []rune, runeOffset, byteOffset int) {
+	*t = matchText{
 		runes:          r,
 		input:          input,
 		hasStringInput: true,
@@ -192,19 +199,35 @@ func runeByteOffsets(runes []rune) []int {
 }
 
 func newMatch(regex *Regexp, capcount int, text *matchText, startpos int) *Match {
-	m := Match{
-		regex:      regex,
-		matchcount: make([]int, capcount),
-		matches:    make([][]int, capcount),
-		textstart:  startpos,
-		balancing:  false,
+	var m *Match
+	if capcount == 1 {
+		// With no explicit capture groups, keep the whole-match bookkeeping in
+		// one allocation rather than allocating three separate slice backings.
+		storage := new(struct {
+			Match
+			countsAndInterval [3]int
+			intervals         [1][]int
+		})
+		m = &storage.Match
+		m.matchcount = storage.countsAndInterval[:1:1]
+		m.matches = storage.intervals[:]
+		m.matches[0] = storage.countsAndInterval[1:]
+	} else {
+		// Capture counts and the initial whole-match interval have the same lifetime.
+		countsAndInterval := make([]int, capcount+2)
+		m = &Match{
+			matchcount: countsAndInterval[:capcount:capcount],
+			matches:    make([][]int, capcount),
+		}
+		m.matches[0] = countsAndInterval[capcount:]
 	}
+	m.regex = regex
+	m.textstart = startpos
 	if (regex.options & ECMAScript) == 0 {
 		m.Name = "0"
 	}
 	m.text = text
-	m.matches[0] = make([]int, 2)
-	return &m
+	return m
 }
 
 func newMatchSparse(regex *Regexp, caps map[int]int, capcount int, text *matchText, startpos int) *Match {
@@ -229,7 +252,13 @@ func (m *Match) tidy(textpos int) {
 	m.textpos = textpos
 	m.capcount = m.matchcount[0]
 	//copy our root capture to the list
-	m.Captures = []Capture{m.Capture}
+	if m.text != nil && !m.text.initialCaptureUsed {
+		m.text.initialCaptureUsed = true
+		m.text.initialCapture[0] = m.Capture
+		m.Captures = m.text.initialCapture[:]
+	} else {
+		m.Captures = []Capture{m.Capture}
+	}
 	if m.text != nil && m.text.hasStringInput {
 		m.text.ensureByteOffsets()
 	}
@@ -362,7 +391,20 @@ func (m *Match) GroupCount() int {
 }
 
 // GroupByName returns a group based on the name of the group, or nil if the group name does not exist
+// For duplicate ECMAScript names, it selects the participating group, or the
+// first declaration if none participated.
 func (m *Match) GroupByName(name string) *Group {
+	// Participating selection follows ECMAScript 2025 §22.2.7.2 RegExpBuiltinExec,
+	// step 34.5;
+	// https://tc39.es/ecma262/2025/multipage/text-processing.html#sec-regexpbuiltinexec
+	if slots := m.regex.duplicateCapnames[name]; len(slots) > 0 {
+		for _, slot := range slots {
+			if m.isMatched(slot) {
+				return m.groupByIndex(slot)
+			}
+		}
+		return m.groupByIndex(slots[0])
+	}
 	num := m.regex.GroupNumberFromName(name)
 	if num < 0 {
 		return nil
@@ -380,6 +422,10 @@ func (m *Match) GroupByNumber(num int) *Group {
 		}
 		num = newNum
 	}
+	return m.groupByIndex(num)
+}
+
+func (m *Match) groupByIndex(num int) *Group {
 	if num >= len(m.matchcount) || num < 0 {
 		return nil
 	}
@@ -407,7 +453,7 @@ func (m *Match) populateOtherGroups() {
 	if m.otherGroups == nil {
 		m.otherGroups = make([]Group, len(m.matchcount)-1)
 		for i := 0; i < len(m.otherGroups); i++ {
-			m.otherGroups[i] = newGroup(m.regex.GroupNameFromNumber(i+1), m.text, m.matches[i+1], m.matchcount[i+1])
+			m.otherGroups[i] = newGroup(m.regex.groupNameFromSlot(i+1), m.text, m.matches[i+1], m.matchcount[i+1])
 		}
 	}
 }

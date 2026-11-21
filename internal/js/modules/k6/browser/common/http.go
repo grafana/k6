@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -159,12 +158,7 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 			continue
 		}
 
-		decodedBytes, err := base64.StdEncoding.DecodeString(i.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("decoding postData %q: %w", i.Bytes, err)
-		}
-
-		pd = append(pd, string(decodedBytes))
+		pd = append(pd, string(i.Bytes))
 	}
 
 	r := Request{
@@ -178,9 +172,9 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		isNavigationRequest: isNavigationRequest,
 		allowInterception:   rp.allowInterception,
 		interceptionID:      rp.interceptionID,
-		timestamp:           ev.Timestamp.Time(),
-		wallTime:            ev.WallTime.Time(),
-		offset:              ev.WallTime.Time().Sub(ev.Timestamp.Time()),
+		timestamp:           protocolTime(float64(ev.Timestamp)),
+		wallTime:            protocolTime(float64(ev.WallTime)),
+		offset:              protocolTime(float64(ev.WallTime)).Sub(protocolTime(float64(ev.Timestamp))),
 		documentID:          documentID.String(),
 		headers:             make(map[string][]string, len(ev.Request.Headers)),
 		ctx:                 ctx,
@@ -563,7 +557,7 @@ type Response struct {
 
 // NewHTTPResponse creates a new HTTP response.
 func NewHTTPResponse(
-	ctx context.Context, req *Request, resp *network.Response, timestamp *cdp.MonotonicTime,
+	ctx context.Context, req *Request, resp *network.Response, timestamp cdp.MonotonicTime,
 ) *Response {
 	vu := k6ext.GetVU(ctx)
 	state := vu.State()
@@ -585,8 +579,8 @@ func NewHTTPResponse(
 		fromDiskCache:     resp.FromDiskCache,
 		fromServiceWorker: resp.FromServiceWorker,
 		fromPrefetchCache: resp.FromPrefetchCache,
-		timestamp:         timestamp.Time(),
-		wallTime:          timestamp.Time().Add(req.offset),
+		timestamp:         protocolTime(float64(timestamp)),
+		wallTime:          protocolTime(float64(timestamp)).Add(req.offset),
 		timing:            resp.Timing,
 		vu:                vu,
 	}
@@ -603,8 +597,8 @@ func NewHTTPResponse(
 		r.securityDetails = &SecurityDetails{
 			SubjectName: resp.SecurityDetails.SubjectName,
 			Issuer:      resp.SecurityDetails.Issuer,
-			ValidFrom:   resp.SecurityDetails.ValidFrom.Time().Unix(),
-			ValidTo:     resp.SecurityDetails.ValidTo.Time().Unix(),
+			ValidFrom:   protocolTime(float64(resp.SecurityDetails.ValidFrom)).Unix(),
+			ValidTo:     protocolTime(float64(resp.SecurityDetails.ValidTo)).Unix(),
 			Protocol:    resp.SecurityDetails.Protocol,
 			SANList:     resp.SecurityDetails.SanList,
 		}
@@ -646,7 +640,7 @@ func (r *Response) fetchBody() error {
 	if cached() {
 		return nil
 	}
-	action := network.GetResponseBody(r.request.requestID)
+	action := newCommand(network.GetResponseBody, network.GetResponseBodyParams{RequestID: r.request.requestID})
 
 	// Try to fetch the response body. If the request to retrieve the response
 	// body is too "quick" then the response body is not available. After
@@ -655,7 +649,11 @@ func (r *Response) fetchBody() error {
 	var err error
 	maxRetries := 5
 	for i := 0; i <= maxRetries; i++ {
-		body, err = action.Do(cdp.WithExecutor(r.ctx, r.request.frame.manager.session))
+		result, callErr := action.Result(r.ctx, r.request.frame.manager.session)
+		err = callErr
+		if err == nil {
+			body = result.Body
+		}
 		if err == nil {
 			break
 		}

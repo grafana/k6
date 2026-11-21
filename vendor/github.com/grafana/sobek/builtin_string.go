@@ -7,13 +7,14 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/grafana/sobek/parser"
 	"github.com/grafana/sobek/unistring"
 
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
 )
+
+const WhitespaceChars = " \f\n\r\t\v\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
 func (r *Runtime) collator() *collate.Collator {
 	collator := r._collator
@@ -36,10 +37,10 @@ func toString(arg Value) String {
 
 func (r *Runtime) builtin_String(call FunctionCall) Value {
 	if len(call.Arguments) > 0 {
-		return toString(call.Arguments[0])
-	} else {
-		return stringEmpty
+		return toString(call.Argument(0))
 	}
+
+	return stringEmpty
 }
 
 func (r *Runtime) _newString(s String, proto *Object) *Object {
@@ -140,7 +141,11 @@ func (r *Runtime) string_fromcodepoint(call FunctionCall) Value {
 			}
 			c = rune(numInt)
 		} else {
-			panic(r.newErrorf(r.getRangeError(), "Invalid code point %s", num))
+			f := num.ToFloat()
+			if f != math.Trunc(f) || f < 0 || f > utf8.MaxRune {
+				panic(r.newErrorf(r.getRangeError(), "Invalid code point %s", num))
+			}
+			c = rune(f)
 		}
 		sb.WriteRune(c)
 	}
@@ -254,29 +259,29 @@ func (r *Runtime) stringproto_concat(call FunctionCall) Value {
 
 	if allAscii {
 		var buf strings.Builder
-		buf.Grow(totalLen)
+		buf.Grow(toStringLen(totalLen))
 		for _, s := range strs {
 			buf.WriteString(s.String())
 		}
 		return asciiString(buf.String())
-	} else {
-		buf := make([]uint16, totalLen+1)
-		buf[0] = unistring.BOM
-		pos := 1
-		for _, s := range strs {
-			switch s := s.(type) {
-			case asciiString:
-				for i := 0; i < len(s); i++ {
-					buf[pos] = uint16(s[i])
-					pos++
-				}
-			case unicodeString:
-				copy(buf[pos:], s[1:])
-				pos += s.Length()
-			}
-		}
-		return unicodeString(buf)
 	}
+
+	buf := make([]uint16, totalLen+1)
+	buf[0] = unistring.BOM
+	pos := 1
+	for _, s := range strs {
+		switch s := s.(type) {
+		case asciiString:
+			for i := 0; i < len(s); i++ {
+				buf[pos] = uint16(s[i])
+				pos++
+			}
+		case unicodeString:
+			copy(buf[pos:], s[1:])
+			pos += s.Length()
+		}
+	}
+	return unicodeString(buf)
 }
 
 func (r *Runtime) stringproto_endsWith(call FunctionCall) Value {
@@ -467,13 +472,18 @@ func (r *Runtime) stringproto_normalize(call FunctionCall) Value {
 	case asciiString:
 		return s
 	case unicodeString:
-		ss := s.String()
-		return newStringValue(f.String(ss))
+		return s.normalize(f)
 	case *importedString:
 		if s.scanned && s.u == nil {
 			return asciiString(s.s)
 		}
 		return newStringValue(f.String(s.s))
+	case *concatString:
+		a, u := devirtualizeString(s)
+		if u == nil {
+			return a
+		}
+		return u.normalize(f)
 	default:
 		panic(unknownStringTypeErr(s))
 	}
@@ -567,7 +577,7 @@ func (r *Runtime) stringproto_repeat(call FunctionCall) Value {
 	a, u := devirtualizeString(s)
 	if u == nil {
 		var sb strings.Builder
-		sb.Grow(len(a) * num)
+		sb.Grow(safeMul(len(a), num))
 		for i := 0; i < num; i++ {
 			sb.WriteString(string(a))
 		}
@@ -575,7 +585,7 @@ func (r *Runtime) stringproto_repeat(call FunctionCall) Value {
 	}
 
 	var sb unicodeStringBuilder
-	sb.Grow(u.Length() * num)
+	sb.Grow(safeMul(u.Length(), num))
 	for i := 0; i < num; i++ {
 		sb.writeUnicodeString(u)
 	}
@@ -999,28 +1009,84 @@ func (r *Runtime) stringproto_toUpperCase(call FunctionCall) Value {
 	return s.toUpper()
 }
 
-func (r *Runtime) stringproto_trim(call FunctionCall) Value {
+func (r *Runtime) stringproto_isWellFormed(call FunctionCall) Value {
+	r.checkObjectCoercible(call.This)
+	_, u := devirtualizeString(call.This.toString())
+	if u == nil || u.loneSurrogateIndex() == -1 {
+		return valueTrue
+	}
+	return valueFalse
+}
+
+func (r *Runtime) stringproto_toWellFormed(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	s := call.This.toString()
+	_, u := devirtualizeString(s)
+	if u == nil {
+		return s
+	}
+	idx := u.loneSurrogateIndex()
+	if idx == -1 {
+		return s
+	}
+	b := make(unicodeString, len(u))
+	copy(b, u)
+	for i := idx + 1; i < len(b); i++ {
+		c := b[i]
+		if isUTF16FirstSurrogate(c) {
+			if i+1 < len(b) && isUTF16SecondSurrogate(b[i+1]) {
+				i++
+				continue
+			}
+			b[i] = utf8.RuneError
+		} else if isUTF16SecondSurrogate(c) {
+			b[i] = utf8.RuneError
+		}
+	}
+	return b
+}
 
-	// TODO handle invalid UTF-16
-	return newStringValue(strings.Trim(s.String(), parser.WhitespaceChars))
+func (r *Runtime) stringproto_trim(call FunctionCall) Value {
+	return r.trimString(call, true, true)
 }
 
 func (r *Runtime) stringproto_trimEnd(call FunctionCall) Value {
-	r.checkObjectCoercible(call.This)
-	s := call.This.toString()
-
-	// TODO handle invalid UTF-16
-	return newStringValue(strings.TrimRight(s.String(), parser.WhitespaceChars))
+	return r.trimString(call, false, true)
 }
 
 func (r *Runtime) stringproto_trimStart(call FunctionCall) Value {
+	return r.trimString(call, true, false)
+}
+
+func (r *Runtime) trimString(call FunctionCall, left, right bool) Value {
 	r.checkObjectCoercible(call.This)
 	s := call.This.toString()
+	a, u := devirtualizeString(s)
+	if u == nil {
+		if left {
+			a = asciiString(strings.TrimLeft(string(a), WhitespaceChars))
+		}
+		if right {
+			a = asciiString(strings.TrimRight(string(a), WhitespaceChars))
+		}
+		return a
+	}
 
-	// TODO handle invalid UTF-16
-	return newStringValue(strings.TrimLeft(s.String(), parser.WhitespaceChars))
+	start, end := 0, u.Length()
+	if left {
+		for start < end && strings.ContainsRune(WhitespaceChars, rune(u[start+1])) {
+			start++
+		}
+	}
+	if right {
+		for end > start && strings.ContainsRune(WhitespaceChars, rune(u[end])) {
+			end--
+		}
+	}
+	if start == 0 && end == u.Length() {
+		return s
+	}
+	return u.Substring(start, end)
 }
 
 func (r *Runtime) stringproto_substr(call FunctionCall) Value {
@@ -1047,6 +1113,92 @@ func (r *Runtime) stringproto_substr(call FunctionCall) Value {
 	return s.Substring(int(start), int(start+length))
 }
 
+// createHTML implements the CreateHTML abstract operation (B.2.2.2.1). If attribute is not empty, the first
+// argument is used as its value, with any '"' replaced by "&quot;".
+func (r *Runtime) createHTML(call FunctionCall, tag, attribute string) Value {
+	r.checkObjectCoercible(call.This)
+	s := call.This.toString()
+	var sb StringBuilder
+	sb.writeASCII("<")
+	sb.writeASCII(tag)
+	if attribute != "" {
+		v := call.Argument(0).toString()
+		sb.writeASCII(" ")
+		sb.writeASCII(attribute)
+		sb.writeASCII(`="`)
+		start := 0
+		for {
+			idx := v.index(asciiString(`"`), start)
+			if idx < 0 {
+				break
+			}
+			sb.WriteSubstring(v, start, idx)
+			sb.writeASCII("&quot;")
+			start = idx + 1
+		}
+		sb.WriteSubstring(v, start, v.Length())
+		sb.writeASCII(`"`)
+	}
+	sb.writeASCII(">")
+	sb.WriteString(s)
+	sb.writeASCII("</")
+	sb.writeASCII(tag)
+	sb.writeASCII(">")
+	return sb.String()
+}
+
+func (r *Runtime) stringproto_anchor(call FunctionCall) Value {
+	return r.createHTML(call, "a", "name")
+}
+
+func (r *Runtime) stringproto_big(call FunctionCall) Value {
+	return r.createHTML(call, "big", "")
+}
+
+func (r *Runtime) stringproto_blink(call FunctionCall) Value {
+	return r.createHTML(call, "blink", "")
+}
+
+func (r *Runtime) stringproto_bold(call FunctionCall) Value {
+	return r.createHTML(call, "b", "")
+}
+
+func (r *Runtime) stringproto_fixed(call FunctionCall) Value {
+	return r.createHTML(call, "tt", "")
+}
+
+func (r *Runtime) stringproto_fontcolor(call FunctionCall) Value {
+	return r.createHTML(call, "font", "color")
+}
+
+func (r *Runtime) stringproto_fontsize(call FunctionCall) Value {
+	return r.createHTML(call, "font", "size")
+}
+
+func (r *Runtime) stringproto_italics(call FunctionCall) Value {
+	return r.createHTML(call, "i", "")
+}
+
+func (r *Runtime) stringproto_link(call FunctionCall) Value {
+	return r.createHTML(call, "a", "href")
+}
+
+func (r *Runtime) stringproto_small(call FunctionCall) Value {
+	return r.createHTML(call, "small", "")
+}
+
+func (r *Runtime) stringproto_strike(call FunctionCall) Value {
+	return r.createHTML(call, "strike", "")
+}
+
+func (r *Runtime) stringproto_sub(call FunctionCall) Value {
+	return r.createHTML(call, "sub", "")
+}
+
+func (r *Runtime) stringproto_sup(call FunctionCall) Value {
+	return r.createHTML(call, "sup", "")
+}
+
 func (r *Runtime) stringIterProto_next(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	if iter, ok := thisObj.self.(*stringIterObject); ok {
@@ -1058,7 +1210,12 @@ func (r *Runtime) stringIterProto_next(call FunctionCall) Value {
 func (r *Runtime) createStringIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
-	o._putProp("next", r.newNativeFunc(r.stringIterProto_next, "next", 0), true, false, true)
+	o._putProp("next", r.newIteratorNextFunc(r.stringIterProto_next, 0, func(iterator *Object) func(Value) (Value, bool) {
+		if i, ok := iterator.self.(*stringIterObject); ok {
+			return i.nextResult
+		}
+		return nil
+	}), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classStringIterator), false, false, true))
 
 	return o
@@ -1092,6 +1249,7 @@ func createStringProtoTemplate() *objectTemplate {
 	t.putStr("endsWith", func(r *Runtime) Value { return r.methodProp(r.stringproto_endsWith, "endsWith", 1) })
 	t.putStr("includes", func(r *Runtime) Value { return r.methodProp(r.stringproto_includes, "includes", 1) })
 	t.putStr("indexOf", func(r *Runtime) Value { return r.methodProp(r.stringproto_indexOf, "indexOf", 1) })
+	t.putStr("isWellFormed", func(r *Runtime) Value { return r.methodProp(r.stringproto_isWellFormed, "isWellFormed", 0) })
 	t.putStr("lastIndexOf", func(r *Runtime) Value { return r.methodProp(r.stringproto_lastIndexOf, "lastIndexOf", 1) })
 	t.putStr("localeCompare", func(r *Runtime) Value { return r.methodProp(r.stringproto_localeCompare, "localeCompare", 1) })
 	t.putStr("match", func(r *Runtime) Value { return r.methodProp(r.stringproto_match, "match", 1) })
@@ -1112,6 +1270,7 @@ func createStringProtoTemplate() *objectTemplate {
 	t.putStr("toLowerCase", func(r *Runtime) Value { return r.methodProp(r.stringproto_toLowerCase, "toLowerCase", 0) })
 	t.putStr("toString", func(r *Runtime) Value { return r.methodProp(r.stringproto_toString, "toString", 0) })
 	t.putStr("toUpperCase", func(r *Runtime) Value { return r.methodProp(r.stringproto_toUpperCase, "toUpperCase", 0) })
+	t.putStr("toWellFormed", func(r *Runtime) Value { return r.methodProp(r.stringproto_toWellFormed, "toWellFormed", 0) })
 	t.putStr("trim", func(r *Runtime) Value { return r.methodProp(r.stringproto_trim, "trim", 0) })
 	t.putStr("trimEnd", func(r *Runtime) Value { return valueProp(r.getStringproto_trimEnd(), true, false, true) })
 	t.putStr("trimStart", func(r *Runtime) Value { return valueProp(r.getStringproto_trimStart(), true, false, true) })
@@ -1120,7 +1279,20 @@ func createStringProtoTemplate() *objectTemplate {
 	t.putStr("valueOf", func(r *Runtime) Value { return r.methodProp(r.stringproto_valueOf, "valueOf", 0) })
 
 	// Annex B
+	t.putStr("anchor", func(r *Runtime) Value { return r.methodProp(r.stringproto_anchor, "anchor", 1) })
+	t.putStr("big", func(r *Runtime) Value { return r.methodProp(r.stringproto_big, "big", 0) })
+	t.putStr("blink", func(r *Runtime) Value { return r.methodProp(r.stringproto_blink, "blink", 0) })
+	t.putStr("bold", func(r *Runtime) Value { return r.methodProp(r.stringproto_bold, "bold", 0) })
+	t.putStr("fixed", func(r *Runtime) Value { return r.methodProp(r.stringproto_fixed, "fixed", 0) })
+	t.putStr("fontcolor", func(r *Runtime) Value { return r.methodProp(r.stringproto_fontcolor, "fontcolor", 1) })
+	t.putStr("fontsize", func(r *Runtime) Value { return r.methodProp(r.stringproto_fontsize, "fontsize", 1) })
+	t.putStr("italics", func(r *Runtime) Value { return r.methodProp(r.stringproto_italics, "italics", 0) })
+	t.putStr("link", func(r *Runtime) Value { return r.methodProp(r.stringproto_link, "link", 1) })
+	t.putStr("small", func(r *Runtime) Value { return r.methodProp(r.stringproto_small, "small", 0) })
+	t.putStr("strike", func(r *Runtime) Value { return r.methodProp(r.stringproto_strike, "strike", 0) })
+	t.putStr("sub", func(r *Runtime) Value { return r.methodProp(r.stringproto_sub, "sub", 0) })
 	t.putStr("substr", func(r *Runtime) Value { return r.methodProp(r.stringproto_substr, "substr", 2) })
+	t.putStr("sup", func(r *Runtime) Value { return r.methodProp(r.stringproto_sup, "sup", 0) })
 
 	t.putSym(SymIterator, func(r *Runtime) Value {
 		return valueProp(r.newNativeFunc(r.stringproto_iterator, "[Symbol.iterator]", 0), true, false, true)

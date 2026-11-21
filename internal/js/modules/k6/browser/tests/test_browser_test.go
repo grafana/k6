@@ -1,6 +1,8 @@
 package tests
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"testing"
 	"time"
@@ -8,7 +10,23 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/env"
+	"go.k6.io/k6/v2/internal/lib/testutils/httpmultibin"
 )
+
+func TestTestBrowserWithFileServer(t *testing.T) {
+	t.Parallel()
+
+	tb := &testBrowser{
+		t:    t,
+		http: &httpmultibin.HTTPMultiBin{Mux: http.NewServeMux()},
+	}
+	response := httptest.NewRecorder()
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/static/page1.html", nil)
+	tb.withFileServer().http.Mux.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), "<h1>Page 1</h1>")
+}
 
 func TestTestBrowserAwaitWithTimeoutShortCircuit(t *testing.T) {
 	t.Parallel()

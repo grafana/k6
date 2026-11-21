@@ -50,8 +50,7 @@ func dateParse(date string) (t time.Time, ok bool) {
 		loc = time.FixedZone("", d.timeZoneOffset*60)
 	}
 	t = time.Date(d.year, time.Month(d.month), d.day, d.hour, d.min, d.sec, d.msec*1e6, loc)
-	unixMilli := t.UnixMilli()
-	ok = unixMilli >= -maxTime && unixMilli <= maxTime
+	_, ok = timeToMsecClip(t)
 	return
 }
 
@@ -86,6 +85,18 @@ func timeToMsec(t time.Time) int64 {
 	return t.Unix()*1000 + int64(t.Nanosecond())/1e6
 }
 
+// timeToMsecClip returns the time value of t in milliseconds and whether it is within the range
+// allowed by TimeClip. Unlike timeToMsec() and t.UnixMilli() it does not overflow when t is too far
+// from the epoch.
+func timeToMsecClip(t time.Time) (int64, bool) {
+	sec := t.Unix()
+	if sec < -maxTime/1000 || sec > maxTime/1000 {
+		return 0, false
+	}
+	msec := sec*1000 + int64(t.Nanosecond())/1e6
+	return msec, msec >= -maxTime && msec <= maxTime
+}
+
 func (d *dateObject) exportType() reflect.Type {
 	return typeTime
 }
@@ -99,6 +110,16 @@ func (d *dateObject) export(*objectExportCtx) interface{} {
 
 func (d *dateObject) setTimeMs(ms int64) Value {
 	if ms >= 0 && ms <= maxTime || ms < 0 && ms >= -maxTime {
+		d.msec = ms
+		return intToValue(ms)
+	}
+
+	d.unset()
+	return _NaN
+}
+
+func (d *dateObject) setTime(t time.Time) Value {
+	if ms, ok := timeToMsecClip(t); ok {
 		d.msec = ms
 		return intToValue(ms)
 	}

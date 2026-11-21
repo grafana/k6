@@ -18,15 +18,15 @@ type setIterObject struct {
 	kind iterationKind
 }
 
-func (o *setIterObject) next() Value {
+func (o *setIterObject) nextResult(_ Value) (Value, bool) {
 	if o.iter == nil {
-		return o.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 
 	entry := o.iter.next()
 	if entry == nil {
 		o.iter = nil
-		return o.val.runtime.createIterResultObject(_undefined, true)
+		return _undefined, false
 	}
 
 	var result Value
@@ -37,7 +37,12 @@ func (o *setIterObject) next() Value {
 		result = o.val.runtime.newArrayValues([]Value{entry.key, entry.key})
 	}
 
-	return o.val.runtime.createIterResultObject(result, false)
+	return result, true
+}
+
+func (o *setIterObject) next() Value {
+	value, valid := o.nextResult(nil)
+	return o.val.runtime.createIterResultObject(value, !valid)
 }
 
 func (so *setObject) init() {
@@ -50,6 +55,9 @@ func (so *setObject) exportType() reflect.Type {
 }
 
 func (so *setObject) export(ctx *objectExportCtx) interface{} {
+	if v, exists := ctx.get(so.val); exists {
+		return v
+	}
 	a := make([]interface{}, so.m.size)
 	ctx.put(so.val, a)
 	iter := so.m.newIter()
@@ -216,30 +224,15 @@ func (r *Runtime) setProto_difference(call FunctionCall) Value {
 
 	// 5. If SetDataSize(set.[[SetData]]) ≤ otherRecord.[[Size]], then
 	if so.m.size <= otherRecord.size {
-		// We can skip the copy if we are certain that the other set is a native Set object
-		if otherRecord.isStd() {
-			otherSet := otherRecord.stdObj
-			iter := so.m.newIter()
-			for {
-				entry := iter.next()
-				if entry == nil {
-					break
-				}
-				if !otherSet.m.has(entry.key) {
-					result.m.set(entry.key, nil)
-				}
+		so.m.copyTo(result.m)
+		iter := so.m.newIter()
+		for {
+			entry := iter.next()
+			if entry == nil {
+				break
 			}
-		} else {
-			so.m.copyTo(result.m)
-			iter := so.m.newIter()
-			for {
-				entry := iter.next()
-				if entry == nil {
-					break
-				}
-				if otherRecord.has(entry.key) {
-					result.m.remove(entry.key)
-				}
+			if otherRecord.has(entry.key) {
+				result.m.remove(entry.key)
 			}
 		}
 	} else {
@@ -427,28 +420,30 @@ func (r *Runtime) builtin_newSet(args []Value, newTarget *Object) *Object {
 	if len(args) > 0 {
 		if arg := args[0]; arg != nil && arg != _undefined && arg != _null {
 			adder := so.getStr("add", nil)
-			stdArr := r.checkStdArrayIter(arg)
+			stdArr := r.checkStdArray(arg)
 			if adder == r.global.setAdder {
-				if stdArr != nil {
+				ir := r.getIterator(arg, nil)
+				if stdArr != nil && ir.nextRes != nil {
 					for _, v := range stdArr.values {
 						so.m.set(v, nil)
 					}
 				} else {
-					r.getIterator(arg, nil).iterate(func(item Value) {
+					ir.iterate(func(item Value) {
 						so.m.set(item, nil)
 					})
 				}
 			} else {
 				adderFn := toMethod(adder)
 				if adderFn == nil {
-					panic(r.NewTypeError("Set.add in missing"))
+					panic(r.NewTypeError("Set.add is missing"))
 				}
-				if stdArr != nil {
+				ir := r.getIterator(arg, nil)
+				if stdArr != nil && ir.nextRes != nil {
 					for _, item := range stdArr.values {
 						adderFn(FunctionCall{This: o, Arguments: []Value{item}})
 					}
 				} else {
-					r.getIterator(arg, nil).iterate(func(item Value) {
+					ir.iterate(func(item Value) {
 						adderFn(FunctionCall{This: o, Arguments: []Value{item}})
 					})
 				}
@@ -490,15 +485,14 @@ func (r *Runtime) setIterProto_next(call FunctionCall) Value {
 }
 
 type setRecord struct {
-	o           *Object
-	size        int
-	has         func(Value) bool
-	iterateKeys func(func(Value) bool)
-	stdObj      *setObject
+	o      *Object
+	size   int
+	has    func(Value) bool
+	keysFn func(FunctionCall) Value
 }
 
-func (sr *setRecord) isStd() bool {
-	return sr.stdObj != nil
+func (sr *setRecord) iterateKeys(step func(Value) bool) {
+	sr.o.runtime.forOfMethod(sr.o, sr.keysFn, step)
 }
 
 func (r *Runtime) getSetRecord(value Value) *setRecord {
@@ -542,38 +536,21 @@ func (r *Runtime) getSetRecord(value Value) *setRecord {
 
 	// 12. Return a new Set Record { [[SetObject]]: obj, [[Size]]: intSize, [[Has]]: has, [[Keys]]: keys }.
 
-	// common case for native Set objects
-	if setObj, ok := o.self.(*setObject); ok && has == r.global.setHas && keys == r.global.setValues {
-		return &setRecord{
-			o:      o,
-			size:   intSize,
-			stdObj: setObj,
-			has:    setObj.m.has,
-			iterateKeys: func(f func(Value) bool) {
-				iter := setObj.m.newIter()
-				for {
-					entry := iter.next()
-					if entry == nil {
-						break
-					}
-					if !f(entry.key) {
-						break
-					}
-				}
-			},
+	sr := &setRecord{
+		o:      o,
+		size:   intSize,
+		keysFn: keysFn,
+	}
+
+	if setObj, ok := o.self.(*setObject); ok && has == r.global.setHas {
+		sr.has = setObj.m.has
+	} else {
+		sr.has = func(v Value) bool {
+			return nilSafe(hasFn(FunctionCall{This: o, Arguments: []Value{v}})).ToBoolean()
 		}
 	}
 
-	return &setRecord{
-		o:    o,
-		size: intSize,
-		has: func(v Value) bool {
-			return nilSafe(hasFn(FunctionCall{This: o, Arguments: []Value{v}})).ToBoolean()
-		},
-		iterateKeys: func(f func(Value) bool) {
-			r.forOfMethod(o, keysFn, f)
-		},
-	}
+	return sr
 }
 
 func (r *Runtime) createSetProto(val *Object) objectImpl {
@@ -603,11 +580,11 @@ func (r *Runtime) createSetProto(val *Object) objectImpl {
 	o._putProp("symmetricDifference", r.newNativeFunc(r.setProto_symmetricDifference, "symmetricDifference", 1), true, false, true)
 	o._putProp("union", r.newNativeFunc(r.setProto_union, "union", 1), true, false, true)
 
-	r.global.setValues = r.newNativeFunc(r.setProto_values, "values", 0)
-	o._putProp("values", r.global.setValues, true, false, true)
-	o._putProp("keys", r.global.setValues, true, false, true)
+	setValues := r.newNativeFunc(r.setProto_values, "values", 0)
+	o._putProp("values", setValues, true, false, true)
+	o._putProp("keys", setValues, true, false, true)
 	o._putProp("entries", r.newNativeFunc(r.setProto_entries, "entries", 0), true, false, true)
-	o._putSym(SymIterator, valueProp(r.global.setValues, true, false, true))
+	o._putSym(SymIterator, valueProp(setValues, true, false, true))
 	o._putSym(SymToStringTag, valueProp(asciiString(classSet), false, false, true))
 
 	return o
@@ -622,8 +599,12 @@ func (r *Runtime) createSet(val *Object) objectImpl {
 
 func (r *Runtime) createSetIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
-
-	o._putProp("next", r.newNativeFunc(r.setIterProto_next, "next", 0), true, false, true)
+	o._putProp("next", r.newIteratorNextFunc(r.setIterProto_next, 0, func(iterator *Object) func(Value) (Value, bool) {
+		if i, ok := iterator.self.(*setIterObject); ok {
+			return i.nextResult
+		}
+		return nil
+	}), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classSetIterator), false, false, true))
 
 	return o

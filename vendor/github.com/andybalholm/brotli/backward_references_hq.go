@@ -305,8 +305,10 @@ func computeMinimumCopyLength(start_cost float32, nodes []zopfliNode, num_bytes 
 	return uint(len)
 }
 
-/* REQUIRES: nodes[pos].cost < kInfinity
-   REQUIRES: nodes[0..pos] satisfies that "ZopfliNode array invariant". */
+/*
+REQUIRES: nodes[pos].cost < kInfinity
+REQUIRES: nodes[0..pos] satisfies that "ZopfliNode array invariant".
+*/
 func computeDistanceShortcut(block_start uint, pos uint, max_backward_limit uint, gap uint, nodes []zopfliNode) uint32 {
 	var clen uint = uint(zopfliNodeCopyLength(&nodes[pos]))
 	var ilen uint = uint(nodes[pos].dcode_insert_length & 0x7FFFFFF)
@@ -326,13 +328,15 @@ func computeDistanceShortcut(block_start uint, pos uint, max_backward_limit uint
 	}
 }
 
-/* Fills in dist_cache[0..3] with the last four distances (as defined by
-   Section 4. of the Spec) that would be used at (block_start + pos) if we
-   used the shortest path of commands from block_start, computed from
-   nodes[0..pos]. The last four distances at block_start are in
-   starting_dist_cache[0..3].
-   REQUIRES: nodes[pos].cost < kInfinity
-   REQUIRES: nodes[0..pos] satisfies that "ZopfliNode array invariant". */
+/*
+Fills in dist_cache[0..3] with the last four distances (as defined by
+Section 4. of the Spec) that would be used at (block_start + pos) if we
+used the shortest path of commands from block_start, computed from
+nodes[0..pos]. The last four distances at block_start are in
+starting_dist_cache[0..3].
+REQUIRES: nodes[pos].cost < kInfinity
+REQUIRES: nodes[0..pos] satisfies that "ZopfliNode array invariant".
+*/
 func computeDistanceCache(pos uint, starting_dist_cache []int, nodes []zopfliNode, dist_cache []int) {
 	var idx int = 0
 	var p uint = uint(nodes[pos].u.shortcut)
@@ -353,8 +357,10 @@ func computeDistanceCache(pos uint, starting_dist_cache []int, nodes []zopfliNod
 	}
 }
 
-/* Maintains "ZopfliNode array invariant" and pushes node to the queue, if it
-   is eligible. */
+/*
+Maintains "ZopfliNode array invariant" and pushes node to the queue, if it
+is eligible.
+*/
 func evaluateNode(block_start uint, pos uint, max_backward_limit uint, gap uint, starting_dist_cache []int, model *zopfliCostModel, queue *startPosQueue, nodes []zopfliNode) {
 	/* Save cost, because ComputeDistanceCache invalidates it. */
 	var node_cost float32 = nodes[pos].u.cost
@@ -606,21 +612,24 @@ func zopfliIterate(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_
 	return computeShortestPathFromNodes(num_bytes, nodes)
 }
 
-/* Computes the shortest path of commands from position to at most
-   position + num_bytes.
+/*
+Computes the shortest path of commands from position to at most
 
-   On return, path->size() is the number of commands found and path[i] is the
-   length of the i-th command (copy length plus insert length).
-   Note that the sum of the lengths of all commands can be less than num_bytes.
+	position + num_bytes.
 
-   On return, the nodes[0..num_bytes] array will have the following
-   "ZopfliNode array invariant":
-   For each i in [1..num_bytes], if nodes[i].cost < kInfinity, then
-     (1) nodes[i].copy_length() >= 2
-     (2) nodes[i].command_length() <= i and
-     (3) nodes[i - nodes[i].command_length()].cost < kInfinity
+	On return, path->size() is the number of commands found and path[i] is the
+	length of the i-th command (copy length plus insert length).
+	Note that the sum of the lengths of all commands can be less than num_bytes.
 
- REQUIRES: nodes != nil and len(nodes) >= num_bytes + 1 */
+	On return, the nodes[0..num_bytes] array will have the following
+	"ZopfliNode array invariant":
+	For each i in [1..num_bytes], if nodes[i].cost < kInfinity, then
+	  (1) nodes[i].copy_length() >= 2
+	  (2) nodes[i].command_length() <= i and
+	  (3) nodes[i - nodes[i].command_length()].cost < kInfinity
+
+REQUIRES: nodes != nil and len(nodes) >= num_bytes + 1
+*/
 func zopfliComputeShortestPath(num_bytes uint, position uint, ringbuffer []byte, ringbuffer_mask uint, params *encoderParams, dist_cache []int, hasher *h10, nodes []zopfliNode) uint {
 	var max_backward_limit uint = maxBackwardLimit(params.lgwin)
 	var max_zopfli_len uint = maxZopfliLen(params)
@@ -717,7 +726,6 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 		var max_length uint = num_bytes - i
 		var num_found_matches uint
 		var cur_match_end uint
-		var j uint
 
 		/* Ensure that we have enough free slots. */
 		if matches_size < cur_match_pos+maxNumMatchesH10+shadow_matches {
@@ -741,9 +749,6 @@ func createHqZopfliBackwardReferences(num_bytes uint, position uint, ringbuffer 
 
 		num_found_matches = findAllMatchesH10(hasher.(*h10), &params.dictionary, ringbuffer, ringbuffer_mask, pos, max_length, max_distance, gap, params, matches[cur_match_pos+shadow_matches:])
 		cur_match_end = cur_match_pos + num_found_matches
-		for j = cur_match_pos; j+1 < cur_match_end; j++ {
-			assert(backwardMatchLength(&matches[j]) <= backwardMatchLength(&matches[j+1]))
-		}
 
 		num_matches[i] = uint32(num_found_matches)
 		if num_found_matches > 0 {

@@ -10,7 +10,6 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/tests/ws"
 
 	"github.com/chromedp/cdproto"
-	"github.com/chromedp/cdproto/cdp"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/target"
 	"github.com/go-json-experiment/json/jsontext"
@@ -97,8 +96,8 @@ func TestSessionCreateSession(t *testing.T) {
 			})
 
 			if assert.NoError(t, err) {
-				action := cdppage.Enable()
-				err := action.Do(cdp.WithExecutor(ctx, session))
+				action := newCommand(cdppage.Enable, cdppage.EnableParams{})
+				err := action.Do(ctx, session)
 
 				require.NoError(t, err)
 				require.Equal(t, []cdproto.MethodType{

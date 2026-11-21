@@ -90,7 +90,7 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 
 		switch result {
 		case decoderResultSuccess:
-			if len(r.in) > 0 {
+			if len(r.in) > 0 || r.buffer_length > 0 {
 				return n, errExcessiveInput
 			}
 			return n, nil

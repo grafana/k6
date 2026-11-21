@@ -104,7 +104,7 @@ func (s *Session) readLoop() {
 	}
 }
 
-// Execute implements the cdp.Executor interface.
+// Execute implements the executor interface.
 func (s *Session) Execute(
 	ctx context.Context, method string, params, res any,
 ) error {
@@ -195,13 +195,13 @@ func (s *Session) ExecuteWithoutExpectationOnReply(
 		// If we don't specify a session (a session ID in the JSON message),
 		// it will be a message for the browser target.
 		//
-		// With a session specified (set using cdp.WithExecutor(ctx, session)),
+		// With a session specified,
 		// it will properly route the CDP message to the correct target
 		// (page, frame etc.).
 		//
 		// The difference between using Connection and Session to send
 		// and receive CDP messages basically, they both implement
-		// the cdp.Executor interface but one adds a sessionID to
+		// the executor interface but one adds a sessionID to
 		// the CPD messages:
 		SessionID: s.id,
 		Method:    cdproto.MethodType(method),

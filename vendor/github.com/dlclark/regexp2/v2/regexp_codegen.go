@@ -58,6 +58,7 @@ func newEngineRegexp(pattern string, c compileConfig, engine RuntimeEngineData) 
 		stringPrefixFilter: engine.StringPrefixFilter,
 		leftContextRunes:   leftContext,
 	}
+	re.initCaptureNames()
 	re.initCaches()
 	return re
 }

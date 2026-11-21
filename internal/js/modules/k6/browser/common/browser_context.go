@@ -194,8 +194,8 @@ func (b *BrowserContext) Browser() *Browser {
 func (b *BrowserContext) ClearPermissions() error {
 	b.logger.Debugf("BrowserContext:ClearPermissions", "bctxid:%v", b.id)
 
-	action := cdpbrowser.ResetPermissions().WithBrowserContextID(b.id)
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+	action := newCommand(cdpbrowser.ResetPermissions, cdpbrowser.ResetPermissionsParams{BrowserContextID: b.id})
+	if err := action.Do(b.ctx, b.browser.conn); err != nil {
 		return fmt.Errorf("clearing permissions: %w", err)
 	}
 
@@ -246,10 +246,13 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts GrantPermis
 	}
 
 	for _, d := range descriptors {
-		action := cdpbrowser.SetPermission(d, cdpbrowser.PermissionSettingGranted).
-			WithOrigin(opts.Origin).
-			WithBrowserContextID(b.id)
-		if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		action := newCommand(cdpbrowser.SetPermission, cdpbrowser.SetPermissionParams{
+			Permission:       d,
+			Setting:          cdpbrowser.PermissionSettingGranted,
+			Origin:           opts.Origin,
+			BrowserContextID: b.id,
+		})
+		if err := action.Do(b.ctx, b.browser.conn); err != nil {
 			return fmt.Errorf("granting browser permission %q: %w", d.Name, err)
 		}
 	}
@@ -478,10 +481,9 @@ func (b *BrowserContext) AddCookies(cookies []*Cookie) error {
 			return fmt.Errorf(msg, c)
 		}
 		// calculate the cookie expiration date, session cookie if not set.
-		var ts *cdp.TimeSinceEpoch
+		var ts cdp.TimeSinceEpoch
 		if c.Expires > 0 {
-			t := cdp.TimeSinceEpoch(time.Unix(c.Expires, 0))
-			ts = &t
+			ts = cdp.TimeSinceEpoch(c.Expires)
 		}
 		cookiesToSet = append(cookiesToSet, &network.CookieParam{
 			Name:     c.Name,
@@ -496,10 +498,9 @@ func (b *BrowserContext) AddCookies(cookies []*Cookie) error {
 		})
 	}
 
-	setCookies := storage.
-		SetCookies(cookiesToSet).
-		WithBrowserContextID(b.id)
-	if err := setCookies.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+	setCookies := newCommand(storage.
+		SetCookies, storage.SetCookiesParams{Cookies: cookiesToSet, BrowserContextID: b.id})
+	if err := setCookies.Do(b.ctx, b.browser.conn); err != nil {
 		return fmt.Errorf("cannot set cookies: %w", err)
 	}
 
@@ -510,10 +511,9 @@ func (b *BrowserContext) AddCookies(cookies []*Cookie) error {
 func (b *BrowserContext) ClearCookies() error {
 	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
 
-	clearCookies := storage.
-		ClearCookies().
-		WithBrowserContextID(b.id)
-	if err := clearCookies.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+	clearCookies := newCommand(storage.
+		ClearCookies, storage.ClearCookiesParams{BrowserContextID: b.id})
+	if err := clearCookies.Do(b.ctx, b.browser.conn); err != nil {
 		return fmt.Errorf("clearing cookies: %w", err)
 	}
 	return nil
@@ -528,12 +528,13 @@ func (b *BrowserContext) Cookies(urls ...string) ([]*Cookie, error) {
 	b.logger.Debugf("BrowserContext:Cookies", "bctxid:%v", b.id)
 
 	// get cookies from this browser context.
-	getCookies := storage.
-		GetCookies().
-		WithBrowserContextID(b.id)
-	networkCookies, err := getCookies.Do(
-		cdp.WithExecutor(b.ctx, b.browser.conn),
+	getCookies := newCommand(storage.
+		GetCookies, storage.GetCookiesParams{BrowserContextID: b.id})
+	result, err := getCookies.Result(
+		b.ctx, b.browser.conn,
 	)
+	networkCookies := result.Cookies
+
 	if err != nil {
 		return nil, fmt.Errorf("retrieving cookies: %w", err)
 	}

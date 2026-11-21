@@ -3,6 +3,7 @@ package sobek
 import "github.com/grafana/sobek/unistring"
 
 var (
+	SymAsyncIterator      = newSymbol(asciiString("Symbol.asyncIterator"))
 	SymHasInstance        = newSymbol(asciiString("Symbol.hasInstance"))
 	SymIsConcatSpreadable = newSymbol(asciiString("Symbol.isConcatSpreadable"))
 	SymIterator           = newSymbol(asciiString("Symbol.iterator"))
@@ -73,6 +74,12 @@ func (r *Runtime) symbol_for(call FunctionCall) Value {
 	return v
 }
 
+// isRegisteredSymbol reports whether s is in the GlobalSymbolRegistry, i.e. was created by Symbol.for().
+func (r *Runtime) isRegisteredSymbol(s *Symbol) bool {
+	// Symbol.for() uses the key as the description
+	return s.desc != nil && r.symbolRegistry[s.desc.string()] == s
+}
+
 func (r *Runtime) symbol_keyfor(call FunctionCall) Value {
 	arg := call.Argument(0)
 	sym, ok := arg.(*Symbol)
@@ -135,6 +142,7 @@ func (r *Runtime) createSymbol(val *Object) objectImpl {
 	o._putProp("keyFor", r.newNativeFunc(r.symbol_keyfor, "keyFor", 1), true, false, true)
 
 	for _, s := range []*Symbol{
+		SymAsyncIterator,
 		SymHasInstance,
 		SymIsConcatSpreadable,
 		SymIterator,

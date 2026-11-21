@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -50,8 +51,9 @@ type Browser struct {
 
 	// Needed as the targets map will be accessed from multiple Go routines,
 	// the main VU/JS go routine and the Go routine listening for CDP messages.
-	pagesMu sync.RWMutex
-	pages   map[target.ID]*Page
+	pagesMu   sync.RWMutex
+	pages     map[target.ID]*Page
+	pageOrder []target.ID
 
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
@@ -169,8 +171,8 @@ func (b *Browser) connect() error {
 func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	b.logger.Debugf("Browser:disposeContext", "bctxid:%v", id)
 
-	action := target.DisposeBrowserContext(id)
-	if err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
+	action := newCommand(target.DisposeBrowserContext, target.DisposeBrowserContextParams{BrowserContextID: id})
+	if err := action.Do(b.vuCtx, b.conn); err != nil {
 		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
 	b.contextMu.Lock()
@@ -197,8 +199,8 @@ func (b *Browser) getPages() []*Page {
 	b.pagesMu.RLock()
 	defer b.pagesMu.RUnlock()
 	pages := make([]*Page, 0, len(b.pages))
-	for _, p := range b.pages {
-		pages = append(pages, p)
+	for _, id := range b.pageOrder {
+		pages = append(pages, b.pages[id])
 	}
 	return pages
 }
@@ -247,16 +249,22 @@ func (b *Browser) initEvents() error {
 		}
 	}()
 
-	action := target.SetAutoAttach(true, true).WithFlatten(true)
-	if err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
+	action := newCommand(target.SetAutoAttach,
+		target.SetAutoAttachParams{
+			AutoAttach:             true,
+			WaitForDebuggerOnStart: true,
+			Flatten:                new(true),
+		})
+	if err := action.Do(b.vuCtx, b.conn); err != nil {
 		return fmt.Errorf("internal error while auto-attaching to browser pages: %w", err)
 	}
 
 	// Target.setAutoAttach has a bug where it does not wait for new Targets being attached.
 	// However making a dummy call afterwards fixes this.
 	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
-	action2 := target.GetTargetInfo()
-	if _, err := action2.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
+	action2 := newCommand(target.GetTargetInfo, target.GetTargetInfoParams{})
+	_, err := action2.Result(b.vuCtx, b.conn)
+	if err != nil {
 		return fmt.Errorf("internal error while getting browser target info: %w", err)
 	}
 
@@ -380,6 +388,9 @@ func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) error
 			"sid:%v tid:%v pageType:%s",
 			ev.SessionID, targetPage.TargetID, targetPage.Type,
 		)
+		if _, exists := b.pages[targetPage.TargetID]; !exists {
+			b.pageOrder = append(b.pageOrder, targetPage.TargetID)
+		}
 		b.pages[targetPage.TargetID] = p
 
 		return nil
@@ -495,6 +506,9 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 		b.logger.Debugf("Browser:onDetachedFromTarget:deletePage", "sid:%v tid:%v", ev.SessionID, targetID)
 
 		delete(b.pages, targetID)
+		if i := slices.Index(b.pageOrder, targetID); i >= 0 {
+			b.pageOrder = slices.Delete(b.pageOrder, i, i+1)
+		}
 		t.didClose()
 	}
 }
@@ -529,8 +543,10 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	defer removeEventHandler()
 
 	// create a new page.
-	action := target.CreateTarget(BlankPage).WithNewWindow(true).WithBrowserContextID(id)
-	tid, err := action.Do(cdp.WithExecutor(ctx, b.conn))
+	action := newCommand(target.CreateTarget,
+		target.CreateTargetParams{URL: BlankPage, NewWindow: new(true), BrowserContextID: id})
+	result, err := action.Result(ctx, b.conn)
+	tid := result.TargetID
 	if err != nil {
 		return nil, fmt.Errorf("creating a new blank page: %w", err)
 	}
@@ -614,7 +630,7 @@ func (b *Browser) Close() {
 		//    thinks it's open.
 		toCtx, toCancelCtx := context.WithTimeout(b.browserCtx, time.Second*10)
 		defer toCancelCtx()
-		err := cdpbrowser.Close().Do(cdp.WithExecutor(toCtx, b.conn))
+		err := newCommand(cdpbrowser.Close, cdp.Empty{}).Do(toCtx, b.conn)
 		if err != nil && !errors.As(err, &closeErr) {
 			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
@@ -720,14 +736,15 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 		return nil, spanRecordError(span, err)
 	}
 
-	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
+	action := newCommand(target.CreateBrowserContext, target.CreateBrowserContextParams{DisposeOnDetach: new(true)})
 	if opts.Proxy != nil {
-		action = action.WithProxyServer(strings.TrimSpace(opts.Proxy.Server))
+		action.params.ProxyServer = strings.TrimSpace(opts.Proxy.Server)
 		if bypass := strings.TrimSpace(opts.Proxy.Bypass); bypass != "" {
-			action = action.WithProxyBypassList(bypass)
+			action.params.ProxyBypassList = bypass
 		}
 	}
-	browserContextID, err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn))
+	result, err := action.Result(b.vuCtx, b.conn)
+	browserContextID := result.BrowserContextID
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
 		return nil, spanRecordErrorf(span, "creating browser context ID %s: %w", browserContextID, err)
@@ -800,9 +817,14 @@ func (b *Browser) fetchVersion() (browserVersion, error) {
 		bv  browserVersion
 		err error
 	)
-	bv.protocolVersion, bv.product, bv.revision, bv.userAgent, bv.jsVersion, err = cdpbrowser.
-		GetVersion().
-		Do(cdp.WithExecutor(b.vuCtx, b.conn))
+	result, err := newCommand(cdpbrowser.GetVersion, cdp.Empty{}).
+		Result(b.vuCtx, b.conn)
+	bv.protocolVersion = result.ProtocolVersion
+	bv.product = result.Product
+	bv.revision = result.Revision
+	bv.userAgent = result.UserAgent
+	bv.jsVersion = result.JsVersion
+
 	if err != nil {
 		return browserVersion{}, fmt.Errorf("getting browser version information: %w", err)
 	}
