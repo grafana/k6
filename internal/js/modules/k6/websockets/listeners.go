@@ -2,6 +2,7 @@ package websockets
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/v2/internal/js/modules/k6/websockets/events"
@@ -55,23 +56,23 @@ func newListener(eventType string) *eventListener {
 
 // add adds a listener to the listener list
 func (l *eventListener) add(entry listenerEntry) {
-	l.list = append(l.list, entry)
-}
-
-// remove removes all listeners matching the provided JavaScript value
-func (l *eventListener) remove(target sobek.Value) {
-	if len(l.list) == 0 {
-		return
-	}
-
-	newList := make([]listenerEntry, 0, len(l.list))
-	for _, entry := range l.list {
-		if !entry.val.SameAs(target) {
-			newList = append(newList, entry)
+	for _, existing := range l.list {
+		if existing.val.SameAs(entry.val) {
+			return
 		}
 	}
 
-	l.list = newList
+	l.list = append(l.list, entry)
+}
+
+// remove removes the listener matching the provided JavaScript value.
+func (l *eventListener) remove(target sobek.Value) {
+	for i, entry := range l.list {
+		if entry.val.SameAs(target) {
+			l.list = slices.Delete(l.list, i, i+1)
+			return
+		}
+	}
 }
 
 // setOn sets a listener for the on* properties, like onopen, onmessage, etc.

@@ -1856,9 +1856,42 @@ func TestRemoveEventListenerRegisteredTwice(t *testing.T) {
 	require.NoError(t, err)
 
 	recorded := ts.callRecorder.Recorded()
-	// This documents current behaviour without dedup.
-	// A single removeEventListener call removes all matching entries, regardless
-	// of how many times the same handler was registered using addEventListener
+	// Duplicate registrations are ignored, so one removal removes the listener.
 	assert.NotContains(t, recorded, "removed-handler-called")
 	assert.Contains(t, recorded, "kept-handler-count:1")
+}
+
+func TestEventListenerDeduplication(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		var pongCount = 0
+		function handler(event) {
+			call(event.type)
+		}
+
+		ws.addEventListener("pong", handler)
+		ws.addEventListener("pong", handler)
+		ws.addEventListener("close", handler)
+		ws.addEventListener("pong", () => {
+			pongCount++
+			if (pongCount === 1) {
+				ws.removeEventListener("pong", handler)
+				ws.removeEventListener("pong", handler)
+				ws.ping()
+			} else if (pongCount === 2) {
+				ws.addEventListener("pong", handler)
+				ws.addEventListener("pong", handler)
+				ws.ping()
+			} else {
+				ws.close()
+			}
+		})
+		ws.addEventListener("open", () => ws.ping())
+	`))
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"pong", "pong", "close"}, ts.callRecorder.Recorded())
 }
