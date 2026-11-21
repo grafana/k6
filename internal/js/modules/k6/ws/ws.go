@@ -23,6 +23,7 @@ import (
 	"go.k6.io/k6/v2/js/modules"
 	httpModule "go.k6.io/k6/v2/js/modules/k6/http"
 	"go.k6.io/k6/v2/lib"
+	"go.k6.io/k6/v2/lib/netext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -259,7 +260,7 @@ func (mi *WS) dial(
 		// Pass a custom net.DialContext function to websocket.Dialer that will substitute
 		// the underlying net.Conn with our own tracked netext.Conn
 		NetDialContext:    state.Dialer.DialContext,
-		Proxy:             http.ProxyFromEnvironment,
+		Proxy:             netext.ProxyFromEnvironmentURLOnly(state.Dialer),
 		TLSClientConfig:   tlsConfig,
 		EnableCompression: args.enableCompression,
 	}

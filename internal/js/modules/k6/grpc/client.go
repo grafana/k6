@@ -240,7 +240,7 @@ func buildTLSConfigFromMap(
 func buildTLSConfigForConnect(parent *tls.Config, tlsMap map[string]any, state *lib.State) (*tls.Config, error) {
 	var aiaFetcher *netext.AIAFetcher
 	if state.Options.TLSAIAFetch.Bool {
-		aiaFetcher = netext.NewAIAFetcher(state.Dialer.DialContext)
+		aiaFetcher = netext.NewAIAFetcherFromDialer(state.Dialer)
 	}
 	return buildTLSConfigFromMap(parent, tlsMap, aiaFetcher, state.Options.InsecureSkipTLSVerify.Bool, state.Logger)
 }

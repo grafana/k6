@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"golang.org/x/net/idna"
 )
 
 // NullHostnameTrie is a nullable HostnameTrie, in the same vein as the nullable types provided by
@@ -134,6 +136,12 @@ func (t *HostnameTrie) insert(s string) error {
 // Contains returns whether s matches a pattern in the HostnameTrie
 // along with the matching pattern, if one was found.
 func (t *HostnameTrie) Contains(s string) (matchedPattern string, matchFound bool) {
-	s = strings.ToLower(s)
+	s = strings.TrimSuffix(s, ".")
+	if ascii, err := idna.Lookup.ToASCII(s); err == nil && ascii != "" {
+		s = ascii
+	} else {
+		s = strings.ToLower(s)
+	}
+	s = strings.TrimSuffix(s, ".")
 	return t.contains(s)
 }

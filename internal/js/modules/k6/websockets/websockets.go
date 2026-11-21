@@ -21,6 +21,7 @@ import (
 
 	"go.k6.io/k6/v2/js/common"
 	"go.k6.io/k6/v2/js/modules"
+	"go.k6.io/k6/v2/lib/netext"
 	"go.k6.io/k6/v2/metrics"
 )
 
@@ -415,7 +416,7 @@ func (w *webSocket) dial(ctx context.Context, params *wsParams) (*websocket.Conn
 
 			return conn, nil
 		},
-		Proxy:             http.ProxyFromEnvironment,
+		Proxy:             netext.ProxyFromEnvironmentURLOnly(state.Dialer),
 		TLSClientConfig:   tlsConfig,
 		EnableCompression: params.enableCompression,
 		Subprotocols:      params.subprocotols,
