@@ -184,6 +184,7 @@ func (r *Reader) Reset(reader io.Reader) {
 	r.j = 0
 	r.blockStart = 0
 	r.readHeader = r.ignoreStreamID
+	r.snappyFrame = false
 }
 
 func (r *Reader) readFull(p []byte, allowEOF bool) (ok bool) {
@@ -206,12 +207,20 @@ func (r *Reader) skippable(tmp []byte, n int, allowEOF bool, id uint8) (ok bool)
 		return false
 	}
 	if fn := r.skippableCB[id-0x80]; fn != nil {
-		rd := io.LimitReader(r.r, int64(n))
+		rd := &io.LimitedReader{R: r.r, N: int64(n)}
 		r.err = fn(rd)
+		if r.err == io.EOF && rd.N > 0 {
+			// The stream ended inside the chunk.
+			r.err = ErrCorrupt
+		}
 		if r.err != nil {
 			return false
 		}
 		_, r.err = io.CopyBuffer(io.Discard, rd, tmp)
+		if r.err == nil && rd.N > 0 {
+			// The stream ended inside the chunk.
+			r.err = ErrCorrupt
+		}
 		return r.err == nil
 	}
 	if rs, ok := r.r.(io.ReadSeeker); ok {
@@ -751,8 +760,8 @@ func (r *Reader) Skip(n int64) error {
 					r.err = err
 					return r.err
 				}
-				if crc(r.decoded[:dLen]) != checksum {
-					r.err = ErrCorrupt
+				if !r.ignoreCRC && crc(r.decoded[:dLen]) != checksum {
+					r.err = ErrCRC
 					return r.err
 				}
 			} else {
@@ -771,7 +780,7 @@ func (r *Reader) Skip(n int64) error {
 				return r.err
 			}
 			if !r.ensureBufferSize(chunkLen) {
-				if r.err != nil {
+				if r.err == nil {
 					r.err = ErrUnsupported
 				}
 				return r.err
@@ -793,11 +802,9 @@ func (r *Reader) Skip(n int64) error {
 			if !r.readFull(r.decoded[:n2], false) {
 				return r.err
 			}
-			if int64(n2) < n {
-				if crc(r.decoded[:n2]) != checksum {
-					r.err = ErrCorrupt
-					return r.err
-				}
+			if !r.ignoreCRC && crc(r.decoded[:n2]) != checksum {
+				r.err = ErrCRC
+				return r.err
 			}
 			r.i, r.j = 0, n2
 			continue
@@ -816,6 +823,8 @@ func (r *Reader) Skip(n int64) error {
 					return r.err
 				}
 			}
+
+			r.snappyFrame = string(r.buf[:len(magicBody)]) == magicBodySnappy
 
 			continue
 		}

@@ -5,11 +5,13 @@
 package zstd
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"io"
 	"maps"
+	"math"
 	"sync"
 	"sync/atomic"
 
@@ -206,6 +208,10 @@ func (d *Decoder) Reset(r io.Reader) error {
 
 		dst, err := d.DecodeAll(b, dst)
 		if !errors.Is(err, ErrDecoderSizeExceeded) {
+			// Consume the input, as streaming from the buffer would.
+			if buf, ok := r.(*bytes.Buffer); ok {
+				buf.Next(len(b))
+			}
 			if err == nil {
 				err = io.EOF
 			}
@@ -365,8 +371,12 @@ func (d *Decoder) DecodeAll(input, dst []byte) ([]byte, error) {
 		if debugDecoder {
 			printf("re-adding decoder: %p", block)
 		}
+		block.data = nil
 		frame.rawInput = nil
 		frame.bBuf = nil
+		frame.history.b = nil
+		frame.history.decoders.literals = nil
+		frame.history.decoders.out = nil
 		if frame.history.decoders.br != nil {
 			frame.history.decoders.br.in = nil
 			frame.history.decoders.br.cursor = 0
@@ -410,8 +420,12 @@ func (d *Decoder) DecodeAll(input, dst []byte) ([]byte, error) {
 				}
 				return dst, ErrDecoderSizeExceeded
 			}
-			if cap(dst)-len(dst) < int(frame.FrameContentSize) {
-				dst2 := make([]byte, len(dst), len(dst)+int(frame.FrameContentSize)+compressedBlockOverAlloc)
+			// The content size is only checked once the frame is decoded, so
+			// allocate no more than the rest of the input can decode to (each
+			// block is at least 4 bytes) and only what fits in an int.
+			size := min(frame.FrameContentSize, uint64(len(frame.bBuf))*(maxCompressedBlockSize/4))
+			if size <= math.MaxInt-compressedBlockOverAlloc-uint64(len(dst)) && cap(dst)-len(dst) < int(size) {
+				dst2 := make([]byte, len(dst), len(dst)+int(size)+compressedBlockOverAlloc)
 				copy(dst2, dst)
 				dst = dst2
 			}
@@ -820,7 +834,10 @@ func (d *Decoder) startStreamDecoder(ctx context.Context, r io.Reader, output ch
 				if debugDecoder && hasErr {
 					println("executeSequences returned:", do.err)
 				}
-				do.b = block.dst
+				// On error, block.dst still holds this block decoder's previous output.
+				if !hasErr {
+					do.b = block.dst
+				}
 			}
 			if !hasErr {
 				decodedFrame += uint64(len(do.b))

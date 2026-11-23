@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/bits"
+	"slices"
 )
 
 const (
@@ -657,6 +659,49 @@ func (s *fseEncoder) approxSize(hist []uint32) uint32 {
 		cost += v * bitCost
 	}
 	return cost >> kAccuracyLog
+}
+
+// minNewSize returns a lower bound in bits for coding hist, which sums
+// to total, with a new table: its entropy, the header and the smallest
+// final state flush.
+func minNewSize(hist []uint32, total int) uint32 {
+	lt := log2Fix8(uint32(total))
+	var sum uint32
+	// writeCount writes 4 bits of table log, then each count in at least
+	// log2(remaining) bits, and every later non-zero count leaves at least
+	// one in remaining. A zero count is followed by 2 bits per 3 more zeros, plus 2.
+	hdr := uint32(4)
+	nnz, zeros := uint32(0), uint32(0)
+	for i, c := range slices.Backward(hist) {
+		if c == 0 {
+			zeros++
+			continue
+		}
+		if zeros > 0 {
+			hdr += highBit(nnz+1) + 2 + 2*((zeros-1)/3)
+			zeros = 0
+		}
+		nnz++
+		if i > 0 {
+			hdr += highBit(nnz + 1)
+		}
+		sum += c * (lt - log2Fix8(c))
+	}
+	if zeros > 0 {
+		hdr += 2 + 2*((zeros-1)/3)
+	}
+	// The first count is written with tableLog bits.
+	hdr += minEncTablelog
+	// log2Fix8 is up to 0.09 bits low, which can raise each cost by as much.
+	sum -= min(sum, uint32(total)*24)
+	return sum>>8 + (hdr+7)&^7 + minEncTablelog
+}
+
+// log2Fix8 returns log2(v) in 8.8 fixed point for v > 0.
+// The fraction is interpolated linearly, so it is at most 0.09 low.
+func log2Fix8(v uint32) uint32 {
+	k := uint32(bits.Len32(v)) - 1
+	return k<<8 | (v<<(31-k))>>23&255
 }
 
 // maxHeaderSize returns the maximum header size in bits.

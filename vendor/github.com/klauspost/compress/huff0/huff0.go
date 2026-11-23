@@ -332,6 +332,76 @@ func (s *Scratch) minSize(total int) int {
 	return int(nbBits) >> 3
 }
 
+// minNewSize returns a lower bound for the size of the input, of length
+// total, with a new table: its entropy and the smallest table header.
+func (s *Scratch) minNewSize(total int) int {
+	lo, _ := log2Bounds(uint32(total))
+	nbBits := int64(total) * int64(lo)
+	nonZero := -1
+	for _, v := range s.count[:s.symbolLen] {
+		if v > 0 {
+			_, hi := log2Bounds(v)
+			nbBits -= int64(v) * int64(hi)
+			nonZero++
+		}
+	}
+	return int(max(nbBits, 0)>>16+7)>>3 + s.minTableSize(nonZero)
+}
+
+// minTableSize returns a lower bound for the size of any table that
+// cTable.write can produce for the histogram, with nonZero of the stored
+// symbols present.
+func (s *Scratch) minTableSize(nonZero int) int {
+	// The weights of all symbols but the last are stored,
+	// as 4 bits each or with FSE if that is smaller.
+	n := int(s.symbolLen) - 1
+	raw := 1 + (n+1)/2
+	if n < 2 {
+		return raw
+	}
+	zeros := n - nonZero
+	// FSE, with a table log of 5 or 6, writes at least 2 bytes of counts.
+	// A weight with c of the 1<<tableLog states then takes at least
+	// tableLog-bits.Len(c-1) bits, except the 2 coded first, which the 2
+	// final states of tableLog bits make up for. Counting all non-zero
+	// weights as one, take the cheapest split of the states.
+	minBits := 0
+	if zeros > 0 {
+		minBits = math.MaxInt
+		for tl := 5; tl <= 6; tl++ {
+			for c0 := 1; c0 < 1<<tl; c0 = 1<<bits.Len(uint(c0-1)) + 1 {
+				b := zeros*(tl-bits.Len(uint(c0-1))) + nonZero*(tl-bits.Len(uint(1<<tl-c0-1)))
+				minBits = min(minBits, b)
+			}
+		}
+	}
+	// One more bit for the end mark.
+	return 1 + min(raw-1, 2+(minBits+1+7)/8)
+}
+
+// log2Tab[i] is log2(1+i/256) in 16.16 fixed point, rounded.
+var log2Tab = func() (t [257]int32) {
+	for i := range t {
+		t[i] = int32(math.Round(math.Log2(1+float64(i)/256) * (1 << 16)))
+	}
+	return t
+}()
+
+// log2Bounds returns lower and upper bounds for log2(v), v > 0,
+// in 16.16 fixed point.
+func log2Bounds(v uint32) (lo, hi int32) {
+	// Scale v to m in [256, 512). If no bits are lost, the table is exact
+	// but for rounding, otherwise log2(v) is between those of m and m+1.
+	k := bits.Len32(v) - 9
+	e := int32(8+k) << 16
+	if k <= 0 {
+		t := log2Tab[v<<-k-256]
+		return e + t - 1, e + t + 1
+	}
+	m := v>>k - 256
+	return e + log2Tab[m] - 1, e + log2Tab[m+1] + 1
+}
+
 func highBit32(val uint32) (n uint32) {
 	return uint32(bits.Len32(val) - 1)
 }
