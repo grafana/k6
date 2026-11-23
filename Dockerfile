@@ -9,6 +9,10 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
 # Runtime stage
 FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf as release
 
+# The pinned base image ships zlib 1.3.2-r1 (CVE-2026-4738, fixed in 1.4-r0).
+# Remove once the base image includes the fix.
+RUN apk upgrade --no-cache zlib
+
 RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
 
