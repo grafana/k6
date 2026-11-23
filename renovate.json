@@ -71,7 +71,7 @@
     {
       "description": "k6 dockerfiles",
       "matchManagers": [
-        "docker"
+        "dockerfile"
       ],
       "matchFileNames": [
         "!packaging/**"
@@ -83,7 +83,7 @@
     {
       "description": "Dockerfiles packaging tool",
       "matchManagers": [
-        "docker"
+        "dockerfile"
       ],
       "matchFileNames": [
         "packaging/**"
