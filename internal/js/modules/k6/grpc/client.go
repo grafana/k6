@@ -325,7 +325,12 @@ func (c *Client) HealthCheck(svc *string) (*grpcext.HealthCheckResponse, error) 
 	if svc != nil {
 		service = *svc
 	}
-	return c.conn.HealthCheck(c.vu.Context(), service)
+	state := c.vu.State()
+	if state == nil {
+		return nil, common.NewInitContextError("health checks can't be performed in the init context")
+	}
+	tagsAndMeta := state.Tags.GetCurrentValues()
+	return c.conn.HealthCheck(c.vu.Context(), service, &tagsAndMeta)
 }
 
 // Invoke creates and calls a unary RPC by fully qualified method name

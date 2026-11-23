@@ -275,13 +275,32 @@ func TestRPCTracing(t *testing.T) {
 		assert.False(t, hasTraceID, "the samples aren't linked to a trace that isn't exported")
 	})
 
+	t.Run("health check span", func(t *testing.T) {
+		t.Parallel()
+		srv := newTracingServer(t)
+		f := newGRPCTracingFixture(t, srv.addr, true)
+
+		tagsAndMeta := f.state.Tags.GetCurrentValues()
+		_, err := f.conn.HealthCheck(f.ctx, "", &tagsAndMeta)
+		require.NoError(t, err)
+
+		spans := f.rec.ByName("grpc.health.v1.Health/Check")
+		require.Len(t, spans, 1)
+		assert.Equal(t, f.parent.SpanContext().SpanID(), spans[0].Parent().SpanID())
+		assert.Equal(t, "OK", spanAttrs(spans[0])["rpc.response.status_code"])
+		assert.Equal(t, [][]string{{traceparentOf(spans[0])}}, srv.received())
+		traceID, _ := f.traceIDMetadata(t)
+		assert.Equal(t, spans[0].SpanContext().TraceID().String(), traceID,
+			"the samples link to the trace")
+	})
+
 	t.Run("k6 RPCs aren't traced", func(t *testing.T) {
 		t.Parallel()
 		srv := newTracingServer(t)
 		f := newGRPCTracingFixture(t, srv.addr, true)
 
-		_, err := f.conn.HealthCheck(f.ctx, "")
-		require.NoError(t, err)
+		// The server doesn't implement reflection, only the RPC matters here.
+		_, _ = f.conn.Reflect(f.ctx)
 
 		assert.Empty(t, f.rec.Ended())
 		assert.Equal(t, [][]string{nil}, srv.received())

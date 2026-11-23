@@ -116,7 +116,10 @@ func (c *Conn) Reflect(ctx context.Context) (*descriptorpb.FileDescriptorSet, er
 }
 
 // HealthCheck executes a unary gRPC healthcheck Check call.
-func (c *Conn) HealthCheck(ctx context.Context, svc string) (*HealthCheckResponse, error) {
+func (c *Conn) HealthCheck(
+	ctx context.Context, svc string, tagsAndMeta *metrics.TagsAndMeta,
+) (*HealthCheckResponse, error) {
+	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: tagsAndMeta, addr: c.addr})
 	healthClient := healthpb.NewHealthClient(c.raw)
 	res, err := healthClient.Check(ctx, &healthpb.HealthCheckRequest{Service: svc})
 	if err != nil {
