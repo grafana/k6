@@ -138,6 +138,11 @@ type recordingSpan struct {
 	attributes        []attribute.KeyValue
 	droppedAttributes int
 	logDropAttrsOnce  sync.Once
+	// attributesDirty indicates attributes may contain duplicate keys.
+	attributesDirty bool
+	// attributesShared indicates the attributes backing array has been exposed
+	// to a reader and must not be modified.
+	attributesShared bool
 
 	// events are stored in FIFO queue capped by configured limit.
 	events evictedQueue[Event]
@@ -251,6 +256,11 @@ func (s *recordingSpan) SetAttributes(attributes ...attribute.KeyValue) {
 		s.addDroppedAttr(len(attributes))
 		return
 	}
+	maxCap := len(s.attributes) + len(attributes)
+	if limit > 0 {
+		maxCap = min(maxCap, limit)
+	}
+	s.ensureAttrsWritable(maxCap)
 
 	// If adding these attributes could exceed the capacity of s perform a
 	// de-duplication and truncation while adding to avoid over allocation.
@@ -268,10 +278,27 @@ func (s *recordingSpan) SetAttributes(attributes ...attribute.KeyValue) {
 			s.addDroppedAttr(1)
 			continue
 		}
-		a = dedupAttr(a)
-		a = attrnorm.Truncate(s.tracer.provider.spanLimits.AttributeValueLengthLimit, a)
+		a = normAttr(
+			a,
+			s.tracer.provider.spanLimits.AttributeValueDepthLimit,
+			s.tracer.provider.spanLimits.AttributeValueLengthLimit,
+		)
 		s.attributes = append(s.attributes, a)
+		s.attributesDirty = true
 	}
+}
+
+// ensureAttrsWritable copies shared attributes into a backing array with at
+// least capacity. This method assumes s.mu.Lock is held by the caller.
+func (s *recordingSpan) ensureAttrsWritable(capacity int) {
+	if !s.attributesShared {
+		return
+	}
+	capacity = max(capacity, len(s.attributes))
+	attrs := make([]attribute.KeyValue, len(s.attributes), capacity)
+	copy(attrs, s.attributes)
+	s.attributes = attrs
+	s.attributesShared = false
 }
 
 // Declared as a var so tests can override.
@@ -329,8 +356,11 @@ func (s *recordingSpan) addOverCapAttrs(limit int, attrs []attribute.KeyValue) {
 
 		if idx, ok := exists[a.Key]; ok {
 			// Perform all updates before dropping, even when at capacity.
-			a = dedupAttr(a)
-			a = attrnorm.Truncate(s.tracer.provider.spanLimits.AttributeValueLengthLimit, a)
+			a = normAttr(
+				a,
+				s.tracer.provider.spanLimits.AttributeValueDepthLimit,
+				s.tracer.provider.spanLimits.AttributeValueLengthLimit,
+			)
 			s.attributes[idx] = a
 			continue
 		}
@@ -340,22 +370,27 @@ func (s *recordingSpan) addOverCapAttrs(limit int, attrs []attribute.KeyValue) {
 			// updates are checked and performed.
 			s.addDroppedAttr(1)
 		} else {
-			a = dedupAttr(a)
-			a = attrnorm.Truncate(s.tracer.provider.spanLimits.AttributeValueLengthLimit, a)
+			a = normAttr(
+				a,
+				s.tracer.provider.spanLimits.AttributeValueDepthLimit,
+				s.tracer.provider.spanLimits.AttributeValueLengthLimit,
+			)
 			s.attributes = append(s.attributes, a)
 			exists[a.Key] = len(s.attributes) - 1
 		}
 	}
 }
 
-func dedupAttr(attr attribute.KeyValue) attribute.KeyValue {
+func normAttr(attr attribute.KeyValue, depthLimit, lengthLimit int) attribute.KeyValue {
 	switch attr.Value.Type() {
 	case attribute.SLICE, attribute.MAP:
-		attr, _ = attrnorm.KeyValue(attr)
-		return attr
-	default:
-		return attr
+		if depthLimit < 0 {
+			attr, _ = attrnorm.KeyValueDedup(attr)
+		} else {
+			attr, _, _ = attrnorm.KeyValueDedupLimitDepth(attr, depthLimit)
+		}
 	}
+	return attrnorm.Truncate(lengthLimit, attr)
 }
 
 // End ends the span. This method does nothing if the span is already ended or
@@ -459,9 +494,7 @@ func (s *recordingSpan) RecordError(err error, opts ...trace.EventOption) {
 		return
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if !s.isRecording() {
+	if !s.IsRecording() {
 		return
 	}
 
@@ -477,7 +510,7 @@ func (s *recordingSpan) RecordError(err error, opts ...trace.EventOption) {
 		))
 	}
 
-	s.addEvent(semconv.ExceptionEventName, opts...)
+	s.AddEvent(semconv.ExceptionEventName, opts...)
 }
 
 func typeStr(i any) string {
@@ -516,7 +549,10 @@ func (s *recordingSpan) AddEvent(name string, o ...trace.EventOption) {
 // This method assumes s.mu.Lock is held by the caller.
 func (s *recordingSpan) addEvent(name string, o ...trace.EventOption) {
 	c := trace.NewEventConfig(o...)
-	attrs, _ := attrnorm.KeyValues(c.Attributes())
+	attrs, _, _ := attrnorm.KeyValuesDedupLimitDepth(
+		c.Attributes(),
+		s.tracer.provider.spanLimits.AttributeValueDepthLimit,
+	)
 	e := Event{Name: name, Attributes: attrs, Time: c.Timestamp()}
 
 	// Discard attributes over limit.
@@ -556,7 +592,7 @@ func (s *recordingSpan) Name() string {
 	return s.name
 }
 
-// Name returns the SpanContext of this span's parent span.
+// Parent returns the SpanContext of this span's parent span.
 func (s *recordingSpan) Parent() trace.SpanContext {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -592,6 +628,7 @@ func (s *recordingSpan) Attributes() []attribute.KeyValue {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.dedupeAttrs()
+	s.attributesShared = cap(s.attributes) > 0
 	return s.attributes
 }
 
@@ -599,6 +636,10 @@ func (s *recordingSpan) Attributes() []attribute.KeyValue {
 //
 // This method assumes s.mu.Lock is held by the caller.
 func (s *recordingSpan) dedupeAttrs() {
+	if !s.attributesDirty {
+		return
+	}
+	s.ensureAttrsWritable(len(s.attributes))
 	// Do not set a capacity when creating this map. Benchmark testing has
 	// showed this to only add unused memory allocations in general use.
 	exists := make(map[attribute.Key]int, len(s.attributes))
@@ -622,6 +663,7 @@ func (s *recordingSpan) dedupeAttrsFromRecord(record map[attribute.Key]int) {
 	}
 	clear(s.attributes[len(unique):]) // Erase unneeded elements to let GC collect objects.
 	s.attributes = unique
+	s.attributesDirty = false
 }
 
 // Links returns the links of this span.
@@ -690,7 +732,10 @@ func (s *recordingSpan) AddLink(link trace.Link) {
 		return
 	}
 
-	attrs, _ := attrnorm.KeyValues(link.Attributes)
+	attrs, _, _ := attrnorm.KeyValuesDedupLimitDepth(
+		link.Attributes,
+		s.tracer.provider.spanLimits.AttributeValueDepthLimit,
+	)
 	l := Link{SpanContext: link.SpanContext, Attributes: attrs}
 
 	// Discard attributes over limit.
@@ -765,6 +810,7 @@ func (s *recordingSpan) snapshot() ReadOnlySpan {
 	if len(s.attributes) > 0 {
 		s.dedupeAttrs()
 		sd.attributes = s.attributes
+		s.attributesShared = true
 	}
 	sd.droppedAttributeCount = s.droppedAttributes
 	if len(s.events.queue) > 0 {
