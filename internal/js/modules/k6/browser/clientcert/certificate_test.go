@@ -111,3 +111,19 @@ func TestLoadCertificate_Errors(t *testing.T) {
 		})
 	}
 }
+
+// Legacy PEM encryption can't always detect a wrong passphrase: about 1 in 256 wrong passphrases
+// passes the padding check and yields garbage, which then fails as a key parse error. Every wrong
+// passphrase must still be reported as a decryption failure.
+func TestLoadCertificate_WrongPassphraseUndetected(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	certPEM, keyPEM := chain.ClientPEM(t, "k6-client", tlstest.KeyECDSA)
+	encryptedKeyPEM := legacyEncrypt(t, keyPEM, "k6-test")
+
+	for i := range 2048 { // makes missing at least one undetected case vanishingly unlikely
+		_, err := LoadCertificate(certPEM, encryptedKeyPEM, fmt.Sprintf("wrong-%d", i))
+		require.ErrorContains(t, err, "decrypting private key")
+	}
+}
