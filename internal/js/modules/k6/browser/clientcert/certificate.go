@@ -35,8 +35,11 @@ func LoadCertificate(cert, key []byte, passphrase string) (tls.Certificate, erro
 	}}
 	c, err := auth.Certificate()
 	if err != nil {
-		// Key decryption errors come from crypto/x509; key pair errors come from crypto/tls.
-		if encrypted && strings.HasPrefix(err.Error(), "x509: ") {
+		// Key decryption errors come from crypto/x509. Legacy PEM encryption can't always detect a
+		// wrong passphrase, so the garbage it then yields fails later as a key parse error from
+		// crypto/tls; for an encrypted key, that also means decryption failed.
+		if encrypted && (strings.HasPrefix(err.Error(), "x509: ") ||
+			strings.HasPrefix(err.Error(), "tls: failed to parse private key")) {
 			return tls.Certificate{}, fmt.Errorf("decrypting private key: %w", err)
 		}
 		return tls.Certificate{}, err
