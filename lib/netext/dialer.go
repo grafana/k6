@@ -2,6 +2,7 @@ package netext
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -212,4 +213,14 @@ func (c *Conn) Write(b []byte) (int, error) {
 		atomic.AddInt64(c.BytesWritten, int64(n))
 	}
 	return n, err
+}
+
+// CloseWrite shuts down the writing side of the connection when the underlying connection
+// supports it, and returns errors.ErrUnsupported otherwise.
+func (c *Conn) CloseWrite() error {
+	cw, ok := c.Conn.(interface{ CloseWrite() error })
+	if !ok {
+		return errors.ErrUnsupported
+	}
+	return cw.CloseWrite()
 }
