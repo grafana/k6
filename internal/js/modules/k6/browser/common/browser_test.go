@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"sync"
 	"testing"
@@ -378,4 +379,19 @@ func (c fakeConn) Execute(
 	ctx context.Context, method string, params, res any,
 ) error {
 	return c.execute(ctx, method, params, res)
+}
+
+func TestBrowserNewContextClientCertificatesNotSupported(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	// The browser has no connection, so any CDP call would panic.
+	b := newBrowser(ctx, ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	opts := DefaultBrowserContextOptions()
+	opts.ClientCertificates = map[string][]tls.Certificate{"https://x.test": {{}}}
+
+	bctx, err := b.NewContext(opts)
+	require.EqualError(t, err, "clientCertificates is not supported yet")
+	require.Nil(t, bctx)
 }
