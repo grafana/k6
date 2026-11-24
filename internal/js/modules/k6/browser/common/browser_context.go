@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/cdproto/target"
 
+	"go.k6.io/k6/v2/internal/js/modules/k6/browser/clientcert"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common/js"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6error"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
@@ -81,6 +83,11 @@ type BrowserContext struct {
 
 	evaluateOnNewDocumentSources []string
 
+	// clientCertificateProxy presents the context's client certificates; nil without them.
+	clientCertificateProxy *clientcert.Proxy
+	// proxyCredentials hands httpCredentials to clientCertificateProxy; nil without it.
+	proxyCredentials *proxyCredentials
+
 	// DownloadsPath is the path where downloads will be stored.
 	DownloadsPath string
 }
@@ -107,12 +114,25 @@ func (b *BrowserContext) setDownloadsPath(path string) error {
 }
 
 // cleanup cleans up the resources associated with the browser context.
-func (b *BrowserContext) cleanup() error {
+func (b *BrowserContext) cleanup() (err error) {
+	defer func() { err = errors.Join(err, b.closeClientCertificateProxy()) }()
+
 	if err := os.RemoveAll(b.DownloadsPath); err != nil { //nolint:forbidigo
 		return fmt.Errorf("removing downloads path: %w", err)
 	}
 	b.DownloadsPath = ""
 
+	return nil
+}
+
+// closeClientCertificateProxy closes the client certificate proxy, if any.
+func (b *BrowserContext) closeClientCertificateProxy() error {
+	if b.clientCertificateProxy == nil {
+		return nil
+	}
+	if err := b.clientCertificateProxy.Close(); err != nil {
+		return fmt.Errorf("closing client certificate proxy: %w", err)
+	}
 	return nil
 }
 
@@ -203,7 +223,9 @@ func (b *BrowserContext) ClearPermissions() error {
 }
 
 // Close shuts down the browser context.
-func (b *BrowserContext) Close() error {
+func (b *BrowserContext) Close() (err error) {
+	defer func() { err = errors.Join(err, b.closeClientCertificateProxy()) }()
+
 	b.logger.Debugf("BrowserContext:Close", "bctxid:%v", b.id)
 
 	if b.id == "" {
@@ -324,6 +346,9 @@ func (b *BrowserContext) SetHTTPCredentials(hc Credentials) error {
 	b.logger.Debugf("BrowserContext:SetHTTPCredentials", "bctxid:%v", b.id)
 
 	b.opts.HTTPCredentials = hc
+	if b.proxyCredentials != nil {
+		b.proxyCredentials.set(hc)
+	}
 	for _, p := range b.browser.getPages() {
 		if err := p.updateHTTPCredentials(); err != nil {
 			return fmt.Errorf("setting HTTP credentials in target ID %s: %w", p.targetID, err)
