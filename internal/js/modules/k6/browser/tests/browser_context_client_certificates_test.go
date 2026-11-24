@@ -215,7 +215,11 @@ func navigateWithClientCertificates(
 			const got = [];
 			for (const u of %s) {
 				const res = await page.goto(u, { waitUntil: 'load' });
-				got.push({ status: res.status(), text: await page.textContent('body') });
+				// page.goto can resolve to null even though the page loaded (an existing race in
+				// k6's navigation handling), so fall back to the page's own record of the status.
+				const status = res ? res.status() : await page.evaluate(
+					() => performance.getEntriesByType('navigation')[0].responseStatus);
+				got.push({ status, text: await page.textContent('body') });
 			}
 			return JSON.stringify(got);
 		} finally {
