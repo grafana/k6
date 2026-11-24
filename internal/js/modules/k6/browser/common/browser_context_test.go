@@ -2,6 +2,10 @@ package common
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -332,4 +336,98 @@ func TestFilterCookies(t *testing.T) {
 			)
 		})
 	}
+}
+
+func TestBrowserContextCleanupClosesClientCertificateProxy(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name          string
+		downloadsPath func(t *testing.T) string
+		wantErr       string
+	}{
+		{
+			name:          "cleanup_ok",
+			downloadsPath: func(t *testing.T) string { return filepath.Join(t.TempDir(), "downloads") },
+		},
+		{
+			name:          "cleanup_fails",
+			downloadsPath: func(*testing.T) string { return "invalid\x00path" },
+			wantErr:       "removing downloads path",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			opts := clientCertificateTestOptions(t)
+			opts.DownloadsPath = tc.downloadsPath(t)
+			b, _ := newClientCertificateTestBrowser(t, nil, nil)
+			bc, err := b.NewContext(opts)
+			require.NoError(t, err)
+			addr := bc.clientCertificateProxy.Addr()
+			requireAcceptsConnections(t, addr)
+
+			err = bc.cleanup()
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
+			}
+			assertRefusesConnections(t, addr)
+		})
+	}
+}
+
+func TestBrowserContextCloseClosesClientCertificateProxy(t *testing.T) {
+	t.Parallel()
+
+	disposeErr := errors.New("dispose failed")
+	b, _ := newClientCertificateTestBrowser(t, nil, disposeErr)
+	bc, err := b.NewContext(clientCertificateTestOptions(t))
+	require.NoError(t, err)
+	addr := bc.clientCertificateProxy.Addr()
+	requireAcceptsConnections(t, addr)
+
+	assert.ErrorIs(t, bc.Close(), disposeErr)
+	assertRefusesConnections(t, addr)
+}
+
+func TestBrowserContextClientCertificateCredentials(t *testing.T) {
+	t.Parallel()
+
+	opts := clientCertificateTestOptions(t)
+	opts.HTTPCredentials = Credentials{Username: "user-0", Password: "pass-0"}
+	b, _ := newClientCertificateTestBrowser(t, nil, nil)
+	bc, err := b.NewContext(opts)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = bc.cleanup() })
+	require.NotNil(t, bc.proxyCredentials)
+	get := bc.proxyCredentials.get
+
+	username, password := get()
+	assert.Equal(t, "user-0", username)
+	assert.Equal(t, "pass-0", password)
+
+	const updates = 100
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for i := 1; i <= updates; i++ {
+			assert.NoError(t, bc.SetHTTPCredentials(Credentials{
+				Username: fmt.Sprintf("user-%d", i), Password: fmt.Sprintf("pass-%d", i),
+			}))
+		}
+	})
+	for range 4 {
+		wg.Go(func() {
+			for range updates {
+				username, password := get()
+				assert.Equal(t, "pass"+username[len("user"):], password, "torn credentials")
+			}
+		})
+	}
+	wg.Wait()
+
+	username, password = get()
+	assert.Equal(t, fmt.Sprintf("user-%d", updates), username)
+	assert.Equal(t, fmt.Sprintf("pass-%d", updates), password)
 }
