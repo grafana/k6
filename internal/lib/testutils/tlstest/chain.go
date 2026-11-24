@@ -1,5 +1,6 @@
 // Package tlstest provides shared helpers for building root CA → intermediate → leaf
-// chains used by AIA fetching tests. Test-only, do not import in production code.
+// chains, issuing server and client certificates from them, and serving AIA responses.
+// Test-only, do not import in production code.
 package tlstest
 
 import (
