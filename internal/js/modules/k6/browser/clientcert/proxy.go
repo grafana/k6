@@ -13,12 +13,16 @@ import (
 	"fmt"
 	"html"
 	"io"
+	stdlog "log"
 	"math/big"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/net/http2"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 )
@@ -146,7 +150,8 @@ func (p *Proxy) certificatesFor(host string, port int) []tls.Certificate {
 
 // intercept terminates the browser's TLS with the dummy certificate and re-originates it to
 // the destination with a client certificate, carrying the browser's ALPN. When the upstream
-// handshake fails, the browser leg negotiates http/1.1 and receives a 503 response.
+// handshake fails, the browser leg keeps the protocol the upstream negotiated, or http/1.1 if
+// none, and receives a 503 response.
 func (p *Proxy) intercept(
 	ctx context.Context, browserRaw, upstreamRaw net.Conn, host string, port int, certs []tls.Certificate,
 ) {
@@ -157,9 +162,9 @@ func (p *Proxy) intercept(
 	browser := tls.Server(browserRaw, &tls.Config{
 		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 			upstream, upstreamErr = p.handshakeUpstream(hello, upstreamRaw, host, certs)
-			protocol := "http/1.1"
-			if np := upstream.ConnectionState().NegotiatedProtocol; upstreamErr == nil && np != "" {
-				protocol = np
+			protocol := upstream.ConnectionState().NegotiatedProtocol
+			if protocol == "" {
+				protocol = "http/1.1"
 			}
 			return &tls.Config{Certificates: []tls.Certificate{p.dummy}, NextProtos: []string{protocol}}, nil
 		},
@@ -172,7 +177,11 @@ func (p *Proxy) intercept(
 	}
 	if upstreamErr != nil {
 		p.logger.Debugf("Proxy:intercept", "host:%s port:%d upstream handshake err:%v", host, port, upstreamErr)
-		write503(browser, browserRaw, upstreamErr)
+		if browser.ConnectionState().NegotiatedProtocol == "h2" {
+			serve503H2(browser, browserRaw, upstreamErr)
+		} else {
+			write503(browser, browserRaw, upstreamErr)
+		}
 		_ = browserRaw.Close()
 		_ = upstreamRaw.Close()
 		return
@@ -244,6 +253,52 @@ func awaitBrowserRequest(browser net.Conn) bool {
 	}
 	var netErr net.Error
 	return n > 0 || err == nil || (errors.As(err, &netErr) && netErr.Timeout())
+}
+
+// serve503H2 answers every HTTP/2 request on browser with a 503 response reporting err. It
+// returns once the HTTP/2 server has stopped, closing browserRaw if that takes longer than
+// responseTimeout.
+func serve503H2(browser, browserRaw net.Conn, err error) {
+	body := clientCertificateErrorBody(err)
+	responded := make(chan struct{})
+	var respondedOnce sync.Once
+	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// The HTTP/2 server turns Connection: close into GOAWAY and closes the connection
+		// when it is idle.
+		w.Header().Set("Connection", "close")
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = io.WriteString(w, body)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		respondedOnce.Do(func() { close(responded) })
+	})
+
+	served := make(chan struct{})
+	go func() {
+		defer close(served)
+		//nolint:staticcheck // serves an already accepted connection, which http.Server cannot
+		(&http2.Server{}).ServeConn(browser, &http2.ServeConnOpts{
+			Handler:    handler,
+			BaseConfig: &http.Server{ErrorLog: stdlog.New(io.Discard, "", 0)}, //nolint:gosec // serves one response
+		})
+	}()
+
+	timer := time.NewTimer(responseTimeout)
+	defer timer.Stop()
+	for {
+		select {
+		case <-responded:
+			responded = nil
+		case <-served:
+			return
+		case <-timer.C:
+			_ = browserRaw.Close()
+			<-served
+			return
+		}
+	}
 }
 
 // peekConn lets the first bytes of a connection be inspected without consuming them.
