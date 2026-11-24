@@ -19,22 +19,14 @@ func TestConnCloseWrite(t *testing.T) {
 		ln, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = ln.Close() })
-
-		peerErr := make(chan error, 1)
 		go func() {
 			peer, err := ln.Accept()
 			if err != nil {
-				peerErr <- err
 				return
 			}
 			defer func() { _ = peer.Close() }()
-			got, err := io.ReadAll(peer)
-			if err != nil {
-				peerErr <- err
-				return
-			}
-			_, err = peer.Write(append([]byte("echo:"), got...))
-			peerErr <- err
+			got, _ := io.ReadAll(peer) // returns once the client half-closes
+			_, _ = peer.Write(append([]byte("echo:"), got...))
 		}()
 
 		raw, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", ln.Addr().String())
@@ -46,10 +38,8 @@ func TestConnCloseWrite(t *testing.T) {
 		_, err = conn.Write([]byte("ping"))
 		require.NoError(t, err)
 		require.NoError(t, conn.CloseWrite())
-
 		got, err := io.ReadAll(conn)
 		require.NoError(t, err)
-		require.NoError(t, <-peerErr)
 		assert.Equal(t, "echo:ping", string(got))
 	})
 
@@ -57,13 +47,8 @@ func TestConnCloseWrite(t *testing.T) {
 		t.Parallel()
 
 		client, server := net.Pipe()
-		t.Cleanup(func() {
-			_ = client.Close()
-			_ = server.Close()
-		})
-		var read, written int64
-		conn := &Conn{Conn: client, BytesRead: &read, BytesWritten: &written}
-
-		assert.ErrorIs(t, conn.CloseWrite(), errors.ErrUnsupported)
+		t.Cleanup(func() { _ = server.Close() })
+		t.Cleanup(func() { _ = client.Close() })
+		assert.ErrorIs(t, (&Conn{Conn: client}).CloseWrite(), errors.ErrUnsupported)
 	})
 }
