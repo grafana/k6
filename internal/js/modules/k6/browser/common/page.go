@@ -27,6 +27,7 @@ import (
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext"
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
+	k6metrics "go.k6.io/k6/v2/metrics"
 )
 
 // BlankPage represents a blank page.
@@ -91,12 +92,14 @@ func (r ReducedMotion) String() string {
 	return reducedMotionToString[r]
 }
 
-var reducedMotionToString = map[ReducedMotion]string{ //nolint:gochecknoglobals
+//nolint:goconst,gochecknoglobals
+var reducedMotionToString = map[ReducedMotion]string{
 	ReducedMotionReduce:       "reduce",
 	ReducedMotionNoPreference: "no-preference",
 }
 
-var reducedMotionToID = map[string]ReducedMotion{ //nolint:gochecknoglobals
+//nolint:gochecknoglobals
+var reducedMotionToID = map[string]ReducedMotion{
 	"reduce":        ReducedMotionReduce,
 	"no-preference": ReducedMotionNoPreference,
 }
@@ -271,6 +274,15 @@ type Page struct {
 
 	backgroundPage bool
 
+	// Supplies the fallback for requests that cannot be associated with an active browser operation.
+	networkFallbackTagsAndMeta atomic.Pointer[k6metrics.TagsAndMeta]
+	networkRecentOperation     *networkOperationContext
+	networkOperationID         atomic.Uint64
+	networkOperations          []*networkOperationContext
+	networkLoaderOperations    map[cdp.LoaderID]*networkOperationContext
+	networkFrameLoaders        map[cdp.FrameID]cdp.LoaderID
+	networkOperationsMu        sync.Mutex
+
 	eventCh            chan Event
 	eventHandlers      map[PageEventName][]pageEventHandlerRecord
 	eventHandlersMu    sync.RWMutex
@@ -323,6 +335,14 @@ func NewPage(
 		logger:           logger,
 	}
 
+	// Popup pages are created off the event loop, so inherit the context of the operation that opened
+	// them, or the opener's fallback when no operation is active.
+	if opener != nil {
+		if tagsAndMeta, ok := opener.getNetworkTagsAndMeta(); ok {
+			p.networkFallbackTagsAndMeta.Store(&tagsAndMeta)
+		}
+	}
+
 	p.logger.Debugf("Page:NewPage", "sid:%v tid:%v backgroundPage:%t",
 		p.sessionID(), tid, bp)
 
@@ -349,13 +369,13 @@ func NewPage(
 
 	p.initEvents()
 
-	action := target.SetAutoAttach(true, true).WithFlatten(true)
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	params := target.SetAutoAttachParams{AutoAttach: true, WaitForDebuggerOnStart: true, Flatten: new(true)}
+	if err := newCommand(target.SetAutoAttach, params).Do(p.ctx, p.session); err != nil {
 		return nil, fmt.Errorf("internal error while auto attaching to browser pages: %w", err)
 	}
 
-	add := runtime.AddBinding(webVitalBinding)
-	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	add := newCommand(runtime.AddBinding, runtime.AddBindingParams{Name: webVitalBinding})
+	if err := add.Do(p.ctx, p.session); err != nil {
 		return nil, fmt.Errorf("internal error while adding binding to page: %w", err)
 	}
 
@@ -631,8 +651,9 @@ func (p *Page) didClose() {
 func (p *Page) evaluateOnNewDocument(source string) error {
 	p.logger.Debugf("Page:evaluateOnNewDocument", "sid:%v", p.sessionID())
 
-	action := page.AddScriptToEvaluateOnNewDocument(source)
-	_, err := action.Do(cdp.WithExecutor(p.ctx, p.session))
+	action := newCommand(page.AddScriptToEvaluateOnNewDocument,
+		page.AddScriptToEvaluateOnNewDocumentParams{Source: source})
+	_, err := action.Result(p.ctx, p.session)
 	if err != nil {
 		return fmt.Errorf("evaluating script on document: %w", err)
 	}
@@ -662,8 +683,9 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 		return nil, errors.New("parent frame has been detached")
 	}
 
-	action := dom.GetFrameOwner(cdp.FrameID(f.ID()))
-	backendNodeID, _, err := action.Do(cdp.WithExecutor(p.ctx, parentSession.session))
+	action := newCommand(dom.GetFrameOwner, dom.GetFrameOwnerParams{FrameID: cdp.FrameID(f.ID())})
+	result, err := action.Result(p.ctx, parentSession.session)
+	backendNodeID := result.BackendNodeID
 	if err != nil {
 		if strings.Contains(err.Error(), "frame with the given id was not found") {
 			return nil, errors.New("frame has been detached")
@@ -716,7 +738,7 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 		return "", nil
 	}
 
-	action := dom.DescribeNode().WithObjectID(documentElement.remoteObject.ObjectID)
+	action := newCommand(dom.DescribeNode, dom.DescribeNodeParams{ObjectID: documentElement.remoteObject.ObjectID})
 	// If the element is in an iframe, then using the page's session will not
 	// contain the element that we're looking for since frames do not
 	// share context between each other due to CORS.
@@ -724,7 +746,8 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 	// Instead here we use the element's session to retrieve the description of
 	// itself, which works even when we're handling elements that are not in
 	// an iframe.
-	node, err := action.Do(cdp.WithExecutor(p.ctx, h.session))
+	commandResult, err := action.Result(p.ctx, h.session)
+	node := commandResult.Node
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:DescribeNode:return", "sid:%v err:%v", p.sessionID(), err)
 		return "", nil
@@ -800,21 +823,25 @@ func (p *Page) hasRoutes() bool {
 	return len(p.routes) > 0
 }
 
-func (p *Page) resetViewport() error {
+func (p *Page) resetViewport(ctx context.Context) error {
 	p.logger.Debugf("Page:resetViewport", "sid:%v", p.sessionID())
 
-	action := emulation.SetDeviceMetricsOverride(0, 0, 0, false)
-	return action.Do(cdp.WithExecutor(p.ctx, p.session))
+	action := newCommand(emulation.SetDeviceMetricsOverride,
+		emulation.SetDeviceMetricsOverrideParams{Width: 0, Height: 0, DeviceScaleFactor: 0, Mobile: false})
+	return action.Do(ctx, p.session)
 }
 
-func (p *Page) setEmulatedSize(emulatedSize *EmulatedSize) error {
+func (p *Page) setEmulatedSize(ctx context.Context, emulatedSize *EmulatedSize) error {
 	p.logger.Debugf("Page:setEmulatedSize", "sid:%v", p.sessionID())
 
+	if err := p.mainFrameSession.updateViewport(ctx, emulatedSize); err != nil {
+		return err
+	}
 	p.emulatedSize = emulatedSize
-	return p.mainFrameSession.updateViewport()
+	return nil
 }
 
-func (p *Page) setViewportSize(viewportSize *Size) error {
+func (p *Page) setViewportSize(ctx context.Context, viewportSize *Size) error {
 	p.logger.Debugf("Page:setViewportSize", "sid:%v vps:%v",
 		p.sessionID(), viewportSize)
 
@@ -826,7 +853,7 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}
-	return p.setEmulatedSize(NewEmulatedSize(viewport, screen))
+	return p.setEmulatedSize(ctx, NewEmulatedSize(viewport, screen))
 }
 
 func (p *Page) updateExtraHTTPHeaders() error {
@@ -908,8 +935,8 @@ func (p *Page) viewportSize() Size {
 func (p *Page) BringToFront() error {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
 
-	action := page.BringToFront()
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	action := newCommand(page.BringToFront, cdp.Empty{})
+	if err := action.Do(p.ctx, p.session); err != nil {
 		return fmt.Errorf("bringing page to front: %w", err)
 	}
 
@@ -994,20 +1021,22 @@ func (p *Page) Close() error {
 			p.logger.Warnf("Page:Close", "failed to trigger visibilitychange for web vitals: %v", err)
 		}
 
-		keyDown := input.DispatchKeyEvent(input.KeyDown).WithKey("Escape")
-		if err := keyDown.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
+		keyDown := newCommand(input.DispatchKeyEvent,
+			input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeKeyDown, Key: "Escape"})
+		if err := keyDown.Do(teardownTimeoutCtx, p.session); err != nil {
 			p.logger.Warnf("Page:Close", "failed to dispatch keydown for web vitals: %v", err)
 		}
 
 		var closeErrs []error
 
-		add := runtime.RemoveBinding(webVitalBinding)
-		if err := add.Do(cdp.WithExecutor(teardownTimeoutCtx, p.session)); err != nil {
+		add := newCommand(runtime.RemoveBinding, runtime.RemoveBindingParams{Name: webVitalBinding})
+		if err := add.Do(teardownTimeoutCtx, p.session); err != nil {
 			// continue so that we can shutdown the page even if we fail to remove the binding.
 			closeErrs = append(closeErrs, fmt.Errorf("internal error while removing binding from page: %w", err))
 		}
 
-		err := target.CloseTarget(p.targetID).Do(cdp.WithExecutor(teardownTimeoutCtx, p.session))
+		err := newCommand(target.CloseTarget,
+			target.CloseTargetParams{TargetID: p.targetID}).Do(teardownTimeoutCtx, p.session)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			// When a close target command is sent to the browser via CDP,
 			// the browser will start to cleanup and the first thing it
@@ -1100,8 +1129,8 @@ func (p *Page) EmulateVisionDeficiency(typ string) error {
 		return fmt.Errorf("unsupported vision deficiency: %s", typ)
 	}
 
-	action := emulation.SetEmulatedVisionDeficiency(t)
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	action := newCommand(emulation.SetEmulatedVisionDeficiency, emulation.SetEmulatedVisionDeficiencyParams{Type: t})
+	if err := action.Do(p.ctx, p.session); err != nil {
 		return fmt.Errorf("setting emulated vision deficiency %q: %w", typ, err)
 	}
 
@@ -1219,6 +1248,123 @@ func (p *Page) GetMouse() *Mouse {
 // GetTouchscreen returns the touchscreen for the page.
 func (p *Page) GetTouchscreen() *Touchscreen {
 	return p.Touchscreen
+}
+
+type networkOperationContext struct {
+	id          uint64
+	tagsAndMeta k6metrics.TagsAndMeta
+}
+
+// SetNetworkFallbackTagsAndMeta records the tags and metadata for requests that cannot be
+// associated with an active browser operation.
+func (p *Page) SetNetworkFallbackTagsAndMeta(tagsAndMeta k6metrics.TagsAndMeta) {
+	p.networkFallbackTagsAndMeta.Store(&tagsAndMeta)
+}
+
+// BeginNetworkOperation makes tagsAndMeta available to requests observed while the operation is
+// active. Calling finishAndRetain keeps it for CDP request events that arrive just after the
+// operation settles, including unsuccessful settlement. Calling abortAndDiscard instead removes it
+// when the browser operation was not launched.
+func (p *Page) BeginNetworkOperation(
+	tagsAndMeta k6metrics.TagsAndMeta,
+) (finishAndRetain, abortAndDiscard func()) {
+	operation := &networkOperationContext{
+		id:          p.networkOperationID.Add(1),
+		tagsAndMeta: tagsAndMeta,
+	}
+	p.networkOperationsMu.Lock()
+	p.networkOperations = append(p.networkOperations, operation)
+	p.networkOperationsMu.Unlock()
+
+	var once sync.Once
+	remove := func(keepRecent bool) {
+		once.Do(func() {
+			p.networkOperationsMu.Lock()
+			defer p.networkOperationsMu.Unlock()
+			if keepRecent {
+				p.networkRecentOperation = operation
+			}
+			for i := range p.networkOperations {
+				if p.networkOperations[i].id != operation.id {
+					continue
+				}
+				p.networkOperations = append(p.networkOperations[:i], p.networkOperations[i+1:]...)
+				return
+			}
+		})
+	}
+	return func() { remove(true) }, func() { remove(false) }
+}
+
+func (p *Page) getNetworkTagsAndMeta() (k6metrics.TagsAndMeta, bool) {
+	tagsAndMeta, _, ok := p.getNetworkTagsAndMetaForRequest("", "", false, false)
+	return tagsAndMeta, ok
+}
+
+func (p *Page) getNetworkTagsAndMetaForRequest(
+	frameID cdp.FrameID,
+	loaderID cdp.LoaderID,
+	preferLoaderContext bool,
+	bindLoaderContext bool,
+) (k6metrics.TagsAndMeta, *networkOperationContext, bool) {
+	p.networkOperationsMu.Lock()
+	var operation *networkOperationContext
+	if preferLoaderContext && loaderID != "" {
+		operation = p.networkLoaderOperations[loaderID]
+	}
+	if operation == nil {
+		if n := len(p.networkOperations); n > 0 {
+			operation = p.networkOperations[n-1]
+		} else {
+			operation = p.networkRecentOperation
+		}
+	}
+	if bindLoaderContext && loaderID != "" && operation != nil {
+		p.bindNetworkLoaderOperationLocked(frameID, loaderID, operation)
+	}
+	p.networkOperationsMu.Unlock()
+
+	if operation != nil {
+		return operation.tagsAndMeta, operation, true
+	}
+
+	if tagsAndMeta := p.networkFallbackTagsAndMeta.Load(); tagsAndMeta != nil {
+		return *tagsAndMeta, nil, true
+	}
+	return k6metrics.TagsAndMeta{}, nil, false
+}
+
+func (p *Page) bindNetworkLoaderOperation(
+	frameID cdp.FrameID, loaderID cdp.LoaderID, operation *networkOperationContext,
+) {
+	if loaderID == "" || operation == nil {
+		return
+	}
+	p.networkOperationsMu.Lock()
+	defer p.networkOperationsMu.Unlock()
+	p.bindNetworkLoaderOperationLocked(frameID, loaderID, operation)
+}
+
+func (p *Page) bindNetworkLoaderOperationLocked(
+	frameID cdp.FrameID, loaderID cdp.LoaderID, operation *networkOperationContext,
+) {
+	if p.networkLoaderOperations == nil {
+		p.networkLoaderOperations = make(map[cdp.LoaderID]*networkOperationContext)
+		p.networkFrameLoaders = make(map[cdp.FrameID]cdp.LoaderID)
+	}
+	if previousLoaderID := p.networkFrameLoaders[frameID]; previousLoaderID != loaderID {
+		delete(p.networkLoaderOperations, previousLoaderID)
+	}
+	p.networkLoaderOperations[loaderID] = operation
+	p.networkFrameLoaders[frameID] = loaderID
+}
+
+func (p *Page) clearNetworkLoaderContext(frameID cdp.FrameID) {
+	p.networkOperationsMu.Lock()
+	loaderID := p.networkFrameLoaders[frameID]
+	delete(p.networkLoaderOperations, loaderID)
+	delete(p.networkFrameLoaders, frameID)
+	p.networkOperationsMu.Unlock()
 }
 
 // Goto will navigate the page to the specified URL and return a HTTP response object.
@@ -1545,8 +1691,8 @@ func (p *Page) Reload(opts *PageReloadOptions) (_ *Response, rerr error) { //nol
 		})
 	defer cancelWaitingForLifecycleEvent()
 
-	reloadAction := page.Reload()
-	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	reloadAction := newCommand(page.Reload, page.ReloadParams{})
+	if err := reloadAction.Do(p.ctx, p.session); err != nil {
 		return nil, err
 	}
 
@@ -1624,8 +1770,8 @@ func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Resp
 			rerr = spanRecordErrorf(span, "page going %s: %w", direction, rerr)
 		}
 	}()
-
-	currentIndex, entries, err := page.GetNavigationHistory().Do(cdp.WithExecutor(p.ctx, p.session))
+	result, err := newCommand(page.GetNavigationHistory, cdp.Empty{}).Result(p.ctx, p.session)
+	currentIndex, entries := result.CurrentIndex, result.Entries
 	if err != nil {
 		return nil, err
 	}
@@ -1643,8 +1789,8 @@ func (p *Page) GoBackForward(delta int, opts *PageGoBackForwardOptions) (_ *Resp
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, opts.Timeout)
 	defer timeoutCancelFn()
 
-	navAction := page.NavigateToHistoryEntry(historyEntryID)
-	if err := navAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	navAction := newCommand(page.NavigateToHistoryEntry, page.NavigateToHistoryEntryParams{EntryID: historyEntryID})
+	if err := navAction.Do(p.ctx, p.session); err != nil {
 		return nil, fmt.Errorf("navigating to history entry %d: %w", historyEntryID, err)
 	}
 
@@ -1694,9 +1840,13 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp, p.logger)
+	s, cancel := newScreenshotter(spanCtx, p.defaultTimeout(), sp, p.logger)
+	defer cancel()
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
+		if errors.Is(s.ctx.Err(), context.DeadlineExceeded) && p.ctx.Err() == nil {
+			err = &k6ext.UserFriendlyError{Err: err, Timeout: p.defaultTimeout()}
+		}
 		return nil, spanRecordErrorf(span, "taking screenshot of page: %w", err)
 	}
 
@@ -1751,7 +1901,7 @@ func (p *Page) SetInputFiles(selector string, files *Files, opts *FrameSetInputF
 func (p *Page) SetViewportSize(viewportSize *Size) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
-	if err := p.setViewportSize(viewportSize); err != nil {
+	if err := p.setViewportSize(p.ctx, viewportSize); err != nil {
 		return fmt.Errorf("setting viewport size: %w", err)
 	}
 

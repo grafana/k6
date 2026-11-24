@@ -80,6 +80,12 @@ type Config struct {
 	BuildServiceAuth string
 	// BuildServiceHeaders HTTP headers for the k6 build service
 	BuildServiceHeaders map[string]string
+	// BuildServiceRetries number of retries for build requests that fail with a transient
+	// status (502/503/504). Default to 3
+	BuildServiceRetries int
+	// BuildServiceBackoff initial backoff time between build request retries. Default to 1s
+	// It is incremented exponentially between retries: 1s, 2s, 4s...
+	BuildServiceBackoff time.Duration
 	// BinDir deprecated use BinaryCacheDir
 	BinDir string
 	// BinaryCacheDir path to binary cache directory. If not set the environment variable K6_BINARY_CACHE is used.
@@ -187,7 +193,8 @@ func NewProviderWithLogger(config Config, logger *slog.Logger) (*Provider, error
 	}
 
 	buildSrv, err := newBuildServiceClient(
-		buildSrvURL, buildSrvAuth, config.BuildServiceAuthType, config.BuildServiceHeaders)
+		buildSrvURL, buildSrvAuth, config.BuildServiceAuthType, config.BuildServiceHeaders,
+		config.BuildServiceRetries, config.BuildServiceBackoff, logger)
 	if err != nil {
 		return nil, NewWrappedError(ErrConfig, err)
 	}

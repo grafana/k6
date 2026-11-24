@@ -1,5 +1,5 @@
-//go:build (appengine || js || nacl || tinygo || wasm || wasip1 || wasip2) && !windows
-// +build appengine js nacl tinygo wasm wasip1 wasip2
+//go:build (appengine || js || nacl || tinygo || wasm || wasip1 || wasip2 || haiku) && !windows
+// +build appengine js nacl tinygo wasm wasip1 wasip2 haiku
 // +build !windows
 
 package isatty

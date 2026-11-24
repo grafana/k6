@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 )
 
@@ -29,7 +28,7 @@ func NewMouse(ctx context.Context, s session, f *Frame, ts *TimeoutSettings, k *
 		frame:           f,
 		timeoutSettings: ts,
 		keyboard:        k,
-		button:          input.None,
+		button:          input.MouseButtonNone,
 	}
 }
 
@@ -84,11 +83,15 @@ func (m *Mouse) Down(opts *MouseDownUpOptions) error {
 
 func (m *Mouse) down(opts *MouseDownUpOptions) error {
 	m.button = input.MouseButton(opts.Button)
-	action := input.DispatchMouseEvent(input.MousePressed, m.x, m.y).
-		WithButton(input.MouseButton(opts.Button)).
-		WithModifiers(input.Modifier(m.keyboard.modifiers)).
-		WithClickCount(opts.ClickCount)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	action := newCommand(input.DispatchMouseEvent, input.DispatchMouseEventParams{
+		Type:       input.DispatchMouseEventTypeMousePressed,
+		X:          m.x,
+		Y:          m.y,
+		Button:     input.MouseButton(opts.Button),
+		Modifiers:  m.keyboard.modifiers,
+		ClickCount: opts.ClickCount,
+	})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		return fmt.Errorf("mouse down: %w", err)
 	}
 	return nil
@@ -103,12 +106,16 @@ func (m *Mouse) Up(opts *MouseDownUpOptions) error {
 }
 
 func (m *Mouse) up(opts *MouseDownUpOptions) error {
-	m.button = input.None
-	action := input.DispatchMouseEvent(input.MouseReleased, m.x, m.y).
-		WithButton(input.MouseButton(opts.Button)).
-		WithModifiers(input.Modifier(m.keyboard.modifiers)).
-		WithClickCount(opts.ClickCount)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+	m.button = input.MouseButtonNone
+	action := newCommand(input.DispatchMouseEvent, input.DispatchMouseEventParams{
+		Type:       input.DispatchMouseEventTypeMouseReleased,
+		X:          m.x,
+		Y:          m.y,
+		Button:     input.MouseButton(opts.Button),
+		Modifiers:  m.keyboard.modifiers,
+		ClickCount: opts.ClickCount,
+	})
+	if err := action.Do(m.ctx, m.session); err != nil {
 		return fmt.Errorf("mouse up: %w", err)
 	}
 
@@ -131,10 +138,14 @@ func (m *Mouse) move(x float64, y float64, opts *MouseMoveOptions) error {
 	for i := int64(1); i <= opts.Steps; i++ {
 		x := fromX + (m.x-fromX)*float64(i/opts.Steps)
 		y := fromY + (m.y-fromY)*float64(i/opts.Steps)
-		action := input.DispatchMouseEvent(input.MouseMoved, x, y).
-			WithButton(m.button).
-			WithModifiers(input.Modifier(m.keyboard.modifiers))
-		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		action := newCommand(input.DispatchMouseEvent, input.DispatchMouseEventParams{
+			Type:      input.DispatchMouseEventTypeMouseMoved,
+			X:         x,
+			Y:         y,
+			Button:    m.button,
+			Modifiers: m.keyboard.modifiers,
+		})
+		if err := action.Do(m.ctx, m.session); err != nil {
 			return fmt.Errorf("mouse move: %w", err)
 		}
 	}

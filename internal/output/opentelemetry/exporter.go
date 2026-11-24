@@ -31,7 +31,7 @@ func getExporter(cfg Config) (metric.Exporter, error) {
 		return nil, err
 	}
 
-	var headers map[string]string
+	headers := make(map[string]string)
 	if cfg.Headers.Valid {
 		headers, err = parseHeaders(cfg.Headers.String)
 		if err != nil {

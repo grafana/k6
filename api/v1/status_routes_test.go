@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/lib/testutils/minirunner"
 	"go.k6.io/k6/v2/lib"
@@ -19,7 +20,7 @@ func TestGetStatus(t *testing.T) {
 	cs := getControlSurface(t, testState)
 
 	rw := httptest.NewRecorder()
-	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
+	NewHandler(cs).ServeHTTP(rw, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/status", nil))
 	res := rw.Result()
 	t.Cleanup(func() {
 		assert.NoError(t, res.Body.Close())
@@ -49,5 +50,24 @@ func TestGetStatus(t *testing.T) {
 		assert.True(t, status.VUsMax.Valid)
 		assert.False(t, status.Stopped)
 		assert.False(t, status.Tainted)
+		assert.Nil(t, status.ExecutionResult)
+		assert.Contains(t, rw.Body.String(), `"execution_result":null`)
 	})
+}
+
+func TestGetStatusExecutionResult(t *testing.T) {
+	t.Parallel()
+
+	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{})
+	cs := getControlSurface(t, testState)
+	cs.Scheduler.GetState().SetExecutionResult(108)
+
+	rw := httptest.NewRecorder()
+	NewHandler(cs).ServeHTTP(
+		rw, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/status", nil),
+	)
+
+	var statusEnvelop StatusJSONAPI
+	require.NoError(t, json.Unmarshal(rw.Body.Bytes(), &statusEnvelop))
+	assert.Equal(t, &ExecutionResult{ExitCode: 108}, statusEnvelop.Status().ExecutionResult)
 }

@@ -1,4 +1,5 @@
 import { browser } from 'k6/browser';
+import { fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -68,6 +69,8 @@ export default async function() {
       tails.click(),
     ]);
     console.log(await currentBet.innerText());
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

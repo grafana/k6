@@ -6,7 +6,7 @@ import (
 
 // mapWorker to the JS module.
 func mapWorker(_ moduleVU, w *common.Worker) mapping {
-	return mapping{
+	return finishMapping(mapping{
 		"url": w.URL(),
-	}
+	})
 }

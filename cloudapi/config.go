@@ -34,11 +34,44 @@ type Config struct {
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
+	// MetricsPushURL is the URL to push metrics to. It is set only
+	// programmatically: from the provisioning API's start_local_execution
+	// response in the self-provision flow, or from K6_CLOUD_METRICS_PUSH_URL
+	// read explicitly by the cmd layer (internal/cmd/outputs_cloud.go) in the
+	// externally-provisioned flow. It is deliberately NOT env-bound (no
+	// envconfig tag): binding it would let a stray K6_CLOUD_METRICS_PUSH_URL
+	// in the environment override the value obtained from provisioning and
+	// corrupt the self-provisioned push. When set, the cloud Output pushes
+	// here instead of deriving a URL from Host.
+	MetricsPushURL null.String `json:"metricsPushURL"`
+
+	// TestRunToken is the scoped test-run token used as the Bearer token for
+	// metrics push (and notify, in the self-provision flow). Like
+	// MetricsPushURL it is set only programmatically — from the provisioning
+	// response, or from K6_CLOUD_TEST_RUN_TOKEN read explicitly by the cmd
+	// layer for an externally-provisioned run — and is deliberately NOT
+	// env-bound, so a stray env var cannot hijack the self-provisioned push.
+	TestRunToken null.String `json:"testRunToken"`
+
 	// PushRefID is the identifier used by k6 Cloud to correlate all the things that
 	// belong to the same test run/execution. Currently, it is equivalent to the test run id.
 	// But, in the future, or in future solutions (e.g. Synthetic Monitoring), there might be
 	// no test run id, and we may still need an identifier to correlate all the things.
 	PushRefID null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
+
+	// Log-push configuration for `k6 cloud run --local-execution`. Like the
+	// scoped push creds above, these are programmatic-only (no envconfig tag):
+	// the self-provisioned flow sets them from the provisioning API's
+	// runtime_config.logs, while the externally-provisioned flow reads the
+	// K6_CLOUD_LOGS_* env vars explicitly in cmd (applyExternalLogsConfig), so
+	// a stray env value can't override the run-scoped values. Consumed by cmd
+	// to configure the cloud log pusher; never serialised.
+	LogsPushURL        null.String        `json:"-"`
+	LogsLevel          null.String        `json:"-"`
+	LogsLimit          null.Int           `json:"-"`
+	LogsPushPeriod     types.NullDuration `json:"-"`
+	LogsMessageMaxSize null.Int           `json:"-"`
+	LogsAllowedLabels  []string           `json:"-"`
 
 	// Defines the max allowed number of time series in a single batch.
 	MaxTimeSeriesInBatch null.Int `json:"maxTimeSeriesInBatch" envconfig:"K6_CLOUD_MAX_TIME_SERIES_IN_BATCH"`
@@ -104,7 +137,7 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 //
-//nolint:cyclop,gocognit
+//nolint:cyclop,funlen,gocognit
 func (c Config) Apply(cfg Config) Config {
 	if cfg.StackID.Valid {
 		c.StackID = cfg.StackID
@@ -133,8 +166,32 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.LogsTailURL.Valid && cfg.LogsTailURL.String != "" {
 		c.LogsTailURL = cfg.LogsTailURL
 	}
+	if cfg.MetricsPushURL.Valid {
+		c.MetricsPushURL = cfg.MetricsPushURL
+	}
+	if cfg.TestRunToken.Valid {
+		c.TestRunToken = cfg.TestRunToken
+	}
 	if cfg.PushRefID.Valid {
 		c.PushRefID = cfg.PushRefID
+	}
+	if cfg.LogsPushURL.Valid {
+		c.LogsPushURL = cfg.LogsPushURL
+	}
+	if cfg.LogsLevel.Valid {
+		c.LogsLevel = cfg.LogsLevel
+	}
+	if cfg.LogsLimit.Valid {
+		c.LogsLimit = cfg.LogsLimit
+	}
+	if cfg.LogsPushPeriod.Valid {
+		c.LogsPushPeriod = cfg.LogsPushPeriod
+	}
+	if cfg.LogsMessageMaxSize.Valid {
+		c.LogsMessageMaxSize = cfg.LogsMessageMaxSize
+	}
+	if len(cfg.LogsAllowedLabels) > 0 {
+		c.LogsAllowedLabels = cfg.LogsAllowedLabels
 	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL

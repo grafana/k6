@@ -218,8 +218,7 @@ func (stream *ReadableStream) pullAlgorithm(
 	return func(obj *sobek.Object) *sobek.Promise {
 		v, err := call(underlyingSource, obj)
 		if err != nil {
-			var ex *sobek.Exception
-			if errors.As(err, &ex) {
+			if ex, ok := errors.AsType[*sobek.Exception](err); ok {
 				return newRejectedPromise(stream.vu, ex.Value())
 			}
 			return newRejectedPromise(stream.vu, err)

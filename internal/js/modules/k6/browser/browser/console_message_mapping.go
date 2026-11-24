@@ -8,8 +8,8 @@ import (
 func mapConsoleMessage(vu moduleVU, event common.PageEvent) mapping {
 	cm := event.ConsoleMessage
 
-	return mapping{
-		"args": func() []mapping {
+	return finishMapping(mapping{
+		"args": passiveCall(func() []mapping {
 			args := cm.Args
 			margs := make([]mapping, 0, len(args))
 			for _, arg := range args {
@@ -18,17 +18,17 @@ func mapConsoleMessage(vu moduleVU, event common.PageEvent) mapping {
 			}
 
 			return margs
-		},
+		}),
 		// page(), text() and type() are defined as
 		// functions in order to match Playwright's API
-		"page": func() mapping {
+		"page": passiveCall(func() mapping {
 			return mapPage(vu, cm.Page)
-		},
-		"text": func() string {
+		}),
+		"text": passiveCall(func() string {
 			return cm.Text
-		},
-		"type": func() string {
+		}),
+		"type": passiveCall(func() string {
 			return cm.Type
-		},
-	}
+		}),
+	})
 }

@@ -95,7 +95,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		remoteObject := &runtime.RemoteObject{
-			Type: runtime.TypeUndefined,
+			Type: runtime.RemoteObjectTypeUndefined,
 		}
 
 		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
@@ -108,8 +108,8 @@ func TestValueFromRemoteObject(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		remoteObject := &runtime.RemoteObject{
-			Type:    runtime.TypeObject,
-			Subtype: runtime.SubtypeNull,
+			Type:    runtime.RemoteObjectTypeObject,
+			Subtype: runtime.RemoteObjectSubtypeNull,
 		}
 
 		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
@@ -121,7 +121,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 		t.Parallel()
 
 		primitiveTypes := []struct {
-			typ   runtime.Type
+			typ   runtime.RemoteObjectType
 			value any
 		}{
 			{
@@ -167,7 +167,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 			ObjectID: remoteObjectID,
 			Preview: &runtime.ObjectPreview{
 				Properties: []*runtime.PropertyPreview{
-					{Name: "num", Type: runtime.TypeNumber, Value: "1"},
+					{Name: "num", Type: runtime.PropertyPreviewTypeNumber, Value: "1"},
 				},
 			},
 		}
@@ -194,14 +194,14 @@ func TestParseRemoteObject(t *testing.T) {
 			name: "most_types",
 			preview: &runtime.ObjectPreview{
 				Properties: []*runtime.PropertyPreview{
-					{Name: "accessor", Type: runtime.TypeAccessor, Value: ""},
-					{Name: "bigint", Type: runtime.TypeBigint, Value: "100n"},
-					{Name: "bool", Type: runtime.TypeBoolean, Value: "true"},
-					{Name: "fn", Type: runtime.TypeFunction, Value: ""},
-					{Name: "num", Type: runtime.TypeNumber, Value: "1"},
-					{Name: "str", Type: runtime.TypeString, Value: "string"},
-					{Name: "strquot", Type: runtime.TypeString, Value: `"quoted string"`},
-					{Name: "sym", Type: runtime.TypeSymbol, Value: "Symbol()"},
+					{Name: "accessor", Type: runtime.PropertyPreviewTypeAccessor, Value: ""},
+					{Name: "bigint", Type: runtime.PropertyPreviewTypeBigint, Value: "100n"},
+					{Name: "bool", Type: runtime.PropertyPreviewTypeBoolean, Value: "true"},
+					{Name: "fn", Type: runtime.PropertyPreviewTypeFunction, Value: ""},
+					{Name: "num", Type: runtime.PropertyPreviewTypeNumber, Value: "1"},
+					{Name: "str", Type: runtime.PropertyPreviewTypeString, Value: "string"},
+					{Name: "strquot", Type: runtime.PropertyPreviewTypeString, Value: `"quoted string"`},
+					{Name: "sym", Type: runtime.PropertyPreviewTypeSymbol, Value: "Symbol()"},
 				},
 			},
 			expected: map[string]any{
@@ -222,7 +222,7 @@ func TestParseRemoteObject(t *testing.T) {
 					// We don't actually get nested ObjectPreviews from CDP.
 					// I.e. the object `{nested: {one: 1}}` returns value "Object"
 					// for the "nested" property, with a nil *ValuePreview. :-/
-					{Name: "nested", Type: runtime.TypeObject, Value: "Object"},
+					{Name: "nested", Type: runtime.PropertyPreviewTypeObject, Value: "Object"},
 				},
 			},
 			expected: map[string]any{
@@ -239,7 +239,7 @@ func TestParseRemoteObject(t *testing.T) {
 			name: "err_parsing_property",
 			preview: &runtime.ObjectPreview{
 				Properties: []*runtime.PropertyPreview{
-					{Name: "failprop", Type: runtime.TypeObject, Value: "some"},
+					{Name: "failprop", Type: runtime.PropertyPreviewTypeObject, Value: "some"},
 				},
 			},
 			expected: map[string]any{},
@@ -258,7 +258,7 @@ func TestParseRemoteObject(t *testing.T) {
 			t.Parallel()
 			remoteObject := &runtime.RemoteObject{
 				Type:     "object",
-				Subtype:  runtime.Subtype(tc.subtype),
+				Subtype:  runtime.RemoteObjectSubtype(tc.subtype),
 				ObjectID: runtime.RemoteObjectID("object_id_0123456789"),
 				Preview:  tc.preview,
 				Value:    tc.value,

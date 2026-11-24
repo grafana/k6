@@ -154,7 +154,7 @@ func (o *objectGoReflect) init() {
 	// Always use pointer type for non-interface values to be able to access both methods defined on
 	// the literal type and on the pointer.
 	if o.fieldsValue.Kind() != reflect.Interface {
-		methodsType = reflect.PtrTo(o.fieldsValue.Type())
+		methodsType = reflect.PointerTo(o.fieldsValue.Type())
 	} else {
 		methodsType = o.fieldsValue.Type()
 	}
@@ -190,6 +190,13 @@ func (o *objectGoReflect) init() {
 	if j, ok := o.origValue.Interface().(JsonEncodable); ok {
 		o.toJson = j.JsonEncodable
 	}
+}
+
+func (o *objectGoReflect) hasAndGetStr(name unistring.String, receiver Value) (Value, bool) {
+	if v := o._get(name.String()); v != nil {
+		return v, true
+	}
+	return o.baseObject.hasAndGetStr(name, receiver)
 }
 
 func (o *objectGoReflect) getStr(name unistring.String, receiver Value) Value {

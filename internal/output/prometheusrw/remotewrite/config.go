@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,8 +34,15 @@ type Config struct {
 	// ServerURL contains the absolute ServerURL for the Write endpoint where to flush the time series.
 	ServerURL null.String `json:"url" envconfig:"K6_PROMETHEUS_RW_SERVER_URL"`
 
+	// Proxy is the URL of the HTTP proxy to use for the remote write requests.
+	// When unset, no proxy is used.
+	Proxy null.String `json:"proxy" envconfig:"K6_PROMETHEUS_RW_PROXY"`
+
 	// Headers contains additional headers that should be included in the HTTP requests.
 	Headers map[string]string `json:"headers"`
+
+	// Labels contains additional labels that should be included in the remote write time series.
+	Labels map[string]string `json:"labels"`
 
 	// InsecureSkipTLSVerify skips TLS client side checks.
 	InsecureSkipTLSVerify null.Bool `json:"insecureSkipTLSVerify" envconfig:"K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"`
@@ -86,6 +94,11 @@ type Config struct {
 
 	// SigV4SecretKey is the AWS secret key.
 	SigV4SecretKey null.String `json:"sigV4SecretKey" envconfig:"K6_PROMETHEUS_RW_SIGV4_SECRET_KEY"`
+
+	// SigV4Token is the AWS session token. It is required when the credentials
+	// are temporary, for example when they come from an IAM role or STS. When
+	// set, it is always included in the signed headers.
+	SigV4Token null.String `json:"sigV4Token" envconfig:"K6_PROMETHEUS_RW_SIGV4_TOKEN"`
 }
 
 // NewConfig creates an Output's configuration.
@@ -102,6 +115,7 @@ func NewConfig() Config {
 		SigV4Region:           null.NewString("", false),
 		SigV4AccessKey:        null.NewString("", false),
 		SigV4SecretKey:        null.NewString("", false),
+		SigV4Token:            null.NewString("", false),
 	}
 }
 
@@ -117,6 +131,14 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 			Username: conf.Username.String,
 			Password: conf.Password.String,
 		}
+	}
+
+	if conf.Proxy.Valid && conf.Proxy.String != "" {
+		proxyURL, err := url.Parse(conf.Proxy.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the proxy URL: %w", err)
+		}
+		hc.ProxyURL = proxyURL
 	}
 
 	tlsMinVersion := uint16(tls.VersionTLS13)
@@ -137,11 +159,12 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 		hc.TLSConfig.Certificates = []tls.Certificate{cert}
 	}
 
-	if isSigV4PartiallyConfigured(conf.SigV4Region, conf.SigV4AccessKey, conf.SigV4SecretKey) {
+	if isSigV4PartiallyConfigured(conf.SigV4Region, conf.SigV4AccessKey, conf.SigV4SecretKey, conf.SigV4Token) {
 		return nil, errors.New(
 			"sigv4 seems to be partially configured. All of " +
 				"K6_PROMETHEUS_RW_SIGV4_REGION, K6_PROMETHEUS_RW_SIGV4_ACCESS_KEY, K6_PROMETHEUS_RW_SIGV4_SECRET_KEY " +
-				"must all be set. Unset all to bypass sigv4",
+				"must all be set; K6_PROMETHEUS_RW_SIGV4_TOKEN is optional but valid only together with them. " +
+				"Unset all to bypass sigv4",
 		)
 	}
 
@@ -150,6 +173,7 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 			Region:             conf.SigV4Region.String,
 			AwsAccessKeyID:     conf.SigV4AccessKey.String,
 			AwsSecretAccessKey: conf.SigV4SecretKey.String,
+			AwsSessionToken:    conf.SigV4Token.String,
 		}
 	}
 
@@ -171,9 +195,15 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 }
 
 // Apply merges applied Config into base.
+//
+//nolint:funlen // flat list of per-field overrides
 func (conf Config) Apply(applied Config) Config {
 	if applied.ServerURL.Valid {
 		conf.ServerURL = applied.ServerURL
+	}
+
+	if applied.Proxy.Valid {
+		conf.Proxy = applied.Proxy
 	}
 
 	if applied.InsecureSkipTLSVerify.Valid {
@@ -208,6 +238,10 @@ func (conf Config) Apply(applied Config) Config {
 		conf.SigV4SecretKey = applied.SigV4SecretKey
 	}
 
+	if applied.SigV4Token.Valid {
+		conf.SigV4Token = applied.SigV4Token
+	}
+
 	if applied.PushInterval.Valid {
 		conf.PushInterval = applied.PushInterval
 	}
@@ -222,6 +256,13 @@ func (conf Config) Apply(applied Config) Config {
 
 	if len(applied.Headers) > 0 {
 		maps.Copy(conf.Headers, applied.Headers)
+	}
+
+	if len(applied.Labels) > 0 {
+		if conf.Labels == nil {
+			conf.Labels = make(map[string]string)
+		}
+		maps.Copy(conf.Labels, applied.Labels)
 	}
 
 	if len(applied.TrendStats) > 0 {
@@ -291,6 +332,7 @@ func envMap(env map[string]string, prefix string) map[string]string {
 func parseEnvs(env map[string]string) (Config, error) {
 	c := Config{
 		Headers: make(map[string]string),
+		Labels:  make(map[string]string),
 	}
 
 	err := envconfig.Process("", &c, func(key string) (string, bool) {
@@ -313,6 +355,16 @@ func parseEnvs(env map[string]string) (Config, error) {
 				return c, fmt.Errorf("the provided header (%s) does not respect the expected format <header key>:<value>", kvPair)
 			}
 			c.Headers[header[0]] = header[1]
+		}
+	}
+
+	if labels, labelsDefined := env["K6_PROMETHEUS_RW_LABELS"]; labelsDefined {
+		for kvPair := range strings.SplitSeq(labels, ",") {
+			key, value, ok := strings.Cut(kvPair, "=")
+			if !ok {
+				return c, fmt.Errorf("the provided label (%s) does not respect the expected format <label key>=<value>", kvPair)
+			}
+			c.Labels[key] = value
 		}
 	}
 
@@ -340,6 +392,8 @@ func parseArg(text string) (Config, error) {
 		switch key {
 		case "url":
 			c.ServerURL = null.StringFrom(v)
+		case "proxy":
+			c.Proxy = null.StringFrom(v)
 		case "insecureSkipTLSVerify":
 			if err := c.InsecureSkipTLSVerify.UnmarshalText([]byte(v)); err != nil {
 				return c, fmt.Errorf("insecureSkipTLSVerify value must be true or false, not %q", v)
@@ -388,11 +442,14 @@ func parseArg(text string) (Config, error) {
 	return c, nil
 }
 
-func isSigV4PartiallyConfigured(region, accessKey, secretKey null.String) bool {
+func isSigV4PartiallyConfigured(region, accessKey, secretKey, token null.String) bool {
 	hasRegion := region.Valid && len(strings.TrimSpace(region.String)) != 0
 	hasAccessID := accessKey.Valid && len(strings.TrimSpace(accessKey.String)) != 0
 	hasSecretAccessKey := secretKey.Valid && len(strings.TrimSpace(secretKey.String)) != 0
-	// either they are all set, or all not set. False if partial
-	isComplete := (hasRegion && hasAccessID && hasSecretAccessKey) || (!hasRegion && !hasAccessID && !hasSecretAccessKey)
+	hasToken := token.Valid && len(strings.TrimSpace(token.String)) != 0
+	// either the required ones are all set (the token is optional), or nothing
+	// is set at all. False if partial
+	isComplete := (hasRegion && hasAccessID && hasSecretAccessKey) ||
+		(!hasRegion && !hasAccessID && !hasSecretAccessKey && !hasToken)
 	return !isComplete
 }

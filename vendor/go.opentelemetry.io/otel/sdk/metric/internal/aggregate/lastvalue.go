@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package aggregate // import "go.opentelemetry.io/otel/sdk/metric/internal/aggregate"
+package aggregate
 
 import (
 	"context"
@@ -21,19 +21,35 @@ type lastValuePoint[N int64 | float64] struct {
 	dropExemplars bool
 }
 
-// lastValueMap summarizes a set of measurements as the last one made.
-type lastValueMap[N int64 | float64] struct {
-	newRes func(attribute.Set) FilteredExemplarReservoir[N]
-	values limitedSyncMap
+func newDeltaLastValue[N int64 | float64](
+	limit int,
+	r func(attribute.Set) FilteredExemplarReservoir[N],
+) *deltaLastValue[N] {
+	s := &deltaLastValue[N]{
+		newRes: r,
+		start:  now(),
+	}
+	s.vals.init(limit)
+	return s
 }
 
-func (s *lastValueMap[N]) measure(
+// deltaLastValue summarizes a set of measurements as the last one made.
+type deltaLastValue[N int64 | float64] struct {
+	newRes func(attribute.Set) FilteredExemplarReservoir[N]
+	start  time.Time
+
+	vals hotColdMap[*lastValuePoint[N]]
+}
+
+func (s *deltaLastValue[N]) measure(
 	ctx context.Context,
 	value N,
-	fltrAttr attribute.Set,
-	droppedAttr []attribute.KeyValue,
+	lazy lazyFilteredAttributes,
 ) {
-	lv := s.values.LoadOrStoreAttr(fltrAttr, func(attr attribute.Set) any {
+	hotIdx := s.vals.start()
+	defer s.vals.done(hotIdx)
+
+	lv := s.vals.hot(hotIdx).LoadOrStoreAttr(lazy, func(attr attribute.Set) *lastValuePoint[N] {
 		r := s.newRes(attr)
 		_, isDrop := r.(*dropRes[N])
 		p := &lastValuePoint[N]{
@@ -44,52 +60,12 @@ func (s *lastValueMap[N]) measure(
 		}
 		p.value.Store(value)
 		return p
-	}).(*lastValuePoint[N])
+	})
 
 	lv.value.Store(value)
 	if !lv.dropExemplars {
-		lv.res.Offer(ctx, value, droppedAttr)
+		lv.res.Offer(ctx, value, lazy)
 	}
-}
-
-func newDeltaLastValue[N int64 | float64](
-	limit int,
-	r func(attribute.Set) FilteredExemplarReservoir[N],
-) *deltaLastValue[N] {
-	return &deltaLastValue[N]{
-		newRes: r,
-		start:  now(),
-		hotColdValMap: [2]lastValueMap[N]{
-			{
-				values: limitedSyncMap{aggLimit: limit},
-				newRes: r,
-			},
-			{
-				values: limitedSyncMap{aggLimit: limit},
-				newRes: r,
-			},
-		},
-	}
-}
-
-// deltaLastValue summarizes a set of measurements as the last one made.
-type deltaLastValue[N int64 | float64] struct {
-	newRes func(attribute.Set) FilteredExemplarReservoir[N]
-	start  time.Time
-
-	hcwg          hotColdWaitGroup
-	hotColdValMap [2]lastValueMap[N]
-}
-
-func (s *deltaLastValue[N]) measure(
-	ctx context.Context,
-	value N,
-	fltrAttr attribute.Set,
-	droppedAttr []attribute.KeyValue,
-) {
-	hotIdx := s.hcwg.start()
-	defer s.hcwg.done(hotIdx)
-	s.hotColdValMap[hotIdx].measure(ctx, value, fltrAttr, droppedAttr)
 }
 
 func (s *deltaLastValue[N]) collect(
@@ -112,14 +88,14 @@ func (s *deltaLastValue[N]) copyAndClearDpts(
 	// the DataPoints is missed (better luck next time).
 	gData, _ := (*dest).(metricdata.Gauge[N])
 	// delta always clears values on collection
-	readIdx := s.hcwg.swapHotAndWait()
+	readIdx := s.vals.swapHotAndWait()
 	// The len will not change while we iterate over values, since we waited
 	// for all writes to finish to the cold values and len.
-	n := s.hotColdValMap[readIdx].values.Len()
+	n := s.vals.Len(readIdx)
 	dPts := reset(gData.DataPoints, n, n)
 
 	var i int
-	s.hotColdValMap[readIdx].values.Range(func(_, value any) bool {
+	s.vals.Range(readIdx, func(_, value any) bool {
 		v := value.(*lastValuePoint[N])
 		dPts[i].Attributes = v.attrs
 		dPts[i].StartTime = s.start
@@ -129,17 +105,19 @@ func (s *deltaLastValue[N]) copyAndClearDpts(
 		i++
 		return true
 	})
-	gData.DataPoints = dPts
 	// Do not report stale values.
-	s.hotColdValMap[readIdx].values.Clear()
+	s.vals.Clear(readIdx)
+
+	gData.DataPoints = dPts
 	*dest = gData
 	return i
 }
 
 // cumulativeLastValue summarizes a set of measurements as the last one made.
 type cumulativeLastValue[N int64 | float64] struct {
-	lastValueMap[N]
-	start time.Time
+	values limitedSyncMap[*lastValuePoint[N]]
+	newRes func(attribute.Set) FilteredExemplarReservoir[N]
+	start  time.Time
 }
 
 func newCumulativeLastValue[N int64 | float64](
@@ -147,11 +125,33 @@ func newCumulativeLastValue[N int64 | float64](
 	r func(attribute.Set) FilteredExemplarReservoir[N],
 ) *cumulativeLastValue[N] {
 	return &cumulativeLastValue[N]{
-		lastValueMap: lastValueMap[N]{
-			values: limitedSyncMap{aggLimit: limit},
-			newRes: r,
-		},
-		start: now(),
+		values: limitedSyncMap[*lastValuePoint[N]]{aggLimit: limit},
+		newRes: r,
+		start:  now(),
+	}
+}
+
+func (s *cumulativeLastValue[N]) measure(
+	ctx context.Context,
+	value N,
+	lazy lazyFilteredAttributes,
+) {
+	lv := s.values.LoadOrStoreAttr(lazy, func(attr attribute.Set) *lastValuePoint[N] {
+		r := s.newRes(attr)
+		_, isDrop := r.(*dropRes[N])
+		p := &lastValuePoint[N]{
+			res:           r,
+			attrs:         attr,
+			startTime:     now(),
+			dropExemplars: isDrop,
+		}
+		p.value.Store(value)
+		return p
+	})
+
+	lv.value.Store(value)
+	if !lv.dropExemplars {
+		lv.res.Offer(ctx, value, lazy)
 	}
 }
 

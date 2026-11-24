@@ -23,6 +23,12 @@ func IoctlGetUint32(fd int, req uint) (uint32, error) {
 	return value, err
 }
 
+func IoctlGetUint64(fd int, req uint) (uint64, error) {
+	var value uint64
+	err := ioctlPtr(fd, req, unsafe.Pointer(&value))
+	return value, err
+}
+
 func IoctlGetRTCTime(fd int) (*RTCTime, error) {
 	var value RTCTime
 	err := ioctlPtr(fd, RTC_RD_TIME, unsafe.Pointer(&value))
@@ -331,4 +337,11 @@ func IoctlLoopSetStatus64(fd int, value *LoopInfo64) error {
 // IoctlLoopConfigure configures all loop device parameters in a single step
 func IoctlLoopConfigure(fd int, value *LoopConfig) error {
 	return ioctlPtr(fd, LOOP_CONFIGURE, unsafe.Pointer(value))
+}
+
+// IoctlPidfdInfo fetches information about a pidfd.
+// The Mask field of the info argument indicates which
+// values to fetch.
+func IoctlPidfdInfo(fd int, info *PidfdInfo) error {
+	return ioctlPtr(fd, PIDFD_GET_INFO, unsafe.Pointer(info))
 }

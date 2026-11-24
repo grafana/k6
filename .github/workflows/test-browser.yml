@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - v.x
   pull_request:
     paths-ignore:
       - 'docs/**'
@@ -22,13 +23,9 @@ jobs:
       go_current: ${{ steps.go_versions.outputs.current }}
       go_prev: ${{ steps.go_versions.outputs.prev }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
       - name: Resolve Go versions
         id: go_versions
-        uses: ./.github/actions/go-versions
+        uses: grafana/k6-ci/.github/actions/go-versions@7dc7a71c57a30eddd3f1591ee0cc5abaeedafa14 # v0.5.4
 
   test-prev:
     needs: configure
@@ -42,7 +39,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -74,7 +71,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Run common test steps
@@ -99,7 +96,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Run common test steps

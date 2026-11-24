@@ -99,7 +99,7 @@ func rootHandler(uiPath string) http.HandlerFunc {
 			http.Redirect(
 				w,
 				r,
-				path.Join(uiPath, r.URL.Path)+"?endpoint=/",
+				path.Join(uiPath, "/")+"?endpoint=/",
 				http.StatusTemporaryRedirect,
 			)
 

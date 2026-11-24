@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otlptracegrpc // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+package otlptracegrpc
 
 import (
 	"fmt"
@@ -74,9 +74,10 @@ func WithEndpoint(endpoint string) Option {
 	return wrappedOption{otlpconfig.WithEndpoint(endpoint)}
 }
 
-// WithEndpointURL sets the target endpoint URL (scheme, host, port, path)
-// the Exporter will connect to. The provided endpoint URL should resemble
-// "https://example.com:4318/v1/traces".
+// WithEndpointURL sets the target endpoint URL (scheme, host, port) the
+// Exporter will connect to. The provided endpoint URL should resemble
+// "https://example.com:4317". If the URL contains a path, it is ignored by
+// the gRPC client.
 //
 // If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
@@ -90,7 +91,7 @@ func WithEndpoint(endpoint string) Option {
 // If an invalid URL is provided, the default value will be kept.
 //
 // By default, if an environment variable is not set, and this option is not
-// passed, "https://localhost:4317/v1/traces" will be used.
+// passed, "https://localhost:4317" will be used.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithEndpointURL(u string) Option {

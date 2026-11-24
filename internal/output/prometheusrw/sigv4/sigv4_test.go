@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuildCanonicalHeaders(t *testing.T) {
@@ -54,4 +55,45 @@ func TestBuildCanonicalHeaders(t *testing.T) {
 	gotSignedHeaders, gotCanonicalHeader := buildCanonicalHeaders(req, nil)
 	assert.Equal(t, wantSignedHeader, gotSignedHeaders)
 	assert.Equal(t, wantCanonicalHeader, gotCanonicalHeader)
+}
+
+func TestDefaultSigner_SessionToken(t *testing.T) {
+	t.Parallel()
+
+	newRequest := func() *http.Request {
+		t.Helper()
+		req, err := http.NewRequestWithContext(
+			context.Background(), http.MethodPost,
+			"https://aps-workspaces.us-east-2.amazonaws.com/workspaces/ws-mock/api/v1/remote_write",
+			strings.NewReader("mock-payload"),
+		)
+		require.NoError(t, err)
+		return req
+	}
+
+	// without a session token the security token header is neither set nor signed
+	req := newRequest()
+	signer := newDefaultSigner(&Config{
+		Region:             "us-east-2",
+		AwsAccessKeyID:     "ASIAUZABC123456",
+		AwsSecretAccessKey: "5wfFi0FEaaaaacccc1111111111111",
+	})
+	require.NoError(t, signer.sign(req))
+	assert.Empty(t, req.Header.Get(securityTokenKey))
+	assert.NotContains(t, req.Header.Get(authorizationHeaderKey), "x-amz-security-token")
+
+	// with a session token the header is set and part of the signed headers,
+	// so the signature covers it
+	req = newRequest()
+	signer = newDefaultSigner(&Config{
+		Region:             "us-east-2",
+		AwsAccessKeyID:     "ASIAUZABC123456",
+		AwsSecretAccessKey: "5wfFi0FEaaaaacccc1111111111111",
+		AwsSessionToken:    "mock-session-token",
+	})
+	require.NoError(t, signer.sign(req))
+	assert.Equal(t, "mock-session-token", req.Header.Get(securityTokenKey))
+	authorization := req.Header.Get(authorizationHeaderKey)
+	assert.Contains(t, authorization, "SignedHeaders=")
+	assert.Contains(t, authorization, "x-amz-security-token")
 }

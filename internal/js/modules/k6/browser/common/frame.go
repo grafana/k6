@@ -56,6 +56,11 @@ var domElementStateToID = map[string]DOMElementState{ //nolint:gochecknoglobals
 	"hidden":   DOMElementStateHidden,
 }
 
+func DOMElementStateIDFromString(format string) (DOMElementState, bool) {
+	id, exists := domElementStateToID[format]
+	return id, exists
+}
+
 // MarshalJSON marshals the enum as a quoted JSON string.
 func (s DOMElementState) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString(`"`)
@@ -496,6 +501,9 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 		return nil, err
 	}
 	if handle == nil {
+		if opts.State == DOMElementStateHidden || opts.State == DOMElementStateDetached {
+			return nil, nil //nolint:nilnil
+		}
 		return nil, fmt.Errorf("waiting for selector %q did not result in any nodes", selector)
 	}
 
@@ -882,13 +890,15 @@ func (f *Frame) Evaluate(pageFunc string, args ...any) (any, error) {
 
 // EvaluateGlobal will evaluate the given JS code in the global object.
 func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
-	action := runtime.Evaluate(js).WithAwaitPromise(true)
+	action := newCommand(runtime.Evaluate, runtime.EvaluateParams{Expression: js, AwaitPromise: new(true)})
 
 	var (
 		exceptionDetails *runtime.ExceptionDetails
 		err              error
 	)
-	if _, exceptionDetails, err = action.Do(cdp.WithExecutor(ctx, f.manager.session)); err != nil {
+	result, err := action.Result(ctx, f.manager.session)
+	exceptionDetails = result.ExceptionDetails
+	if err != nil {
 		return fmt.Errorf("evaluating JS in global context: %w", err)
 	}
 	if exceptionDetails != nil {
@@ -1660,6 +1670,15 @@ func (f *Frame) QueryAll(selector string) ([]*ElementHandle, error) {
 
 // Page returns page that owns frame.
 func (f *Frame) Page() *Page {
+	if f == nil {
+		return nil
+	}
+	if f.page != nil {
+		return f.page
+	}
+	if f.manager == nil {
+		return nil
+	}
 	return f.manager.page
 }
 

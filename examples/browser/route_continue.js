@@ -1,4 +1,4 @@
-import { sleep } from 'k6';
+import { sleep, fail } from 'k6';
 import { browser } from 'k6/browser';
 import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
@@ -37,6 +37,8 @@ export default async function () {
     check(null, {
       pizzaName: await e.innerText() === 'Name: My Pizza',
     });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

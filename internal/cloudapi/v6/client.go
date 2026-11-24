@@ -11,13 +11,9 @@ import (
 
 	k6cloud "github.com/grafana/k6-cloud-openapi-client-go/k6"
 	"github.com/sirupsen/logrus"
-)
-
-const (
-	// RetryInterval is the default cloud request retry interval
-	RetryInterval = 500 * time.Millisecond
-	// MaxRetries specifies max retry attempts
-	MaxRetries = 3
+	"go.k6.io/k6/v2/errext"
+	"go.k6.io/k6/v2/internal/cloudapi/clientcfg"
+	"go.k6.io/k6/v2/internal/cloudapi/httperr"
 )
 
 // Client handles communication with the k6 Cloud API.
@@ -36,23 +32,7 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 		return nil, fmt.Errorf("token is required to create cloud API client")
 	}
 
-	cfg := &k6cloud.Configuration{
-		DefaultHeader: make(map[string]string),
-		UserAgent:     "k6cloud/" + version,
-		Servers: k6cloud.ServerConfigurations{
-			{
-				URL:         host,
-				Description: "Global k6 Cloud API.",
-			},
-		},
-		OperationServers: map[string]k6cloud.ServerConfigurations{},
-		HTTPClient: &http.Client{
-			Timeout:   timeout,
-			Transport: &bodyResetTransport{base: http.DefaultTransport},
-		},
-		MaxRetries:    MaxRetries,
-		RetryInterval: RetryInterval,
-	}
+	cfg := clientcfg.New(host, version, "Global k6 Cloud API.", timeout)
 
 	c := &Client{
 		apiClient: k6cloud.NewAPIClient(cfg),
@@ -79,31 +59,12 @@ func (c *Client) BaseURL() string {
 	return c.baseURL
 }
 
-// bodyResetTransport resets req.Body from GetBody before each round trip.
-// The vendored SDK retries 5xx/429 by re-calling Do on the same request
-// without resetting its Body. After Connection: close the drained body
-// causes "ContentLength=N with Body length 0".
-type bodyResetTransport struct{ base http.RoundTripper }
-
-func (rt *bodyResetTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.GetBody == nil {
-		return rt.base.RoundTrip(req)
-	}
-	body, err := req.GetBody()
-	if err != nil {
-		return nil, err
-	}
-	req.Body = body
-	return rt.base.RoundTrip(req)
-}
-
 // CheckResponse checks the parsed response.
 // It returns nil if the code is in the successful range,
 // otherwise it tries to parse the body and return a parsed error.
 func CheckResponse(r *http.Response, err error) error {
 	if err != nil {
-		var aerr *k6cloud.GenericOpenAPIError
-		if !errors.As(err, &aerr) {
+		if _, ok := errors.AsType[*k6cloud.GenericOpenAPIError](err); !ok {
 			return err
 		}
 	}
@@ -121,21 +82,28 @@ func CheckResponse(r *http.Response, err error) error {
 		return err
 	}
 
+	var respErr error
 	var payload ResponseError
 	if err := json.Unmarshal(data, &payload); err != nil {
-		if r.StatusCode == http.StatusUnauthorized {
-			return errNotAuthenticated
+		if classified := httperr.ClassifyStatus(r.StatusCode); classified != nil {
+			respErr = classified
+		} else {
+			respErr = fmt.Errorf(
+				"unexpected HTTP error from %s: %d %s",
+				r.Request.URL,
+				r.StatusCode,
+				http.StatusText(r.StatusCode),
+			)
 		}
-		if r.StatusCode == http.StatusForbidden {
-			return errNotAuthorized
-		}
-		return fmt.Errorf(
-			"unexpected HTTP error from %s: %d %s",
-			r.Request.URL,
-			r.StatusCode,
-			http.StatusText(r.StatusCode),
-		)
+	} else {
+		payload.Response = r
+		respErr = payload
 	}
-	payload.Response = r
-	return payload
+
+	if r.StatusCode == http.StatusUnauthorized {
+		return errext.WithHint(respErr,
+			"Authenticate by running `k6 cloud login` "+
+				"or verify the active Grafana Cloud token (K6_CLOUD_TOKEN, options.cloud.token)")
+	}
+	return respErr
 }

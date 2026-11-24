@@ -1,11 +1,11 @@
-FROM debian:13@sha256:fac46bff2e02f51425b6e33b0e1169f55dfb053d83511ca28aa50c09fd5ed7a4
+FROM debian:13@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
 
 LABEL maintainer="k6 Developers <developers@k6.io>"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update -y && \
-    apt-get install -y apt-utils createrepo-c curl git gnupg2 s3cmd unzip rpm
+    apt-get install -y apt-utils bzip2 createrepo-c curl git gnupg2 s3cmd unzip rpm
 
 # Download awscli, check GPG signature and install.
 COPY ./awscli-key.gpg .

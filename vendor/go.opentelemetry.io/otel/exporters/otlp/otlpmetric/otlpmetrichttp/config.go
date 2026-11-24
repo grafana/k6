@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otlpmetrichttp // import "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+package otlpmetrichttp
 
 import (
 	"crypto/tls"
@@ -85,6 +85,11 @@ func WithEndpoint(endpoint string) Option {
 // take precedence.
 //
 // If an invalid URL is provided, the default value will be kept.
+//
+// The path of the provided URL is used as-is; with one exception: if the URL has
+// no path, it is normalized to the root path ("/"). The default metrics path
+// ("/v1/metrics") is not appended automatically. Use WithEndpoint if you want
+// that behavior, or pass a URL that includes that path.
 //
 // By default, if an environment variable is not set, and this option is not
 // passed, "localhost:4318" will be used.
@@ -193,6 +198,15 @@ func WithTimeout(duration time.Duration) Option {
 // resource consumption or abuse.
 func WithMaxRequestSize(size int) Option {
 	return wrappedOption{oconf.WithMaxRequestSize(size)}
+}
+
+// WithMaxResponseSize sets the maximum size, in bytes, of an OTLP/HTTP
+// response body, after decompression, that the exporter will read.
+//
+// By default, a limit of 4 MiB is used. Values less than or equal to zero are
+// ignored. The response-size limit cannot be disabled.
+func WithMaxResponseSize(size int64) Option {
+	return wrappedOption{oconf.WithMaxResponseSize(size)}
 }
 
 // WithRetry sets the retry policy for transient retryable errors that are

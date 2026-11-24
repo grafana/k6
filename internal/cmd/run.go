@@ -16,6 +16,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"go.k6.io/k6/v2/cmd/state"
 	"go.k6.io/k6/v2/errext"
@@ -73,6 +74,24 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
 
+	// shutdownTracerProvider is set once the tracer provider is created below.
+	// It must run after the Exit event has been emitted and handled (e.g. by
+	// the browser module ending any open spans), but before globalCtx is
+	// cancelled by globalCancel above, since it derives its own timeout from
+	// globalCtx.
+	var shutdownTracerProvider func()
+	// runSpan is the span of the whole test run, ended right before the tracer
+	// provider is shut down so it gets exported with the rest of the spans.
+	var runSpan oteltrace.Span
+	defer func() {
+		if runSpan != nil {
+			trace.EndSpan(runSpan, err)
+		}
+		if shutdownTracerProvider != nil {
+			shutdownTracerProvider()
+		}
+	}()
+
 	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
 	// k6 was started with the --linger option.
 	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
@@ -119,13 +138,21 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err = c.setupTracerProvider(globalCtx, test); err != nil {
 		return err
 	}
-	waitTracesFlushed := func() {
+	shutdownTracerProvider = func() {
 		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
 		defer cancel()
 		if tpErr := test.preInitState.TracerProvider.Shutdown(ctx); tpErr != nil {
 			logger.Errorf("The tracer provider didn't stop gracefully: %v", tpErr)
 		}
 	}
+
+	// testCtx is globalCtx carrying the run span. The span is also attached to runCtx,
+	// so that the execution contexts derived from them, and the teardown, are part of
+	// the test run trace.
+	tracer := trace.Tracer(test.preInitState.TracerProvider, test.preInitState.FeatureFlags)
+	var testCtx context.Context
+	testCtx, runSpan = trace.StartTestRun(globalCtx, tracer, logger)
+	runCtx = oteltrace.ContextWithSpan(runCtx, runSpan)
 
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
@@ -377,24 +404,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	defer func() {
-		logger.Debug("Waiting for metrics and traces processing to finish...")
+		logger.Debug("Waiting for metrics processing to finish...")
 		close(samples)
-
-		ww := [...]func(){
-			waitOutputsFlushed,
-			waitTracesFlushed,
-		}
-		var wg sync.WaitGroup
-		wg.Add(len(ww))
-		for _, w := range ww {
-			go func() {
-				w()
-				wg.Done()
-			}()
-		}
-		wg.Wait()
-
-		logger.Debug("Metrics and traces processing finished!")
+		waitOutputsFlushed()
+		logger.Debug("Metrics processing finished!")
 	}()
 
 	printExecutionDescription(
@@ -451,7 +464,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
-	err = execScheduler.Run(globalCtx, runCtx, samples)
+	err = execScheduler.Run(testCtx, runCtx, samples)
 
 	waitTestEndDone := emitEvent(&event.Event{Type: event.TestEnd})
 	defer waitTestEndDone()
@@ -460,15 +473,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// usage report after the context is done.
 	if !conf.NoUsageReport.Bool {
 		backgroundProcesses.Go(func() {
-			reportCtx, reportCancel := context.WithTimeout(globalCtx, 3*time.Second)
-			defer reportCancel()
-			logger.Debug("Sending usage report...")
-
-			if rerr := reportUsage(reportCtx, execScheduler, test); rerr != nil {
-				logger.WithError(rerr).Debug("Error sending usage report")
-			} else {
-				logger.Debug("Usage report sent successfully")
-			}
+			reportUsage(globalCtx, c.gs, func(ctx context.Context) map[string]any {
+				return createReport(test.preInitState.Usage, execScheduler, func() map[string]struct{} {
+					return catalogModulePaths(ctx, c.gs)
+				})
+			})
 		})
 	}
 
@@ -476,6 +485,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		err = common.UnwrapSobekInterruptedError(err)
 		logger.WithError(err).Debug("Test finished with an error")
+		setExecutionResult(executionState, err)
 		return err
 	}
 
@@ -489,15 +499,29 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// ensure we return an error indicating that the test run was marked as failed, and the proper
 	// exit code is used.
 	if testRunState.TestStatus.Failed() {
-		return errext.WithExitCodeIfNone(
+		err = errext.WithExitCodeIfNone(
 			fmt.Errorf("test run was marked as failed"),
 			exitcodes.MarkedAsFailed,
 		)
+		setExecutionResult(executionState, err)
+		return err
 	}
 
 	logger.Debug("Test finished cleanly")
+	setExecutionResult(executionState, nil)
 
 	return nil
+}
+
+func setExecutionResult(executionState *lib.ExecutionState, err error) {
+	exitCode := 0
+	if err != nil {
+		exitCode = -1
+		if ecerr, ok := errors.AsType[errext.HasExitCode](err); ok {
+			exitCode = int(ecerr.ExitCode())
+		}
+	}
+	executionState.SetExecutionResult(exitCode)
 }
 
 func getSummaryMode(runtimeOptions lib.RuntimeOptions) (summary.Mode, bool, error) {
@@ -557,10 +581,10 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
   {{.}} run -u 5 -d 10s script.js
 
   # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
-  {{.}} run -u 0 -s 10s:100 -s 60s:100 -s 10s:0
+  {{.}} run -u 0 -s 10s:100 -s 60s:100 -s 10s:0 script.js
 
   # Send metrics to a remote storage using the OpenTelemetry output.
-  {{.}} run -o opentelemetry`[1:])
+  {{.}} run -o opentelemetry script.js`[1:])
 
 	runCmd := &cobra.Command{
 		Use:   "run",

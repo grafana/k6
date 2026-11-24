@@ -24,6 +24,8 @@ func optionFlagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
 	flags.SortFlags = false
 
+	flags.Bool("once", false, "run the test with 1 VU and 1 iteration")
+	flags.StringSlice("scenario", nil, "run scenarios by name (comma-separated)")
 	flags.Int64P("vus", "u", 1, "number of virtual users")
 	flags.DurationP("duration", "d", 0, "test duration limit")
 	flags.Int64P("iterations", "i", 0, "script total iteration limit (among all VUs)")
@@ -40,6 +42,7 @@ func optionFlagSet() *pflag.FlagSet {
 	flags.String("user-agent", fmt.Sprintf("Grafana k6/%s", build.Version), "user agent for http requests")
 	flags.String("http-debug", "", "log all HTTP requests and responses. Excludes body by default. To include body use '--http-debug=full'") //nolint:lll
 	flags.Lookup("http-debug").NoOptDefVal = "headers"
+	flags.Bool("http-debug-redact", false, "mask credential headers in the --http-debug output")
 	flags.Bool("insecure-skip-tls-verify", false, "skip verification of TLS certificates")
 	flags.Bool("no-connection-reuse", false, "disable keep-alive connections")
 	flags.Bool("no-vu-connection-reuse", false, "don't reuse connections between iterations")
@@ -79,6 +82,13 @@ func optionFlagSet() *pflag.FlagSet {
 
 //nolint:funlen,gocognit,cyclop // this needs breaking up but probably should wait for croconf
 func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
+	if err := checkOnceConflicts(flags); err != nil {
+		return lib.Options{}, err
+	}
+	if err := checkScenarioConflicts(flags); err != nil {
+		return lib.Options{}, err
+	}
+
 	opts := lib.Options{
 		VUs:                     getNullInt64(flags, "vus"),
 		Duration:                getNullDuration(flags, "duration"),
@@ -92,6 +102,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		RPS:                     getNullInt64(flags, "rps"),
 		UserAgent:               getNullString(flags, "user-agent"),
 		HTTPDebug:               getNullString(flags, "http-debug"),
+		HTTPDebugRedact:         getNullBool(flags, "http-debug-redact"),
 		InsecureSkipTLSVerify:   getNullBool(flags, "insecure-skip-tls-verify"),
 		NoConnectionReuse:       getNullBool(flags, "no-connection-reuse"),
 		NoVUConnectionReuse:     getNullBool(flags, "no-vu-connection-reuse"),

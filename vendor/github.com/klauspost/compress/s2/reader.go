@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"runtime"
 	"sync"
@@ -212,17 +211,22 @@ func (r *Reader) skippable(tmp []byte, n int, allowEOF bool, id uint8) (ok bool)
 		if r.err != nil {
 			return false
 		}
-		_, r.err = io.CopyBuffer(ioutil.Discard, rd, tmp)
+		_, r.err = io.CopyBuffer(io.Discard, rd, tmp)
 		return r.err == nil
 	}
 	if rs, ok := r.r.(io.ReadSeeker); ok {
-		_, err := rs.Seek(int64(n), io.SeekCurrent)
-		if err == nil {
-			return true
-		}
-		if err == io.ErrUnexpectedEOF || (r.err == io.EOF && !allowEOF) {
-			r.err = ErrCorrupt
-			return false
+		if cur, err := rs.Seek(0, io.SeekCurrent); err == nil {
+			if end, err := rs.Seek(0, io.SeekEnd); err == nil {
+				if cur+int64(n) <= end {
+					if _, err := rs.Seek(cur+int64(n), io.SeekStart); err == nil {
+						return true
+					}
+				}
+				if _, err := rs.Seek(cur, io.SeekStart); err != nil {
+					r.err = ErrCorrupt
+					return false
+				}
+			}
 		}
 	}
 	for n > 0 {
@@ -446,9 +450,7 @@ func (r *Reader) DecodeConcurrent(w io.Writer, concurrent int) (written int64, e
 	}
 	// Writer
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for toWrite := range queue {
 			entry := <-toWrite
 			reUse <- toWrite
@@ -475,7 +477,7 @@ func (r *Reader) DecodeConcurrent(w io.Writer, concurrent int) (written int64, e
 			}
 			aWritten += int64(n)
 		}
-	}()
+	})
 
 	defer func() {
 		if r.err != nil {

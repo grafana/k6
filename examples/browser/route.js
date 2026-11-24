@@ -1,5 +1,5 @@
 import { browser } from 'k6/browser';
-import { check } from 'k6';
+import { check, fail } from 'k6';
 
 export const options = {
   scenarios: {
@@ -64,6 +64,8 @@ export default async function () {
       'pizza API status is 200': (r) => r.status() === 200,
       'pizza API URL is correct': (r) => r.url() === 'https://quickpizza.grafana.com/api/pizza',
     });
+  } catch (error) {
+    fail(`Browser iteration failed: ${error.message}`);
   } finally {
     await page.close();
   }

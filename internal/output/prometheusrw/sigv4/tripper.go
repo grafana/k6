@@ -18,6 +18,10 @@ type Config struct {
 	Region             string
 	AwsAccessKeyID     string
 	AwsSecretAccessKey string
+
+	// AwsSessionToken is optional. It is required when the credentials are
+	// temporary, for example when they come from an IAM role or STS.
+	AwsSessionToken string
 }
 
 func (c *Config) validate() error {

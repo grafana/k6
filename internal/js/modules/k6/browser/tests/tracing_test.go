@@ -52,6 +52,23 @@ const html = `
 </html>
 `
 
+// clientRedirectHTML performs a single client-initiated redirect on load (JS
+// assigning location). The query-string guard prevents a redirect loop. Chrome
+// emits two consecutive main-frame frameStartedLoading events for the resulting
+// document, which used to create a spurious phantom navigation span.
+const clientRedirectHTML = `<!DOCTYPE html>
+<html>
+<head><title>redirect</title></head>
+<body>landing
+<script>
+  if (!location.search) {
+    location.replace(location.pathname + '?var=B');
+  }
+</script>
+</body>
+</html>
+`
+
 // TestTracing verifies that all methods instrumented to generate
 // traces behave correctly.
 func TestTracing(t *testing.T) {
@@ -322,6 +339,129 @@ func TestNavigationSpanCreation(t *testing.T) {
 			// changes slightly on every test run. Instead we're going to make
 			// sure that the slice matches but not the order.
 			assert.ElementsMatch(t, tc.expected, got, fmt.Sprintf("%s failed", tc.name))
+		})
+	}
+}
+
+// TestNavigationSpanPhantomOnClientRedirect asserts that a client-initiated
+// redirect does not create a spurious phantom navigation span. Navigating to a
+// page that redirects itself once should yield exactly one navigation span per
+// committed main-frame document plus the initial about:blank: about:blank, the
+// landing document, and the redirect target (3), not 4.
+func TestNavigationSpanPhantomOnClientRedirect(t *testing.T) {
+	t.Parallel()
+
+	tracer := &mockTracer{spans: make(map[string]struct{})}
+	tp := &mockTracerProvider{tracer: tracer}
+
+	ts := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, err := fmt.Fprint(w, clientRedirectHTML)
+			require.NoError(t, err)
+		},
+	))
+	t.Cleanup(ts.Close)
+
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+	rt := vu.Runtime()
+	root := browser.New()
+	mod := root.NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+	require.NoError(t, rt.Set("browser", jsMod.Browser))
+	vu.ActivateVU()
+	vu.StartIteration(t)
+	defer vu.EndIteration(t)
+
+	js := fmt.Sprintf(`
+		page = await browser.newPage();
+		await page.goto('%s', {waitUntil:'load'});
+		await page.waitForTimeout(1500);
+		await page.close();
+		`, ts.URL)
+	assertJSInEventLoop(t, vu, js)
+
+	got := tracer.cloneOrderedSpans()
+	navs := 0
+	for _, s := range got {
+		if s == "navigation" {
+			navs++
+		}
+	}
+	// about:blank + landing document + redirect target = 3. A phantom
+	// rotation on the redirect's duplicate frameStartedLoading would make 4.
+	assert.Equalf(t, 3, navs,
+		"expected 3 navigation spans (no phantom), got %d; spans: %v", navs, got)
+}
+
+// TestNavigationSpanAfterNonCommittingLoad asserts that a main-frame load that
+// never commits a document (a download or a 204 response) does not stop the
+// next real navigation from rotating a new navigation span. Such loads fire
+// frameStartedLoading and frameStoppedLoading but no frameNavigated.
+func TestNavigationSpanAfterNonCommittingLoad(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "download", path: "/download"},
+		{name: "no_content", path: "/no-content"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tracer := &mockTracer{spans: make(map[string]struct{})}
+			tp := &mockTracerProvider{tracer: tracer}
+
+			ts := httptest.NewServer(http.HandlerFunc(
+				func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/download":
+						w.Header().Set("Content-Type", "application/octet-stream")
+						w.Header().Set("Content-Disposition", `attachment; filename="file.bin"`)
+						_, err := fmt.Fprint(w, "data")
+						require.NoError(t, err)
+					case "/no-content":
+						w.WriteHeader(http.StatusNoContent)
+					default:
+						w.Header().Set("Content-Type", "text/html; charset=utf-8")
+						_, err := fmt.Fprint(w, html)
+						require.NoError(t, err)
+					}
+				},
+			))
+			t.Cleanup(ts.Close)
+
+			vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+			rt := vu.Runtime()
+			root := browser.New()
+			mod := root.NewModuleInstance(vu)
+			jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+			require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+			require.NoError(t, rt.Set("browser", jsMod.Browser))
+			vu.ActivateVU()
+			vu.StartIteration(t)
+			defer vu.EndIteration(t)
+
+			assertJSInEventLoop(t, vu, fmt.Sprintf(`
+				page = await browser.newPage();
+				await page.goto('%s/a', {waitUntil:'load'});
+				await page.evaluate((p) => { location.href = p; }, '%s');
+				await page.waitForTimeout(1000);
+				`, ts.URL, tt.path))
+			_ = tracer.cloneOrderedSpans()
+
+			assertJSInEventLoop(t, vu, fmt.Sprintf(`
+				await page.goto('%s/b', {waitUntil:'load'});
+				await page.close();
+				`, ts.URL))
+
+			got := tracer.cloneOrderedSpans()
+			assert.Containsf(t, got, "navigation",
+				"navigating after a non-committing load should rotate a new navigation span; spans: %v", got)
 		})
 	}
 }

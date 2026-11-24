@@ -33,6 +33,20 @@ type LoadTest struct {
 	Updated   time.Time `json:"updated"`
 }
 
+// LoadZone is a Grafana Cloud k6 load zone.
+type LoadZone struct {
+	ID int64 `json:"id"`
+	// K6LoadZoneID is the identifier used to reference the load zone from
+	// k6 scripts (e.g. "amazon:us:ashburn").
+	K6LoadZoneID string `json:"k6_load_zone_id"`
+	Name         string `json:"name"`
+	// Public reports whether the load zone is a public (Grafana-managed)
+	// zone as opposed to a private/custom one.
+	Public bool `json:"public"`
+	// Available reports whether the load zone is currently usable.
+	Available bool `json:"available"`
+}
+
 // ListProjects retrieves the list of projects for the configured stack.
 func (c *Client) ListProjects(ctx context.Context) ([]Project, error) {
 	const pageSize int32 = 1000
@@ -141,6 +155,35 @@ func (c *Client) listLoadTestsPage(
 	return res, nil
 }
 
+// ListLoadZones retrieves the list of load zones available to the configured stack.
+func (c *Client) ListLoadZones(ctx context.Context) (_ []LoadZone, err error) {
+	res, hr, err := c.apiClient.LoadZonesAPI.
+		LoadZonesList(c.authCtx(ctx)).
+		XStackId(c.stackID).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, errUnknown
+	}
+
+	zones := make([]LoadZone, 0, len(res.Value))
+	for _, zone := range res.Value {
+		zones = append(zones, LoadZone{
+			ID:           zone.Id,
+			K6LoadZoneID: zone.K6LoadZoneId,
+			Name:         zone.Name,
+			Public:       zone.Public,
+			Available:    zone.Available,
+		})
+	}
+
+	return zones, nil
+}
+
 // ValidateToken validates the cloud authentication token.
 func (c *Client) ValidateToken(ctx context.Context, stackURL string) (_ *k6cloud.AuthenticationResponse, err error) {
 	if stackURL == "" {
@@ -198,6 +241,37 @@ func (c *Client) ValidateOptions(ctx context.Context, projectID int64, opts lib.
 	}
 
 	return nil
+}
+
+// CreateOrFindLoadTest creates a load test by name in the given project without
+// uploading a script. If the API returns 409 (conflict), it falls back to
+// looking up the existing test by name and returns its ID.
+func (c *Client) CreateOrFindLoadTest(ctx context.Context, projectID int64, name string) (_ int64, err error) {
+	res, hr, err := c.apiClient.LoadTestsAPI.
+		ProjectsLoadTestsCreate(c.authCtx(ctx), projectID).
+		XStackId(c.stackID).
+		Name(name).
+		Execute()
+	defer closeResponse(hr, &err)
+
+	if err := CheckResponse(hr, err); err != nil {
+		var rerr ResponseError
+		if errors.As(err, &rerr) && rerr.Response != nil && rerr.Response.StatusCode == http.StatusConflict {
+			lt, err := c.findTestByName(ctx, projectID, name)
+			if err != nil {
+				return 0, err
+			}
+			return lt.GetId(), nil
+		}
+		return 0, err
+	}
+	if res == nil {
+		// The SDK getters return zero values on a nil receiver, so guard
+		// against silently producing a bogus 0 id and report it clearly.
+		return 0, errors.New("unexpected nil response from CreateOrFindLoadTest")
+	}
+
+	return res.GetId(), nil
 }
 
 // UploadTest creates or updates a cloud load test's script.

@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -54,7 +56,7 @@ func TestTextSummary(t *testing.T) {
 			runner, err := getSimpleRunner(
 				t, "/script.js",
 				fmt.Sprintf(`
-					exports.options = {summaryTrendStats: %s};
+					exports.options = {handleSummaryTimeout: "2m", summaryTrendStats: %s};
 					exports.default = function() {/* we don't run this, metrics are mocked */};
 				`, string(trendStats)),
 				lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
@@ -110,7 +112,8 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t,
 		"/script.js",
-		"exports.default = function() {/* we don't run this, metrics are mocked */};",
+		`exports.options = {handleSummaryTimeout: "2m"};
+		exports.default = function() {/* we don't run this, metrics are mocked */};`,
 		lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
 	)
 	require.NoError(t, err)
@@ -294,7 +297,7 @@ func TestOldJSONExport(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {handleSummaryTimeout: "2m", summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
 		exports.default = function() {/* we don't run this, metrics are mocked */};
 		`,
 		lib.RuntimeOptions{
@@ -555,12 +558,41 @@ const expectedHandleSummaryDataWithSetup = `
     }
 }`
 
+// TestHandleSummaryPendingPromise checks that a handleSummary() whose promise never settles is
+// logged as an error and k6 falls back to the default summary, as it does for other callback errors.
+func TestHandleSummaryPendingPromise(t *testing.T) {
+	t.Parallel()
+	logger, hook := logtest.NewNullLogger()
+	runner, err := getSimpleRunner(t, "/script.js", `
+		export const options = { handleSummaryTimeout: "1s" };
+		export default function () { /* we don't run this, metrics are mocked */ }
+		export async function handleSummary(data) {
+			await new Promise(() => {});
+			return { "never.json": "{}" };
+		}
+		`, logger)
+	require.NoError(t, err)
+
+	result, err := runner.HandleSummary(t.Context(), createTestLegacySummary(t), nil, summary.Meta{})
+	require.NoError(t, err)
+	require.NotNil(t, result["stdout"], "falls back to the default summary")
+	require.Nil(t, result["never.json"])
+
+	var logged bool
+	for _, e := range hook.AllEntries() {
+		if strings.Contains(e.Message, "did not finish") {
+			logged = true
+		}
+	}
+	require.True(t, logged, "the pending promise is logged as an error")
+}
+
 func TestRawHandleSummaryData(t *testing.T) {
 	t.Parallel()
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {handleSummaryTimeout: "2m", summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
 		exports.default = function() { /* we don't run this, metrics are mocked */ };
 		exports.handleSummary = function(data) {
 			return {'rawdata.json': JSON.stringify(data)};
@@ -597,7 +629,7 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {handleSummaryTimeout: "2m", summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
 		exports.default = function() { /* we don't run this, metrics are mocked */ };
 		exports.handleSummary = function(data) {
 			if(data.setup_data != 5) {
@@ -623,7 +655,7 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {handleSummaryTimeout: "2m", summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
 		exports.default = function() { /* we don't run this, metrics are mocked */ };
 		exports.handleSummary = async function(data) {
             return await Promise.resolve({'dataWithSetup.json': JSON.stringify(data)});
@@ -650,6 +682,7 @@ func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 			t.Parallel()
 			runner, err := getSimpleRunner(t, "/script.js",
 				fmt.Sprintf(`
+					exports.options = {handleSummaryTimeout: "2m"};
 					exports.default = function() { /* we don't run this, metrics are mocked */ };
 					exports.handleSummary = %s;
 				`, tc),
@@ -673,6 +706,7 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	logger.AddHook(logHook)
 
 	runner, err := getSimpleRunner(t, "/script.js", `
+			exports.options = {handleSummaryTimeout: "2m"};
 			exports.default = function() {/* we don't run this, metrics are mocked */};
 			exports.handleSummary = function(data) {
 				throw new Error('intentional error');
@@ -696,6 +730,6 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	assert.Equal(t, 1, len(logErrors))
 	errMsg, err := logErrors[0].String()
 	require.NoError(t, err)
-	assert.Contains(t, errMsg, "\"Error: intentional error\\n\\tat file:///script.js:4:11(3)\\n")
+	assert.Contains(t, errMsg, "\"Error: intentional error\\n\\tat file:///script.js:5:11(3)\\n")
 	assert.Equal(t, logrus.Fields{"hint": "script exception", "source": "stacktrace"}, logErrors[0].Data)
 }

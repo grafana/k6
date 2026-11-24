@@ -94,4 +94,4 @@ It's preferable to make multiple PRs - in most cases you can split them in three
 
 Further splitting is recommended if PRs become too big.
 
-When updating Sobek it's recommended to run the tc39 tests in `js/tc39`. And if needed, update the breaking ones as explained in an [Introduction to a k6's TC39 testing](./js/tc39/README.md).
+When updating Sobek it's recommended to run the tc39 tests in `internal/js/tc39`. And if needed, update the breaking ones as explained in an [Introduction to a k6's TC39 testing](./internal/js/tc39/README.md).

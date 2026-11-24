@@ -3,17 +3,12 @@ package sobek
 import (
 	"hash/maphash"
 	"io"
-	"math"
 	"reflect"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/grafana/sobek/parser"
 	"github.com/grafana/sobek/unistring"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 // Represents a string imported from Go. The idea is to delay the scanning for unicode characters and converting
@@ -42,7 +37,7 @@ func (i *importedString) ensureScanned() {
 func (i *importedString) ToInteger() int64 {
 	i.ensureScanned()
 	if i.u != nil {
-		return 0
+		return i.u.ToInteger()
 	}
 	return asciiString(i.s).ToInteger()
 }
@@ -70,7 +65,7 @@ func (i *importedString) String() string {
 func (i *importedString) ToFloat() float64 {
 	i.ensureScanned()
 	if i.u != nil {
-		return math.NaN()
+		return i.u.ToFloat()
 	}
 	return asciiString(i.s).ToFloat()
 }
@@ -120,6 +115,8 @@ func (i *importedString) StrictEquals(other Value) bool {
 		}
 	case *importedString:
 		return i.s == otherStr.s
+	case *concatString:
+		return i.StrictEquals(otherStr.flatten())
 	}
 	return false
 }
@@ -188,7 +185,11 @@ func (i *importedString) Substring(start, end int) String {
 }
 
 func (i *importedString) CompareTo(v String) int {
-	return strings.Compare(i.s, v.String())
+	i.ensureScanned()
+	if i.u != nil {
+		return i.u.CompareTo(v)
+	}
+	return asciiString(i.s).CompareTo(v)
 }
 
 func (i *importedString) Reader() io.RuneReader {
@@ -288,7 +289,10 @@ func (i *importedString) lastIndex(v String, pos int) int {
 func (i *importedString) toLower() String {
 	i.ensureScanned()
 	if i.u != nil {
-		return toLower(i.s)
+		var b StringBuilder
+		b.Grow(len(i.s))
+		toLower(i.s, &b)
+		return b.String()
 	}
 	return asciiString(i.s).toLower()
 }
@@ -296,12 +300,14 @@ func (i *importedString) toLower() String {
 func (i *importedString) toUpper() String {
 	i.ensureScanned()
 	if i.u != nil {
-		caser := cases.Upper(language.Und)
-		return newStringValue(caser.String(i.s))
+		var b StringBuilder
+		b.Grow(len(i.s))
+		toUpper(i.s, &b)
+		return b.String()
 	}
 	return asciiString(i.s).toUpper()
 }
 
 func (i *importedString) toTrimmedUTF8() string {
-	return strings.Trim(i.s, parser.WhitespaceChars)
+	return strings.Trim(i.s, WhitespaceChars)
 }

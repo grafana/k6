@@ -1,6 +1,6 @@
 # Introduction to a k6's TC39 testing
 
-`js/tc39` package tests k6 [Sobek](https://github.com/grafana/sobek) and the k6 Sobek+esbuild combo against the tc39 test suite.
+`internal/js/tc39` package tests k6 [Sobek](https://github.com/grafana/sobek) and the k6 Sobek+esbuild combo against the tc39 test suite.
 
 Ways to use it:
 1. run ./checkout.sh to checkout the last commit sha of [test262](https://github.com/tc39/test262)

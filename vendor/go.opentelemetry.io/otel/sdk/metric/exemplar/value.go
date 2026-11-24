@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package exemplar // import "go.opentelemetry.io/otel/sdk/metric/exemplar"
+package exemplar
 
 import "math"
 
@@ -49,8 +49,8 @@ func (v Value) Int64() int64 {
 	return 0
 }
 
-// Float64 returns the value of v as an float64. If the ValueType of v is not
-// an Float64ValueType, 0 is returned.
+// Float64 returns the value of v as a float64. If the ValueType of v is not
+// a Float64ValueType, 0 is returned.
 func (v Value) Float64() float64 {
 	if v.t == Float64ValueType {
 		return math.Float64frombits(v.val)

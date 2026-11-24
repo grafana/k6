@@ -158,6 +158,10 @@ type ExecutionState struct {
 	// observability of the k6 test run progress.
 	executionStatus *uint32
 
+	// The exit code that will result from the completed test execution. It is
+	// unset until the execution result is known.
+	executionResultExitCode atomic.Pointer[int]
+
 	// A nanosecond UNIX timestamp that is set when the test is actually
 	// started. The default 0 value is used to denote that the test hasn't
 	// started yet...
@@ -321,6 +325,21 @@ func (es *ExecutionState) SetExecutionStatus(newStatus ExecutionStatus) (oldStat
 // predictable with options like --paused or --linger.
 func (es *ExecutionState) GetCurrentExecutionStatus() ExecutionStatus {
 	return ExecutionStatus(atomic.LoadUint32(es.executionStatus))
+}
+
+// SetExecutionResult records the exit code resulting from the test execution.
+func (es *ExecutionState) SetExecutionResult(exitCode int) {
+	es.executionResultExitCode.Store(&exitCode)
+}
+
+// GetExecutionResult returns the test execution's exit code when it is known.
+func (es *ExecutionState) GetExecutionResult() (int, bool) {
+	exitCode := es.executionResultExitCode.Load()
+	if exitCode == nil {
+		return 0, false
+	}
+
+	return *exitCode, true
 }
 
 // MarkStarted saves the current timestamp as the test start time.

@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package otlpmetrichttp // import "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
+package otlpmetrichttp
 
 import (
 	"bytes"
@@ -31,11 +31,12 @@ import (
 
 type client struct {
 	// req is cloned for every upload the client makes.
-	req            *http.Request
-	compression    Compression
-	maxRequestSize int
-	requestFunc    retry.RequestFunc
-	httpClient     *http.Client
+	req             *http.Request
+	compression     Compression
+	maxRequestSize  int
+	maxResponseSize int64
+	requestFunc     retry.RequestFunc
+	httpClient      *http.Client
 
 	inst *observ.Instrumentation
 }
@@ -58,13 +59,6 @@ var ourTransport = &http.Transport{
 }
 
 var errInsecureEndpointWithTLS = errors.New("insecure HTTP endpoint cannot use TLS client configuration")
-
-// maxResponseBodySize is the maximum number of bytes to read from a response
-// body. It is set to 4 MiB per the OTLP specification recommendation to
-// mitigate excessive memory usage caused by a misconfigured or malicious
-// server. If exceeded, the response is treated as a not-retryable error.
-// This is a variable to allow tests to override it.
-var maxResponseBodySize int64 = 4 * 1024 * 1024
 
 // newClient creates a new HTTP metric client.
 func newClient(cfg oconf.Config) (*client, error) {
@@ -120,12 +114,13 @@ func newClient(cfg oconf.Config) (*client, error) {
 	inst, err := observ.NewInstrumentation(counter.NextExporterID(), cfg.Metrics.Endpoint)
 
 	return &client{
-		compression:    Compression(cfg.Metrics.Compression),
-		maxRequestSize: cfg.Metrics.MaxRequestSize,
-		req:            req,
-		requestFunc:    cfg.RetryConfig.RequestFunc(evaluate),
-		httpClient:     httpClient,
-		inst:           inst,
+		compression:     Compression(cfg.Metrics.Compression),
+		maxRequestSize:  cfg.Metrics.MaxRequestSize,
+		maxResponseSize: cfg.Metrics.MaxResponseSize,
+		req:             req,
+		requestFunc:     cfg.RetryConfig.RequestFunc(evaluate),
+		httpClient:      httpClient,
+		inst:            inst,
 	}, err
 }
 
@@ -204,11 +199,7 @@ func (c *client) UploadMetrics(ctx context.Context, protoMetrics *metricpb.Resou
 
 			// Read the partial success message, if any.
 			var respData bytes.Buffer
-			if _, err := io.Copy(&respData, http.MaxBytesReader(nil, resp.Body, maxResponseBodySize)); err != nil {
-				var maxBytesErr *http.MaxBytesError
-				if errors.As(err, &maxBytesErr) {
-					return fmt.Errorf("response body too large: exceeded %d bytes", maxBytesErr.Limit)
-				}
+			if err := internal.CopyResponseBody(&respData, resp.Body, c.maxResponseSize); err != nil {
 				return err
 			}
 			if respData.Len() == 0 {
@@ -239,11 +230,7 @@ func (c *client) UploadMetrics(ctx context.Context, protoMetrics *metricpb.Resou
 		// message to be returned. It will help in
 		// debugging the actual issue.
 		var respData bytes.Buffer
-		if _, err := io.Copy(&respData, http.MaxBytesReader(nil, resp.Body, maxResponseBodySize)); err != nil {
-			var maxBytesErr *http.MaxBytesError
-			if errors.As(err, &maxBytesErr) {
-				return fmt.Errorf("response body too large: exceeded %d bytes", maxBytesErr.Limit)
-			}
+		if err := internal.CopyResponseBody(&respData, resp.Body, c.maxResponseSize); err != nil {
 			return err
 		}
 		respStr := strings.TrimSpace(respData.String())
@@ -341,7 +328,7 @@ func (r *request) reset(ctx context.Context) {
 
 // retryableError represents a request failure that can be retried.
 type retryableError struct {
-	throttle int64
+	throttle time.Duration
 	err      error
 }
 
@@ -351,13 +338,27 @@ type retryableError struct {
 func newResponseError(header http.Header, wrapped error) error {
 	var rErr retryableError
 	if v := header.Get("Retry-After"); v != "" {
-		if t, err := strconv.ParseInt(v, 10, 64); err == nil {
-			rErr.throttle = t
-		}
+		rErr.throttle = retryAfterDuration(v)
 	}
 
 	rErr.err = wrapped
 	return rErr
+}
+
+func retryAfterDuration(v string) time.Duration {
+	if t, err := strconv.ParseInt(v, 10, 64); err == nil && t >= 0 {
+		const maxRetryAfterSeconds = int64(1<<63-1) / int64(time.Second)
+		if t > maxRetryAfterSeconds {
+			return time.Duration(1<<63 - 1)
+		}
+		return time.Duration(t) * time.Second
+	}
+
+	if date, err := http.ParseTime(v); err == nil {
+		return max(time.Until(date), 0)
+	}
+
+	return 0
 }
 
 func (e retryableError) Error() string {
@@ -401,5 +402,5 @@ func evaluate(err error) (bool, time.Duration) {
 		return false, 0
 	}
 
-	return true, time.Duration(rErr.throttle)
+	return true, rErr.throttle
 }

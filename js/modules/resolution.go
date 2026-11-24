@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/sobek/ast"
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/v2/ext"
 	"go.k6.io/k6/v2/internal/js/compiler"
 	"go.k6.io/k6/v2/internal/loader"
 	"go.k6.io/k6/v2/internal/usage"
@@ -78,12 +79,17 @@ func (mr *ModuleResolver) initializeGoModule(name string) (sobek.ModuleRecord, e
 		mr.unknownModules = append(mr.unknownModules, name)
 		return &unknownModule{name: name, requested: make(map[string]struct{})}, nil
 	}
-	// we don't want to report extensions and we would have hit cache if this isn't the first time
-	if !strings.HasPrefix(name, "k6/x/") {
-		err := mr.usage.Strings("modules", name)
-		if err != nil {
-			mr.logger.WithError(err).Warnf("Error while reporting usage of module %q", name)
+	// We would have hit the cache if this isn't the first time, so each distinct
+	// module is recorded once. An extension is identified by membership in the
+	// extension registry, not by its k6/x/ name: its resolved registry entry is
+	// recorded under "extensions" so the report needs no re-resolution, while
+	// built-in modules stay in the "modules" bucket.
+	if e, ok := ext.Get(ext.JSExtension)[name]; ok {
+		if err := mr.usage.Values("extensions", e); err != nil {
+			mr.logger.WithError(err).Warnf("Error while reporting usage of extension %q", name)
 		}
+	} else if err := mr.usage.Strings("modules", name); err != nil {
+		mr.logger.WithError(err).Warnf("Error while reporting usage of module %q", name)
 	}
 	k6m, ok := mod.(Module)
 	if !ok {

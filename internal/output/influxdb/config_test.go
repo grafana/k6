@@ -15,6 +15,15 @@ func TestParseURL(t *testing.T) {
 		"/dbname":                      {DB: null.StringFrom("dbname")},
 		"http://localhost:8086":        {Addr: null.StringFrom("http://localhost:8086")},
 		"http://localhost:8086/dbname": {Addr: null.StringFrom("http://localhost:8086"), DB: null.StringFrom("dbname")},
+		"http://my.site.io/influxdbA/k6db": {
+			Addr: null.StringFrom("http://my.site.io/influxdbA"),
+			DB:   null.StringFrom("k6db"),
+		},
+		"http://my.site.io/a/b/c/dbname": {
+			Addr: null.StringFrom("http://my.site.io/a/b/c"),
+			DB:   null.StringFrom("dbname"),
+		},
+		"http://my.site.io/prefix/": {Addr: null.StringFrom("http://my.site.io/prefix")},
 	}
 	queries := map[string]struct {
 		Config Config

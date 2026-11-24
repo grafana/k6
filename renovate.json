@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>grafana/grafana-renovate-config//presets/k6/k6-engine-base.json",
-    "schedule:weekly"
+    "schedule:weekly",
+    "github>grafana/grafana-renovate-config//presets/k6/k6-engine-automerge.json"
   ],
   "ignorePaths": [
     "**/vendor/**",
@@ -19,17 +20,16 @@
       "matchManagers": [
         "gomod"
       ],
-      "enabled": true,
       "postUpdateOptions": [
         "gomodTidy",
         "gomodUpdateImportPaths"
       ]
     },
     {
-      "description": "Do not update indirect dependencies",
+      "description": "Allow indirect Go vulnerability fixes; the shared schedule suppresses routine updates",
       "matchManagers": ["gomod"],
       "matchDepTypes": ["indirect"],
-      "enabled": false
+      "allowedVersions": null
     },
     {
       "groupName": "golangx",
@@ -71,10 +71,10 @@
     {
       "description": "k6 dockerfiles",
       "matchManagers": [
-        "docker"
+        "dockerfile"
       ],
-      "ignorePaths": [
-        "packaging/**"
+      "matchFileNames": [
+        "!packaging/**"
       ],
       "extends": [
         "schedule:monthly"
@@ -83,7 +83,7 @@
     {
       "description": "Dockerfiles packaging tool",
       "matchManagers": [
-        "docker"
+        "dockerfile"
       ],
       "matchFileNames": [
         "packaging/**"
@@ -102,31 +102,36 @@
         "schedule:quarterly"
       ]
     },
-	{
-      "matchBaseBranches": ["v1.x"],
-      "matchUpdateTypes": ["major", "minor", "patch", "pin", "digest"],
-      "enabled": false,
-      "description": "Disable all standard updates for v1"
-    },
     {
-      "matchBaseBranches": ["v1.x"],
-      "matchUpdateTypes": ["security"],
-      "enabled": true,
-      "dependencyDashboardApproval": false,
-      "description": "Override and enable only security updates for v1"
-    },
-    {
-      "description": "v1.x Dockerfile",
-      "matchBaseBranches": ["v1.x"],
-      "matchManagers": [
-        "docker"
-      ],
+      "description": "The influxdb-v1 example must stay on InfluxDB v1.x: allow minor/patch/digest updates only",
       "matchFileNames": [
-        "Dockerfile"
+        "examples/docker-compose/influxdb-v1/**"
       ],
-      "extends": [
-        "schedule:weekly"
-      ]
+      "matchPackageNames": [
+        "influxdb"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "matchBaseBranches": ["v1.x"],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "digest",
+        "pinDigest",
+        "lockfileUpdate",
+        "lockFileMaintenance",
+        "bump",
+        "rollback",
+        "replacement"
+      ],
+      "enabled": false,
+      "description": "Disable routine updates for v1; vulnerability alerts bypass this rule"
     }
   ]
 }

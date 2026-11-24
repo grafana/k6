@@ -50,6 +50,14 @@ type ElementHandle struct {
 	frame *Frame
 }
 
+// Page returns the page that owns the element handle.
+func (h *ElementHandle) Page() *Page {
+	if h == nil || h.frame == nil {
+		return nil
+	}
+	return h.frame.Page()
+}
+
 // String returns a string representation of ElementHandle.
 // It exists mostly for debugging where we don't want fmt.Sprintf to just
 // go through a complex object and try to stringify it.
@@ -63,8 +71,10 @@ func (h *ElementHandle) String() string {
 func (h *ElementHandle) boundingBox() (*Rect, error) {
 	var box *dom.BoxModel
 	var err error
-	action := dom.GetBoxModel().WithObjectID(h.remoteObject.ObjectID)
-	if box, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	action := newCommand(dom.GetBoxModel, dom.GetBoxModelParams{ObjectID: h.remoteObject.ObjectID})
+	result, err := action.Result(h.ctx, h.session)
+	box = result.Model
+	if err != nil {
 		return nil, fmt.Errorf("getting bounding box model of DOM node: %w", err)
 	}
 
@@ -477,8 +487,9 @@ func (h *ElementHandle) ownerFrame(apiCtx context.Context) (*Frame, error) {
 }
 
 func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect *dom.Rect) error {
-	action := dom.ScrollIntoViewIfNeeded().WithObjectID(h.remoteObject.ObjectID).WithRect(rect)
-	err := action.Do(cdp.WithExecutor(apiCtx, h.session))
+	action := newCommand(dom.ScrollIntoViewIfNeeded,
+		dom.ScrollIntoViewIfNeededParams{ObjectID: h.remoteObject.ObjectID, Rect: rect})
+	err := action.Do(apiCtx, h.session)
 	if err != nil {
 		if strings.Contains(err.Error(), "Node does not have a layout object") {
 			return ErrElementNotVisible
@@ -854,8 +865,10 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 		node *cdp.Node
 		err  error
 	)
-	action := dom.DescribeNode().WithObjectID(h.remoteObject.ObjectID)
-	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	action := newCommand(dom.DescribeNode, dom.DescribeNodeParams{ObjectID: h.remoteObject.ObjectID})
+	result, err := action.Result(h.ctx, h.session)
+	node = result.Node
+	if err != nil {
 		return nil, fmt.Errorf("getting remote node %q: %w", h.remoteObject.ObjectID, err)
 	}
 	if node == nil || node.FrameID == "" {
@@ -1151,8 +1164,10 @@ func (h *ElementHandle) OwnerFrame() (_ *Frame, rerr error) {
 	}
 
 	var node *cdp.Node
-	action := dom.DescribeNode().WithObjectID(documentHandle.remoteObject.ObjectID)
-	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+	action := newCommand(dom.DescribeNode, dom.DescribeNodeParams{ObjectID: documentHandle.remoteObject.ObjectID})
+	result, err := action.Result(h.ctx, h.session)
+	node = result.Node
+	if err != nil {
 		return nil, fmt.Errorf("getting node in frame: %w", err)
 	}
 	if node == nil || node.FrameID == "" {
@@ -1391,9 +1406,13 @@ func (h *ElementHandle) Screenshot(
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp, h.logger)
+	s, cancel := newScreenshotter(spanCtx, opts.Timeout, sp, h.logger)
+	defer cancel()
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
+		if errors.Is(s.ctx.Err(), context.DeadlineExceeded) && h.ctx.Err() == nil {
+			err = &k6ext.UserFriendlyError{Err: err, Timeout: opts.Timeout}
+		}
 		return nil, spanRecordErrorf(span, "taking screenshot of elementHandle: %w", err)
 	}
 
@@ -1868,8 +1887,7 @@ func errorFromDOMError(v any) error {
 	default:
 		return fmt.Errorf("unexpected DOM error type %T", v)
 	}
-	var uerr *k6ext.UserFriendlyError
-	if errors.As(err, &uerr) {
+	if _, ok := errors.AsType[*k6ext.UserFriendlyError](err); ok {
 		return err
 	}
 	if strings.Contains(serr, "timed out") {

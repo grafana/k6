@@ -183,3 +183,25 @@ func TestSerialize(t *testing.T) {
 		}
 	})
 }
+
+func TestSerializeBooleanAttributes(t *testing.T) {
+	t.Parallel()
+
+	// "checked" and "disabled" are boolean attributes: their presence alone
+	// sets them, whatever their value (or lack of one) is.
+	rt := getTestRuntimeWithDoc(t, `
+	<form>
+		<input type="checkbox" name="checkbox_bare" value="a" checked>
+		<input type="checkbox" name="checkbox_empty" value="b" checked="">
+		<input type="radio" name="radio_bare" value="c" checked>
+		<input type="checkbox" name="checkbox_unchecked" value="d">
+		<input type="text" name="text_disabled_bare" value="e" disabled>
+		<input type="text" name="text_disabled_empty" value="f" disabled="">
+		<input type="text" name="text_enabled" value="g">
+	</form>`)
+
+	v, err := rt.RunString(`doc.find("form").serialize()`)
+	if assert.NoError(t, err) {
+		assert.Equal(t, "checkbox_bare=a&checkbox_empty=b&radio_bare=c&text_enabled=g", v.String())
+	}
+}

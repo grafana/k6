@@ -1,12 +1,17 @@
-FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine@sha256:3ad57304ad93bbec8548a0437ad9e06a455660655d9af011d58b993f6f615648 as builder
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine@sha256:0a5f7fe796599ff487605987432e7619ae45beeb2fba4c2ce0b907879932aebf as builder
 WORKDIR $GOPATH/src/go.k6.io/k6
 COPY . .
 ARG TARGETOS TARGETARCH
 RUN apk --no-cache add git=~2
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /usr/bin/k6
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+    -ldflags "-X go.k6.io/k6/v2/internal/build.BuildOrigin=release" -o /usr/bin/k6
 
 # Runtime stage
-FROM alpine:3.24.1@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b as release
+FROM alpine:3.24.4@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf as release
+
+# The pinned base image ships zlib 1.3.2-r1 (CVE-2026-4738, fixed in 1.4-r0).
+# Remove once the base image includes the fix.
+RUN apk upgrade --no-cache zlib
 
 RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6

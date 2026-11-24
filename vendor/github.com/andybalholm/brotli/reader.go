@@ -33,8 +33,23 @@ func NewReader(src io.Reader) *Reader {
 func (r *Reader) Reset(src io.Reader) error {
 	if r.error_code < 0 {
 		// There was an unrecoverable error, leaving the Reader's state
-		// undefined. Clear out everything but the buffer.
-		*r = Reader{buf: r.buf}
+		// undefined. Clear out everything but the buffers.
+		*r = Reader{
+			buf:              r.buf,
+			block_type_trees: r.block_type_trees,
+			literal_hgroup: huffmanTreeGroup{
+				htrees: r.literal_hgroup.htrees,
+				codes:  r.literal_hgroup.codes,
+			},
+			distance_hgroup: huffmanTreeGroup{
+				htrees: r.distance_hgroup.htrees,
+				codes:  r.distance_hgroup.codes,
+			},
+			insert_copy_hgroup: huffmanTreeGroup{
+				htrees: r.insert_copy_hgroup.htrees,
+				codes:  r.insert_copy_hgroup.codes,
+			},
+		}
 	}
 
 	decoderStateInit(r)
@@ -42,6 +57,7 @@ func (r *Reader) Reset(src io.Reader) error {
 	if r.buf == nil {
 		r.buf = make([]byte, readBufSize)
 	}
+	r.in = r.buf[:0]
 	return nil
 }
 
@@ -74,7 +90,7 @@ func (r *Reader) Read(p []byte) (n int, err error) {
 
 		switch result {
 		case decoderResultSuccess:
-			if len(r.in) > 0 {
+			if len(r.in) > 0 || r.buffer_length > 0 {
 				return n, errExcessiveInput
 			}
 			return n, nil

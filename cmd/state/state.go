@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/v2/internal/event"
+	cloudlog "go.k6.io/k6/v2/internal/log/cloud"
 	cloudsecrets "go.k6.io/k6/v2/internal/secretsource/cloud"
 	"go.k6.io/k6/v2/internal/ui/console"
 	"go.k6.io/k6/v2/internal/usage"
@@ -43,6 +44,11 @@ const (
 	// fetched by `k6 x`. Tests point this at httptest or an unreachable address
 	// to keep the command tree construction off the real network.
 	ProvisionCatalogURL = "K6_PROVISION_CATALOG_URL"
+
+	// UsageReportURL overrides the endpoint the anonymous usage report is sent
+	// to. It defaults to the production endpoint and lets tests point it at an
+	// httptest server to observe the report.
+	UsageReportURL = "K6_USAGE_REPORT_URL"
 
 	// defaultBuildServiceURL defines the URL to the default (grafana hosted) build service
 	defaultBuildServiceURL = "https://ingest.k6.io/builder/api/v1"
@@ -90,6 +96,7 @@ type GlobalState struct {
 
 	SecretsManager    *secretsource.Manager
 	CloudSecretSource *cloudsecrets.SecretSource
+	CloudLogPusher    *cloudlog.Pusher
 	Usage             *usage.Usage
 	TestStatus        *lib.TestStatus
 }
@@ -107,13 +114,13 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 	stderrTTY := !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
 	outMutex := &sync.Mutex{}
 	stdout := &console.Writer{
-		RawOutFd: int(os.Stdout.Fd()), //nolint:gosec
+		RawOutFd: int(os.Stdout.Fd()),
 		Mutex:    outMutex,
 		Writer:   colorable.NewColorable(os.Stdout),
 		IsTTY:    stdoutTTY,
 	}
 	stderr := &console.Writer{
-		RawOutFd: int(os.Stderr.Fd()), //nolint:gosec
+		RawOutFd: int(os.Stderr.Fd()),
 		Mutex:    outMutex,
 		Writer:   colorable.NewColorable(os.Stderr),
 		IsTTY:    stderrTTY,
@@ -185,15 +192,16 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 // GlobalFlags contains global config values that apply for all k6 sub-commands.
 type GlobalFlags struct {
-	ConfigFilePath   string
-	Quiet            bool
-	NoColor          bool
-	Address          string
-	ProfilingEnabled bool
-	LogOutput        string
-	SecretSource     []string
-	LogFormat        string
-	Verbose          bool
+	ConfigFilePath          string
+	Quiet                   bool
+	NoColor                 bool
+	Address                 string
+	ProfilingEnabled        bool
+	LogOutput               string
+	SecretSource            []string
+	LogFormat               string
+	LogNanosecondTimestamps bool
+	Verbose                 bool
 
 	AutoExtensionResolution bool
 	BuildServiceURL         string
@@ -239,6 +247,9 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string, args []string) Gl
 	// color output from k6.
 	if _, ok := env["NO_COLOR"]; ok {
 		result.NoColor = true
+	}
+	if _, ok := env["K6_LOG_NS_TIMESTAMPS"]; ok {
+		result.LogNanosecondTimestamps = true
 	}
 	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
 		result.ProfilingEnabled = true

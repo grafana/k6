@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Nested shadow DOM</title>
+</head>
+<body>
+  <button>Light</button>
+  <div id="outer-host"></div>
+  <script>
+    const outer = document.getElementById('outer-host').attachShadow({ mode: 'open' });
+    outer.innerHTML = `
+      <button>Outer</button>
+      <span title="Tip">Outer text</span>
+      <label>Name <input></label>
+      <div id="inner-host"></div>`;
+    const inner = outer.getElementById('inner-host').attachShadow({ mode: 'open' });
+    inner.innerHTML = `
+      <button>Inner</button>
+      <p>Inner text</p>
+      <input placeholder="Inner field">`;
+  </script>
+</body>
+</html>

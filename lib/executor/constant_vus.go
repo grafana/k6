@@ -128,9 +128,10 @@ func (clv ConstantVUs) Run(parentCtx context.Context, _ chan<- metrics.SampleCon
 	gracefulStop := clv.config.GetGracefulStop()
 
 	waitOnProgressChannel := make(chan struct{})
-	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
+	startTime, maxDurationCtx, regDurationCtx, cancel, regCancel := getDurationContexts(parentCtx, duration, gracefulStop)
 	defer func() {
 		cancel()
+		regCancel()
 		<-waitOnProgressChannel
 	}()
 

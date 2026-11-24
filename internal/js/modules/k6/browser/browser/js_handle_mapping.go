@@ -10,16 +10,31 @@ import (
 
 // mapJSHandle to the JS module.
 func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
+	// Register network operations against the handle's owning page so that
+	// network-classified calls (evaluate/evaluateHandle) invoked directly on a
+	// standalone handle are attributed like they are on element handles. Page()
+	// is not part of the JS-facing JSHandleAPI, so reach it via the concrete
+	// implementations (BaseJSHandle/ElementHandle). It is nil for worker or
+	// isolated-world handles, in which case withPageNetworkCalls falls back to
+	// finishing the mapping without a network-operation begin.
+	var page *common.Page
+	if ph, ok := jsh.(interface{ Page() *common.Page }); ok {
+		page = ph.Page()
+	}
+	return withPageNetworkCalls(vu, page, newJSHandleMapping(vu, jsh))
+}
+
+func newJSHandleMapping(vu moduleVU, jsh common.JSHandleAPI) mapping {
 	return mapping{
-		"asElement": func() mapping {
+		"asElement": passiveCall(func() mapping {
 			return mapElementHandle(vu, jsh.AsElement())
-		},
-		"dispose": func() *sobek.Promise {
+		}),
+		"dispose": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return nil, jsh.Dispose()
 			})
-		},
-		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+		}),
+		"evaluate": networkCall(func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluate requires a page function")
 			}
@@ -28,8 +43,8 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			return promise(vu, func() (any, error) {
 				return jsh.Evaluate(funcString, gopts...)
 			}), nil
-		},
-		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+		}),
+		"evaluateHandle": networkCall(func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
 			if sobekEmptyString(pageFunc) {
 				return nil, fmt.Errorf("evaluateHandle requires a page function")
 			}
@@ -42,8 +57,8 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				}
 				return mapJSHandle(vu, h), nil
 			}), nil
-		},
-		"getProperties": func() *sobek.Promise {
+		}),
+		"getProperties": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				props, err := jsh.GetProperties()
 				if err != nil {
@@ -56,11 +71,11 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				}
 				return dst, nil
 			})
-		},
-		"jsonValue": func() *sobek.Promise {
+		}),
+		"jsonValue": passiveCall(func() *sobek.Promise {
 			return promise(vu, func() (any, error) {
 				return jsh.JSONValue() //nolint:wrapcheck
 			})
-		},
+		}),
 	}
 }
