@@ -9,8 +9,12 @@ package gjson
 
 import (
 	"iter"
+	"math"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -129,7 +133,13 @@ func (t Result) Int() int64 {
 	case True:
 		return 1
 	case String:
-		n, _ := parseInt(t.Str)
+		n, ok := parseInt(t.Str)
+		if !ok {
+			f, err := strconv.ParseFloat(t.Str, 64)
+			if err == nil {
+				n = f2i(f)
+			}
+		}
 		return n
 	case Number:
 		// try to directly convert the float64 to int64
@@ -143,7 +153,27 @@ func (t Result) Int() int64 {
 			return i
 		}
 		// fallback to a standard conversion
-		return int64(t.Num)
+		return f2i(t.Num)
+	}
+}
+
+func f2u(f float64) uint64 {
+	if f >= math.MaxUint64 {
+		return math.MaxUint64
+	} else if f < 0 {
+		return 0
+	} else {
+		return uint64(f)
+	}
+}
+
+func f2i(f float64) int64 {
+	if f >= math.MaxInt64 {
+		return math.MaxInt64
+	} else if f < math.MinInt64 {
+		return math.MinInt64
+	} else {
+		return int64(f)
 	}
 }
 
@@ -155,7 +185,13 @@ func (t Result) Uint() uint64 {
 	case True:
 		return 1
 	case String:
-		n, _ := parseUint(t.Str)
+		n, ok := parseUint(t.Str)
+		if !ok {
+			f, err := strconv.ParseFloat(t.Str, 64)
+			if err == nil {
+				n = f2u(f)
+			}
+		}
 		return n
 	case Number:
 		// try to directly convert the float64 to uint64
@@ -169,7 +205,7 @@ func (t Result) Uint() uint64 {
 			return u
 		}
 		// fallback to a standard conversion
-		return uint64(t.Num)
+		return f2u(t.Num)
 	}
 }
 
@@ -334,9 +370,9 @@ func (t Result) Get(path string) Result {
 
 type arrayOrMapResult struct {
 	a  []Result
-	ai []interface{}
+	ai []any
 	o  map[string]Result
-	oi map[string]interface{}
+	oi map[string]any
 	vc byte
 }
 
@@ -371,13 +407,13 @@ func (t Result) arrayOrMap(vc byte, valueize bool) (r arrayOrMapResult) {
 	}
 	if r.vc == '{' {
 		if valueize {
-			r.oi = make(map[string]interface{})
+			r.oi = make(map[string]any)
 		} else {
 			r.o = make(map[string]Result)
 		}
 	} else {
 		if valueize {
-			r.ai = make([]interface{}, 0)
+			r.ai = make([]any, 0)
 		} else {
 			r.a = make([]Result, 0)
 		}
@@ -668,7 +704,7 @@ func (t Result) Exists() bool {
 //	nil, for JSON null
 //	map[string]interface{}, for JSON objects
 //	[]interface{}, for JSON arrays
-func (t Result) Value() interface{} {
+func (t Result) Value() any {
 	if t.Type == String {
 		return t.Str
 	}
@@ -681,9 +717,10 @@ func (t Result) Value() interface{} {
 		return t.Num
 	case JSON:
 		r := t.arrayOrMap(0, true)
-		if r.vc == '{' {
+		switch r.vc {
+		case '{':
 			return r.oi
-		} else if r.vc == '[' {
+		case '[':
 			return r.ai
 		}
 		return nil
@@ -952,7 +989,7 @@ right:
 
 // peek at the next byte and see if it's a '@', '[', or '{'.
 func isDotPiperChar(s string) bool {
-	if DisableModifiers {
+	if modifiersAreDisabled {
 		return false
 	}
 	c := s[0]
@@ -964,8 +1001,7 @@ func isDotPiperChar(s string) bool {
 				break
 			}
 		}
-		_, ok := modifiers[s[1:i]]
-		return ok
+		return getModifier(s[1:i]) != nil
 	}
 	return c == '[' || c == '{'
 }
@@ -1946,7 +1982,8 @@ func parseSubSelectors(path string) (sels []subSelector, out string, ok bool) {
 		case '\\':
 			i++
 		case '@':
-			if modifier == 0 && i > 0 && (path[i-1] == '.' || path[i-1] == '|') {
+			if modifier == 0 && i > 0 && (path[i-1] == '.' ||
+				path[i-1] == '|') {
 				modifier = i
 			}
 		case ':':
@@ -2022,15 +2059,22 @@ func appendHex16(dst []byte, x uint16) []byte {
 	)
 }
 
-// DisableEscapeHTML will disable the automatic escaping of certain
+// Deprecated: This flag does nothing. Use SetEscapeHTML() instead.
+var DisableEscapeHTML = false
+
+var disableEscapeHTML atomic.Bool
+
+// SetEscapeHTML to enable/disable the automatic escaping of certain
 // "problamatic" HTML characters when encoding to JSON.
 // These character include '>', '<' and '&', which get escaped to \u003e,
 // \u0026, and \u003c respectively.
-//
-// This is a global flag and will affect all further gjson operations.
-// Ideally, if used, it should be set one time before other gjson functions
-// are called.
-var DisableEscapeHTML = false
+func SetEscapeHTML(escapeHTML bool) {
+	disableEscapeHTML.Store(!escapeHTML)
+}
+
+func escapeHTML() bool {
+	return !disableEscapeHTML.Load()
+}
 
 // AppendJSONString is a convenience function that converts the provided string
 // to a valid JSON string and appends it to dst.
@@ -2055,10 +2099,13 @@ func AppendJSONString(dst []byte, s string) []byte {
 				dst = append(dst, 'u')
 				dst = appendHex16(dst, uint16(s[i]))
 			}
-		} else if !DisableEscapeHTML &&
-			(s[i] == '>' || s[i] == '<' || s[i] == '&') {
-			dst = append(dst, '\\', 'u')
-			dst = appendHex16(dst, uint16(s[i]))
+		} else if s[i] == '>' || s[i] == '<' || s[i] == '&' {
+			if escapeHTML() {
+				dst = append(dst, '\\', 'u')
+				dst = appendHex16(dst, uint16(s[i]))
+			} else {
+				dst = append(dst, s[i])
+			}
 		} else if s[i] == '\\' {
 			dst = append(dst, '\\', '\\')
 		} else if s[i] == '"' {
@@ -2070,7 +2117,7 @@ func AppendJSONString(dst []byte, s string) []byte {
 				break
 			}
 			if r == utf8.RuneError && n == 1 {
-				dst = append(dst, `\ufffd`...)
+				dst = append(dst, "\xef\xbf\xbd"...)
 			} else if r == '\u2028' || r == '\u2029' {
 				dst = append(dst, `\u202`...)
 				dst = append(dst, hexchars[r&0xF])
@@ -2129,15 +2176,15 @@ type parseContext struct {
 // use the Valid function first.
 func Get(json, path string) Result {
 	if len(path) > 1 {
-		if (path[0] == '@' && !DisableModifiers) || path[0] == '!' {
+		if (path[0] == '@' && !modifiersAreDisabled) || path[0] == '!' {
 			// possible modifier
 			var ok bool
 			var npath string
 			var rjson string
-			if path[0] == '@' && !DisableModifiers {
+			if path[0] == '@' && !modifiersAreDisabled {
 				npath, rjson, ok = execModifier(json, path)
 			} else if path[0] == '!' {
-				npath, rjson, ok = execStatic(json, path)
+				npath, rjson, ok = execStatic(path)
 			}
 			if ok {
 				path = npath
@@ -2289,13 +2336,15 @@ func unescape(json string) string {
 				}
 				r := runeit(json[i+1:])
 				i += 5
-				if utf16.IsSurrogate(r) {
-					// need another code
+				if r >= 0xD800 && r < 0xDC00 {
+					// high surrogate
 					if len(json[i:]) >= 6 && json[i] == '\\' &&
 						json[i+1] == 'u' {
-						// we expect it to be correct so just consume it
-						r = utf16.DecodeRune(r, runeit(json[i+2:]))
-						i += 6
+						r2 := runeit(json[i+2:])
+						if r2 >= 0xDC00 && r2 < 0xE000 {
+							r = utf16.DecodeRune(r, r2)
+							i += 6
+						}
 					}
 				}
 				// provide enough space to encode the largest utf8 possible
@@ -2611,6 +2660,12 @@ func validarray(data []byte, i int) (outi int, ok bool) {
 	}
 	return i, false
 }
+
+func ishex(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+		(c >= 'A' && c <= 'F')
+}
+
 func validstring(data []byte, i int) (outi int, ok bool) {
 	for ; i < len(data); i++ {
 		if data[i] < ' ' {
@@ -2625,14 +2680,9 @@ func validstring(data []byte, i int) (outi int, ok bool) {
 				return i, false
 			case '"', '\\', '/', 'b', 'f', 'n', 'r', 't':
 			case 'u':
-				for j := 0; j < 4; j++ {
+				for range 4 {
 					i++
-					if i >= len(data) {
-						return i, false
-					}
-					if !((data[i] >= '0' && data[i] <= '9') ||
-						(data[i] >= 'a' && data[i] <= 'f') ||
-						(data[i] >= 'A' && data[i] <= 'F')) {
+					if i >= len(data) || !ishex(data[i]) {
 						return i, false
 					}
 				}
@@ -2764,42 +2814,60 @@ func ValidBytes(json []byte) bool {
 	return ok
 }
 
-func parseUint(s string) (n uint64, ok bool) {
+func parseUint(s string) (uint64, bool) {
 	var i int
-	if i == len(s) {
-		return 0, false
-	}
-	for ; i < len(s); i++ {
-		if s[i] >= '0' && s[i] <= '9' {
-			n = n*10 + uint64(s[i]-'0')
+	for len(s) == 0 || len(s) >= 20 {
+		if len(s) > 0 && s[0] == '0' {
+			if len(s) == 1 {
+				return 0, true
+			}
+			s = s[1:]
+			continue
+		}
+		if len(s) == 20 {
+			for j := range len(s) {
+				if s[j] < '0' || s[j] > '9' {
+					return 0, false
+				}
+			}
+			if s > "18446744073709551615" {
+				return 18446744073709551615, true
+			}
 		} else {
 			return 0, false
 		}
+		break
+	}
+	var n uint64
+	for ; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return 0, false
+		}
+		n = n*10 + uint64(s[i]-'0')
 	}
 	return n, true
 }
 
-func parseInt(s string) (n int64, ok bool) {
-	var i int
+func parseInt(s string) (int64, bool) {
 	var sign bool
 	if len(s) > 0 && s[0] == '-' {
 		sign = true
-		i++
+		s = s[1:]
 	}
-	if i == len(s) {
+	n, ok := parseUint(s)
+	if !ok {
 		return 0, false
 	}
-	for ; i < len(s); i++ {
-		if s[i] >= '0' && s[i] <= '9' {
-			n = n*10 + int64(s[i]-'0')
-		} else {
-			return 0, false
-		}
-	}
 	if sign {
-		return n * -1, true
+		if n > 9223372036854775808 {
+			return -9223372036854775808, true
+		}
+		return -int64(n), true
 	}
-	return n, true
+	if n > 9223372036854775807 {
+		return 9223372036854775807, true
+	}
+	return int64(n), true
 }
 
 // safeInt validates a given JSON number
@@ -2815,7 +2883,7 @@ func safeInt(f float64) (n int64, ok bool) {
 
 // execStatic parses the path to find a static value.
 // The input expects that the path already starts with a '!'
-func execStatic(json, path string) (pathOut, res string, ok bool) {
+func execStatic(path string) (pathOut, res string, ok bool) {
 	name := path[1:]
 	if len(name) > 0 {
 		switch name[0] {
@@ -2868,7 +2936,7 @@ func execModifier(json, path string) (pathOut, res string, ok bool) {
 			break
 		}
 	}
-	if fn, ok := modifiers[name]; ok {
+	if fn := getModifier(name); fn != nil {
 		var args string
 		if hasArgs {
 			var parsedArgs bool
@@ -2913,13 +2981,20 @@ func unwrap(json string) string {
 	return json
 }
 
-// DisableModifiers will disable the modifier syntax
+// Deprecated: Modifiers can no longer be disabled at runtime. To disable
+// modifiers use the build flag:
+//
+//	-ldflags="-X 'github.com/tidwall/gjson.disableModifiers=true'"
 var DisableModifiers = false
+var disableModifiers = "false"                        // ldflag ("true")
+var modifiersAreDisabled = disableModifiers == "true" // usable feature bool
 
-var modifiers map[string]func(json, arg string) string
+var stockModifiers map[string]func(json, arg string) string
+var userModifiers map[string]func(json, arg string) string
+var userModifiersLock sync.RWMutex
 
 func init() {
-	modifiers = map[string]func(json, arg string) string{
+	stockModifiers = map[string]func(json, arg string) string{
 		"pretty":  modPretty,
 		"ugly":    modUgly,
 		"reverse": modReverse,
@@ -2934,19 +3009,45 @@ func init() {
 		"group":   modGroup,
 		"dig":     modDig,
 	}
+	userModifiers = map[string]func(json, arg string) string{}
 }
 
 // AddModifier binds a custom modifier command to the GJSON syntax.
-// This operation is not thread safe and should be executed prior to
-// using all other gjson function.
+// Provide the name of the modifier without the '@' prefix.
+// The default modifiers, such as 'pretty/this/valid', cannot be
+// overwritten; attempts will simply be ignored.
 func AddModifier(name string, fn func(json, arg string) string) {
-	modifiers[name] = fn
+	if stockModifiers[name] != nil {
+		// User wants to overwrite stock modifier. Ignore request
+	} else {
+		userModifiersLock.Lock()
+		userModifiers[name] = fn
+		userModifiersLock.Unlock()
+	}
+}
+
+// getUserModifier return a user-defined modifier.
+// It's noinline to ensure that the caller 'getModifier' remains inline.
+//
+//go:noinline
+func getUserModifier(name string) func(json, arg string) string {
+	userModifiersLock.RLock()
+	fn := userModifiers[name]
+	userModifiersLock.RUnlock()
+	return fn
+}
+
+func getModifier(name string) func(json, arg string) string {
+	fn := stockModifiers[name]
+	if fn == nil {
+		fn = getUserModifier(name)
+	}
+	return fn
 }
 
 // ModifierExists returns true when the specified modifier exists.
 func ModifierExists(name string, fn func(json, arg string) string) bool {
-	_, ok := modifiers[name]
-	return ok
+	return getModifier(name) != nil
 }
 
 // cleanWS remove any non-whitespace from string
@@ -3184,11 +3285,13 @@ func modJoin(json, arg string) string {
 			if !value.IsObject() {
 				return true
 			}
-			if idx > 0 {
-				out = append(out, ',')
+			if uw := unwrap(value.Raw); len(uw) > 0 {
+				if idx > 0 {
+					out = append(out, ',')
+				}
+				out = append(out, uw...)
+				idx++
 			}
-			out = append(out, unwrap(value.Raw)...)
-			idx++
 			return true
 		})
 	} else {
@@ -3373,6 +3476,11 @@ func revSquash(json string) string {
 	// reverse squash
 	// expects that the tail character is a ']' or '}' or ')' or '"'
 	// squash the value, ignoring all nested arrays and objects.
+	if len(json) == 0 {
+		// Nothing to squash. Path can walk past the start of the document on
+		// malformed JSON (#400); guard against json[len(json)-1] panicking.
+		return json
+	}
 	i := len(json) - 1
 	var depth int
 	if json[i] != '"' {
@@ -3520,13 +3628,13 @@ func (t Result) Path(json string) string {
 		}
 	}
 	if len(comps) == 0 {
-		if DisableModifiers {
+		if modifiersAreDisabled {
 			goto fail
 		}
 		return "@this"
 	}
-	for i := len(comps) - 1; i >= 0; i-- {
-		rcomp := Parse(comps[i])
+	for _, comp := range slices.Backward(comps) {
+		rcomp := Parse(comp)
 		if !rcomp.Exists() {
 			goto fail
 		}
