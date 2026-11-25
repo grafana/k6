@@ -411,15 +411,7 @@ func (c *Client) buildInvokeRequest(
 		return grpcReq, errors.New("request cannot be nil")
 	}
 
-	object := req.ToObject(c.vu.Runtime())
-
-	var stack []*sobek.Object
-	normalized, err := normalizeNumberStrings(object, c.vu.Runtime(), stack)
-	if err != nil {
-		return grpcReq, fmt.Errorf("unable to normalize number strings: %w", err)
-	}
-
-	b, err := normalized.ToObject(c.vu.Runtime()).MarshalJSON()
+	b, err := marshalRequest(c.vu.Runtime(), req.ToObject(c.vu.Runtime()))
 	if err != nil {
 		return grpcReq, fmt.Errorf("unable to serialise request object: %w", err)
 	}
@@ -437,109 +429,39 @@ func (c *Client) buildInvokeRequest(
 	}, nil
 }
 
-// normalizeNumberStrings recursively traverses a sobek.Value and converts special float values
-// (NaN, Infinity) to their string representations for proper JSON serialization. Objects and
-// arrays are copied only when they contain such a value, so the caller's object is never
-// modified and objects without special float values are returned as is.
-func normalizeNumberStrings(v sobek.Value, runtime *sobek.Runtime, stack []*sobek.Object) (sobek.Value, error) {
-	normalized, _, err := normalizeValue(v, runtime, stack)
-	return normalized, err
-}
-
-// normalizeValue implements normalizeNumberStrings. The returned bool reports whether the value
-// was replaced, so parents can skip copying when none of their values changed.
-func normalizeValue(v sobek.Value, runtime *sobek.Runtime, stack []*sobek.Object) (sobek.Value, bool, error) {
-	// If v is a primitive (not an object or array), handle it directly.
-	if common.IsNullish(v) {
-		return v, false, nil
-	}
-
-	// Handle special float values.
-	if v.ExportType().Kind() == reflect.Float64 {
-		f := v.ToFloat()
-		switch {
-		case math.IsNaN(f):
-			return runtime.ToValue("NaN"), true, nil
-		case math.IsInf(f, 1):
-			return runtime.ToValue("Infinity"), true, nil
-		case math.IsInf(f, -1):
-			return runtime.ToValue("-Infinity"), true, nil
-		}
-
-		return v, false, nil
-	}
-
-	// If it's not a real object (e.g., a string, bool, or regular number primitive),
-	// after checking for special floats, we can just return it. Checking the type first avoids
-	// allocating a wrapper object for every primitive value.
-	obj, ok := v.(*sobek.Object)
+// marshalRequest serializes the request object with JSON.stringify. JSON can't represent the
+// special float values (NaN, Infinity), so a replacer turns them into the strings protojson
+// accepts for them, instead of letting JSON.stringify write them as null.
+func marshalRequest(runtime *sobek.Runtime, req *sobek.Object) ([]byte, error) {
+	stringify, ok := sobek.AssertFunction(runtime.GlobalObject().Get("JSON").ToObject(runtime).Get("stringify"))
 	if !ok {
-		return v, false, nil
+		return nil, errors.New("JSON.stringify is not a function")
 	}
 
-	// We use obj.ClassName() to distinguish real objects from boxed primitives (e.g. new String()).
-	className := obj.ClassName()
-	if className != "Object" && className != "Array" {
-		return v, false, nil
-	}
-
-	// Similar to what's done when marshaling into JSON,
-	// detect and prevent infinite recursion due to circular object references.
-	for _, vis := range stack {
-		if obj.SameAs(vis) {
-			return nil, false, errors.New("cyclic reference to an object found")
+	replacer := runtime.ToValue(func(call sobek.FunctionCall) sobek.Value {
+		v := call.Argument(1)
+		if t := v.ExportType(); t == nil || t.Kind() != reflect.Float64 {
+			return v
 		}
-	}
-	stack = append(stack, obj)
 
-	newObj, err := normalizeObject(obj, className == "Array", runtime, stack)
+		switch f := v.ToFloat(); {
+		case math.IsNaN(f):
+			return runtime.ToValue("NaN")
+		case math.IsInf(f, 1):
+			return runtime.ToValue("Infinity")
+		case math.IsInf(f, -1):
+			return runtime.ToValue("-Infinity")
+		}
+
+		return v
+	})
+
+	b, err := stringify(sobek.Undefined(), req, replacer)
 	if err != nil {
-		return nil, false, err
-	}
-	if newObj == nil {
-		return v, false, nil
+		return nil, err
 	}
 
-	return newObj, true, nil
-}
-
-// normalizeObject normalizes the values of a real object or array. It copies the object lazily:
-// only once one of its values has changed, copying the unchanged values seen before it. It
-// returns nil when none of the values changed.
-func normalizeObject(
-	obj *sobek.Object, isArray bool, runtime *sobek.Runtime, stack []*sobek.Object,
-) (*sobek.Object, error) {
-	var newObj *sobek.Object
-	keys := obj.Keys()
-	for i, key := range keys {
-		normalizedVal, changed, err := normalizeValue(obj.Get(key), runtime, stack)
-		if err != nil {
-			return nil, err
-		}
-
-		if newObj == nil {
-			if !changed {
-				continue
-			}
-			if isArray {
-				newObj = runtime.NewArray()
-			} else {
-				// Keep the prototype so a toJSON() defined on it is still honored when marshaling.
-				newObj = runtime.CreateObject(obj.Prototype())
-			}
-			for _, prev := range keys[:i] {
-				if err := newObj.Set(prev, obj.Get(prev)); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		if err := newObj.Set(key, normalizedVal); err != nil {
-			return nil, err
-		}
-	}
-
-	return newObj, nil
+	return []byte(b.String()), nil
 }
 
 // Close will close the client gRPC connection

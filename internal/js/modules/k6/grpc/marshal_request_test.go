@@ -8,21 +8,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNormalizeNumberStrings(t *testing.T) {
+func TestMarshalRequest(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
 		input    string
 		expected string
-		// same reports whether the input object must be returned as is, without a copy.
-		same bool
 	}{
 		{
 			name:     "NoSpecialFloats",
 			input:    `({ a: 1, b: "x", c: [1.5, { d: true }], e: null })`,
 			expected: `{"a":1,"b":"x","c":[1.5,{"d":true}],"e":null}`,
-			same:     true,
+		},
+		{
+			name:     "TopLevel",
+			input:    `NaN`,
+			expected: `"NaN"`,
 		},
 		{
 			name:     "NestedInObject",
@@ -35,21 +37,20 @@ func TestNormalizeNumberStrings(t *testing.T) {
 			expected: `{"a":[1,"Infinity","-Infinity",4]}`,
 		},
 		{
-			name:     "PrototypeToJSON",
-			input:    `class P { constructor() { this.x = 1 } toJSON() { return { y: 2 } } }; ({ p: new P() })`,
-			expected: `{"p":{"y":2}}`,
-			same:     true,
-		},
-		{
-			name: "PrototypeToJSONWithSpecialFloat",
-			input: `class P { constructor() { this.x = NaN } toJSON() { return { y: this.x } } };
-				({ p: new P() })`,
-			expected: `{"p":{"y":"NaN"}}`,
-		},
-		{
 			name:     "NullPrototype",
 			input:    `const o = Object.create(null); o.a = NaN; o.b = 1; ({ o })`,
 			expected: `{"o":{"a":"NaN","b":1}}`,
+		},
+		{
+			name: "PrototypeToJSONWithPrivateField",
+			input: `class P { #v = 1; constructor() { this.f = NaN } toJSON() { return { v: this.#v, f: this.f } } };
+				({ p: new P() })`,
+			expected: `{"p":{"v":1,"f":"NaN"}}`,
+		},
+		{
+			name:     "ToJSONReturnsSpecialFloat",
+			input:    `({ p: { toJSON() { return 0 / 0 } } })`,
+			expected: `{"p":"NaN"}`,
 		},
 	}
 
@@ -63,13 +64,9 @@ func TestNormalizeNumberStrings(t *testing.T) {
 			before, err := input.ToObject(rt).MarshalJSON()
 			require.NoError(t, err)
 
-			normalized, err := normalizeNumberStrings(input, rt, nil)
-			require.NoError(t, err)
-
-			got, err := normalized.ToObject(rt).MarshalJSON()
+			got, err := marshalRequest(rt, input.ToObject(rt))
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.expected, string(got))
-			assert.Equal(t, tt.same, normalized.ToObject(rt).SameAs(input.ToObject(rt)))
 
 			// The caller's object must never be modified.
 			after, err := input.ToObject(rt).MarshalJSON()
@@ -79,13 +76,26 @@ func TestNormalizeNumberStrings(t *testing.T) {
 	}
 }
 
-func TestNormalizeNumberStringsCyclic(t *testing.T) {
+func TestMarshalRequestGetterCalledOnce(t *testing.T) {
+	t.Parallel()
+
+	rt := sobek.New()
+	input, err := rt.RunString(`var calls = 0; ({ get a() { calls++; return 1 }, b: NaN })`)
+	require.NoError(t, err)
+
+	got, err := marshalRequest(rt, input.ToObject(rt))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"a":1,"b":"NaN"}`, string(got))
+	assert.Equal(t, int64(1), rt.Get("calls").ToInteger())
+}
+
+func TestMarshalRequestCyclic(t *testing.T) {
 	t.Parallel()
 
 	rt := sobek.New()
 	input, err := rt.RunString(`let a = {}; a.b = { c: a }; a`)
 	require.NoError(t, err)
 
-	_, err = normalizeNumberStrings(input, rt, nil)
-	require.ErrorContains(t, err, "cyclic reference to an object found")
+	_, err = marshalRequest(rt, input.ToObject(rt))
+	require.ErrorContains(t, err, "Converting circular structure to JSON")
 }
