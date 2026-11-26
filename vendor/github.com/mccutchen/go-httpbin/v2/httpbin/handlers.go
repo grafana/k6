@@ -1065,6 +1065,8 @@ func (h *HTTPBin) ImageAccept(w http.ResponseWriter, r *http.Request) {
 		doImage(w, "svg")
 	case strings.Contains(accept, "image/jpeg"):
 		doImage(w, "jpeg")
+	case strings.Contains(accept, "image/avif"):
+		doImage(w, "avif")
 	default:
 		writeError(w, http.StatusUnsupportedMediaType, nil)
 	}

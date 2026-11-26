@@ -21,7 +21,7 @@ func preflight(h http.Handler) http.Handler {
 		respHeader.Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == "OPTIONS" {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, HEAD, PUT, DELETE, PATCH, QUERY, OPTIONS")
 			w.Header().Set("Access-Control-Max-Age", "3600")
 			if r.Header.Get("Access-Control-Request-Headers") != "" {
 				w.Header().Set("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
