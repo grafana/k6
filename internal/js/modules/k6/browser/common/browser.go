@@ -735,6 +735,9 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	if err := opts.Proxy.Validate(); err != nil {
 		return nil, spanRecordError(span, err)
 	}
+	if len(opts.ClientCertificates) > 0 {
+		return nil, spanRecordError(span, errors.New("clientCertificates is not supported yet"))
+	}
 
 	action := newCommand(target.CreateBrowserContext, target.CreateBrowserContextParams{DisposeOnDetach: new(true)})
 	if opts.Proxy != nil {
