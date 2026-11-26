@@ -45,6 +45,79 @@ func TestConsoleContext(t *testing.T) {
 	require.Equal(t, "b", entry.Message)
 }
 
+func TestConsoleAssert(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		script  string
+		message string // Empty means no log entry is expected.
+	}{
+		{name: "true", script: `console.assert(true, "oops")`},
+		{name: "nonzero number", script: `console.assert(42, "oops")`},
+		{name: "nonempty string", script: `console.assert("hello", "oops")`},
+		{name: "object", script: `console.assert({}, "oops")`},
+		{name: "boxed false", script: `console.assert(new Boolean(false), "oops")`},
+		{name: "no arguments", script: `console.assert()`, message: "Assertion failed"},
+		{name: "false", script: `console.assert(false)`, message: "Assertion failed"},
+		{name: "zero", script: `console.assert(0)`, message: "Assertion failed"},
+		{name: "empty string condition", script: `console.assert("")`, message: "Assertion failed"},
+		{name: "null", script: `console.assert(null)`, message: "Assertion failed"},
+		{name: "undefined", script: `console.assert(undefined)`, message: "Assertion failed"},
+		{name: "NaN", script: `console.assert(NaN)`, message: "Assertion failed"},
+		{
+			name: "string message", script: `console.assert(false, "oops")`,
+			message: "Assertion failed: oops",
+		},
+		{
+			name: "string followed by data", script: `console.assert(false, "oops", 42)`,
+			message: "Assertion failed: oops 42",
+		},
+		{
+			name: "number followed by data", script: `console.assert(false, 42, "oops")`,
+			message: "Assertion failed 42 oops",
+		},
+		{
+			name: "empty string message", script: `console.assert(false, "")`,
+			message: "Assertion failed: ",
+		},
+		{
+			name: "object message", script: `console.assert(false, {status: 404})`,
+			message: "Assertion failed { status: 404 }",
+		},
+		{
+			name: "null condition with message", script: `console.assert(null, "oops")`,
+			message: "Assertion failed: oops",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := sobek.New()
+			rt.SetFieldNameMapper(common.FieldNameMapper{})
+			logger, hook := logtest.NewNullLogger()
+			logger.SetLevel(logrus.DebugLevel)
+			require.NoError(t, rt.Set("console", newConsole(logger)))
+
+			_, err := rt.RunString(tt.script)
+			require.NoError(t, err)
+
+			entries := hook.AllEntries()
+			if tt.message == "" {
+				require.Empty(t, entries)
+				return
+			}
+
+			require.Len(t, entries, 1)
+			assert.Equal(t, tt.message, entries[0].Message)
+			assert.Equal(t, logrus.ErrorLevel, entries[0].Level)
+			assert.Equal(t, logrus.Fields{"source": "console"}, entries[0].Data)
+		})
+	}
+}
+
 func getSimpleRunner(tb testing.TB, filename, data string, opts ...any) (*Runner, error) {
 	var (
 		rtOpts      = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
@@ -81,6 +82,28 @@ func (c console) Warn(args ...sobek.Value) {
 
 func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
+}
+
+func (c console) Assert(condition sobek.Value, args ...sobek.Value) {
+	if condition != nil && condition.ToBoolean() {
+		return
+	}
+
+	message := "Assertion failed"
+
+	if len(args) > 0 {
+		first := args[0]
+
+		if sobek.IsString(first) {
+			message += ": " + first.String()
+			args = args[1:]
+		}
+	}
+
+	sobekMessage := sobek.StringFromUTF16(utf16.Encode([]rune(message)))
+
+	// Because logrus has no assert level, failed assertions are logged as errors.
+	c.log(logrus.ErrorLevel, append([]sobek.Value{sobekMessage}, args...)...)
 }
 
 const (
