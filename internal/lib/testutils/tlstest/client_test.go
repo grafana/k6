@@ -30,7 +30,12 @@ func getWithClientCert(t *testing.T, chain *Chain, cert tls.Certificate) (string
 	defer srv.Close()
 
 	client := srv.Client()
-	client.Transport.(*http.Transport).TLSClientConfig.Certificates = []tls.Certificate{cert}
+	// Always present cert, even when it doesn't match the server's acceptable CAs.
+	client.Transport.(*http.Transport).TLSClientConfig.GetClientCertificate = func(
+		*tls.CertificateRequestInfo,
+	) (*tls.Certificate, error) {
+		return &cert, nil
+	}
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL, nil)
 	require.NoError(t, err)
 	resp, err := client.Do(req)
@@ -77,4 +82,21 @@ func TestChainClientCertificate_OtherChain(t *testing.T) {
 
 	_, err := getWithClientCert(t, NewChain(t), NewChain(t).ClientCertificate(t, "other", KeyECDSA))
 	assert.ErrorContains(t, err, "unknown certificate authority")
+}
+
+func TestNewChain_DistinctCANames(t *testing.T) {
+	t.Parallel()
+
+	// Servers list acceptable CAs by name, so a certificate from another chain must not
+	// match this chain's CA names.
+	chain := NewChain(t)
+	cri := &tls.CertificateRequestInfo{
+		AcceptableCAs:    [][]byte{chain.RootCert.RawSubject, chain.IntermediateCert.RawSubject},
+		SignatureSchemes: []tls.SignatureScheme{tls.ECDSAWithP256AndSHA256},
+		Version:          tls.VersionTLS13,
+	}
+	own := chain.ClientCertificate(t, "own", KeyECDSA)
+	other := NewChain(t).ClientCertificate(t, "other", KeyECDSA)
+	assert.NoError(t, cri.SupportsCertificate(&own))
+	assert.Error(t, cri.SupportsCertificate(&other))
 }
