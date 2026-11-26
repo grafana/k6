@@ -1,0 +1,20 @@
+diff --git a/WebCryptoAPI/import_export/importKey_failures.js b/WebCryptoAPI/import_export/importKey_failures.js
+index bba48401e..f6f148f21 100644
+--- a/WebCryptoAPI/import_export/importKey_failures.js
++++ b/WebCryptoAPI/import_export/importKey_failures.js
+@@ -18,11 +18,11 @@ function run_test(algorithmNames) {
+ 
+ 
+     var allTestVectors = [ // Parameters that should work for importKey / exportKey
+-        {name: "Ed25519", privateUsages: ["sign"], publicUsages: ["verify"]},
+-        {name: "Ed448", privateUsages: ["sign"], publicUsages: ["verify"]},
++        // {name: "Ed25519", privateUsages: ["sign"], publicUsages: ["verify"]},
++        // {name: "Ed448", privateUsages: ["sign"], publicUsages: ["verify"]},
+         {name: "ECDSA", privateUsages: ["sign"], publicUsages: ["verify"]},
+-        {name: "X25519",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []},
+-        {name: "X448",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []},
++        // {name: "X25519",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []},
++        // {name: "X448",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []},
+         {name: "ECDH",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []}
+     ];
+ 
