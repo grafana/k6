@@ -51,10 +51,13 @@ func NewChain(t testing.TB) *Chain {
 		return n
 	}
 
+	// Unique CA names per chain, so CA-list-based certificate selection can tell chains apart.
+	rootSerial := serial()
+	id := rootSerial.Text(16)
 	rootKey := genKey()
 	rootTmpl := &x509.Certificate{
-		SerialNumber:          serial(),
-		Subject:               pkix.Name{CommonName: "tlstest Root CA"},
+		SerialNumber:          rootSerial,
+		Subject:               pkix.Name{CommonName: "tlstest Root CA " + id},
 		NotBefore:             time.Now().Add(-time.Hour),
 		NotAfter:              time.Now().Add(24 * time.Hour),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
@@ -69,7 +72,7 @@ func NewChain(t testing.TB) *Chain {
 	interKey := genKey()
 	interTmpl := &x509.Certificate{
 		SerialNumber:          serial(),
-		Subject:               pkix.Name{CommonName: "tlstest Intermediate CA"},
+		Subject:               pkix.Name{CommonName: "tlstest Intermediate CA " + id},
 		NotBefore:             time.Now().Add(-time.Hour),
 		NotAfter:              time.Now().Add(24 * time.Hour),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
