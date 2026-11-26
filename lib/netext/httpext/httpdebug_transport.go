@@ -33,7 +33,19 @@ func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func (t httpDebugTransport) debugRequest(req *http.Request, requestID string) {
-	dump, err := httputil.DumpRequestOut(req, t.httpDebugOption == "full")
+	withBody := t.httpDebugOption == "full"
+	if withBody && req.Body != nil && req.Body != http.NoBody && req.GetBody != nil {
+		// httputil.DumpRequestOut drains req.Body and then replaces it with a new reader,
+		// which would be left consumed after the request is sent. A wrapping RoundTripper
+		// that resends the request (e.g. NTLM authentication) needs the body it installed
+		// to remain the one that is set on the request, so dump a copy that gets its own
+		// body from GetBody instead and leave the original request untouched.
+		if body, err := req.GetBody(); err == nil {
+			req = req.Clone(req.Context())
+			req.Body = body
+		}
+	}
+	dump, err := httputil.DumpRequestOut(req, withBody)
 	if err != nil {
 		t.logger.Error(err)
 	}
