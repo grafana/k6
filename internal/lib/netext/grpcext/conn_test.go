@@ -19,6 +19,8 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
 
+	"go.k6.io/k6/v2/metrics"
+
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
@@ -100,7 +102,7 @@ func TestHealthCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := c.HealthCheck(context.Background(), tc.svc)
+			res, err := c.HealthCheck(context.Background(), tc.svc, &metrics.TagsAndMeta{})
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedStatus, res.Status)
 		})

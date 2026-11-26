@@ -190,6 +190,58 @@ func TestTracesOutputHTTPRequestSpans(t *testing.T) {
 	assert.ElementsMatch(t, wantTraceparents, traceparents)
 }
 
+// TestTracesOutputGRPCRequestSpans checks the wiring of the gRPC request spans in a test run: the
+// unary and stream RPCs of the script are children of their iteration, and the reflection RPCs
+// made by k6 aren't traced. The span contents are tested in internal/lib/netext/grpcext.
+func TestTracesOutputGRPCRequestSpans(t *testing.T) {
+	t.Parallel()
+
+	srv := NewGRPC(t)
+	script := fmt.Sprintf(`
+		import { Client, Stream } from 'k6/net/grpc';
+		export const options = { vus: 1, iterations: 1 };
+		const client = new Client();
+		export default async function () {
+			client.connect(%q, { plaintext: true, reflect: true });
+			const point = { latitude: 410248224, longitude: -747127767 };
+			client.invoke('main.FeatureExplorer/GetFeature', point);
+			await client.asyncInvoke('main.FeatureExplorer/GetFeature', point);
+			await new Promise((resolve, reject) => {
+				const stream = new Stream(client, 'main.FeatureExplorer/ListFeatures');
+				stream.on('end', resolve);
+				stream.on('error', reject);
+				stream.write({
+					lo: { latitude: 400000000, longitude: -750000000 },
+					hi: { latitude: 420000000, longitude: -730000000 },
+				});
+				stream.end();
+			});
+			client.close();
+		}
+	`, srv.Addr)
+
+	collector, endpoint := newOTLPCollector(t)
+	ts := getSingleFileTestState(t, script, []string{nativeTracingFlag, "--traces-output=otel=" + endpoint}, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	iterations := collector.byName("iteration")
+	require.Len(t, iterations, 1)
+	unary := collector.byName("main.FeatureExplorer/GetFeature")
+	streams := collector.byName("main.FeatureExplorer/ListFeatures")
+	require.Len(t, unary, 2)
+	require.Len(t, streams, 1)
+	for _, s := range append(unary, streams...) {
+		assert.Equal(t, iterations[0].GetSpanId(), s.GetParentSpanId(), "RPCs are children of the iteration")
+		assert.Equal(t, tracepb.Span_SPAN_KIND_CLIENT, s.GetKind())
+	}
+
+	collector.mu.Lock()
+	defer collector.mu.Unlock()
+	for _, s := range collector.spans {
+		assert.NotContains(t, s.GetName(), "ServerReflection", "the reflection RPCs aren't traced")
+	}
+}
+
 func TestTracesOutputRecordsFailures(t *testing.T) {
 	t.Parallel()
 

@@ -77,6 +77,7 @@ type clientConnCloser interface {
 type Conn struct {
 	raw   clientConnCloser
 	types *protoregistry.Types
+	addr  string
 }
 
 // DefaultOptions generates an option set
@@ -104,6 +105,7 @@ func Dial(ctx context.Context, addr string, types *protoregistry.Types, options 
 	return &Conn{
 		raw:   conn,
 		types: types,
+		addr:  addr,
 	}, nil
 }
 
@@ -114,7 +116,10 @@ func (c *Conn) Reflect(ctx context.Context) (*descriptorpb.FileDescriptorSet, er
 }
 
 // HealthCheck executes a unary gRPC healthcheck Check call.
-func (c *Conn) HealthCheck(ctx context.Context, svc string) (*HealthCheckResponse, error) {
+func (c *Conn) HealthCheck(
+	ctx context.Context, svc string, tagsAndMeta *metrics.TagsAndMeta,
+) (*HealthCheckResponse, error) {
+	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: tagsAndMeta, addr: c.addr})
 	healthClient := healthpb.NewHealthClient(c.raw)
 	res, err := healthClient.Check(ctx, &healthpb.HealthCheckRequest{Service: svc})
 	if err != nil {
@@ -154,7 +159,7 @@ func (c *Conn) Invoke(
 		return nil, fmt.Errorf("unable to serialise request object to protocol buffer: %w", err)
 	}
 
-	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta})
+	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta, addr: c.addr})
 
 	var resp *dynamicpb.Message
 	if req.DiscardResponseMessage {
@@ -285,7 +290,7 @@ func (c *Conn) NewStream(
 ) (*Stream, error) {
 	ctx = metadata.NewOutgoingContext(ctx, req.Metadata)
 
-	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta})
+	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta, addr: c.addr})
 
 	stream, err := c.raw.NewStream(ctx, &grpc.StreamDesc{
 		StreamName:    string(req.MethodDescriptor.Name()),
@@ -325,9 +330,17 @@ func (statsHandler) HandleConn(context.Context, grpcstats.ConnStats) {
 	// noop
 }
 
-// TagRPC implements the grpcstats.Handler interface
-func (statsHandler) TagRPC(ctx context.Context, _ *grpcstats.RPCTagInfo) context.Context {
-	// noop
+// TagRPC implements the grpcstats.Handler interface. With tracing enabled, it starts the span
+// of the RPCs of the script, ended on their End stats.
+func (h statsHandler) TagRPC(ctx context.Context, info *grpcstats.RPCTagInfo) context.Context {
+	// The RPCs made by k6 itself, e.g. the reflection ones, have no RPC state, and aren't traced.
+	stateRPC := getRPCState(ctx)
+	if stateRPC == nil {
+		return ctx
+	}
+	if state := h.getState(); state != nil && state.Tracer != nil {
+		ctx = startSpan(ctx, state.Tracer, info.FullMethodName, stateRPC)
+	}
 	return ctx
 }
 
@@ -346,6 +359,7 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 
 	switch s := stat.(type) {
 	case *grpcstats.OutHeader:
+		setPeerAttributes(ctx, s.RemoteAddr)
 		// TODO: figure out something better, e.g. via TagConn() or TagRPC()?
 		if state.Options.SystemTags.Has(metrics.TagIP) && s.RemoteAddr != nil {
 			if ip, _, err := net.SplitHostPort(s.RemoteAddr.String()); err == nil {
@@ -366,6 +380,7 @@ func (h statsHandler) HandleRPC(ctx context.Context, stat grpcstats.RPCStats) {
 			Metadata: stateRPC.tagsAndMeta.Metadata,
 			Value:    metrics.D(s.EndTime.Sub(s.BeginTime)),
 		})
+		endSpan(ctx, s.Error)
 	}
 
 	// (rogchap) Re-using --http-debug flag as gRPC is technically still HTTP
@@ -456,6 +471,8 @@ var ctxKeyRPCState = contextKey("rpcState") //nolint:gochecknoglobals
 
 type rpcState struct {
 	tagsAndMeta *metrics.TagsAndMeta
+	// addr is the target of the connection, e.g. host:port.
+	addr string
 }
 
 func withRPCState(ctx context.Context, rpcState *rpcState) context.Context {
