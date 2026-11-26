@@ -14,24 +14,28 @@ import (
 
 /* Function to find maximal matching prefixes of strings. */
 func findMatchLengthWithLimit(s1 []byte, s2 []byte, limit uint) uint {
+	if limit == 0 {
+		return 0
+	}
+	s1 = s1[:limit]
+	s2 = s2[:limit]
 	var matched uint = 0
-	_, _ = s1[limit-1], s2[limit-1] // bounds check
 	switch runtime.GOARCH {
 	case "amd64", "arm64":
-		// Compare 8 bytes at at time.
+		// Compare 8 bytes at a time.
 		for matched+8 <= limit {
-			w1 := binary.LittleEndian.Uint64(s1[matched:])
-			w2 := binary.LittleEndian.Uint64(s2[matched:])
+			w1 := binary.LittleEndian.Uint64(s1[matched : matched+8])
+			w2 := binary.LittleEndian.Uint64(s2[matched : matched+8])
 			if w1 != w2 {
 				return matched + uint(bits.TrailingZeros64(w1^w2)>>3)
 			}
 			matched += 8
 		}
 	case "386":
-		// Compare 4 bytes at at time.
+		// Compare 4 bytes at a time.
 		for matched+4 <= limit {
-			w1 := binary.LittleEndian.Uint32(s1[matched:])
-			w2 := binary.LittleEndian.Uint32(s2[matched:])
+			w1 := binary.LittleEndian.Uint32(s1[matched : matched+4])
+			w2 := binary.LittleEndian.Uint32(s2[matched : matched+4])
 			if w1 != w2 {
 				return matched + uint(bits.TrailingZeros32(w1^w2)>>3)
 			}
