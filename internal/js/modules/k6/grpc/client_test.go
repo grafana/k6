@@ -1270,7 +1270,7 @@ func TestClient(t *testing.T) {
 
 				let respNaN = client.invoke("grpc.wrappers.testing.Service/TestDouble", obj1);
 				`,
-				err: "cyclic reference to an object found",
+				err: "Converting circular structure to JSON",
 			},
 		},
 		{
