@@ -15,6 +15,7 @@ type httpDebugTransport struct {
 	originalTransport http.RoundTripper
 	httpDebugOption   string
 	redact            bool
+	requestID         string
 	logger            logrus.FieldLogger
 }
 
@@ -25,7 +26,10 @@ type httpDebugTransport struct {
 //   - https://github.com/k6io/k6/issues/1042
 //   - https://github.com/k6io/k6/issues/774
 func (t httpDebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	id := uuid.NewString()
+	id := t.requestID
+	if id == "" {
+		id = uuid.NewString()
+	}
 	t.debugRequest(req, id)
 	resp, err := t.originalTransport.RoundTrip(req)
 	t.debugResponse(resp, id)
