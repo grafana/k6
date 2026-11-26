@@ -380,7 +380,14 @@ func (i *Index) Load(b []byte) ([]byte, error) {
 // IO errors are returned as-is.
 func (i *Index) LoadStream(rs io.ReadSeeker) error {
 	// Go to end.
-	_, err := rs.Seek(-10, io.SeekEnd)
+	size, err := rs.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+	if size < 10 {
+		return ErrUnsupported
+	}
+	_, err = rs.Seek(-10, io.SeekEnd)
 	if err != nil {
 		return err
 	}
@@ -396,6 +403,9 @@ func (i *Index) LoadStream(rs io.ReadSeeker) error {
 	sz := binary.LittleEndian.Uint32(tmp[:4])
 	if sz > maxChunkSize+skippableFrameHeader {
 		return ErrCorrupt
+	}
+	if int64(sz) > size {
+		return io.ErrUnexpectedEOF
 	}
 	_, err = rs.Seek(-int64(sz), io.SeekEnd)
 	if err != nil {

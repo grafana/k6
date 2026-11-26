@@ -10,6 +10,7 @@ import (
 	"bufio"
 	"compress/gzip"
 	"encoding/binary"
+	"fmt"
 	"hash/crc32"
 	"io"
 	"time"
@@ -195,7 +196,11 @@ func (z *Reader) readHeader() (hdr Header, err error) {
 		return hdr, ErrHeader
 	}
 	flg := z.buf[3]
-	hdr.ModTime = time.Unix(int64(le.Uint32(z.buf[4:8])), 0)
+	if t := int64(le.Uint32(z.buf[4:8])); t > 0 {
+		// Section 2.3.1, the zero value for MTIME means that the
+		// modified time is not set.
+		hdr.ModTime = time.Unix(t, 0)
+	}
 	// z.buf[8] is XFL and is currently ignored.
 	hdr.OS = z.buf[9]
 	z.digest = crc32.ChecksumIEEE(z.buf[:10])
@@ -216,14 +221,14 @@ func (z *Reader) readHeader() (hdr Header, err error) {
 	var s string
 	if flg&flagName != 0 {
 		if s, err = z.readString(); err != nil {
-			return hdr, err
+			return hdr, noEOF(err)
 		}
 		hdr.Name = s
 	}
 
 	if flg&flagComment != 0 {
 		if s, err = z.readString(); err != nil {
-			return hdr, err
+			return hdr, noEOF(err)
 		}
 		hdr.Comment = s
 	}
@@ -337,8 +342,12 @@ func (z *Reader) WriteTo(w io.Writer) (int64, error) {
 		total += n
 		z.size += uint32(n)
 		if err != nil {
-			z.err = err
-			return total, z.err
+			// z.err doubles as the end-of-stream marker. Wrap with %w so a
+			// writer's io.EOF stays identifiable as a write failure and is
+			// not mistaken for a clean end of the input (io.EOF) or reported
+			// to later calls as truncated input (io.ErrUnexpectedEOF).
+			z.err = fmt.Errorf("gzip: %w", err)
+			return total, err
 		}
 
 		// Finished file; check checksum + size.
@@ -360,6 +369,10 @@ func (z *Reader) WriteTo(w io.Writer) (int64, error) {
 
 		// File is ok; check if there is another.
 		if !z.multistream {
+			// Match Read: mark the reader as ended, so a later Read
+			// returns io.EOF instead of interpreting the bytes after
+			// the member as a checksum.
+			z.err = io.EOF
 			return total, nil
 		}
 		crcWriter.Reset()

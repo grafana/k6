@@ -376,6 +376,7 @@ func (b *blockEnc) encodeLits(lits []byte, raw bool) error {
 		lh.setSizes(len(out), len(lits), single)
 		if len(out)+lh.size() >= len(lits) {
 			err = huff0.ErrIncompressible
+			b.dropUnwrittenTable(reUsed)
 		}
 	}
 	switch err {
@@ -427,6 +428,15 @@ func (b *blockEnc) encodeLits(lits []byte, raw bool) error {
 	// No sequences.
 	b.output = append(b.output, 0)
 	return nil
+}
+
+// dropUnwrittenTable stops later blocks reusing the literal table after
+// compressed literals are written raw: a new table became the previous one,
+// but the decoder never gets it.
+func (b *blockEnc) dropUnwrittenTable(reUsed bool) {
+	if !reUsed {
+		b.litEnc.Reuse = huff0.ReusePolicyNone
+	}
 }
 
 // encodeRLE will encode an RLE block.
@@ -540,6 +550,7 @@ func (b *blockEnc) encode(org []byte, raw, rawAllLits bool) error {
 		szComp := lh.size()
 		if len(out)+szComp >= len(b.literals)+szRaw {
 			err = huff0.ErrIncompressible
+			b.dropUnwrittenTable(reUsed)
 		}
 	}
 	switch err {
@@ -612,58 +623,21 @@ func (b *blockEnc) encode(org []byte, raw, rawAllLits bool) error {
 		println("Encoding", len(b.sequences), "sequences")
 	}
 	b.genCodes()
-	llEnc := b.coders.llEnc
-	ofEnc := b.coders.ofEnc
-	mlEnc := b.coders.mlEnc
-	err = llEnc.normalizeCount(len(b.sequences))
+	llEnc, llMode, err := b.chooseComp(b.coders.llEnc, b.coders.llPrev, &fsePredefEnc[tableLiteralLengths], b.sequences[0].llCode)
 	if err != nil {
 		return err
 	}
-	err = ofEnc.normalizeCount(len(b.sequences))
+	ofEnc, ofMode, err := b.chooseComp(b.coders.ofEnc, b.coders.ofPrev, &fsePredefEnc[tableOffsets], b.sequences[0].ofCode)
 	if err != nil {
 		return err
 	}
-	err = mlEnc.normalizeCount(len(b.sequences))
+	mlEnc, mlMode, err := b.chooseComp(b.coders.mlEnc, b.coders.mlPrev, &fsePredefEnc[tableMatchLengths], b.sequences[0].mlCode)
 	if err != nil {
 		return err
 	}
 
 	// Write compression mode
-	var mode uint8
-	if llEnc.useRLE {
-		mode |= uint8(compModeRLE) << 6
-		llEnc.setRLE(b.sequences[0].llCode)
-		if debugEncoder {
-			println("llEnc.useRLE")
-		}
-	} else {
-		var m seqCompMode
-		llEnc, m = b.chooseComp(llEnc, b.coders.llPrev, &fsePredefEnc[tableLiteralLengths])
-		mode |= uint8(m) << 6
-	}
-	if ofEnc.useRLE {
-		mode |= uint8(compModeRLE) << 4
-		ofEnc.setRLE(b.sequences[0].ofCode)
-		if debugEncoder {
-			println("ofEnc.useRLE")
-		}
-	} else {
-		var m seqCompMode
-		ofEnc, m = b.chooseComp(ofEnc, b.coders.ofPrev, &fsePredefEnc[tableOffsets])
-		mode |= uint8(m) << 4
-	}
-
-	if mlEnc.useRLE {
-		mode |= uint8(compModeRLE) << 2
-		mlEnc.setRLE(b.sequences[0].mlCode)
-		if debugEncoder {
-			println("mlEnc.useRLE, code: ", b.sequences[0].mlCode, "value", b.sequences[0].matchLen)
-		}
-	} else {
-		var m seqCompMode
-		mlEnc, m = b.chooseComp(mlEnc, b.coders.mlPrev, &fsePredefEnc[tableMatchLengths])
-		mode |= uint8(m) << 2
-	}
+	mode := uint8(llMode)<<6 | uint8(ofMode)<<4 | uint8(mlMode)<<2
 	b.output = append(b.output, mode)
 	if debugEncoder {
 		printf("Compression modes: 0b%b", mode)
@@ -797,12 +771,44 @@ func (b *blockEnc) encode(org []byte, raw, rawAllLits bool) error {
 	return nil
 }
 
-// chooseComp chooses the cheapest of the new, predefined and previous table.
-func (b *blockEnc) chooseComp(cur, prev, preDef *fseEncoder) (*fseEncoder, seqCompMode) {
+// chooseComp chooses the cheapest of RLE and the new, predefined and previous table.
+// rle is the code to use if all sequences have the same one.
+// The new table is only built if it could be the cheapest.
+func (b *blockEnc) chooseComp(cur, prev, preDef *fseEncoder, rle uint8) (*fseEncoder, seqCompMode, error) {
+	nSeq := len(b.sequences)
+	if cur.maxCount == nSeq {
+		cur.setRLE(rle)
+		if debugEncoder {
+			println("Using RLE, code:", rle)
+		}
+		return cur, compModeRLE, nil
+	}
+	cur.useRLE = false
 	hist := cur.count[:cur.symbolLen]
-	nSize := cur.approxSize(hist) + cur.maxHeaderSize()
 	predefSize := preDef.approxSize(hist)
 	prevSize := prev.approxSize(hist)
+	if predefSize != math.MaxUint32 {
+		predefSize += uint32(preDef.actualTableLog)
+	}
+	if prevSize != math.MaxUint32 {
+		prevSize += uint32(prev.actualTableLog)
+	}
+	if min(predefSize, prevSize) <= minNewSize(hist, nSeq) || forcePreDef {
+		if predefSize <= prevSize || forcePreDef {
+			if debugEncoder {
+				println("Using predefined", predefSize>>3, "without a new table")
+			}
+			return preDef, compModePredefined, nil
+		}
+		if debugEncoder {
+			println("Using previous", prevSize>>3, "without a new table")
+		}
+		return prev, compModeRepeat, nil
+	}
+	if err := cur.normalizeCount(nSeq); err != nil {
+		return nil, 0, err
+	}
+	nSize := cur.approxSize(hist) + cur.maxHeaderSize()
 
 	// Add a small penalty for new encoders.
 	// Don't bother with extremely small (<2 byte gains).
@@ -819,29 +825,23 @@ func (b *blockEnc) chooseComp(cur, prev, preDef *fseEncoder) (*fseEncoder, seqCo
 	// Each stream ends with a flush of tableLog bits.
 	nSize += uint32(cur.actualTableLog)
 	nSizePrev += uint32(cur.actualTableLog)
-	if predefSize != math.MaxUint32 {
-		predefSize += uint32(preDef.actualTableLog)
-	}
-	if prevSize != math.MaxUint32 {
-		prevSize += uint32(prev.actualTableLog)
-	}
 	switch {
-	case predefSize <= prevSize && predefSize <= nSize || forcePreDef:
+	case predefSize <= prevSize && predefSize <= nSize:
 		if debugEncoder {
 			println("Using predefined", predefSize>>3, "<=", nSize>>3)
 		}
-		return preDef, compModePredefined
+		return preDef, compModePredefined, nil
 	case prevSize <= nSizePrev:
 		if debugEncoder {
 			println("Using previous", prevSize>>3, "<=", nSizePrev>>3)
 		}
-		return prev, compModeRepeat
+		return prev, compModeRepeat, nil
 	default:
 		if debugEncoder {
 			println("Using new, predef", predefSize>>3, ". previous:", prevSize>>3, ">", nSize>>3, "header max:", cur.maxHeaderSize()>>3, "bytes")
 			println("tl:", cur.actualTableLog, "symbolLen:", cur.symbolLen, "norm:", cur.norm[:cur.symbolLen], "hist", cur.count[:cur.symbolLen])
 		}
-		return cur, compModeFSE
+		return cur, compModeFSE, nil
 	}
 }
 
