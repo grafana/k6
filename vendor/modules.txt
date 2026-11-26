@@ -142,7 +142,7 @@ github.com/evanw/esbuild/pkg/api
 # github.com/fatih/color v1.19.0
 ## explicit; go 1.25.0
 github.com/fatih/color
-# github.com/go-json-experiment/json v0.0.0-20260820222146-c27c302e5fc3
+# github.com/go-json-experiment/json v1.27.2
 ## explicit; go 1.26
 github.com/go-json-experiment/json
 github.com/go-json-experiment/json/internal
