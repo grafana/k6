@@ -97,6 +97,9 @@ An archive is a fully self-contained test run, and can be executed identically e
 		Example: exampleText,
 		Args:    cobra.ExactArgs(1),
 		RunE:    c.run,
+		// archive only reads a test's structure and never uses real secret
+		// values, so it may default to the dummy secret source.
+		Annotations: map[string]string{secretsOptionalAnnotation: "true"},
 	}
 
 	archiveCmd.Flags().SortFlags = false
