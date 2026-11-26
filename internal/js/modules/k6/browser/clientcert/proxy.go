@@ -199,13 +199,41 @@ func (p *Proxy) handshakeUpstream(
 		protos = []string{"http/1.1"}
 	}
 	upstream := tls.Client(conn, &tls.Config{
-		ServerName:         host,
-		NextProtos:         protos,
-		RootCAs:            p.cfg.RootCAs,
-		InsecureSkipVerify: p.cfg.IgnoreHTTPSErrors, //nolint:gosec // the user opted out with ignoreHTTPSErrors
-		Certificates:       certs,
+		ServerName:           host,
+		NextProtos:           protos,
+		RootCAs:              p.cfg.RootCAs,
+		InsecureSkipVerify:   p.cfg.IgnoreHTTPSErrors, //nolint:gosec // the user opted out with ignoreHTTPSErrors
+		GetClientCertificate: selectClientCertificate(certs),
 	})
 	return upstream, upstream.HandshakeContext(hello.Context())
+}
+
+// selectClientCertificate picks the certificate to send. For TLS 1.3 it returns the first
+// certificate usable with the earliest scheme in the server's order; for TLS 1.2 it considers
+// only the last certificate. The server's CA list is ignored. With no usable certificate it
+// returns an empty certificate, so that none is sent.
+func selectClientCertificate(certs []tls.Certificate) func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
+	return func(cri *tls.CertificateRequestInfo) (*tls.Certificate, error) {
+		req := *cri
+		req.AcceptableCAs = nil
+		if req.Version >= tls.VersionTLS13 {
+			for _, scheme := range cri.SignatureSchemes {
+				req.SignatureSchemes = []tls.SignatureScheme{scheme}
+				for i := range certs {
+					if req.SupportsCertificate(&certs[i]) == nil {
+						return &certs[i], nil
+					}
+				}
+			}
+			return &tls.Certificate{}, nil
+		}
+		if len(certs) > 0 {
+			if last := &certs[len(certs)-1]; req.SupportsCertificate(last) == nil {
+				return last, nil
+			}
+		}
+		return &tls.Certificate{}, nil
+	}
 }
 
 // clientCertificateErrorBody returns the HTML body of a 503 response reporting err.

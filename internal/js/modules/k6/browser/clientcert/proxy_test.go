@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"io"
 	stdlog "log"
@@ -31,21 +32,33 @@ func TestProxy(t *testing.T) {
 	tests := []struct {
 		name       string
 		h2         bool
+		unlistedCA bool
 		protoMajor int
 		protocol   string
 	}{
 		{name: "h2", h2: true, protoMajor: 2, protocol: "h2"},
 		{name: "http1", h2: false, protoMajor: 1, protocol: "http/1.1"},
+		{name: "ca_not_listed_by_server", h2: true, unlistedCA: true, protoMajor: 2, protocol: "h2"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			chain := tlstest.NewChain(t)
-			srv := startTLSServer(t, chain, &tls.Config{
+			serverCfg := &tls.Config{
 				ClientAuth: tls.RequireAndVerifyClientCert,
 				ClientCAs:  chain.RootPool,
-			}, tt.h2)
+			}
+			if tt.unlistedCA {
+				// The server lists a CA that issued none of the client's chain but accepts any
+				// certificate.
+				dummy, err := dummyCertificate()
+				require.NoError(t, err)
+				serverCfg.ClientAuth = tls.RequireAnyClientCert
+				serverCfg.ClientCAs = x509.NewCertPool()
+				serverCfg.ClientCAs.AddCert(dummy.Leaf)
+			}
+			srv := startTLSServer(t, chain, serverCfg, tt.h2)
 			p := startProxy(t, ProxyConfig{
 				Certificates: map[string][]tls.Certificate{
 					originOf(t, srv.URL): {chain.ClientCertificate(t, "client", tlstest.KeyECDSA)},
@@ -227,6 +240,109 @@ func TestClientCertificateErrorBody(t *testing.T) {
 
 	got := clientCertificateErrorBody(errors.New("<script>\"x\"\nsecond line"))
 	assert.Equal(t, "k6 client-certificate error: &lt;script&gt;&#34;x&#34; <br>second line", got)
+}
+
+func TestSelectClientCertificate(t *testing.T) {
+	t.Parallel()
+
+	var (
+		ecdsaScheme   = tls.ECDSAWithP256AndSHA256
+		pssScheme     = tls.PSSWithSHA256
+		pkcs1Scheme   = tls.PKCS1WithSHA256
+		ed25519Scheme = tls.Ed25519
+	)
+	certs := map[string]tls.Certificate{
+		"rsa":     tlstest.NewChain(t).ClientCertificate(t, "rsa", tlstest.KeyRSA),
+		"ecdsa":   tlstest.NewChain(t).ClientCertificate(t, "ecdsa", tlstest.KeyECDSA),
+		"ed25519": tlstest.NewChain(t).ClientCertificate(t, "ed25519", tlstest.KeyEd25519),
+	}
+	// No certificate in the loaded chains is issued by the dummy certificate's subject.
+	dummy, err := dummyCertificate()
+	require.NoError(t, err)
+	otherCA := [][]byte{dummy.Leaf.RawSubject}
+
+	tests := []struct {
+		name          string
+		version       uint16
+		schemes       []tls.SignatureScheme
+		acceptableCAs [][]byte
+		certs         []string
+		want          string
+	}{
+		{
+			name: "tls13_ecdsa_first", version: tls.VersionTLS13,
+			schemes: []tls.SignatureScheme{ecdsaScheme, pssScheme, pkcs1Scheme},
+			certs:   []string{"rsa", "ecdsa"}, want: "ecdsa",
+		},
+		{
+			name: "tls13_ecdsa_first_reversed", version: tls.VersionTLS13,
+			schemes: []tls.SignatureScheme{ecdsaScheme, pssScheme, pkcs1Scheme},
+			certs:   []string{"ecdsa", "rsa"}, want: "ecdsa",
+		},
+		{
+			name: "tls13_rsa_first", version: tls.VersionTLS13,
+			schemes: []tls.SignatureScheme{pssScheme, pkcs1Scheme, ecdsaScheme},
+			certs:   []string{"ecdsa", "rsa"}, want: "rsa",
+		},
+		{
+			name: "tls13_ed25519_first", version: tls.VersionTLS13,
+			schemes: []tls.SignatureScheme{ed25519Scheme, pssScheme},
+			certs:   []string{"rsa", "ed25519"}, want: "ed25519",
+		},
+		{
+			name: "tls13_ca_list_ignored", version: tls.VersionTLS13,
+			schemes: []tls.SignatureScheme{pssScheme}, acceptableCAs: otherCA,
+			certs: []string{"rsa"}, want: "rsa",
+		},
+		{
+			name: "tls13_no_acceptable_scheme", version: tls.VersionTLS13,
+			schemes: []tls.SignatureScheme{ecdsaScheme},
+			certs:   []string{"rsa"}, want: "",
+		},
+		{
+			name: "tls12_last_loaded", version: tls.VersionTLS12,
+			schemes: []tls.SignatureScheme{ecdsaScheme, pssScheme, pkcs1Scheme},
+			certs:   []string{"ecdsa", "rsa"}, want: "rsa",
+		},
+		{
+			name: "tls12_last_loaded_reversed", version: tls.VersionTLS12,
+			schemes: []tls.SignatureScheme{pssScheme, pkcs1Scheme, ecdsaScheme},
+			certs:   []string{"rsa", "ecdsa"}, want: "ecdsa",
+		},
+		{
+			name: "tls12_last_not_acceptable", version: tls.VersionTLS12,
+			schemes: []tls.SignatureScheme{ecdsaScheme},
+			certs:   []string{"ecdsa", "rsa"}, want: "",
+		},
+		{
+			name: "tls12_ca_list_ignored", version: tls.VersionTLS12,
+			schemes: []tls.SignatureScheme{pssScheme, pkcs1Scheme}, acceptableCAs: otherCA,
+			certs: []string{"rsa"}, want: "rsa",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			loaded := make([]tls.Certificate, 0, len(tt.certs))
+			for _, name := range tt.certs {
+				loaded = append(loaded, certs[name])
+			}
+			got, err := selectClientCertificate(loaded)(&tls.CertificateRequestInfo{
+				Version:          tt.version,
+				SignatureSchemes: tt.schemes,
+				AcceptableCAs:    tt.acceptableCAs,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			if tt.want == "" {
+				assert.Empty(t, got.Certificate)
+				return
+			}
+			require.NotNil(t, got.Leaf)
+			assert.Equal(t, tt.want, got.Leaf.Subject.CommonName)
+		})
+	}
 }
 
 func TestServe503H2_Terminates(t *testing.T) {
