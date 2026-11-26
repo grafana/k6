@@ -2,12 +2,17 @@ package tests
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
+	"maps"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -16,7 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/v2/internal/lib/testutils/connectproxy"
 	"go.k6.io/k6/v2/internal/lib/testutils/tlstest"
+	"go.k6.io/k6/v2/lib/types"
 )
 
 // clientCertNavigation is the outcome of navigating a page to a URL.
@@ -37,8 +44,12 @@ func TestBrowserContextClientCertificates(t *testing.T) {
 
 	chain := tlstest.NewChain(t)
 	rsaCert, rsaKey := chain.ClientPEM(t, "k6-rsa-client", tlstest.KeyRSA)
+	ecdsaCert, ecdsaKey := chain.ClientPEM(t, "k6-ecdsa-client", tlstest.KeyECDSA)
 	rsaFor := func(origin string) clientCertOption {
 		return clientCertOption{Origin: origin, Cert: string(rsaCert), Key: string(rsaKey)}
+	}
+	ecdsaFor := func(origin string) clientCertOption {
+		return clientCertOption{Origin: origin, Cert: string(ecdsaCert), Key: string(ecdsaKey)}
 	}
 	requireCert := clientCertServerOptions{clientAuth: tls.RequireAndVerifyClientCert}
 	rsaPage := clientCertNavigation{Status: 200, Text: "cn:k6-rsa-client proto:1"}
@@ -160,6 +171,91 @@ func TestBrowserContextClientCertificates(t *testing.T) {
 				assert.Equal(t, "cn:k6-rsa-client:ping", got)
 			},
 		},
+		{
+			name: "via_context_proxy_407",
+			run: func(t *testing.T) {
+				srv := newClientCertServer(t, chain, requireCert)
+				plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+					_, err := io.WriteString(w, `<!doctype html><html><head><link rel="icon" href="data:,"></head><body>plain</body></html>`)
+					assert.NoError(t, err)
+				}))
+				t.Cleanup(plain.Close)
+				proxy := newClientCertRecordingProxy(t, "proxy-user", "proxy-pass")
+
+				got := navigateWithClientCertificates(t, newTestBrowser(t), "newContext", map[string]any{
+					"ignoreHTTPSErrors":  true,
+					"proxy":              map[string]any{"server": proxy.URL},
+					"httpCredentials":    map[string]any{"username": "proxy-user", "password": "proxy-pass"},
+					"clientCertificates": []clientCertOption{rsaFor(srv.URL)},
+				}, srv.URL, plain.URL+"/plain")
+				assert.Equal(t, []clientCertNavigation{rsaPage, {Status: 200, Text: "plain"}}, got)
+				requests := proxy.Requests()
+				assert.Contains(t, requests, "CONNECT "+strings.TrimPrefix(srv.URL, "https://"))
+				assert.Contains(t, requests, "GET "+plain.URL+"/plain")
+			},
+		},
+		{
+			name: "bypass_host_direct",
+			run: func(t *testing.T) {
+				srv := newClientCertServer(t, chain, clientCertServerOptions{clientAuth: tls.VerifyClientCertIfGiven})
+				proxy := connectproxy.New(t, connectproxy.Options{})
+				got := navigateWithClientCertificates(t, newTestBrowser(t), "newContext", map[string]any{
+					"ignoreHTTPSErrors":  true,
+					"proxy":              map[string]any{"server": proxy.URL(), "bypass": "127.0.0.1"},
+					"clientCertificates": []clientCertOption{rsaFor(srv.URL)},
+				}, srv.URL)
+				assert.Equal(t, []clientCertNavigation{{Status: 200, Text: "cn:none proto:1"}}, got)
+				// Chromium's own background requests may still reach the proxy.
+				assert.NotContains(t, proxy.Targets(), strings.TrimPrefix(srv.URL, "https://"))
+			},
+		},
+		{
+			name: "k6_hosts_mapping",
+			run: func(t *testing.T) {
+				srv := newClientCertServer(t, chain, requireCert)
+				port := clientCertPort(t, srv.URL)
+				tb := newTestBrowser(t)
+				hosts, err := types.NewNullHosts(map[string]types.Host{
+					"clientcert.test": {IP: net.IPv4(127, 0, 0, 1), Port: srv.Listener.Addr().(*net.TCPAddr).Port},
+				})
+				require.NoError(t, err)
+				tb.vu.StateField.Options.Hosts = hosts
+
+				origin := "https://clientcert.test:" + port
+				got := navigateWithClientCertificates(t, tb, "newContext", map[string]any{
+					"ignoreHTTPSErrors":  true,
+					"clientCertificates": []clientCertOption{rsaFor(origin)},
+				}, origin+"/")
+				assert.Equal(t, []clientCertNavigation{rsaPage}, got)
+			},
+		},
+		{
+			name: "mixed_key_types_tls13",
+			run: func(t *testing.T) {
+				srv := newClientCertServer(t, chain, clientCertServerOptions{
+					clientAuth: tls.RequireAndVerifyClientCert, minVersion: tls.VersionTLS13,
+				})
+				got := navigateWithClientCertificates(t, newTestBrowser(t), "newContext", map[string]any{
+					"ignoreHTTPSErrors":  true,
+					"clientCertificates": []clientCertOption{ecdsaFor(srv.URL), rsaFor(srv.URL)},
+				}, srv.URL)
+				assert.Equal(t, []clientCertNavigation{rsaPage}, got)
+			},
+		},
+		{
+			name: "mixed_key_types_tls12",
+			run: func(t *testing.T) {
+				srv := newClientCertServer(t, chain, clientCertServerOptions{
+					clientAuth: tls.RequireAndVerifyClientCert, maxVersion: tls.VersionTLS12,
+				})
+				got := navigateWithClientCertificates(t, newTestBrowser(t), "newContext", map[string]any{
+					"ignoreHTTPSErrors":  true,
+					"clientCertificates": []clientCertOption{rsaFor(srv.URL), ecdsaFor(srv.URL)},
+				}, srv.URL)
+				assert.Equal(t, []clientCertNavigation{{Status: 200, Text: "cn:k6-ecdsa-client proto:1"}}, got)
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -259,6 +355,8 @@ func clientCertPort(t *testing.T, serverURL string) string {
 type clientCertServerOptions struct {
 	clientAuth tls.ClientAuthType
 	h2         bool
+	minVersion uint16
+	maxVersion uint16
 }
 
 // newClientCertServer starts an HTTPS server with chain's leaf, for localhost and 127.0.0.1,
@@ -299,6 +397,8 @@ func newClientCertServer(t *testing.T, chain *tlstest.Chain, opts clientCertServ
 		Certificates: []tls.Certificate{chain.FullChainTLSCertificate(t)},
 		ClientAuth:   opts.clientAuth,
 		ClientCAs:    chain.RootPool,
+		MinVersion:   opts.minVersion,
+		MaxVersion:   opts.maxVersion,
 	}
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
@@ -311,4 +411,101 @@ func clientCertCN(r *http.Request) string {
 		return "none"
 	}
 	return r.TLS.PeerCertificates[0].Subject.CommonName
+}
+
+// clientCertRecordingProxy is an HTTP proxy that tunnels CONNECT requests and forwards
+// absolute-form requests, answering 407 until a request carries the expected Basic
+// credentials.
+type clientCertRecordingProxy struct {
+	*httptest.Server
+
+	mu       sync.Mutex
+	requests []string
+}
+
+func newClientCertRecordingProxy(t *testing.T, username, password string) *clientCertRecordingProxy {
+	t.Helper()
+
+	wantAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte(username+":"+password))
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	t.Cleanup(transport.CloseIdleConnections)
+
+	p := &clientCertRecordingProxy{}
+	p.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Proxy-Authorization") != wantAuth {
+			w.Header().Set("Proxy-Authenticate", `Basic realm="test"`)
+			w.WriteHeader(http.StatusProxyAuthRequired)
+			return
+		}
+		if r.Method == http.MethodConnect {
+			p.record("CONNECT " + r.Host)
+			clientCertTunnel(w, r)
+			return
+		}
+		p.record(r.Method + " " + r.URL.String())
+		out := r.Clone(r.Context())
+		out.RequestURI = ""
+		out.Header.Del("Proxy-Authorization")
+		resp, err := transport.RoundTrip(out)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close() //nolint:errcheck
+		maps.Copy(w.Header(), resp.Header)
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
+	}))
+	t.Cleanup(p.Close)
+
+	return p
+}
+
+func (p *clientCertRecordingProxy) record(request string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.requests = append(p.requests, request)
+}
+
+// Requests returns the authenticated requests as "<method> <target>", in order.
+func (p *clientCertRecordingProxy) Requests() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]string(nil), p.requests...)
+}
+
+// clientCertTunnel answers the CONNECT request r and copies between the client and r.Host in
+// both directions, forwarding half-closes, until both directions finish.
+func clientCertTunnel(w http.ResponseWriter, r *http.Request) {
+	target, err := (&net.Dialer{}).DialContext(r.Context(), "tcp", r.Host)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	client, buf, err := http.NewResponseController(w).Hijack()
+	if err != nil {
+		_ = target.Close()
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if _, err := io.WriteString(client, "HTTP/1.1 200 Connection established\r\n\r\n"); err != nil {
+		_ = client.Close()
+		_ = target.Close()
+		return
+	}
+	go func() {
+		var wg sync.WaitGroup
+		copyHalf := func(dst net.Conn, src io.Reader) {
+			_, _ = io.Copy(dst, src)
+			if cw, ok := dst.(interface{ CloseWrite() error }); ok {
+				_ = cw.CloseWrite()
+			}
+		}
+		wg.Go(func() { copyHalf(target, buf.Reader) })
+		wg.Go(func() { copyHalf(client, target) })
+		wg.Wait()
+		_ = client.Close()
+		_ = target.Close()
+	}()
 }
