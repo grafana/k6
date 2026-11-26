@@ -151,7 +151,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// the test run trace.
 	tracer := trace.Tracer(test.preInitState.TracerProvider, test.preInitState.FeatureFlags)
 	var testCtx context.Context
-	testCtx, runSpan = trace.StartTestRun(globalCtx, tracer, logger)
+	// An incoming trace (TRACEPARENT environment variable) is continued by the run span.
+	parentCtx := globalCtx
+	if tracer != nil {
+		parentCtx = trace.ExtractParentFromEnv(globalCtx, c.gs.Env, logger)
+	}
+	testCtx, runSpan = trace.StartTestRun(parentCtx, tracer, logger)
 	runCtx = oteltrace.ContextWithSpan(runCtx, runSpan)
 
 	// Write the full consolidated *and derived* options back to the Runner.
