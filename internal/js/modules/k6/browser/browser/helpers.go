@@ -90,6 +90,10 @@ func newRegExMatcher(ctx context.Context, vu moduleVU, tq *taskqueue.TaskQueue) 
 //   - Otherwise, rejects the promise with the error fn returns.
 func promise(vu moduleVU, fn func() (result any, reason error)) *sobek.Promise {
 	p, resolve, reject := promises.New(vu)
+	if vu.State() == nil {
+		reject(k6ext.BrowserError(errBrowserInitContext))
+		return p
+	}
 	go func() {
 		v, err := fn()
 		if err != nil {

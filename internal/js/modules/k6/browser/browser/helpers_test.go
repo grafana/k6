@@ -1,26 +1,32 @@
 package browser
 
 import (
+	"context"
 	"testing"
 
 	"github.com/grafana/sobek"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	k6modulestest "go.k6.io/k6/v2/js/modulestest"
 )
 
-func TestSobekEmptyString(t *testing.T) {
+func TestPromiseWithoutIterationState(t *testing.T) {
 	t.Parallel()
-	// SobekEmpty string should return true if the argument
-	// is an empty string or not defined in the Sobek runtime.
-	rt := sobek.New()
-	require.NoError(t, rt.Set("sobekEmptyString", sobekEmptyString))
-	for _, s := range []string{"() => true", "'() => false'"} { // not empty
-		v, err := rt.RunString(`sobekEmptyString(` + s + `)`)
-		require.NoError(t, err)
-		require.Falsef(t, v.ToBoolean(), "got: true, want: false for %q", s)
-	}
-	for _, s := range []string{"", "  ", "null", "undefined"} { // empty
-		v, err := rt.RunString(`sobekEmptyString(` + s + `)`)
-		require.NoError(t, err)
-		require.Truef(t, v.ToBoolean(), "got: false, want: true for %q", s)
-	}
+
+	vu := moduleVU{VU: &k6modulestest.VU{
+		CtxField:     context.Background(),
+		RuntimeField: sobek.New(),
+		RegisterCallbackField: func() func(f func() error) {
+			return func(f func() error) { _ = f() }
+		},
+	}}
+
+	promise := promise(vu, func() (any, error) {
+		t.Fatal("promise callback ran in the init context")
+		return nil, nil
+	})
+
+	require.Equal(t, sobek.PromiseStateRejected, promise.State())
+	assert.Contains(t, promise.Result().String(), "iteration context")
 }
