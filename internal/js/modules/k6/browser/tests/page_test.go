@@ -314,6 +314,81 @@ func TestPageEvaluateErrorHasBrowserModule(t *testing.T) {
 	assert.Equal(t, "browser", fields["module"])
 }
 
+func TestBrowserPromiseErrorProperties(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name    string
+		script  string
+		message string
+	}{
+		{"navigation", `await page.waitForNavigation({ timeout: 10 });`, "timed out after 10ms"},
+		{"screenshot", `await page.screenshot({ path: "invalid\u0000.png" });`, "persisting screenshot"},
+		{"response_body", `
+			const pending = page.waitForResponse(redirectURL);
+			await page.goto(redirectURL);
+			const response = await pending;
+			await response.body();
+		`, "response body is unavailable for redirect responses"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withHTTPServer())
+			tb.withHandler("/redirect", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, tb.url("/get"), http.StatusFound)
+			})
+			tb.vu.ActivateVU()
+			tb.vu.StartIteration(t)
+			defer tb.vu.EndIteration(t)
+
+			result := tb.vu.RunPromise(t, `
+				const page = await browser.newPage();
+				const redirectURL = %q;
+				try {
+					%s
+				} catch (error) {
+					return [error.name, error.message, error instanceof Error];
+				} finally {
+					await page.close();
+				}
+			`, tb.url("/redirect"), tc.script)
+			properties := result.Result().ToObject(tb.vu.Runtime())
+			assert.Equal(t, "GoError", properties.Get("0").String())
+			assert.Contains(t, properties.Get("1").String(), tc.message)
+			assert.True(t, properties.Get("2").ToBoolean())
+		})
+	}
+}
+
+func TestBrowserPromiseArrayBuffers(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/body", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := io.WriteString(w, "hello")
+		require.NoError(t, err)
+	})
+	tb.vu.ActivateVU()
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	result := tb.vu.RunPromise(t, `
+		const page = await browser.newPage();
+		try {
+			const response = await page.goto(%q);
+			const screenshot = await page.screenshot();
+			const body = await response.body();
+			return [screenshot instanceof ArrayBuffer, new Uint8Array(screenshot)[0],
+				body instanceof ArrayBuffer, String.fromCharCode(...new Uint8Array(body))];
+		} finally {
+			await page.close();
+		}
+	`, tb.url("/body"))
+	require.Equal(t, sobek.PromiseStateFulfilled, result.State())
+	assert.Equal(t, []any{true, int64(137), true, "hello"}, result.Result().Export())
+}
+
 func TestPageGoto(t *testing.T) {
 	t.Parallel()
 
