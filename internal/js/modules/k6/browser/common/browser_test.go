@@ -381,17 +381,17 @@ func (c fakeConn) Execute(
 	return c.execute(ctx, method, params, res)
 }
 
-func TestBrowserNewContextClientCertificatesNotSupported(t *testing.T) {
+func TestBrowserNewContextClientCertificates_RemoteBrowser(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 	// The browser has no connection, so any CDP call would panic.
-	b := newBrowser(ctx, ctx, cancel, nil, NewLocalBrowserOptions(), log.NewNullLogger())
+	b := newBrowser(ctx, ctx, cancel, nil, NewRemoteBrowserOptions(), log.NewNullLogger())
 	opts := DefaultBrowserContextOptions()
 	opts.ClientCertificates = map[string][]tls.Certificate{"https://x.test": {{}}}
 
 	bctx, err := b.NewContext(opts)
-	require.EqualError(t, err, "clientCertificates is not supported yet")
+	require.EqualError(t, err, "clientCertificates is not supported with a remote browser")
 	require.Nil(t, bctx)
 }
