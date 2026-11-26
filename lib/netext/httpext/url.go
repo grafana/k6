@@ -3,6 +3,7 @@ package httpext
 import (
 	"fmt"
 	"net/url"
+	"strings"
 )
 
 // A URL wraps net.URL, and preserves the template (if any) the URL was constructed from.
@@ -39,13 +40,30 @@ func (u URL) Clean() string {
 		return u.URL
 	}
 
-	if password, passwordOk := u.u.User.Password(); passwordOk {
-		// here 3 is for the '://' and 4 is because of '://' and ':' between the credentials
-		return u.URL[:len(u.u.Scheme)+3] + "****:****" + u.URL[len(u.u.Scheme)+4+len(u.u.User.Username())+len(password):]
+	// Mask the credentials in the raw URL without relying on the decoded
+	// username/password lengths. Those lengths differ from the bytes actually
+	// present in u.URL whenever the userinfo contains percent-encoded characters
+	// (e.g. a password with a '@', ':' or space), and using them would slice in
+	// the wrong place and leak part of the credentials into the "clean" output.
+	// Instead locate the userinfo in the raw string: it spans from right after
+	// the "scheme://" prefix up to the '@' that separates it from the host.
+	prefixLen := len(u.u.Scheme) + len("://")
+	authority := u.URL[prefixLen:]
+	if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+		authority = authority[:end]
+	}
+	// url.Parse splits the userinfo from the host at the last '@' in the
+	// authority, so mirror that here.
+	at := strings.LastIndex(authority, "@")
+	if at < 0 {
+		return u.URL
 	}
 
-	// here 3 in both places is for the '://'
-	return u.URL[:len(u.u.Scheme)+3] + "****" + u.URL[len(u.u.Scheme)+3+len(u.u.User.Username()):]
+	mask := "****"
+	if _, passwordOk := u.u.User.Password(); passwordOk {
+		mask = "****:****"
+	}
+	return u.URL[:prefixLen] + mask + u.URL[prefixLen+at:]
 }
 
 // GetURL returns the internal url.URL
