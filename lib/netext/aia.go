@@ -17,6 +17,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/singleflight"
+
+	"go.k6.io/k6/v2/lib"
 )
 
 const (
@@ -57,6 +59,22 @@ func NewAIAFetcher(dial DialContextFunc) *AIAFetcher {
 			Transport: &http.Transport{
 				Proxy:       http.ProxyFromEnvironment,
 				DialContext: dial,
+			},
+		},
+	}
+}
+
+// NewAIAFetcherFromDialer binds the fetcher to the caller's k6 dialer so AIA
+// requests use the same blocking lists and host overrides as the request that
+// presented the certificate. The URL-only proxy check is sufficient because AIA
+// requests never set a Host override.
+func NewAIAFetcherFromDialer(d lib.DialContexter) *AIAFetcher {
+	return &AIAFetcher{
+		httpClient: &http.Client{
+			Timeout: aiaFetchTimeout,
+			Transport: &http.Transport{
+				Proxy:       ProxyFromEnvironmentURLOnly(d),
+				DialContext: d.DialContext,
 			},
 		},
 	}

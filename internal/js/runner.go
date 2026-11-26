@@ -203,7 +203,7 @@ func (r *Runner) newVU(
 		tlsConfig = r.aiaFetcher.Wrap(tlsConfig, r.preInitState.Logger) //nolint:contextcheck
 	}
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy: dialer.ProxyFromEnvironment,
 		// net/http mutates TLSClientConfig (NextProtos) while setting up HTTP/2 on the first
 		// request. Give the transport its own copy so that it doesn't race with other users
 		// of the VU's TLSConfig, such as the WebSocket and gRPC modules.
@@ -610,7 +610,7 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 		BlockedHostnames: opts.BlockedHostnames.Trie,
 		Hosts:            opts.Hosts.Trie,
 	}
-	r.aiaFetcher = netext.NewAIAFetcher(runnerDialer.DialContext)
+	r.aiaFetcher = netext.NewAIAFetcherFromDialer(runnerDialer)
 
 	// FIXME: add tests
 	r.RunTags = r.preInitState.Registry.RootTagSet().WithTagsFromMap(r.Bundle.Options.RunTags)
