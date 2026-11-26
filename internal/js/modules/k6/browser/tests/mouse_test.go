@@ -8,6 +8,40 @@ import (
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/common"
 )
 
+func TestMouseMoveSteps(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	tb.vu.StartIteration(t)
+	defer tb.vu.EndIteration(t)
+
+	_, err := tb.vu.RunAsync(t, `
+		const page = await browser.newPage();
+		await page.evaluate(() => {
+			window.positions = [];
+			window.addEventListener('mousemove', event => {
+				window.positions.push([event.clientX, event.clientY]);
+			});
+		});
+		await page.mouse.move(10, 20);
+		const cases = [
+			{ x: 110, y: 220, options: { steps: 5 }, want: [[30, 60], [50, 100], [70, 140], [90, 180], [110, 220]] },
+			{ x: 10, y: 20, options: { steps: 5 }, want: [[90, 180], [70, 140], [50, 100], [30, 60], [10, 20]] },
+			{ x: 20, y: 30, want: [[20, 30]] },
+		];
+		for (const test of cases) {
+			await page.evaluate(() => { window.positions = []; });
+			await page.mouse.move(test.x, test.y, test.options);
+			const got = await page.evaluate(() => window.positions);
+			if (JSON.stringify(got) !== JSON.stringify(test.want)) {
+				throw new Error('expected ' + JSON.stringify(test.want) + ', got ' + JSON.stringify(got));
+			}
+		}
+		await page.close();
+	`)
+	require.NoError(t, err)
+}
+
 func TestMouseActions(t *testing.T) {
 	t.Parallel()
 
