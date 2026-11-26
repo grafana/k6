@@ -50,6 +50,9 @@ type Options struct {
 type parsingState struct {
 	// set when we couldn't load external source map so we can try parsing without loading it
 	couldntLoadSourceMap bool
+	// typesStripped is set once the types have been stripped. Code that still can't be parsed after
+	// that has a real syntax error, so it is reported as it is instead of stripping its types again.
+	typesStripped bool
 	// srcMap is the current full sourceMap that has been generated read so far
 	srcMap          []byte
 	srcMapError     error
@@ -117,7 +120,7 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 
 	isTsExtensionFile := strings.HasSuffix(filename, ".ts")
 	isStdin := filename == "file:///-"
-	if !isTsExtensionFile && !isStdin {
+	if (!isTsExtensionFile && !isStdin) || ps.typesStripped {
 		return nil, "", err
 	}
 
@@ -125,6 +128,7 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 	if err != nil {
 		return nil, "", err
 	}
+	ps.typesStripped = true
 
 	// At this point we have stripped types successfully, no matter whether it was a .ts file
 	// or a script from stdin, and so we can report that a TS file been parsed successfully.
