@@ -1,6 +1,7 @@
 package clientcert
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 
 	"go.k6.io/k6/v2/internal/js/modules/k6/browser/log"
 	"go.k6.io/k6/v2/internal/lib/testutils/tlstest"
@@ -145,15 +148,21 @@ func TestProxy_UpstreamTLSFailure(t *testing.T) {
 	tests := []struct {
 		name              string
 		untrusted         bool
+		h2                bool
 		rejectCert        bool
 		maxVersion        uint16
 		ignoreHTTPSErrors bool
 		wantStatus        int
+		wantProtoMajor    int
 	}{
-		{name: "untrusted_server_h1", untrusted: true, wantStatus: http.StatusServiceUnavailable},
+		{name: "untrusted_server_h1", untrusted: true, wantStatus: http.StatusServiceUnavailable, wantProtoMajor: 1},
+		{
+			name: "untrusted_server_h2", untrusted: true, h2: true,
+			wantStatus: http.StatusServiceUnavailable, wantProtoMajor: 2,
+		},
 		{
 			name: "server_rejects_cert_tls12", rejectCert: true,
-			maxVersion: tls.VersionTLS12, wantStatus: http.StatusServiceUnavailable,
+			maxVersion: tls.VersionTLS12, wantStatus: http.StatusServiceUnavailable, wantProtoMajor: 1,
 		},
 		{name: "ignore_https_errors", untrusted: true, ignoreHTTPSErrors: true, wantStatus: http.StatusOK},
 	}
@@ -171,7 +180,7 @@ func TestProxy_UpstreamTLSFailure(t *testing.T) {
 			if tt.rejectCert {
 				serverCfg.ClientCAs = other.RootPool
 			}
-			srv := startTLSServer(t, chain, serverCfg, false)
+			srv := startTLSServer(t, chain, serverCfg, tt.h2)
 
 			cfg := ProxyConfig{
 				Certificates: map[string][]tls.Certificate{
@@ -190,7 +199,7 @@ func TestProxy_UpstreamTLSFailure(t *testing.T) {
 			if tt.wantStatus != http.StatusServiceUnavailable {
 				return
 			}
-			assert.Equal(t, 1, resp.ProtoMajor)
+			assert.Equal(t, tt.wantProtoMajor, resp.ProtoMajor)
 			assert.True(t, strings.HasPrefix(resp.Body, "k6 client-certificate error: "), resp.Body)
 			assert.Equal(t, "text/html; charset=utf-8", resp.Header.Get("Content-Type"))
 		})
@@ -218,6 +227,49 @@ func TestClientCertificateErrorBody(t *testing.T) {
 
 	got := clientCertificateErrorBody(errors.New("<script>\"x\"\nsecond line"))
 	assert.Equal(t, "k6 client-certificate error: &lt;script&gt;&#34;x&#34; <br>second line", got)
+}
+
+func TestServe503H2_Terminates(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		request bool
+	}{
+		{name: "client_keeps_connection_open", request: true},
+		{name: "browser_closes_before_request"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client, browser, browserRaw := tlsPipe(t, "h2")
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				serve503H2(browser, browserRaw, errors.New("upstream failed"))
+			}()
+
+			if !tt.request {
+				require.NoError(t, client.Close())
+				requireReturns(t, done, 3*time.Second, "serve503H2")
+				return
+			}
+
+			var resp h2Response
+			select {
+			case resp = <-sendH2Request(t, client):
+			case <-time.After(5 * time.Second):
+				require.FailNow(t, "no response")
+			}
+
+			requireReturns(t, done, 3*time.Second, "serve503H2")
+			require.NoError(t, resp.err)
+			assert.Equal(t, "503", resp.status)
+			assert.Equal(t, "text/html; charset=utf-8", resp.contentType)
+			assert.Equal(t, "k6 client-certificate error: upstream failed", resp.body)
+		})
+	}
 }
 
 // startTLSServer starts an HTTPS server presenting chain's leaf, configured by cfg. The handler
@@ -295,4 +347,108 @@ func originOf(t *testing.T, rawURL string) string {
 	o, err := NormalizeOrigin(rawURL)
 	require.NoError(t, err)
 	return o
+}
+
+// tlsPipe returns the client and server ends of an in-memory TLS connection that negotiated
+// protocol, and the server's underlying connection.
+func tlsPipe(t *testing.T, protocol string) (*tls.Conn, *tls.Conn, net.Conn) {
+	t.Helper()
+	c, s := net.Pipe()
+	t.Cleanup(func() {
+		_ = c.Close()
+		_ = s.Close()
+	})
+	cert, err := dummyCertificate()
+	require.NoError(t, err)
+	server := tls.Server(s, &tls.Config{Certificates: []tls.Certificate{cert}, NextProtos: []string{protocol}})
+	client := tls.Client(c, &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{protocol},
+	})
+
+	serverErr := make(chan error, 1)
+	go func() { serverErr <- server.HandshakeContext(t.Context()) }()
+	require.NoError(t, client.HandshakeContext(t.Context()))
+	require.NoError(t, <-serverErr)
+	require.Equal(t, protocol, client.ConnectionState().NegotiatedProtocol)
+	return client, server, s
+}
+
+// requireReturns fails t unless done is closed within timeout.
+func requireReturns(t *testing.T, done <-chan struct{}, timeout time.Duration, what string) {
+	t.Helper()
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		require.FailNow(t, what+" did not return within "+timeout.String())
+	}
+}
+
+type h2Response struct {
+	status      string
+	contentType string
+	body        string
+	err         error
+}
+
+// sendH2Request sends a GET request on stream 1 of conn and delivers the response on the
+// returned channel. Unlike Go's HTTP/2 client, it keeps reading conn afterwards and never
+// closes it, even after a GOAWAY.
+func sendH2Request(t *testing.T, conn net.Conn) <-chan h2Response {
+	t.Helper()
+	fr := http2.NewFramer(conn, conn)
+	fr.ReadMetaHeaders = hpack.NewDecoder(4096, nil)
+
+	result := make(chan h2Response, 1)
+	go func() {
+		var resp h2Response
+		for {
+			f, err := fr.ReadFrame()
+			if err != nil {
+				resp.err = err
+				result <- resp
+				return
+			}
+			switch f := f.(type) {
+			case *http2.MetaHeadersFrame:
+				resp.status = f.PseudoValue("status")
+				for _, hf := range f.RegularFields() {
+					if hf.Name == "content-type" {
+						resp.contentType = hf.Value
+					}
+				}
+			case *http2.DataFrame:
+				resp.body += string(f.Data())
+				if f.StreamEnded() {
+					result <- resp
+					for {
+						if _, err := fr.ReadFrame(); err != nil {
+							return
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	var block bytes.Buffer
+	enc := hpack.NewEncoder(&block)
+	for _, hf := range []hpack.HeaderField{
+		{Name: ":method", Value: http.MethodGet},
+		{Name: ":scheme", Value: "https"},
+		{Name: ":authority", Value: "example.com"},
+		{Name: ":path", Value: "/"},
+	} {
+		require.NoError(t, enc.WriteField(hf))
+	}
+	_, err := io.WriteString(conn, http2.ClientPreface)
+	require.NoError(t, err)
+	require.NoError(t, fr.WriteSettings())
+	require.NoError(t, fr.WriteHeaders(http2.HeadersFrameParam{
+		StreamID:      1,
+		BlockFragment: block.Bytes(),
+		EndStream:     true,
+		EndHeaders:    true,
+	}))
+	return result
 }
