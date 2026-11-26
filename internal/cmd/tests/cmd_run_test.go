@@ -2046,6 +2046,48 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 	assert.Contains(t, stdout, "output: Prometheus remote write")
 }
 
+func TestPrometheusRemoteWriteOutputPerInstanceURL(t *testing.T) {
+	t.Parallel()
+
+	// Two remote write endpoints, like the two replicas of a Prometheus HA pair. Each counts the
+	// write requests it receives.
+	newEndpoint := func() (*httptest.Server, *atomic.Int64) {
+		var writes atomic.Int64
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				writes.Add(1)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		t.Cleanup(srv.Close)
+		return srv, &writes
+	}
+	first, firstWrites := newEndpoint()
+	second, secondWrites := newEndpoint()
+
+	ts := NewGlobalTestState(t)
+	// Shared by both outputs; the argument of each --out takes precedence over it.
+	ts.Env["K6_PROMETHEUS_RW_SERVER_URL"] = "http://a-fake-url-for-fail"
+	ts.CmdArgs = []string{
+		"k6", "run",
+		"--out", "experimental-prometheus-rw=url=" + first.URL,
+		"--out", "experimental-prometheus-rw=url=" + second.URL,
+		"-",
+	}
+	ts.Stdin = bytes.NewBufferString(`export default function () {};`)
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	ts.OutMutex.Lock()
+	stdout := ts.Stdout.String()
+	ts.OutMutex.Unlock()
+
+	assert.Contains(t, stdout, "Prometheus remote write ("+first.URL+")")
+	assert.Contains(t, stdout, "Prometheus remote write ("+second.URL+")")
+	// Each output flushes when the test ends, so both endpoints receive the results.
+	assert.Positive(t, firstWrites.Load())
+	assert.Positive(t, secondWrites.Load())
+}
+
 func BenchmarkReadResponseBody(b *testing.B) {
 	httpSrv := httpmultibin.NewHTTPMultiBin(b)
 
