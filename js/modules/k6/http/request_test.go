@@ -267,6 +267,22 @@ func TestRequest(t *testing.T) {
 			`))
 			assert.NoError(t, err)
 		})
+		t.Run("undefinedParamsKeepDefaults", func(t *testing.T) {
+			_, err := rt.RunString(sr(`
+			var params = {
+				redirects: undefined, timeout: undefined, compression: undefined,
+				responseType: undefined, auth: undefined, throw: undefined,
+				headers: undefined, cookies: undefined, tags: undefined,
+			};
+			var res = http.get("HTTPBIN_URL/redirect/1", params);
+			if (res.status != 200) { throw new Error("wrong status: " + res.status) }
+			if (res.url != "HTTPBIN_URL/get") { throw new Error("incorrect URL: " + res.url) }
+			params.redirects = null;
+			res = http.get("HTTPBIN_URL/redirect/1", params);
+			if (res.status != 200) { throw new Error("wrong status with null: " + res.status) }
+			`))
+			assert.NoError(t, err)
+		})
 
 		t.Run("post body", func(t *testing.T) {
 			tb.Mux.HandleFunc("/post-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
