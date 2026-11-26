@@ -356,6 +356,34 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "ConnectionSharing",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");
+
+				var otherClient = new grpc.Client();
+				otherClient.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+					return &grpc_testing.Empty{}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR", { connectionSharing: true });
+				otherClient.connect("GRPCBIN_ADDR", { connectionSharing: true });
+
+				// Closing one client must leave the shared connection open for the other one.
+				client.close();
+
+				var resp = otherClient.invoke("grpc.testing.TestService/EmptyCall", {})
+				if (resp.status !== grpc.StatusOK) {
+					throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
+				}
+				otherClient.close();`,
+			},
+		},
+		{
 			name: "InvokeDiscardResponseMessage",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
@@ -1813,5 +1841,82 @@ func TestAnyWithNotCommonTypes(t *testing.T) {
 			},
 		})
 		`))
+	require.NoError(t, err)
+}
+
+func TestClientConnectionSharingKeepsOwnTypes(t *testing.T) {
+	t.Parallel()
+
+	// Both files declare the same service, but only the second one declares
+	// the message carried in the Any field, so only a client that loaded it
+	// can serialise a request that holds that message.
+	const protoTemplate = `
+		syntax = "proto3";
+		package sharing.types;
+		import "google/protobuf/any.proto";
+
+		service AnyTestService {
+			rpc Invoke (Request) returns (Empty) {}
+		}
+
+		message Request {
+			google.protobuf.Any data = 1;
+		}
+
+		message Empty {}
+		%s
+	`
+
+	ts := newTestState(t)
+	fs := fsext.NewMemMapFs()
+	ts.VU.InitEnvField.FileSystems["file"] = fs
+
+	require.NoError(t, fsext.WriteFile(fs, "/without_point.proto", fmt.Appendf(nil, protoTemplate, ""), 0x600))
+	require.NoError(t, fsext.WriteFile(fs, "/with_point.proto",
+		fmt.Appendf(nil, protoTemplate, "message Point { int64 x = 1; }"), 0x600))
+
+	_, err := ts.Run(`
+		var withoutPoint = new grpc.Client();
+		withoutPoint.load(["/"], "/without_point.proto");
+
+		var withPoint = new grpc.Client();
+		withPoint.load(["/"], "/with_point.proto");
+	`)
+	require.NoError(t, err)
+
+	ts.ToVUContext()
+
+	// The client without the type dials the shared connection, so the other
+	// one would fail to serialise its request if it used the registry of the
+	// client that dialed.
+	_, err = ts.Run(`
+		withoutPoint.connect("GRPCBIN_ADDR", { connectionSharing: true });
+		withPoint.connect("GRPCBIN_ADDR", { connectionSharing: true });
+
+		var req = { data: { "@type": "type.googleapis.com/sharing.types.Point", "x": 1 } };
+
+		// The test server doesn't implement the service: getting its answer
+		// proves that the request was serialised and sent.
+		var resp = withPoint.invoke("sharing.types.AnyTestService/Invoke", req);
+		if (resp.status !== grpc.StatusUnimplemented) {
+			throw new Error("unexpected error: " + JSON.stringify(resp.error) + " or status: " + resp.status);
+		}
+
+		var serialised = true;
+		try {
+			withoutPoint.invoke("sharing.types.AnyTestService/Invoke", req);
+		} catch (e) {
+			serialised = false;
+			if (!String(e).includes("sharing.types.Point")) {
+				throw new Error("unexpected error: " + e);
+			}
+		}
+		if (serialised) {
+			throw new Error("a client must not resolve the types loaded by another client sharing its connection");
+		}
+
+		withoutPoint.close();
+		withPoint.close();
+	`)
 	require.NoError(t, err)
 }

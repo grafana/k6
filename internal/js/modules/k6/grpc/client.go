@@ -44,6 +44,9 @@ type Client struct {
 
 	types    *protoregistry.Types
 	typesMtx sync.Mutex
+
+	connPool *connectionPool
+	shared   *sharedConn // set while the connection comes from connPool
 }
 
 // Load will parse the given proto files and make the file descriptors available to request.
@@ -296,7 +299,7 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	}
 
 	c.addr = addr
-	c.conn, err = grpcext.Dial(ctx, addr, c.types, opts...)
+	c.conn, err = c.dial(ctx, addr, p, opts...)
 	if err != nil {
 		return false, err
 	}
@@ -317,6 +320,38 @@ func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	}
 
 	return true, err
+}
+
+// dial establishes a shared or a dedicated gRPC connection.
+func (c *Client) dial(
+	ctx context.Context, addr string, p *connectParams, opts ...grpc.DialOption,
+) (*grpcext.Conn, error) {
+	// Give back the shared connection of a previous connect().
+	if c.shared != nil {
+		shared := c.shared
+		c.shared, c.conn = nil, nil
+		if err := c.connPool.release(shared); err != nil {
+			c.vu.State().Logger.WithError(err).Warn("unable to close the previous shared gRPC connection")
+		}
+	}
+
+	if !p.ConnectionSharing {
+		return grpcext.Dial(ctx, addr, c.types, opts...)
+	}
+
+	key, err := newConnectionKey(addr, p)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, shared, err := c.connPool.getOrDial(ctx, key, addr, c.types, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	c.shared = shared
+
+	return conn, nil
 }
 
 // HealthCheck checks if the server side is up and ready to serve responses
@@ -508,7 +543,14 @@ func (c *Client) Close() error {
 	if c.conn == nil {
 		return nil
 	}
-	err := c.conn.Close()
+
+	var err error
+	if c.shared != nil {
+		err = c.connPool.release(c.shared)
+		c.shared = nil
+	} else {
+		err = c.conn.Close()
+	}
 	c.conn = nil
 
 	return err

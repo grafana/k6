@@ -132,9 +132,12 @@ type connectParams struct {
 	MaxSendSize           int64
 	TLS                   map[string]any
 	Authority             string
+	// ConnectionSharing shares the connection with the other VUs connected to the
+	// same server with the same parameters. It is experimental.
+	ConnectionSharing bool
 }
 
-func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
+func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit,funlen
 	result := &connectParams{
 		IsPlaintext:           false,
 		UseReflectionProtocol: false,
@@ -208,6 +211,12 @@ func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) 
 			result.Authority, ok = v.(string)
 			if !ok {
 				return result, fmt.Errorf("invalid authority value: '%#v', it needs to be a string", v)
+			}
+		case "connectionSharing":
+			var ok bool
+			result.ConnectionSharing, ok = v.(bool)
+			if !ok {
+				return result, fmt.Errorf("invalid connectionSharing value: '%#v', it needs to be boolean", v)
 			}
 		default:
 			return result, fmt.Errorf("unknown connect param: %q", k)
