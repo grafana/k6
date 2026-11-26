@@ -3,6 +3,8 @@ package clientcert
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
+	"encoding/base64"
 	"io"
 	"net"
 	"net/http"
@@ -17,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/v2/internal/lib/testutils/connectproxy"
+	"go.k6.io/k6/v2/internal/lib/testutils/tlstest"
 )
 
 func TestUpstreamDialer(t *testing.T) {
@@ -152,8 +155,88 @@ func TestUpstreamDialer(t *testing.T) {
 	}
 }
 
+func TestUpstreamDialer_ProxyResponses(t *testing.T) {
+	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	basic := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:pass"))
+
+	tests := []struct {
+		name     string
+		scheme   string
+		proxy    fakeProxyOptions
+		hello    bool
+		wantAuth []string
+	}{
+		{
+			name:     "https_proxy",
+			scheme:   "https",
+			proxy:    fakeProxyOptions{tls: &tls.Config{Certificates: []tls.Certificate{chain.FullChainTLSCertificate(t)}}},
+			wantAuth: []string{""},
+		},
+		{
+			name:     "proxy_407_stalled_body",
+			scheme:   "http",
+			proxy:    fakeProxyOptions{requireAuth: basic},
+			wantAuth: []string{"", basic},
+		},
+		{
+			name:     "connect_200_with_content_length",
+			scheme:   "http",
+			proxy:    fakeProxyOptions{contentLength: true},
+			hello:    true,
+			wantAuth: []string{""},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			destination := startEchoAfterEOFServer(t)
+			proxy := startFakeProxy(t, tt.proxy)
+			cfg := UpstreamConfig{
+				ProxyServer: tt.scheme + "://" + proxy.addr,
+				Credentials: func() (string, string) { return "user", "pass" },
+				rootCAs:     chain.RootPool,
+			}
+			var d net.Dialer
+			dial, err := NewUpstreamDialer(cfg, d.DialContext)
+			require.NoError(t, err)
+
+			start := time.Now()
+			conn, err := dial(t.Context(), "tcp", destination)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = conn.Close() })
+			assert.Less(t, time.Since(start), 2*time.Second)
+
+			if tt.hello {
+				assert.Equal(t, "hello", string(readWithin(t, conn, len("hello"))))
+			}
+			exchange(t, conn)
+			reqs := proxy.recorded()
+			require.Len(t, reqs, len(tt.wantAuth))
+			for i, req := range reqs {
+				assert.Equal(t, destination, req.RequestURI)
+				assert.Equal(t, destination, req.Host)
+				assert.Equal(t, tt.wantAuth[i], req.Header.Get("Proxy-Authorization"))
+			}
+			assert.Eventually(t, func() bool {
+				return proxy.closed.Load() == proxy.accepted.Load()-1
+			}, 2*time.Second, 10*time.Millisecond, "rejected proxy connections left open")
+
+			require.NoError(t, conn.Close())
+			assert.Eventually(t, func() bool {
+				return proxy.closed.Load() == proxy.accepted.Load()
+			}, 2*time.Second, 10*time.Millisecond, "tunnel left open")
+		})
+	}
+}
+
 func TestUpstreamDialer_ContextCancelled(t *testing.T) {
 	t.Parallel()
+
+	chain := tlstest.NewChain(t)
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{chain.FullChainTLSCertificate(t)}}
 
 	tests := []struct {
 		name   string
@@ -165,6 +248,16 @@ func TestUpstreamDialer_ContextCancelled(t *testing.T) {
 			scheme: "http",
 			proxy:  fakeProxyOptions{neverReply: true},
 		},
+		{
+			name:   "https_proxy_stalls_handshake",
+			scheme: "https",
+			proxy:  fakeProxyOptions{stallHandshake: true},
+		},
+		{
+			name:   "https_proxy_stalls_after_connect",
+			scheme: "https",
+			proxy:  fakeProxyOptions{tls: tlsConfig, neverReply: true},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -173,6 +266,7 @@ func TestUpstreamDialer_ContextCancelled(t *testing.T) {
 			proxy := startFakeProxy(t, tt.proxy)
 			cfg := UpstreamConfig{
 				ProxyServer: tt.scheme + "://" + proxy.addr,
+				rootCAs:     chain.RootPool,
 			}
 			var d net.Dialer
 			dial, err := NewUpstreamDialer(cfg, d.DialContext)
@@ -191,6 +285,9 @@ func TestUpstreamDialer_ContextCancelled(t *testing.T) {
 			}()
 
 			require.Eventually(t, func() bool {
+				if tt.proxy.stallHandshake {
+					return proxy.accepted.Load() == 1
+				}
 				return len(proxy.recorded()) == 1
 			}, 2*time.Second, 10*time.Millisecond, "proxy did not see the connection")
 			cancel()
@@ -219,11 +316,6 @@ func TestNewUpstreamDialer_Errors(t *testing.T) {
 		server  string
 		wantErr string
 	}{
-		{
-			name:    "https",
-			server:  "https://user:secret@127.0.0.1:443",
-			wantErr: "unsupported proxy server scheme",
-		},
 		{
 			name:    "socks5",
 			server:  "socks5://user:secret@127.0.0.1:1080",
@@ -345,8 +437,17 @@ func (d *recordingDialer) dialed() []string {
 }
 
 type fakeProxyOptions struct {
+	// tls makes the proxy accept TLS connections.
+	tls *tls.Config
+	// requireAuth answers 407 unless Proxy-Authorization equals it. The 407 declares a
+	// 1000-byte body and sends only 10 bytes of it.
+	requireAuth string
+	// contentLength adds Content-Length: 5 to the 200 and sends "hello" in the same write.
+	contentLength bool
 	// neverReply reads the CONNECT and never answers.
 	neverReply bool
+	// stallHandshake accepts connections and never completes the TLS handshake.
+	stallHandshake bool
 }
 
 // fakeProxy is an HTTP CONNECT proxy that reads one request per connection. A connection
@@ -411,7 +512,18 @@ func (p *fakeProxy) recorded() []*http.Request {
 
 // handle serves one connection and returns once the client has closed it.
 func (p *fakeProxy) handle(raw net.Conn) {
+	if p.opts.stallHandshake {
+		_, _ = io.Copy(io.Discard, raw)
+		return
+	}
 	conn := raw
+	if p.opts.tls != nil {
+		tc := tls.Server(raw, p.opts.tls)
+		if err := tc.HandshakeContext(context.Background()); err != nil {
+			return
+		}
+		conn = tc
+	}
 	br := bufio.NewReader(conn)
 	req, err := http.ReadRequest(br)
 	if err != nil {
@@ -425,8 +537,13 @@ func (p *fakeProxy) handle(raw net.Conn) {
 		_, _ = io.WriteString(conn, response)
 		_, _ = io.Copy(io.Discard, br)
 	}
-	if p.opts.neverReply {
+	switch {
+	case p.opts.neverReply:
 		reject("")
+		return
+	case p.opts.requireAuth != "" && req.Header.Get("Proxy-Authorization") != p.opts.requireAuth:
+		reject("HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"k6\"\r\n" +
+			"Content-Length: 1000\r\n\r\n" + strings.Repeat("x", 10))
 		return
 	}
 
@@ -439,6 +556,9 @@ func (p *fakeProxy) handle(raw net.Conn) {
 	p.track(dest)
 
 	response := "HTTP/1.1 200 Connection established\r\n\r\n"
+	if p.opts.contentLength {
+		response = "HTTP/1.1 200 Connection established\r\nContent-Length: 5\r\n\r\nhello"
+	}
 	if _, err := io.WriteString(conn, response); err != nil {
 		return
 	}

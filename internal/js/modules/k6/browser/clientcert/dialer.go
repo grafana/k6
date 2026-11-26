@@ -3,6 +3,8 @@ package clientcert
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -22,12 +24,15 @@ type UpstreamConfig struct {
 	Credentials func() (username, password string)
 	// Logger receives debug logs of each dial; nil disables them.
 	Logger *log.Logger
+
+	// rootCAs verifies https proxies; nil means the system roots.
+	rootCAs *x509.CertPool
 }
 
 // upstreamProxy is a parsed proxy server.
 type upstreamProxy struct {
-	scheme string // http
-	host   string // hostname
+	scheme string // http or https
+	host   string // hostname, used as the TLS server name of an https proxy
 	addr   string // host:port
 }
 
@@ -37,8 +42,8 @@ type upstreamDialer struct {
 	direct DialFunc
 }
 
-// NewUpstreamDialer returns a DialFunc that reaches destinations through the configured http
-// proxy, or directly through direct when there is none. Destination hostnames are passed to
+// NewUpstreamDialer returns a DialFunc that reaches destinations through the configured http or
+// https proxy, or directly through direct when there is none. Destination hostnames are passed to
 // the proxy unresolved.
 func NewUpstreamDialer(cfg UpstreamConfig, direct DialFunc) (DialFunc, error) {
 	if cfg.ProxyServer == "" {
@@ -67,8 +72,10 @@ func parseUpstreamProxy(u *url.URL) (*upstreamProxy, error) {
 	switch scheme {
 	case "http":
 		port = "80"
+	case "https":
+		port = "443"
 	default:
-		return nil, fmt.Errorf("unsupported proxy server scheme %q: use http", u.Scheme)
+		return nil, fmt.Errorf("unsupported proxy server scheme %q: use http or https", u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
@@ -117,6 +124,7 @@ func (d *upstreamDialer) connect(
 	if err != nil {
 		return nil, 0, "", ctxErrOr(ctx, fmt.Errorf("dialing %s proxy: %w", p.scheme, err))
 	}
+	// Closing raw, never the TLS conn, aborts without waiting to send close_notify.
 	stop := context.AfterFunc(ctx, func() { _ = raw.Close() })
 	defer stop()
 	handedOver := false
@@ -127,6 +135,17 @@ func (d *upstreamDialer) connect(
 	}()
 
 	transport := raw
+	if p.scheme == "https" {
+		tc := tls.Client(raw, &tls.Config{
+			ServerName: p.host,
+			RootCAs:    d.cfg.rootCAs,
+			MinVersion: tls.VersionTLS12,
+		})
+		if err := tc.HandshakeContext(ctx); err != nil {
+			return nil, 0, "", ctxErrOr(ctx, fmt.Errorf("TLS handshake with https proxy: %w", err))
+		}
+		transport = tc
+	}
 
 	req := &http.Request{
 		Method: http.MethodConnect,
