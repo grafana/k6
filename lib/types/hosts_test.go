@@ -245,3 +245,26 @@ func TestHostsJSON(t *testing.T) {
 		}
 	})
 }
+
+func TestHostsJSONInvalidAddress(t *testing.T) {
+	t.Parallel()
+
+	tcs := []string{
+		`{"example.com":"localhost"}`,
+		`{"example.com":"1.2.3"}`,
+		`{"example.com":"example.org:8080"}`,
+		`{"example.com":"[cc::dd]"}`,
+		`{"example.com":""}`,
+		`{"example.com":"1.2.3.4:http"}`,
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc, func(t *testing.T) {
+			t.Parallel()
+			var hosts NullHosts
+			err := json.Unmarshal([]byte(tc), &hosts)
+			require.ErrorContains(t, err, `for host "example.com"`)
+			assert.False(t, hosts.Valid)
+		})
+	}
+}
