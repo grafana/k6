@@ -382,11 +382,14 @@ func (s *stream) close(err error) {
 	}
 
 	s.logger.Debugf("stream %s is closing", s.method)
-	close(s.done)
-
+	// Queue the end event before closing s.done: closing wakes loop(), whose
+	// deferred tq.Close() can otherwise win the race to the taskqueue mutex and
+	// silently drop this task (Queue after Close is a no-op). Fixes #6718.
 	s.tq.Queue(func() error {
 		return s.callEventListeners(eventEnd)
 	})
+
+	close(s.done)
 
 	if s.timeoutCancel != nil {
 		s.timeoutCancel()
