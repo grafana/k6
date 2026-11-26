@@ -21,6 +21,15 @@ func TestNewConfig(t *testing.T) {
 	assert.Equal(t, "unix", config.TimeFormat.String)
 }
 
+func TestTimeFormatStringIsCaseSensitive(t *testing.T) {
+	t.Parallel()
+
+	const mixedCaseTimeFormat = "uNix"
+
+	_, err := TimeFormatString(mixedCaseTimeFormat)
+	assert.Error(t, err)
+}
+
 func TestApply(t *testing.T) {
 	t.Parallel()
 
