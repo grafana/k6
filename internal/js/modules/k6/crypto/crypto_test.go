@@ -491,6 +491,29 @@ func TestHMac(t *testing.T) {
 	}
 }
 
+func TestCreateHashInvalidAlgorithm(t *testing.T) {
+	t.Parallel()
+
+	// Common mistakes: Web Crypto names, capitalization, typos, and empty input.
+	// createHMAC already rejects these; createHash used to call a nil hash constructor.
+	for _, algorithm := range []string{"SHA256", "sha-256", "sha3", "md6", ""} {
+		name := algorithm
+		if name == "" {
+			name = "empty"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
+			_ = rt.Set("algorithm", rt.ToValue(algorithm))
+
+			_, err := rt.RunString(`crypto.createHash(algorithm);`)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "invalid algorithm: "+algorithm)
+		})
+	}
+}
+
 func TestHexEncode(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
