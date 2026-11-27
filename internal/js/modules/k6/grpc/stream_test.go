@@ -659,3 +659,63 @@ func assertTags(t *testing.T, sample metrics.Sample, tags map[string]string) {
 		assert.Equal(t, v, tag)
 	}
 }
+
+// TestStream_WriteFailureDuringWriteLoopDoesNotHang verifies that a failed
+// stream.Send while the event loop is mid-write-loop does not deadlock the VU.
+// Without the fix, writeData's outer loop blocks forever forwarding to a
+// writeChannel whose consumer already exited, so the next stream.write() blocks
+// on writeQueueCh and the queued closeWithError callback never runs.
+func TestStream_WriteFailureDuringWriteLoopDoesNotHang(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	stub := grpc_wrappers_testing.Register(ts.httpBin.ServerGRPC)
+	stub.TestStreamImplementation = func(stream grpc_wrappers_testing.Service_TestStreamServer) error {
+		if _, err := stream.Recv(); err != nil {
+			return err
+		}
+		// Reject the stream so subsequent client Send calls fail while the
+		// VU is still in its write loop.
+		return status.Error(codes.Aborted, "server closed stream")
+	}
+
+	initString := codeBlock{
+		code: `
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/httpmultibin/grpc_wrappers_testing/test.proto");`,
+	}
+	vuString := codeBlock{
+		code: `
+		client.connect("GRPCBIN_ADDR");
+		let stream = new grpc.Stream(client, "grpc.wrappers.testing.Service/TestStream");
+		stream.on('error', function () { call('error'); });
+		stream.on('end', function () { call('end'); });
+		for (let i = 0; i < 100; i++) {
+			stream.write('msg-' + i);
+		}
+		call('finished');
+		`,
+	}
+
+	val, err := ts.Run(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_, runErr := ts.RunOnEventLoop(vuString.code)
+		assert.NoError(t, runErr)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("event loop hung: stream.write blocked after writeData send failure")
+	}
+
+	recorded := ts.callRecorder.Recorded()
+	assert.Contains(t, recorded, "finished")
+}
