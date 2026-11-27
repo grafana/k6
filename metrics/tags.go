@@ -68,8 +68,27 @@ func (ts *TagSet) IsEmpty() bool {
 }
 
 // Map returns a {key: value} string map with all of the tags in the set.
+//
+// Note: Map allocates a new map on every call and is not memory efficient.
+// Prefer Iterate for performance-sensitive code paths.
 func (ts *TagSet) Map() map[string]string {
 	return (*atlas.Node)(ts).Path()
+}
+
+// Len returns the number of tags in the TagSet.
+func (ts *TagSet) Len() int {
+	return (*atlas.Node)(ts).Len()
+}
+
+// Iterate calls fn for each key=value tag pair in the TagSet.
+// This is a memory-efficient alternative to Map() as it avoids allocating a map.
+func (ts *TagSet) Iterate(fn func(key, value string)) {
+	n := (*atlas.Node)(ts)
+	for !n.IsRoot() {
+		prev, key, value := n.Data()
+		fn(key, value)
+		n = prev
+	}
 }
 
 // WithTagsFromMap sorts the given tags by their keys and adds them to the

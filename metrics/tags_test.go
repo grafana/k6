@@ -298,3 +298,55 @@ func TestEnabledTagsTextUnmarshal(t *testing.T) {
 		require.Equal(t, expected, *set)
 	}
 }
+
+func TestTagSetLenAndIterate(t *testing.T) {
+	t.Parallel()
+
+	r := NewRegistry()
+	root := r.RootTagSet()
+	assert.Equal(t, 0, root.Len())
+
+	called := 0
+	root.Iterate(func(_, _ string) {
+		called++
+	})
+	assert.Equal(t, 0, called)
+
+	tags := root.With("k1", "v1").With("k2", "v2").With("k3", "v3")
+	assert.Equal(t, 3, tags.Len())
+
+	got := make(map[string]string, tags.Len())
+	tags.Iterate(func(k, v string) {
+		got[k] = v
+	})
+	assert.Equal(t, map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"}, got)
+}
+
+func BenchmarkTagSetIterate(b *testing.B) {
+	tags := NewRegistry().RootTagSet()
+	for i := range 10 {
+		tags = tags.With(fmt.Sprintf("tag%d", i), fmt.Sprintf("value%d", i))
+	}
+
+	b.Run("Map", func(b *testing.B) {
+		b.ReportAllocs()
+		var count int
+		for b.Loop() {
+			for k, v := range tags.Map() {
+				count += len(k) + len(v)
+			}
+		}
+		_ = count
+	})
+
+	b.Run("Iterate", func(b *testing.B) {
+		b.ReportAllocs()
+		var count int
+		for b.Loop() {
+			tags.Iterate(func(k, v string) {
+				count += len(k) + len(v)
+			})
+		}
+		_ = count
+	})
+}
