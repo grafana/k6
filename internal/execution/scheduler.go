@@ -577,6 +577,10 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 // is that some of the executors for the test don't support pausing after the
 // test has been started.
 //
+// A request for the pause state the test already has returns nil. A retried
+// PATCH /v1/status can then return the current status instead of failing the
+// run when the first response was lost.
+//
 // IMPORTANT: Currently only the externally controlled executor can be paused
 // and resumed multiple times in the middle of the test execution! Even then,
 // "pausing" is a bit misleading, since k6 won't pause in the middle of the
@@ -584,10 +588,11 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 // iterations to finish, and it just won't start any new ones nor will it
 // increment the value returned by GetCurrentTestRunDuration().
 func (e *Scheduler) SetPaused(pause bool) error {
+	if e.state.IsPaused() == pause {
+		return nil
+	}
+
 	if !e.state.HasStarted() && e.state.IsPaused() {
-		if pause {
-			return fmt.Errorf("execution is already paused")
-		}
 		e.state.Test.Logger.Debug("Starting execution")
 		return e.state.Resume()
 	}
