@@ -68,6 +68,19 @@ type Output struct {
 
 // New creates a new cloud output.
 func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*Output, error) {
+	// Reject non-positive concurrency / batch size before Start() can hang or
+	// panic in flushBatches. newOutput validates the local config, but CreateTestRun
+	// ConfigOverride (and provisioning runtime_config) is applied afterwards and
+	// reaches us here without that check.
+	if conf.MetricPushConcurrency.Int64 < 1 {
+		return nil, fmt.Errorf("metrics push concurrency must be a positive number but is %d",
+			conf.MetricPushConcurrency.Int64)
+	}
+	if conf.MaxTimeSeriesInBatch.Int64 < 1 {
+		return nil, fmt.Errorf("max allowed number of time series in a single batch must be a positive number but is %d",
+			conf.MaxTimeSeriesInBatch.Int64)
+	}
+
 	// TODO: move this creation operation to the centralized output. Reducing the probability to
 	// break the logic for the config overwriting.
 	//
