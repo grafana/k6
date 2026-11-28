@@ -26,10 +26,11 @@ type EventToolsRemoved struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/WebMCP#event-toolInvoked
 type EventToolInvoked struct {
-	ToolName     string      `json:"toolName"`     // Name of the tool to invoke.
-	FrameID      cdp.FrameID `json:"frameId"`      // Frame id
-	InvocationID string      `json:"invocationId"` // Invocation identifier.
-	Input        string      `json:"input"`        // The input parameters used for the invocation.
+	FrameID      cdp.FrameID `json:"frameId"`                     // Frame id
+	InvocationID string      `json:"invocationId"`                // Invocation identifier.
+	Input        string      `json:"input"`                       // The input parameters used for the invocation.
+	ToolName     string      `json:"toolName,omitempty,omitzero"` // Name of the tool to invoke. Missing if the tool was invoked by its identifier, but could not be found (e.g., it was already unregistered), so its name could not be recovered.
+	ToolID       ToolID      `json:"toolId,omitempty,omitzero"`   // Identifier of the tool to invoke. Missing if the tool was invoked by name, but could not be found, so its identifier could not be recovered.
 }
 
 // EventToolResponded event fired when a tool invocation completes or fails.

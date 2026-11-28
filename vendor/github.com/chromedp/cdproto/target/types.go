@@ -42,7 +42,7 @@ type Info struct {
 	OpenerFrameID    cdp.FrameID          `json:"openerFrameId,omitempty,omitzero"` // Frame id of originating window (is only set if target has an opener).
 	ParentFrameID    cdp.FrameID          `json:"parentFrameId,omitempty,omitzero"` // Id of the parent frame, present for "iframe" and "worker" targets. For nested workers, this is the "ancestor" frame that created the first worker in the nested chain.
 	BrowserContextID cdp.BrowserContextID `json:"browserContextId,omitempty,omitzero"`
-	Subtype          string               `json:"subtype,omitempty,omitzero"` // Provides additional details for specific target types. For example, for the type of "page", this may be set to "prerender".
+	Subtype          string               `json:"subtype,omitempty,omitzero"` // Provides additional details for specific target types. For example, for the type of "page", this may be set to "prerender", and for "tab", this may be set to "unloaded". An unloaded tab has a history entry, but no document for it: for example, after the tab was discarded, after session restore without load, or after the renderer crashed. The tab stays unloaded until a new document commits. A new tab that has not navigated is not unloaded. Target.targetInfoChanged reports changes of this value for tabs.
 	EmbedderData     jsonv2.Value         `json:"embedderData,omitempty,omitzero"`
 }
 

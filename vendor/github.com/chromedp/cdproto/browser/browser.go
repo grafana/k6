@@ -238,19 +238,6 @@ type ExecuteBrowserCommandParams struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#method-executeBrowserCommand
 var ExecuteBrowserCommand = cdp.Command[ExecuteBrowserCommandParams, cdp.Empty]{Method: CommandExecuteBrowserCommand}
 
-// AddPrivacySandboxEnrollmentOverrideParams are the parameters of the
-// command Browser.addPrivacySandboxEnrollmentOverride.
-type AddPrivacySandboxEnrollmentOverrideParams struct {
-	URL string `json:"url"`
-}
-
-// AddPrivacySandboxEnrollmentOverride allows a site to use privacy sandbox
-// features that require enrollment without the site actually being enrolled.
-// Only supported on page targets.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#method-addPrivacySandboxEnrollmentOverride
-var AddPrivacySandboxEnrollmentOverride = cdp.Command[AddPrivacySandboxEnrollmentOverrideParams, cdp.Empty]{Method: CommandAddPrivacySandboxEnrollmentOverride}
-
 // GetGlobalPrivacyControlResult is the result of the command
 // Browser.getGlobalPrivacyControl.
 type GetGlobalPrivacyControlResult struct {
@@ -295,25 +282,24 @@ var DownloadProgress = cdp.Event[EventDownloadProgress]{Method: "Browser.downloa
 
 // Command names.
 const (
-	CommandSetPermission                       = "Browser.setPermission"
-	CommandResetPermissions                    = "Browser.resetPermissions"
-	CommandSetDownloadBehavior                 = "Browser.setDownloadBehavior"
-	CommandCancelDownload                      = "Browser.cancelDownload"
-	CommandClose                               = "Browser.close"
-	CommandCrash                               = "Browser.crash"
-	CommandCrashGPUProcess                     = "Browser.crashGpuProcess"
-	CommandGetVersion                          = "Browser.getVersion"
-	CommandGetBrowserCommandLine               = "Browser.getBrowserCommandLine"
-	CommandAddMockCamera                       = "Browser.addMockCamera"
-	CommandGetHistograms                       = "Browser.getHistograms"
-	CommandGetHistogram                        = "Browser.getHistogram"
-	CommandGetWindowBounds                     = "Browser.getWindowBounds"
-	CommandGetWindowForTarget                  = "Browser.getWindowForTarget"
-	CommandSetWindowBounds                     = "Browser.setWindowBounds"
-	CommandSetContentsSize                     = "Browser.setContentsSize"
-	CommandSetDockTile                         = "Browser.setDockTile"
-	CommandExecuteBrowserCommand               = "Browser.executeBrowserCommand"
-	CommandAddPrivacySandboxEnrollmentOverride = "Browser.addPrivacySandboxEnrollmentOverride"
-	CommandGetGlobalPrivacyControl             = "Browser.getGlobalPrivacyControl"
-	CommandSetGlobalPrivacyControl             = "Browser.setGlobalPrivacyControl"
+	CommandSetPermission           = "Browser.setPermission"
+	CommandResetPermissions        = "Browser.resetPermissions"
+	CommandSetDownloadBehavior     = "Browser.setDownloadBehavior"
+	CommandCancelDownload          = "Browser.cancelDownload"
+	CommandClose                   = "Browser.close"
+	CommandCrash                   = "Browser.crash"
+	CommandCrashGPUProcess         = "Browser.crashGpuProcess"
+	CommandGetVersion              = "Browser.getVersion"
+	CommandGetBrowserCommandLine   = "Browser.getBrowserCommandLine"
+	CommandAddMockCamera           = "Browser.addMockCamera"
+	CommandGetHistograms           = "Browser.getHistograms"
+	CommandGetHistogram            = "Browser.getHistogram"
+	CommandGetWindowBounds         = "Browser.getWindowBounds"
+	CommandGetWindowForTarget      = "Browser.getWindowForTarget"
+	CommandSetWindowBounds         = "Browser.setWindowBounds"
+	CommandSetContentsSize         = "Browser.setContentsSize"
+	CommandSetDockTile             = "Browser.setDockTile"
+	CommandExecuteBrowserCommand   = "Browser.executeBrowserCommand"
+	CommandGetGlobalPrivacyControl = "Browser.getGlobalPrivacyControl"
+	CommandSetGlobalPrivacyControl = "Browser.setGlobalPrivacyControl"
 )

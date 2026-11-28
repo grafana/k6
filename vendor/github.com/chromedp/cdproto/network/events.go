@@ -268,16 +268,18 @@ type EventDirectTCPSocketChunkReceived struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketJoinedMulticastGroup
 type EventDirectUDPSocketJoinedMulticastGroup struct {
-	Identifier RequestID `json:"identifier"`
-	IPAddress  string    `json:"IPAddress"`
+	Identifier    RequestID `json:"identifier"`
+	IPAddress     string    `json:"IPAddress"`                        // Multicast group address.
+	SourceAddress string    `json:"sourceAddress,omitempty,omitzero"` // Source address of a source-specific multicast (SSM) membership. Absent for any-source multicast (ASM) memberships.
 }
 
 // EventDirectUDPSocketLeftMulticastGroup [no description].
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Network#event-directUDPSocketLeftMulticastGroup
 type EventDirectUDPSocketLeftMulticastGroup struct {
-	Identifier RequestID `json:"identifier"`
-	IPAddress  string    `json:"IPAddress"`
+	Identifier    RequestID `json:"identifier"`
+	IPAddress     string    `json:"IPAddress"`                        // Multicast group address.
+	SourceAddress string    `json:"sourceAddress,omitempty,omitzero"` // Source address of a source-specific multicast (SSM) membership. Absent for any-source multicast (ASM) memberships.
 }
 
 // EventDirectUDPSocketCreated fired upon direct_socket.UDPSocket creation.

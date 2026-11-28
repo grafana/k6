@@ -10,7 +10,6 @@ package emulation
 
 import (
 	"github.com/chromedp/cdproto/cdp"
-	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/page"
 )
 
@@ -91,23 +90,6 @@ type SetSafeAreaInsetsOverrideParams struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setSafeAreaInsetsOverride
 var SetSafeAreaInsetsOverride = cdp.Command[SetSafeAreaInsetsOverrideParams, cdp.Empty]{Method: CommandSetSafeAreaInsetsOverride}
-
-// SetVirtualKeyboardGeometryOverrideParams are the parameters of the command
-// Emulation.setVirtualKeyboardGeometryOverride.
-type SetVirtualKeyboardGeometryOverrideParams struct {
-	KeyboardRect *dom.Rect `json:"keyboardRect,omitempty,omitzero"`
-}
-
-// SetVirtualKeyboardGeometryOverride overrides virtual keyboard geometry in
-// CSS pixels, relative to the top-level viewport. The provided rect is used for
-// navigator.virtualKeyboard.boundingRect, geometrychange events, and
-// env(keyboard-inset-*) values on the inspected frame. The override applies
-// independently of navigator.virtualKeyboard.overlaysContent so clients can
-// preview overlay geometry without mutating page state. Values are rounded to
-// the nearest CSS pixel. Omitting the rect clears the override.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Emulation#method-setVirtualKeyboardGeometryOverride
-var SetVirtualKeyboardGeometryOverride = cdp.Command[SetVirtualKeyboardGeometryOverrideParams, cdp.Empty]{Method: CommandSetVirtualKeyboardGeometryOverride}
 
 // SetDeviceMetricsOverrideParams are the parameters of the command
 // Emulation.setDeviceMetricsOverride.
@@ -639,7 +621,6 @@ const (
 	CommandSetCPUThrottlingRate                     = "Emulation.setCPUThrottlingRate"
 	CommandSetDefaultBackgroundColorOverride        = "Emulation.setDefaultBackgroundColorOverride"
 	CommandSetSafeAreaInsetsOverride                = "Emulation.setSafeAreaInsetsOverride"
-	CommandSetVirtualKeyboardGeometryOverride       = "Emulation.setVirtualKeyboardGeometryOverride"
 	CommandSetDeviceMetricsOverride                 = "Emulation.setDeviceMetricsOverride"
 	CommandSetDevicePostureOverride                 = "Emulation.setDevicePostureOverride"
 	CommandClearDevicePostureOverride               = "Emulation.clearDevicePostureOverride"

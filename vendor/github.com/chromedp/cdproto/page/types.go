@@ -29,7 +29,6 @@ const (
 	PermissionsPolicyFeatureAutofill                                 PermissionsPolicyFeature = "autofill"
 	PermissionsPolicyFeatureAutoplay                                 PermissionsPolicyFeature = "autoplay"
 	PermissionsPolicyFeatureBluetooth                                PermissionsPolicyFeature = "bluetooth"
-	PermissionsPolicyFeatureBrowsingTopics                           PermissionsPolicyFeature = "browsing-topics"
 	PermissionsPolicyFeatureCamera                                   PermissionsPolicyFeature = "camera"
 	PermissionsPolicyFeatureCapturedSurfaceControl                   PermissionsPolicyFeature = "captured-surface-control"
 	PermissionsPolicyFeatureChDpr                                    PermissionsPolicyFeature = "ch-dpr"
@@ -83,7 +82,6 @@ const (
 	PermissionsPolicyFeatureHid                                      PermissionsPolicyFeature = "hid"
 	PermissionsPolicyFeatureIdentityCredentialsGet                   PermissionsPolicyFeature = "identity-credentials-get"
 	PermissionsPolicyFeatureIdleDetection                            PermissionsPolicyFeature = "idle-detection"
-	PermissionsPolicyFeatureInterestCohort                           PermissionsPolicyFeature = "interest-cohort"
 	PermissionsPolicyFeatureKeyboardMap                              PermissionsPolicyFeature = "keyboard-map"
 	PermissionsPolicyFeatureLanguageDetector                         PermissionsPolicyFeature = "language-detector"
 	PermissionsPolicyFeatureLanguageModel                            PermissionsPolicyFeature = "language-model"
@@ -107,6 +105,7 @@ const (
 	PermissionsPolicyFeaturePublickeyCredentialsRemoteClientDataJSON PermissionsPolicyFeature = "publickey-credentials-remote-client-data-json"
 	PermissionsPolicyFeatureRewriter                                 PermissionsPolicyFeature = "rewriter"
 	PermissionsPolicyFeatureScreenWakeLock                           PermissionsPolicyFeature = "screen-wake-lock"
+	PermissionsPolicyFeatureSemanticEmbedder                         PermissionsPolicyFeature = "semantic-embedder"
 	PermissionsPolicyFeatureSerial                                   PermissionsPolicyFeature = "serial"
 	PermissionsPolicyFeatureSmartCard                                PermissionsPolicyFeature = "smart-card"
 	PermissionsPolicyFeatureSpeakerSelection                         PermissionsPolicyFeature = "speaker-selection"
@@ -934,6 +933,22 @@ func (t StartScreencastFormat) String() string {
 const (
 	StartScreencastFormatJpeg StartScreencastFormat = "jpeg"
 	StartScreencastFormatPng  StartScreencastFormat = "png"
+)
+
+// StartScreenRecordingCaptureArea the area to record. Defaults to target.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Page#method-startScreenRecording
+type StartScreenRecordingCaptureArea string
+
+// String returns the StartScreenRecordingCaptureArea as string value.
+func (t StartScreenRecordingCaptureArea) String() string {
+	return string(t)
+}
+
+// StartScreenRecordingCaptureArea values.
+const (
+	StartScreenRecordingCaptureAreaTarget        StartScreenRecordingCaptureArea = "target"
+	StartScreenRecordingCaptureAreaBrowserWindow StartScreenRecordingCaptureArea = "browserWindow"
 )
 
 // SetWebLifecycleStateState target lifecycle state.
