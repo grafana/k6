@@ -405,6 +405,7 @@ type ReloadParams struct {
 	IgnoreCache            *bool        `json:"ignoreCache,omitempty,omitzero"`            // If true, browser cache is ignored (as if the user pressed Shift+refresh).
 	ScriptToEvaluateOnLoad string       `json:"scriptToEvaluateOnLoad,omitempty,omitzero"` // If set, the script will be injected into all frames of the inspected page after reload. Argument will be ignored if reloading dataURL origin.
 	LoaderID               cdp.LoaderID `json:"loaderId,omitempty,omitzero"`               // If set, an error will be thrown if the target page's main frame's loader id does not match the provided id. This prevents accidentally reloading an unintended target in case there's a racing navigation.
+	CheckForRepost         *bool        `json:"checkForRepost,omitempty,omitzero"`         // If true and the page has POST data, the browser shows the form resubmission dialog before the reload. The command returns after the user responds to the dialog. If the user cancels the dialog, the command returns an error. The default value is false.
 }
 
 // Reload reloads given page optionally ignoring the cache.
@@ -575,10 +576,11 @@ var StartScreencast = cdp.Command[StartScreencastParams, cdp.Empty]{Method: Comm
 // StartScreenRecordingParams are the parameters of the command
 // Page.startScreenRecording.
 type StartScreenRecordingParams struct {
-	Audio     *bool `json:"audio,omitempty,omitzero"`
-	MaxWidth  int64 `json:"maxWidth,omitempty,omitzero"`  // Maximum frame width in pixels.
-	MaxHeight int64 `json:"maxHeight,omitempty,omitzero"` // Maximum frame height in pixels.
-	FrameRate int64 `json:"frameRate,omitempty,omitzero"` // Maximum frame rate in frames per second.
+	Audio       *bool                           `json:"audio,omitempty,omitzero"`
+	MaxWidth    int64                           `json:"maxWidth,omitempty,omitzero"`    // Maximum frame width in pixels.
+	MaxHeight   int64                           `json:"maxHeight,omitempty,omitzero"`   // Maximum frame height in pixels.
+	FrameRate   int64                           `json:"frameRate,omitempty,omitzero"`   // Maximum frame rate in frames per second.
+	CaptureArea StartScreenRecordingCaptureArea `json:"captureArea,omitempty,omitzero"` // The area to record. Defaults to target.
 }
 
 // StartScreenRecordingResult is the result of the command

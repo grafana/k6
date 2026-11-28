@@ -45,7 +45,7 @@ github.com/cenkalti/backoff/v5
 # github.com/cespare/xxhash/v2 v2.3.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/chromedp/cdproto v0.158.3
+# github.com/chromedp/cdproto v0.160.10
 ## explicit; go 1.25
 github.com/chromedp/cdproto
 github.com/chromedp/cdproto/accessibility

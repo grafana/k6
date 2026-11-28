@@ -55,8 +55,8 @@ type RemoteObject struct {
 	Type                RemoteObjectType     `json:"type"`                                   // Object type.
 	Subtype             RemoteObjectSubtype  `json:"subtype,omitempty,omitzero"`             // Object subtype hint. Specified for object type values only. NOTE: If you change anything here, make sure to also update subtype in ObjectPreview and PropertyPreview below.
 	ClassName           string               `json:"className,omitempty,omitzero"`           // Object class (constructor) name. Specified for object type values only.
-	Value               jsonv2.Value         `json:"value,omitempty,omitzero"`               // Remote object value in case of primitive values or JSON values (if it was requested).
-	UnserializableValue UnserializableValue  `json:"unserializableValue,omitempty,omitzero"` // Primitive value which can not be JSON-stringified does not have value, but gets this property.
+	Value               jsonv2.Value         `json:"value,omitempty,omitzero"`               // Remote object value in case of primitive values or JSON values (if it was requested). Not set in deep serialization mode, see deepSerializedValue.
+	UnserializableValue UnserializableValue  `json:"unserializableValue,omitempty,omitzero"` // Primitive value which can not be JSON-stringified does not have value, but gets this property. Not set in deep serialization mode, see deepSerializedValue.
 	Description         string               `json:"description,omitempty,omitzero"`         // String representation of the object.
 	DeepSerializedValue *DeepSerializedValue `json:"deepSerializedValue,omitempty,omitzero"` // Deep serialized value.
 	ObjectID            RemoteObjectID       `json:"objectId,omitempty,omitzero"`            // Unique object identifier (for non-primitive values).

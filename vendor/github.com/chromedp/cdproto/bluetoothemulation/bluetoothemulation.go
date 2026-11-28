@@ -225,6 +225,20 @@ type SimulateGATTDisconnectionParams struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-simulateGATTDisconnection
 var SimulateGATTDisconnection = cdp.Command[SimulateGATTDisconnectionParams, cdp.Empty]{Method: CommandSimulateGATTDisconnection}
 
+// SimulateGATTMtuChangeParams are the parameters of the command
+// BluetoothEmulation.simulateGATTMtuChange.
+type SimulateGATTMtuChangeParams struct {
+	Address string `json:"address"`
+	Mtu     int64  `json:"mtu"`
+}
+
+// SimulateGATTMtuChange simulates the ATT MTU exchange procedure from
+// Bluetooth Core Specification Vol 3 Part F 3.4.2 establishing |mtu| for the
+// connection to the peripheral with |address|.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/BluetoothEmulation#method-simulateGATTMtuChange
+var SimulateGATTMtuChange = cdp.Command[SimulateGATTMtuChangeParams, cdp.Empty]{Method: CommandSimulateGATTMtuChange}
+
 // GattOperationReceived event for when a GATT operation of |type| to the
 // peripheral with |address| happened.
 //
@@ -262,4 +276,5 @@ const (
 	CommandAddDescriptor                           = "BluetoothEmulation.addDescriptor"
 	CommandRemoveDescriptor                        = "BluetoothEmulation.removeDescriptor"
 	CommandSimulateGATTDisconnection               = "BluetoothEmulation.simulateGATTDisconnection"
+	CommandSimulateGATTMtuChange                   = "BluetoothEmulation.simulateGATTMtuChange"
 )

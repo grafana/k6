@@ -218,7 +218,6 @@ const (
 	PseudoTypeSelectListbox               PseudoType = "select-listbox"
 	PseudoTypePermissionIcon              PseudoType = "permission-icon"
 	PseudoTypeOverscrollAreaParent        PseudoType = "overscroll-area-parent"
-	PseudoTypeOverscrollBackdrop          PseudoType = "overscroll-backdrop"
 	PseudoTypeSkeleton                    PseudoType = "skeleton"
 )
 

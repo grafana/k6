@@ -915,10 +915,13 @@ const (
 	ElementAccessibilityIssueReasonInteractiveContentOptionChild       ElementAccessibilityIssueReason = "InteractiveContentOptionChild"
 	ElementAccessibilityIssueReasonInteractiveContentLegendChild       ElementAccessibilityIssueReason = "InteractiveContentLegendChild"
 	ElementAccessibilityIssueReasonInteractiveContentSummaryDescendant ElementAccessibilityIssueReason = "InteractiveContentSummaryDescendant"
+	ElementAccessibilityIssueReasonAnchorMenuDescendant                ElementAccessibilityIssueReason = "AnchorMenuDescendant"
+	ElementAccessibilityIssueReasonInteractiveContentMenuDescendant    ElementAccessibilityIssueReason = "InteractiveContentMenuDescendant"
+	ElementAccessibilityIssueReasonTextMenuDescendant                  ElementAccessibilityIssueReason = "TextMenuDescendant"
 )
 
 // ElementAccessibilityIssueDetails this issue warns about errors in the
-// select or summary element content model.
+// select, summary, or menu element content model.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Audits#type-ElementAccessibilityIssueDetails
 type ElementAccessibilityIssueDetails struct {
@@ -1108,6 +1111,17 @@ type LazyLoadImageIssueDetails struct {
 	FrameID cdp.FrameID       `json:"frameId"` // Frame containing the image.
 }
 
+// ViewportFitCoverMissingSafeAreaInsetTopIssueDetails details for issues
+// about a page that declares viewport-fit=cover, receives a non-zero top
+// safe-area inset (e.g. a device cutout or system status bar), but does not
+// consume env(safe-area-inset-top) anywhere in its CSS while having DOM content
+// likely to be occluded by that inset.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Audits#type-ViewportFitCoverMissingSafeAreaInsetTopIssueDetails
+type ViewportFitCoverMissingSafeAreaInsetTopIssueDetails struct {
+	FrameID cdp.FrameID `json:"frameId"` // The frame that triggered the issue.
+}
+
 // InspectorIssueCode a unique identifier for the type of issue. Each type
 // may use one of the optional fields in InspectorIssueDetails to convey more
 // specific information about the kind of issue.
@@ -1122,37 +1136,38 @@ func (t InspectorIssueCode) String() string {
 
 // InspectorIssueCode values.
 const (
-	InspectorIssueCodeCookieIssue                           InspectorIssueCode = "CookieIssue"
-	InspectorIssueCodeMixedContentIssue                     InspectorIssueCode = "MixedContentIssue"
-	InspectorIssueCodeBlockedByResponseIssue                InspectorIssueCode = "BlockedByResponseIssue"
-	InspectorIssueCodeHeavyAdIssue                          InspectorIssueCode = "HeavyAdIssue"
-	InspectorIssueCodeContentSecurityPolicyIssue            InspectorIssueCode = "ContentSecurityPolicyIssue"
-	InspectorIssueCodeSharedArrayBufferIssue                InspectorIssueCode = "SharedArrayBufferIssue"
-	InspectorIssueCodeCorsIssue                             InspectorIssueCode = "CorsIssue"
-	InspectorIssueCodeQuirksModeIssue                       InspectorIssueCode = "QuirksModeIssue"
-	InspectorIssueCodePartitioningBlobURLIssue              InspectorIssueCode = "PartitioningBlobURLIssue"
-	InspectorIssueCodeNavigatorUserAgentIssue               InspectorIssueCode = "NavigatorUserAgentIssue"
-	InspectorIssueCodeGenericIssue                          InspectorIssueCode = "GenericIssue"
-	InspectorIssueCodeDeprecationIssue                      InspectorIssueCode = "DeprecationIssue"
-	InspectorIssueCodeClientHintIssue                       InspectorIssueCode = "ClientHintIssue"
-	InspectorIssueCodeFederatedAuthRequestIssue             InspectorIssueCode = "FederatedAuthRequestIssue"
-	InspectorIssueCodeBounceTrackingIssue                   InspectorIssueCode = "BounceTrackingIssue"
-	InspectorIssueCodeCookieDeprecationMetadataIssue        InspectorIssueCode = "CookieDeprecationMetadataIssue"
-	InspectorIssueCodeStylesheetLoadingIssue                InspectorIssueCode = "StylesheetLoadingIssue"
-	InspectorIssueCodeFederatedAuthUserInfoRequestIssue     InspectorIssueCode = "FederatedAuthUserInfoRequestIssue"
-	InspectorIssueCodePropertyRuleIssue                     InspectorIssueCode = "PropertyRuleIssue"
-	InspectorIssueCodeSharedDictionaryIssue                 InspectorIssueCode = "SharedDictionaryIssue"
-	InspectorIssueCodeElementAccessibilityIssue             InspectorIssueCode = "ElementAccessibilityIssue"
-	InspectorIssueCodeSRIMessageSignatureIssue              InspectorIssueCode = "SRIMessageSignatureIssue"
-	InspectorIssueCodeUnencodedDigestIssue                  InspectorIssueCode = "UnencodedDigestIssue"
-	InspectorIssueCodeConnectionAllowlistIssue              InspectorIssueCode = "ConnectionAllowlistIssue"
-	InspectorIssueCodeUserReidentificationIssue             InspectorIssueCode = "UserReidentificationIssue"
-	InspectorIssueCodePermissionElementIssue                InspectorIssueCode = "PermissionElementIssue"
-	InspectorIssueCodePerformanceIssue                      InspectorIssueCode = "PerformanceIssue"
-	InspectorIssueCodeSelectivePermissionsInterventionIssue InspectorIssueCode = "SelectivePermissionsInterventionIssue"
-	InspectorIssueCodeEmailVerificationRequestIssue         InspectorIssueCode = "EmailVerificationRequestIssue"
-	InspectorIssueCodeLazyLoadImageIssue                    InspectorIssueCode = "LazyLoadImageIssue"
-	InspectorIssueCodeWebInstallIssue                       InspectorIssueCode = "WebInstallIssue"
+	InspectorIssueCodeCookieIssue                                  InspectorIssueCode = "CookieIssue"
+	InspectorIssueCodeMixedContentIssue                            InspectorIssueCode = "MixedContentIssue"
+	InspectorIssueCodeBlockedByResponseIssue                       InspectorIssueCode = "BlockedByResponseIssue"
+	InspectorIssueCodeHeavyAdIssue                                 InspectorIssueCode = "HeavyAdIssue"
+	InspectorIssueCodeContentSecurityPolicyIssue                   InspectorIssueCode = "ContentSecurityPolicyIssue"
+	InspectorIssueCodeSharedArrayBufferIssue                       InspectorIssueCode = "SharedArrayBufferIssue"
+	InspectorIssueCodeCorsIssue                                    InspectorIssueCode = "CorsIssue"
+	InspectorIssueCodeQuirksModeIssue                              InspectorIssueCode = "QuirksModeIssue"
+	InspectorIssueCodePartitioningBlobURLIssue                     InspectorIssueCode = "PartitioningBlobURLIssue"
+	InspectorIssueCodeNavigatorUserAgentIssue                      InspectorIssueCode = "NavigatorUserAgentIssue"
+	InspectorIssueCodeGenericIssue                                 InspectorIssueCode = "GenericIssue"
+	InspectorIssueCodeDeprecationIssue                             InspectorIssueCode = "DeprecationIssue"
+	InspectorIssueCodeClientHintIssue                              InspectorIssueCode = "ClientHintIssue"
+	InspectorIssueCodeFederatedAuthRequestIssue                    InspectorIssueCode = "FederatedAuthRequestIssue"
+	InspectorIssueCodeBounceTrackingIssue                          InspectorIssueCode = "BounceTrackingIssue"
+	InspectorIssueCodeCookieDeprecationMetadataIssue               InspectorIssueCode = "CookieDeprecationMetadataIssue"
+	InspectorIssueCodeStylesheetLoadingIssue                       InspectorIssueCode = "StylesheetLoadingIssue"
+	InspectorIssueCodeFederatedAuthUserInfoRequestIssue            InspectorIssueCode = "FederatedAuthUserInfoRequestIssue"
+	InspectorIssueCodePropertyRuleIssue                            InspectorIssueCode = "PropertyRuleIssue"
+	InspectorIssueCodeSharedDictionaryIssue                        InspectorIssueCode = "SharedDictionaryIssue"
+	InspectorIssueCodeElementAccessibilityIssue                    InspectorIssueCode = "ElementAccessibilityIssue"
+	InspectorIssueCodeSRIMessageSignatureIssue                     InspectorIssueCode = "SRIMessageSignatureIssue"
+	InspectorIssueCodeUnencodedDigestIssue                         InspectorIssueCode = "UnencodedDigestIssue"
+	InspectorIssueCodeConnectionAllowlistIssue                     InspectorIssueCode = "ConnectionAllowlistIssue"
+	InspectorIssueCodeUserReidentificationIssue                    InspectorIssueCode = "UserReidentificationIssue"
+	InspectorIssueCodePermissionElementIssue                       InspectorIssueCode = "PermissionElementIssue"
+	InspectorIssueCodePerformanceIssue                             InspectorIssueCode = "PerformanceIssue"
+	InspectorIssueCodeSelectivePermissionsInterventionIssue        InspectorIssueCode = "SelectivePermissionsInterventionIssue"
+	InspectorIssueCodeEmailVerificationRequestIssue                InspectorIssueCode = "EmailVerificationRequestIssue"
+	InspectorIssueCodeLazyLoadImageIssue                           InspectorIssueCode = "LazyLoadImageIssue"
+	InspectorIssueCodeWebInstallIssue                              InspectorIssueCode = "WebInstallIssue"
+	InspectorIssueCodeViewportFitCoverMissingSafeAreaInsetTopIssue InspectorIssueCode = "ViewportFitCoverMissingSafeAreaInsetTopIssue"
 )
 
 // InspectorIssueDetails this struct holds a list of optional fields with
@@ -1161,36 +1176,37 @@ const (
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Audits#type-InspectorIssueDetails
 type InspectorIssueDetails struct {
-	CookieIssueDetails                           *CookieIssueDetails                           `json:"cookieIssueDetails,omitempty,omitzero"`
-	MixedContentIssueDetails                     *MixedContentIssueDetails                     `json:"mixedContentIssueDetails,omitempty,omitzero"`
-	BlockedByResponseIssueDetails                *BlockedByResponseIssueDetails                `json:"blockedByResponseIssueDetails,omitempty,omitzero"`
-	HeavyAdIssueDetails                          *HeavyAdIssueDetails                          `json:"heavyAdIssueDetails,omitempty,omitzero"`
-	ContentSecurityPolicyIssueDetails            *ContentSecurityPolicyIssueDetails            `json:"contentSecurityPolicyIssueDetails,omitempty,omitzero"`
-	SharedArrayBufferIssueDetails                *SharedArrayBufferIssueDetails                `json:"sharedArrayBufferIssueDetails,omitempty,omitzero"`
-	CorsIssueDetails                             *CorsIssueDetails                             `json:"corsIssueDetails,omitempty,omitzero"`
-	QuirksModeIssueDetails                       *QuirksModeIssueDetails                       `json:"quirksModeIssueDetails,omitempty,omitzero"`
-	PartitioningBlobURLIssueDetails              *PartitioningBlobURLIssueDetails              `json:"partitioningBlobURLIssueDetails,omitempty,omitzero"`
-	GenericIssueDetails                          *GenericIssueDetails                          `json:"genericIssueDetails,omitempty,omitzero"`
-	DeprecationIssueDetails                      *DeprecationIssueDetails                      `json:"deprecationIssueDetails,omitempty,omitzero"`
-	ClientHintIssueDetails                       *ClientHintIssueDetails                       `json:"clientHintIssueDetails,omitempty,omitzero"`
-	FederatedAuthRequestIssueDetails             *FederatedAuthRequestIssueDetails             `json:"federatedAuthRequestIssueDetails,omitempty,omitzero"`
-	BounceTrackingIssueDetails                   *BounceTrackingIssueDetails                   `json:"bounceTrackingIssueDetails,omitempty,omitzero"`
-	CookieDeprecationMetadataIssueDetails        *CookieDeprecationMetadataIssueDetails        `json:"cookieDeprecationMetadataIssueDetails,omitempty,omitzero"`
-	StylesheetLoadingIssueDetails                *StylesheetLoadingIssueDetails                `json:"stylesheetLoadingIssueDetails,omitempty,omitzero"`
-	PropertyRuleIssueDetails                     *PropertyRuleIssueDetails                     `json:"propertyRuleIssueDetails,omitempty,omitzero"`
-	FederatedAuthUserInfoRequestIssueDetails     *FederatedAuthUserInfoRequestIssueDetails     `json:"federatedAuthUserInfoRequestIssueDetails,omitempty,omitzero"`
-	SharedDictionaryIssueDetails                 *SharedDictionaryIssueDetails                 `json:"sharedDictionaryIssueDetails,omitempty,omitzero"`
-	ElementAccessibilityIssueDetails             *ElementAccessibilityIssueDetails             `json:"elementAccessibilityIssueDetails,omitempty,omitzero"`
-	SriMessageSignatureIssueDetails              *SRIMessageSignatureIssueDetails              `json:"sriMessageSignatureIssueDetails,omitempty,omitzero"`
-	UnencodedDigestIssueDetails                  *UnencodedDigestIssueDetails                  `json:"unencodedDigestIssueDetails,omitempty,omitzero"`
-	ConnectionAllowlistIssueDetails              *ConnectionAllowlistIssueDetails              `json:"connectionAllowlistIssueDetails,omitempty,omitzero"`
-	UserReidentificationIssueDetails             *UserReidentificationIssueDetails             `json:"userReidentificationIssueDetails,omitempty,omitzero"`
-	PermissionElementIssueDetails                *PermissionElementIssueDetails                `json:"permissionElementIssueDetails,omitempty,omitzero"`
-	PerformanceIssueDetails                      *PerformanceIssueDetails                      `json:"performanceIssueDetails,omitempty,omitzero"`
-	SelectivePermissionsInterventionIssueDetails *SelectivePermissionsInterventionIssueDetails `json:"selectivePermissionsInterventionIssueDetails,omitempty,omitzero"`
-	EmailVerificationRequestIssueDetails         *EmailVerificationRequestIssueDetails         `json:"emailVerificationRequestIssueDetails,omitempty,omitzero"`
-	LazyLoadImageIssueDetails                    *LazyLoadImageIssueDetails                    `json:"lazyLoadImageIssueDetails,omitempty,omitzero"`
-	WebInstallIssueDetails                       *WebInstallIssueDetails                       `json:"webInstallIssueDetails,omitempty,omitzero"`
+	CookieIssueDetails                                  *CookieIssueDetails                                  `json:"cookieIssueDetails,omitempty,omitzero"`
+	MixedContentIssueDetails                            *MixedContentIssueDetails                            `json:"mixedContentIssueDetails,omitempty,omitzero"`
+	BlockedByResponseIssueDetails                       *BlockedByResponseIssueDetails                       `json:"blockedByResponseIssueDetails,omitempty,omitzero"`
+	HeavyAdIssueDetails                                 *HeavyAdIssueDetails                                 `json:"heavyAdIssueDetails,omitempty,omitzero"`
+	ContentSecurityPolicyIssueDetails                   *ContentSecurityPolicyIssueDetails                   `json:"contentSecurityPolicyIssueDetails,omitempty,omitzero"`
+	SharedArrayBufferIssueDetails                       *SharedArrayBufferIssueDetails                       `json:"sharedArrayBufferIssueDetails,omitempty,omitzero"`
+	CorsIssueDetails                                    *CorsIssueDetails                                    `json:"corsIssueDetails,omitempty,omitzero"`
+	QuirksModeIssueDetails                              *QuirksModeIssueDetails                              `json:"quirksModeIssueDetails,omitempty,omitzero"`
+	PartitioningBlobURLIssueDetails                     *PartitioningBlobURLIssueDetails                     `json:"partitioningBlobURLIssueDetails,omitempty,omitzero"`
+	GenericIssueDetails                                 *GenericIssueDetails                                 `json:"genericIssueDetails,omitempty,omitzero"`
+	DeprecationIssueDetails                             *DeprecationIssueDetails                             `json:"deprecationIssueDetails,omitempty,omitzero"`
+	ClientHintIssueDetails                              *ClientHintIssueDetails                              `json:"clientHintIssueDetails,omitempty,omitzero"`
+	FederatedAuthRequestIssueDetails                    *FederatedAuthRequestIssueDetails                    `json:"federatedAuthRequestIssueDetails,omitempty,omitzero"`
+	BounceTrackingIssueDetails                          *BounceTrackingIssueDetails                          `json:"bounceTrackingIssueDetails,omitempty,omitzero"`
+	CookieDeprecationMetadataIssueDetails               *CookieDeprecationMetadataIssueDetails               `json:"cookieDeprecationMetadataIssueDetails,omitempty,omitzero"`
+	StylesheetLoadingIssueDetails                       *StylesheetLoadingIssueDetails                       `json:"stylesheetLoadingIssueDetails,omitempty,omitzero"`
+	PropertyRuleIssueDetails                            *PropertyRuleIssueDetails                            `json:"propertyRuleIssueDetails,omitempty,omitzero"`
+	FederatedAuthUserInfoRequestIssueDetails            *FederatedAuthUserInfoRequestIssueDetails            `json:"federatedAuthUserInfoRequestIssueDetails,omitempty,omitzero"`
+	SharedDictionaryIssueDetails                        *SharedDictionaryIssueDetails                        `json:"sharedDictionaryIssueDetails,omitempty,omitzero"`
+	ElementAccessibilityIssueDetails                    *ElementAccessibilityIssueDetails                    `json:"elementAccessibilityIssueDetails,omitempty,omitzero"`
+	SriMessageSignatureIssueDetails                     *SRIMessageSignatureIssueDetails                     `json:"sriMessageSignatureIssueDetails,omitempty,omitzero"`
+	UnencodedDigestIssueDetails                         *UnencodedDigestIssueDetails                         `json:"unencodedDigestIssueDetails,omitempty,omitzero"`
+	ConnectionAllowlistIssueDetails                     *ConnectionAllowlistIssueDetails                     `json:"connectionAllowlistIssueDetails,omitempty,omitzero"`
+	UserReidentificationIssueDetails                    *UserReidentificationIssueDetails                    `json:"userReidentificationIssueDetails,omitempty,omitzero"`
+	PermissionElementIssueDetails                       *PermissionElementIssueDetails                       `json:"permissionElementIssueDetails,omitempty,omitzero"`
+	PerformanceIssueDetails                             *PerformanceIssueDetails                             `json:"performanceIssueDetails,omitempty,omitzero"`
+	SelectivePermissionsInterventionIssueDetails        *SelectivePermissionsInterventionIssueDetails        `json:"selectivePermissionsInterventionIssueDetails,omitempty,omitzero"`
+	EmailVerificationRequestIssueDetails                *EmailVerificationRequestIssueDetails                `json:"emailVerificationRequestIssueDetails,omitempty,omitzero"`
+	LazyLoadImageIssueDetails                           *LazyLoadImageIssueDetails                           `json:"lazyLoadImageIssueDetails,omitempty,omitzero"`
+	WebInstallIssueDetails                              *WebInstallIssueDetails                              `json:"webInstallIssueDetails,omitempty,omitzero"`
+	ViewportFitCoverMissingSafeAreaInsetTopIssueDetails *ViewportFitCoverMissingSafeAreaInsetTopIssueDetails `json:"viewportFitCoverMissingSafeAreaInsetTopIssueDetails,omitempty,omitzero"`
 }
 
 // IssueID a unique id for a DevTools inspector issue. Allows other entities
